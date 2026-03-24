@@ -10,13 +10,13 @@ Usage:
 import argparse
 import os
 import platform
-import shutil
 import subprocess
 import sys
-import textwrap
 
+import readchar
 import requests
 from rich.console import Console
+from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -103,7 +103,7 @@ def open_magnet(magnet_link: str) -> None:
         else:
             subprocess.Popen(["xdg-open", magnet_link])
     except Exception as e:
-        console.print(f"[error]✗ Failed to open magnet link: {e}[/error]")
+        console.print(f"[error] Failed to open magnet link: {e}[/error]")
         console.print(f"[info]Magnet link:[/info] {magnet_link}")
 
 
@@ -117,10 +117,10 @@ def search_torrents(query: str) -> list[dict]:
         response.raise_for_status()
         data = response.json()
     except requests.RequestException as e:
-        console.print(f"[error]✗ API request failed: {e}[/error]")
+        console.print(f"[error] API request failed: {e}[/error]")
         return []
     except ValueError:
-        console.print("[error]✗ Invalid response from API.[/error]")
+        console.print("[error] Invalid response from API.[/error]")
         return []
 
     # apibay returns [{"id": "0", "name": "No results ..."}] when nothing is found
@@ -130,115 +130,140 @@ def search_torrents(query: str) -> list[dict]:
     return data[:MAX_RESULTS]
 
 
-# Display
-def display_results(results: list[dict]) -> Table:
-    """Build and print a rich table of torrent results. Returns the table."""
+# Interactive Table Selection
+def build_table(
+    results: list[dict],
+    selected_idx: int,
+    scroll_offset: int,
+    visible_count: int,
+    total: int,
+) -> Table:
+    """Build a rich table showing only the visible window of rows."""
+    # Scroll indicator in the title
+    end_idx = min(scroll_offset + visible_count, total)
+    scroll_info = f"[dim]({scroll_offset + 1}-{end_idx} of {total})[/dim]"
+
     table = Table(
-        title="🔍 Torrent Results",
+        title=f"Torrent Results {scroll_info}",
         title_style="bold magenta",
         border_style="bright_blue",
         header_style="bold cyan",
-        row_styles=["", "dim"],
         show_lines=False,
         padding=(0, 1),
+        caption="[dim] Up/Down: navigate | Enter: select | Esc: cancel | Type number to jump[/dim]",
+        caption_style="dim",
     )
 
     table.add_column("#", style="bold white", justify="right", width=4)
-    table.add_column("Name", style="white", max_width=60, no_wrap=False)
+    table.add_column("Name", style="white", max_width=60, no_wrap=True)
     table.add_column("Size", style="cyan", justify="right", width=10)
     table.add_column("Seeds", justify="right", width=7)
     table.add_column("Leeches", justify="right", width=9)
 
-    for i, item in enumerate(results):
+    # Only render the visible slice
+    visible_slice = results[scroll_offset:end_idx]
+
+    for vi, item in enumerate(visible_slice):
+        i = scroll_offset + vi  # Real index
         seeds = int(item.get("seeders", 0))
         leeches = int(item.get("leechers", 0))
         size = int(item.get("size", 0))
         name = item.get("name", "Unknown")
 
+        is_selected = i == selected_idx
+
+        if is_selected:
+            row_style = "bold reverse"
+            num_text = f">> {i}"
+            seed_text = str(seeds)
+            leech_text = str(leeches)
+        else:
+            row_style = "" if i % 2 == 0 else "dim"
+            num_text = str(i)
+            seed_text = f"[{seed_style(seeds)}]{seeds}[/{seed_style(seeds)}]"
+            leech_text = f"[{leech_style(leeches)}]{leeches}[/{leech_style(leeches)}]"
+
         table.add_row(
-            str(i),
+            num_text,
             name,
             format_size(size),
-            f"[{seed_style(seeds)}]{seeds}[/{seed_style(seeds)}]",
-            f"[{leech_style(leeches)}]{leeches}[/{leech_style(leeches)}]",
+            seed_text,
+            leech_text,
+            style=row_style,
         )
-
-    console.print()
-    console.print(table)
-    console.print()
 
     return table
 
 
-# Selection (fzf)
-def select_with_fzf(results: list[dict]) -> int | None:
+def interactive_select(results: list[dict]) -> int | None:
     """
-    Pipe results into fzf for interactive selection.
+    Display an interactive table where the user navigates with arrow keys.
+    Only shows rows that fit the terminal height (scrolling window).
     Returns the index of the selected result, or None if cancelled.
     """
-    fzf_path = shutil.which("fzf")
-    if not fzf_path:
-        console.print(
-            "[warning] fzf not found. Falling back to manual input.[/warning]"
-        )
-        return select_manual(results)
+    current = 0
+    num_buffer = ""
+    total = len(results)
 
-    # Build lines for fzf: "index | name | size | seeds"
-    lines = []
-    for i, item in enumerate(results):
-        name = item.get("name", "Unknown")
-        seeds = item.get("seeders", 0)
-        size = format_size(int(item.get("size", 0)))
-        lines.append(f"{i:>3} │ {name} │ {size} │ S:{seeds}")
+    # Calculate how many rows fit: terminal height minus overhead
+    # (title, header, caption, border lines, prompt above/below ~ 8 lines)
+    term_height = console.size.height
+    overhead = 8
+    visible_count = max(3, term_height - overhead)
+    visible_count = min(visible_count, total)  # Don't exceed result count
 
-    fzf_input = "\n".join(lines)
+    scroll_offset = 0
 
-    try:
-        result = subprocess.run(
-            [
-                fzf_path,
-                "--height=40%",
-                "--reverse",
-                "--border=rounded",
-                "--prompt=Select torrent > ",
-                "--header=↑/↓ navigate  |  Enter select  |  Esc cancel",
-                "--color=fg:#c0caf5,bg:#1a1b26,hl:#bb9af7",
-                "--color=fg+:#c0caf5,bg+:#292e42,hl+:#7dcfff",
-                "--color=info:#7aa2f7,prompt:#7dcfff,pointer:#ff007c",
-                "--color=marker:#9ece6a,spinner:#9ece6a,header:#9ece6a",
-            ],
-            input=fzf_input,
-            capture_output=True,
-            text=True,
-        )
+    console.print()
 
-        if result.returncode != 0:
-            # User pressed Esc or Ctrl+C
-            return None
+    with Live(
+        build_table(results, current, scroll_offset, visible_count, total),
+        console=console,
+        refresh_per_second=15,
+        transient=False,
+    ) as live:
+        while True:
+            key = readchar.readkey()
 
-        selected_line = result.stdout.strip()
-        # Extract the index from the start of the line
-        idx = int(selected_line.split("│")[0].strip())
-        return idx
+            if key == readchar.key.UP:
+                current = max(0, current - 1)
+                num_buffer = ""
+            elif key == readchar.key.DOWN:
+                current = min(total - 1, current + 1)
+                num_buffer = ""
+            elif key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
+                return current
+            elif key == readchar.key.ESC:
+                return None
+            elif key in (readchar.key.CTRL_C,):
+                return None
+            elif key.isdigit():
+                num_buffer += key
+                try:
+                    idx = int(num_buffer)
+                    if 0 <= idx < total:
+                        current = idx
+                    if idx >= total and idx * 10 > total * 10:
+                        num_buffer = key
+                        idx = int(key)
+                        if 0 <= idx < total:
+                            current = idx
+                except ValueError:
+                    num_buffer = ""
+            else:
+                num_buffer = ""
 
-    except (subprocess.SubprocessError, ValueError, IndexError):
-        console.print("[warning] fzf error. Falling back to manual input.[/warning]")
-        return select_manual(results)
+            # Keep cursor visible: adjust scroll_offset to follow current
+            if current < scroll_offset:
+                scroll_offset = current
+            elif current >= scroll_offset + visible_count:
+                scroll_offset = current - visible_count + 1
 
+            live.update(
+                build_table(results, current, scroll_offset, visible_count, total)
+            )
 
-def select_manual(results: list[dict]) -> int | None:
-    """Fallback manual selection when fzf is not available."""
-    try:
-        raw = console.input("[info]Enter torrent #[/info] (or 'q' to cancel): ")
-        if raw.strip().lower() in ("q", "quit", "exit"):
-            return None
-        idx = int(raw.strip())
-        if 0 <= idx < len(results):
-            return idx
-        console.print(f"[error] Invalid index. Must be 0–{len(results) - 1}.[/error]")
-        return None
-    except (ValueError, EOFError):
-        return None
+    return None
 
 
 # Main Loop
@@ -279,7 +304,7 @@ def main() -> None:
             continue
 
         # Search
-        console.print(f"[info]Searching for:[/info] [highlight]{query}[/highlight]…")
+        console.print(f"[info]Searching for:[/info] [highlight]{query}[/highlight]...")
 
         results = search_torrents(query)
         if not results:
@@ -287,11 +312,8 @@ def main() -> None:
             query = None
             continue
 
-        # Display
-        display_results(results)
-
-        # Select
-        idx = select_with_fzf(results)
+        # Interactive table selection (single unified view)
+        idx = interactive_select(results)
         if idx is None:
             console.print("[info]Selection cancelled.[/info]\n")
             query = None
@@ -305,7 +327,7 @@ def main() -> None:
 
         # Download
         magnet = build_magnet(info_hash, name)
-        console.print("[info]Opening magnet link with default torrent client…[/info]")
+        console.print("[info]Opening magnet link with default torrent client...[/info]")
         open_magnet(magnet)
         console.print("[success] Magnet link sent to torrent client![/success]\n")
 
