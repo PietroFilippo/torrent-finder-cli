@@ -6,7 +6,6 @@ Usage:
     python torrent_search.py              # Interactive prompt
     python torrent_search.py -q "query"   # Direct search
 """
-
 import argparse
 import os
 import platform
@@ -41,7 +40,7 @@ console = Console(theme=custom_theme)
 
 # Constants
 API_URL = "https://apibay.org/q.php"
-MAX_RESULTS = 20
+RESULTS_PER_PAGE = 20
 DOWNLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
 
 TRACKERS = [
@@ -54,7 +53,6 @@ TRACKERS = [
     "udp://exodus.desync.com:6969",
     "udp://open.demonii.com:1337/announce",
 ]
-
 
 # Utilities
 def format_size(size_bytes: int) -> str:
@@ -69,7 +67,6 @@ def format_size(size_bytes: int) -> str:
         idx += 1
     return f"{size:.1f} {units[idx]}"
 
-
 def parse_size_to_bytes(size_str: str) -> int:
     """Parse a human-readable size string like '5.0 MB' or '2.6 GB' to bytes."""
     match = re.match(r"([\d.]+)\s*(B|KB|MB|GB|TB)", size_str.strip(), re.IGNORECASE)
@@ -79,7 +76,6 @@ def parse_size_to_bytes(size_str: str) -> int:
     unit = match.group(2).upper()
     multipliers = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
     return int(value * multipliers.get(unit, 1))
-
 
 def seed_style(seeds: int) -> str:
     """Return a rich color tag based on seed count."""
@@ -91,7 +87,6 @@ def seed_style(seeds: int) -> str:
         return "yellow"
     return "red"
 
-
 def leech_style(leeches: int) -> str:
     """Return a rich color tag based on leech count."""
     if leeches <= 5:
@@ -100,12 +95,10 @@ def leech_style(leeches: int) -> str:
         return "yellow"
     return "red"
 
-
 def build_magnet(info_hash: str, name: str) -> str:
     """Build a magnet URI from an info hash."""
     trackers = "&".join(f"tr={t}" for t in TRACKERS)
     return f"magnet:?xt=urn:btih:{info_hash}&dn={name}&{trackers}"
-
 
 def open_magnet(magnet_link: str) -> None:
     """Open a magnet link with the system default handler (qBittorrent, etc.)."""
@@ -121,11 +114,9 @@ def open_magnet(magnet_link: str) -> None:
         console.print(f"[error] Failed to open magnet link: {e}[/error]")
         console.print(f"[info]Magnet link:[/info] {magnet_link}")
 
-
 def has_webtorrent() -> bool:
     """Check if webtorrent-cli is installed."""
     return shutil.which("webtorrent") is not None
-
 
 def download_with_webtorrent(magnet_link: str) -> None:
     """Download torrent content directly using webtorrent-cli.
@@ -159,7 +150,6 @@ def download_with_webtorrent(magnet_link: str) -> None:
         console.print("\n[warning] Download cancelled.[/warning]\n")
     except FileNotFoundError:
         console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
-
 
 def download_method_prompt() -> str | None:
     """
@@ -197,9 +187,7 @@ def download_method_prompt() -> str | None:
         console.print("[warning] Invalid choice.[/warning]")
         return None
 
-
 # API
-
 
 def search_torrents(query: str) -> list[dict]:
     """Search apibay.org and return a list of torrent dicts."""
@@ -218,8 +206,7 @@ def search_torrents(query: str) -> list[dict]:
     if not data or (len(data) == 1 and data[0].get("id") == "0"):
         return []
 
-    return data[:MAX_RESULTS]
-
+    return data
 
 # Interactive Table Selection
 def build_table(
@@ -228,20 +215,32 @@ def build_table(
     scroll_offset: int,
     visible_count: int,
     total: int,
+    current_page: int = 0,
+    total_pages: int = 1,
+    global_offset: int = 0,
 ) -> Table:
     """Build a rich table showing only the visible window of rows."""
     # Scroll indicator in the title
     end_idx = min(scroll_offset + visible_count, total)
     scroll_info = f"[dim]({scroll_offset + 1}-{end_idx} of {total})[/dim]"
 
+    # Page indicator (only show when there are multiple pages)
+    page_info = ""
+    if total_pages > 1:
+        page_info = f"  [bold cyan]Page {current_page + 1}/{total_pages}[/bold cyan]"
+
     table = Table(
-        title=f"Torrent Results {scroll_info}",
+        title=f"Torrent Results {scroll_info}{page_info}",
         title_style="bold magenta",
         border_style="bright_blue",
         header_style="bold cyan",
         show_lines=False,
         padding=(0, 1),
-        caption="[dim] Up/Down: navigate | Enter: select | Esc: cancel | Type number to jump[/dim]",
+        caption=(
+            "[dim] Up/Down: navigate | Enter: select | Esc: cancel | Type number to jump"
+            + (" | Left/Right: change page" if total_pages > 1 else "")
+            + "[/dim]"
+        ),
         caption_style="dim",
     )
 
@@ -255,7 +254,8 @@ def build_table(
     visible_slice = results[scroll_offset:end_idx]
 
     for vi, item in enumerate(visible_slice):
-        i = scroll_offset + vi  # Real index
+        i = scroll_offset + vi  # Local index within the page
+        global_i = global_offset + i  # Global index across all results
         seeds = int(item.get("seeders", 0))
         leeches = int(item.get("leechers", 0))
         size = int(item.get("size", 0))
@@ -265,12 +265,12 @@ def build_table(
 
         if is_selected:
             row_style = "bold reverse"
-            num_text = f">> {i}"
+            num_text = f">> {global_i}"
             seed_text = str(seeds)
             leech_text = str(leeches)
         else:
             row_style = "" if i % 2 == 0 else "dim"
-            num_text = str(i)
+            num_text = str(global_i)
             seed_text = f"[{seed_style(seeds)}]{seeds}[/{seed_style(seeds)}]"
             leech_text = f"[{leech_style(leeches)}]{leeches}[/{leech_style(leeches)}]"
 
@@ -285,16 +285,31 @@ def build_table(
 
     return table
 
-
 def interactive_select(results: list[dict]) -> int | None:
     """
     Display an interactive table where the user navigates with arrow keys.
-    Only shows rows that fit the terminal height (scrolling window).
-    Returns the index of the selected result, or None if cancelled.
+    Results are split into pages of RESULTS_PER_PAGE. Left/Right arrows
+    switch pages. Returns the global index of the selected result, or
+    None if cancelled.
     """
+    import math
+
+    all_results = results
+    total_all = len(all_results)
+    total_pages = math.ceil(total_all / RESULTS_PER_PAGE)
+    current_page = 0
+
+    def page_results():
+        start = current_page * RESULTS_PER_PAGE
+        end = start + RESULTS_PER_PAGE
+        return all_results[start:end]
+
+    # Current selection index (local to the page)
     current = 0
     num_buffer = ""
-    total = len(results)
+    page_items = page_results()
+    total = len(page_items)
+    global_offset = current_page * RESULTS_PER_PAGE
 
     # Calculate how many rows fit: terminal height minus overhead
     # (title, header, caption, border lines, prompt above/below ~ 8 lines)
@@ -308,7 +323,10 @@ def interactive_select(results: list[dict]) -> int | None:
     console.print()
 
     with Live(
-        build_table(results, current, scroll_offset, visible_count, total),
+        build_table(
+            page_items, current, scroll_offset, visible_count, total,
+            current_page, total_pages, global_offset,
+        ),
         console=console,
         refresh_per_second=15,
         transient=False,
@@ -322,8 +340,28 @@ def interactive_select(results: list[dict]) -> int | None:
             elif key == readchar.key.DOWN:
                 current = min(total - 1, current + 1)
                 num_buffer = ""
+            elif key == readchar.key.LEFT:
+                if current_page > 0:
+                    current_page -= 1
+                    page_items = page_results()
+                    total = len(page_items)
+                    global_offset = current_page * RESULTS_PER_PAGE
+                    current = 0
+                    scroll_offset = 0
+                    visible_count = min(max(3, term_height - overhead), total)
+                num_buffer = ""
+            elif key == readchar.key.RIGHT:
+                if current_page < total_pages - 1:
+                    current_page += 1
+                    page_items = page_results()
+                    total = len(page_items)
+                    global_offset = current_page * RESULTS_PER_PAGE
+                    current = 0
+                    scroll_offset = 0
+                    visible_count = min(max(3, term_height - overhead), total)
+                num_buffer = ""
             elif key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
-                return current
+                return global_offset + current
             elif key == readchar.key.ESC:
                 return None
             elif key in (readchar.key.CTRL_C,):
@@ -351,11 +389,13 @@ def interactive_select(results: list[dict]) -> int | None:
                 scroll_offset = current - visible_count + 1
 
             live.update(
-                build_table(results, current, scroll_offset, visible_count, total)
+                build_table(
+                    page_items, current, scroll_offset, visible_count, total,
+                    current_page, total_pages, global_offset,
+                )
             )
 
     return None
-
 
 # Main Loop
 def print_banner() -> None:
@@ -369,7 +409,6 @@ def print_banner() -> None:
         )
     )
     console.print()
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
@@ -442,7 +481,6 @@ def main() -> None:
             break
 
         query = None
-
 
 if __name__ == "__main__":
     main()
