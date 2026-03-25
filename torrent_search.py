@@ -114,6 +114,66 @@ def open_magnet(magnet_link: str) -> None:
         console.print(f"[error] Failed to open magnet link: {e}[/error]")
         console.print(f"[info]Magnet link:[/info] {magnet_link}")
 
+def detect_torrent_client() -> str:
+    """Detect the installed torrent client.
+
+    On Windows, scans common install directories first, then checks PATH, then the registry.
+    """
+    # Known torrent client executables and their friendly names
+    KNOWN_CLIENTS = {
+        "qbittorrent": "qBittorrent",
+        "utorrent": "uTorrent",
+        "bittorrent": "BitTorrent",
+        "deluge": "Deluge",
+        "transmission-qt": "Transmission",
+        "transmission-gtk": "Transmission",
+        "vuze": "Vuze",
+        "tixati": "Tixati",
+        "biglybt": "BiglyBT",
+    }
+
+    # 1. Windows: scan common install directories
+    if platform.system() == "Windows":
+        search_dirs = [
+            os.environ.get("PROGRAMFILES", r"C:\Program Files"),
+            os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
+            os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs"),
+        ]
+        for search_dir in search_dirs:
+            if not search_dir or not os.path.isdir(search_dir):
+                continue
+            try:
+                for folder in os.listdir(search_dir):
+                    folder_lower = folder.lower()
+                    for key, name in KNOWN_CLIENTS.items():
+                        if key in folder_lower:
+                            return name
+            except OSError:
+                continue
+
+    # 2. Check PATH
+    for exe, name in KNOWN_CLIENTS.items():
+        if shutil.which(exe):
+            return name
+
+    # 3. Windows fallback: read the registry magnet: handler
+    if platform.system() == "Windows":
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r"magnet\shell\open\command") as key:
+                cmd = winreg.QueryValueEx(key, "")[0]
+                exe_match = re.search(r'([\w.-]+)\.exe', cmd, re.IGNORECASE)
+                if exe_match:
+                    exe_name = exe_match.group(1).lower()
+                    for known_key, friendly_name in KNOWN_CLIENTS.items():
+                        if known_key in exe_name:
+                            return friendly_name
+                    return exe_match.group(1).capitalize()
+        except (OSError, ImportError):
+            pass
+
+    return "default torrent client"
+
 def has_webtorrent() -> bool:
     """Check if webtorrent-cli is installed."""
     return shutil.which("webtorrent") is not None
@@ -158,8 +218,10 @@ def download_method_prompt() -> str | None:
     """
     wt_available = has_webtorrent()
 
+    client_name = detect_torrent_client()
+
     console.print("[title]Download method:[/title]")
-    console.print("  [bold cyan][T][/bold cyan] Open in torrent client (qBittorrent)")
+    console.print(f"  [bold cyan][T][/bold cyan] Open in {client_name}")
     if wt_available:
         console.print("  [bold cyan][D][/bold cyan] Download directly (webtorrent)")
         console.print("      [dim yellow]Will not seed after download. Slower than torrent client.[/dim yellow]")
