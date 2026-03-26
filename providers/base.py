@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import requests
 
 from constants import API_URL, console
+from filters import FilterConfig, FilterPreset, apply_filters
 
 
 class BaseProvider(ABC):
@@ -20,11 +21,17 @@ class BaseProvider(ABC):
     icon: str
     categories: list[int]
 
+    default_filters: FilterConfig | None = None
+    presets: list[FilterPreset] = []
+    
+    def __init__(self):
+        self.active_presets: list[FilterPreset] = []
+
     @property
     def label(self) -> str:
         return f"{self.icon} {self.name}"
 
-    def search(self, query: str) -> list[dict]:
+    def search(self, query: str, cli_filters: FilterConfig | None = None) -> list[dict]:
         """Search apibay across all provider categories, merge, dedupe, and sort by seeds."""
         seen_hashes: set[str] = set()
         merged: list[dict] = []
@@ -52,6 +59,19 @@ class BaseProvider(ABC):
                 if h and h not in seen_hashes:
                     seen_hashes.add(h)
                     merged.append(item)
+
+        # Apply filters
+        # 1. Default provider filters
+        if self.default_filters:
+            merged = apply_filters(merged, self.default_filters)
+            
+        # 2. Active preset filters
+        for preset in self.active_presets:
+            merged = apply_filters(merged, preset.config)
+
+        # 3. CLI filters
+        if cli_filters:
+            merged = apply_filters(merged, cli_filters)
 
         # Sort by seeders descending
         merged.sort(key=lambda x: int(x.get("seeders", 0)), reverse=True)

@@ -104,7 +104,7 @@ def download_with_webtorrent(magnet_link: str) -> None:
 
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
     console.print(f"[info]Downloading to:[/info] [highlight]{DOWNLOADS_DIR}[/highlight]")
-    console.print("[dim]Press Ctrl+C to cancel the download.[/dim]\n")
+    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
 
     try:
         result = subprocess.run(
