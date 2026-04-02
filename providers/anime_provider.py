@@ -71,7 +71,8 @@ class AnimeProvider(BaseProvider):
                         "info_hash": info_hash.text.lower(),
                         "seeders": seeders.text if seeders is not None else "0",
                         "leechers": leechers.text if leechers is not None else "0",
-                        "size": str(size_bytes)
+                        "size": str(size_bytes),
+                        "source": "Nyaa"
                     })
         except Exception:
             pass

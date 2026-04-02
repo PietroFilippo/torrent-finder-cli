@@ -45,8 +45,9 @@ def build_table(
         caption_style="dim",
     )
 
-    table.add_column("#", style="bold white", justify="right", width=4)
-    table.add_column("Name", style="white", max_width=60, no_wrap=True)
+    table.add_column("#", style="bold white", justify="right", width=7)
+    table.add_column("Source", style="magenta", width=9)
+    table.add_column("Name", style="white", max_width=46, no_wrap=True)
     table.add_column("Size", style="cyan", justify="right", width=10)
     table.add_column("Seeds", justify="right", width=7)
     table.add_column("Leeches", justify="right", width=9)
@@ -75,8 +76,11 @@ def build_table(
             seed_text = f"[{seed_style(seeds)}]{seeds}[/{seed_style(seeds)}]"
             leech_text = f"[{leech_style(leeches)}]{leeches}[/{leech_style(leeches)}]"
 
+        source_val = item.get("source", "Apibay")
+
         table.add_row(
             num_text,
+            source_val,
             name,
             format_size(size),
             seed_text,

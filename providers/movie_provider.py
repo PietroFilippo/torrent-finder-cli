@@ -46,7 +46,8 @@ class MovieProvider(BaseProvider):
                         "info_hash": t.get("hash", "").lower(),
                         "seeders": str(t.get("seeds", 0)),
                         "leechers": str(t.get("peers", 0)),
-                        "size": str(t.get("size_bytes", 0))
+                        "size": str(t.get("size_bytes", 0)),
+                        "source": "YTS"
                     })
         except Exception:
             pass

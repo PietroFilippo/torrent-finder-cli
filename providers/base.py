@@ -59,6 +59,8 @@ class BaseProvider(ABC):
             if not data or (len(data) == 1 and data[0].get("id") == "0"):
                 continue
 
+            for item in data:
+                item["source"] = "Apibay"
             results.extend(data)
         return results
 
@@ -79,7 +81,8 @@ class BaseProvider(ABC):
                     "info_hash": r.get("infohash", "").lower(),
                     "seeders": str(r.get("swarm", {}).get("seeders", 0)),
                     "leechers": str(r.get("swarm", {}).get("leechers", 0)),
-                    "size": str(r.get("size", 0))
+                    "size": str(r.get("size", 0)),
+                    "source": "SolidTorrents"
                 })
         except Exception:
             pass
