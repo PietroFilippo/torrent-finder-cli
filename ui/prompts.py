@@ -139,27 +139,30 @@ def download_method_prompt() -> str | None:
         console.print("      [dim yellow]Will not seed after download. Slower than torrent client.[/dim yellow]")
     else:
         console.print("  [dim][D] Download directly (webtorrent not installed)[/dim]")
+    console.print("  [bold cyan][S][/bold cyan] Search & Download Subtitles")
     console.print("  [bold cyan][C][/bold cyan] Cancel")
     console.print()
 
-    try:
-        choice = console.input("[info]Choose [T/D/C]:[/info] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        return None
-
-    if choice in ("t", ""):
-        return "t"
-    elif choice == "d":
-        if not wt_available:
-            console.print("[error] webtorrent-cli is not installed.[/error]")
-            console.print("[info]Install with:[/info] npm install -g webtorrent-cli\n")
+    while True:
+        try:
+            choice = console.input("[info]Choose [T/D/S/C]:[/info] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
             return None
-        return "d"
-    elif choice == "c":
-        return None
-    else:
-        console.print("[warning] Invalid choice.[/warning]")
-        return None
+
+        if choice in ("t", ""):
+            return "t"
+        elif choice == "d":
+            if not wt_available:
+                console.print("[error] webtorrent-cli is not installed.[/error]")
+                console.print("[info]Install with:[/info] npm install -g webtorrent-cli\n")
+                continue
+            return "d"
+        elif choice == "s":
+            return "s"
+        elif choice == "c":
+            return None
+        else:
+            console.print("[warning] Invalid choice. Please try again.[/warning]")
 
 
 def provider_select_prompt() -> object | None:

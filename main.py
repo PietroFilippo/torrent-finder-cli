@@ -7,6 +7,11 @@ Usage:
     python main.py -q "query"   # Direct search
 """
 import argparse
+import warnings
+
+# Suppress requests dependency warnings (urllib3/chardet version mismatch)
+warnings.filterwarnings("ignore", module=".*requests.*")
+warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 from constants import console
 from downloader import download_with_webtorrent, open_magnet
@@ -109,21 +114,30 @@ def main() -> None:
 
         # Download method selection
         magnet = build_magnet(info_hash, name)
-        method = download_method_prompt()
+        
+        while True:
+            method = download_method_prompt()
 
-        if method == "t":
-            clear_screen()
-            console.print("[info]Opening magnet link with default torrent client...[/info]")
-            open_magnet(magnet)
-            console.print("[success] Magnet link sent to torrent client![/success]\n")
-        elif method == "d":
-            clear_screen()
-            download_with_webtorrent(magnet)
-        else:
-            clear_screen()
-            console.print("[info]Download cancelled.[/info]\n")
-            query = None
-            continue
+            if method == "t":
+                clear_screen()
+                console.print("[info]Opening magnet link with default torrent client...[/info]")
+                open_magnet(magnet)
+                console.print("[success] Magnet link sent to torrent client![/success]\n")
+                break
+            elif method == "d":
+                clear_screen()
+                download_with_webtorrent(magnet)
+                break
+            elif method == "s":
+                from subtitles import download_subtitles
+                download_subtitles(name)
+                # Loop back so they can still download the video!
+                console.print()
+                continue
+            else:
+                clear_screen()
+                console.print("[info]Download cancelled.[/info]\n")
+                break
 
         # Continue?
         try:
