@@ -54,7 +54,7 @@ def main() -> None:
 
     # Clean the terminal for initial run if an interactive search is expected
     if not (args.type and args.query):
-        clear_screen()
+        console.clear()
 
     while True:
         if not current_provider:
@@ -134,6 +134,21 @@ def main() -> None:
                 download_subtitles(name)
                 # Loop back so they can still download the video!
                 console.print()
+                continue
+            elif method == "l":
+                console.print(f"\n[info]Magnet link:[/info]\n[highlight]{magnet}[/highlight]\n")
+                try:
+                    import subprocess, platform
+                    if platform.system() == "Windows":
+                        subprocess.run("clip", input=magnet.encode(), check=True)
+                    elif platform.system() == "Darwin":
+                        subprocess.run("pbcopy", input=magnet.encode(), check=True)
+                    else:
+                        subprocess.run(["xclip", "-selection", "clipboard"], input=magnet.encode(), check=True)
+                    console.print("[success] Copied to clipboard![/success]\n")
+                except Exception:
+                    console.print("[dim]Could not copy to clipboard automatically.[/dim]\n")
+                # Loop back so they can still download
                 continue
             else:
                 clear_screen()

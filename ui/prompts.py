@@ -62,8 +62,6 @@ def filter_menu(provider) -> None:
         console.print("[warning] No presets available for this provider.[/warning]")
         return
 
-    clear_screen()
-
     # Build toggle items: first item is "Clear all filters", rest are presets
     items = [SelectItem(label="Clear all filters", value="clear")]
     for p in provider.presets:
@@ -78,6 +76,7 @@ def filter_menu(provider) -> None:
         title=f"Filter Presets — {provider.label}",
         multi=True,
         footer="↑/↓ navigate  •  Space toggle  •  Enter confirm  •  Esc cancel",
+        banner=_make_banner_panel(),
     )
 
     if result is None:
@@ -102,17 +101,20 @@ def filter_menu(provider) -> None:
         console.print("[success] All filters cleared.[/success]")
 
 
-def print_banner() -> None:
-    """Display the app banner."""
+def _make_banner_panel() -> Panel:
+    """Return the app banner as a Rich Panel renderable."""
     banner = Text()
     banner.append("Torrent Search CLI", style="bold magenta")
-    console.print(
-        Panel(
-            banner,
-            border_style="bright_blue",
-            padding=(1, 2),
-        )
+    return Panel(
+        banner,
+        border_style="bright_blue",
+        padding=(1, 2),
     )
+
+
+def print_banner() -> None:
+    """Display the app banner."""
+    console.print(_make_banner_panel())
     console.print()
 
 
@@ -141,7 +143,7 @@ def download_method_prompt(show_subtitles: bool = True) -> str | None:
             label="Download directly (webtorrent)",
             value="d",
             enabled=wt_available,
-            hint="" if wt_available else "(not installed)",
+            hint="Slower, won't seed" if wt_available else "(not installed)",
         ),
     ]
 
@@ -151,9 +153,14 @@ def download_method_prompt(show_subtitles: bool = True) -> str | None:
             value="s",
         ))
 
+    items.append(SelectItem(
+        label="Copy magnet link",
+        value="l",
+    ))
+
     items.append(SelectItem(label="Cancel", value=None))
 
-    idx = arrow_select(items, title="Download Method")
+    idx = arrow_select(items, title="Download Method", banner=_make_banner_panel())
 
     if idx is None:
         return None
@@ -163,14 +170,13 @@ def download_method_prompt(show_subtitles: bool = True) -> str | None:
 
 def provider_select_prompt() -> object | None:
     """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled."""
-    clear_screen()
-
     items = [SelectItem(label=p.label, value=p) for p in PROVIDERS]
 
     idx = arrow_select(
         items,
         title="Select Provider",
         footer="↑/↓ navigate  •  Enter select  •  Esc cancel\n   Tip: For the best results, search using the complete name.",
+        banner=_make_banner_panel(),
     )
 
     if idx is None:
