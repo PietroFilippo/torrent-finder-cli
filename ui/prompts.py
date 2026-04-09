@@ -62,8 +62,8 @@ def filter_menu(provider) -> None:
         console.print("[warning] No presets available for this provider.[/warning]")
         return
 
-    # Build toggle items: first item is "Clear all filters", rest are presets
-    items = [SelectItem(label="Clear all filters", value="clear")]
+    # Build toggle items + action buttons
+    items = []
     for p in provider.presets:
         items.append(SelectItem(
             label=p.name,
@@ -71,34 +71,38 @@ def filter_menu(provider) -> None:
             toggled=p in provider.active_presets,
         ))
 
-    result = arrow_select(
+    # Action buttons
+    items.append(SelectItem(label="Clear all", value="clear", is_action=True))
+    items.append(SelectItem(label="✅ Confirm", value="confirm", is_action=True))
+    items.append(SelectItem(label="↩ Go Back", value="back", is_action=True))
+
+    def handle_filter_action(idx, items):
+        if items[idx].value == "clear":
+            for it in items:
+                if not it.is_action:
+                    it.toggled = False
+            return True  # Stay in menu
+        return False  # Exit for Confirm / Go Back
+
+    result_idx = arrow_select(
         items,
         title=f"Filter Presets — {provider.label}",
         multi=True,
-        footer="↑/↓ navigate  •  Space toggle  •  Enter confirm  •  Esc cancel",
         banner=_make_banner_panel(),
+        on_action=handle_filter_action,
     )
 
-    if result is None:
+    if result_idx is None:
         return
 
-    # Check if "Clear all" was toggled
-    if 0 in result:
+    action = items[result_idx].value
+
+    if action == "confirm":
         provider.active_presets.clear()
-        console.print("[success] All filters cleared.[/success]")
-        return
-
-    # Apply toggled presets
-    provider.active_presets.clear()
-    for idx in result:
-        preset = items[idx].value
-        provider.active_presets.append(preset)
-
-    active_names = [p.name for p in provider.active_presets]
-    if active_names:
-        console.print(f"[success] Active filters: {', '.join(active_names)}[/success]")
-    else:
-        console.print("[success] All filters cleared.[/success]")
+        for it in items:
+            if not it.is_action and it.toggled:
+                provider.active_presets.append(it.value)
+    # "back" — just return
 
 
 def _make_banner_panel() -> Panel:
@@ -126,10 +130,11 @@ def clear_screen() -> None:
     print_banner()
 
 
-def download_method_prompt(show_subtitles: bool = True) -> str | None:
+def download_method_prompt(magnet: str = "", show_subtitles: bool = True) -> str | None:
     """
     Prompt the user to choose a download method.
-    Returns 't' for torrent client, 'd' for direct download, 's' for subtitles, None for cancel.
+    Returns 't', 'd', 's', 'back', or None.
+    'l' (copy magnet) is handled internally.
     """
     wt_available = has_webtorrent()
     client_name = detect_torrent_client()
@@ -156,11 +161,34 @@ def download_method_prompt(show_subtitles: bool = True) -> str | None:
     items.append(SelectItem(
         label="Copy magnet link",
         value="l",
+        is_action=True,
     ))
 
+    items.append(SelectItem(label="↩ Go back to results", value="back"))
     items.append(SelectItem(label="Cancel", value=None))
 
-    idx = arrow_select(items, title="Download Method", banner=_make_banner_panel())
+    def handle_download_action(idx, items):
+        if items[idx].value == "l" and magnet:
+            try:
+                import subprocess, platform
+                if platform.system() == "Windows":
+                    subprocess.run("clip", input=magnet.encode(), check=True)
+                elif platform.system() == "Darwin":
+                    subprocess.run("pbcopy", input=magnet.encode(), check=True)
+                else:
+                    subprocess.run(["xclip", "-selection", "clipboard"], input=magnet.encode(), check=True)
+                items[idx].hint = "✅ Copied!"
+            except Exception:
+                items[idx].hint = "⚠ Could not copy"
+            return True  # Stay in menu
+        return False
+
+    idx = arrow_select(
+        items,
+        title="Download Method",
+        banner=_make_banner_panel(),
+        on_action=handle_download_action,
+    )
 
     if idx is None:
         return None
@@ -176,6 +204,29 @@ def provider_select_prompt() -> object | None:
         items,
         title="Select Provider",
         footer="↑/↓ navigate  •  Enter select  •  Esc cancel\n   Tip: For the best results, search using the complete name.",
+        banner=_make_banner_panel(),
+    )
+
+    if idx is None:
+        return None
+
+    return items[idx].value
+
+
+def search_again_prompt() -> str | None:
+    """Prompt the user for what to do next after a download.
+
+    Returns 'search', 'provider', or None (exit).
+    """
+    items = [
+        SelectItem(label="🔍 Search Again", value="search"),
+        SelectItem(label="🔄 Change Provider", value="provider"),
+        SelectItem(label="👋 Exit", value="exit"),
+    ]
+
+    idx = arrow_select(
+        items,
+        title="What's Next?",
         banner=_make_banner_panel(),
     )
 

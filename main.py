@@ -14,10 +14,11 @@ warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 from constants import console
+import readchar
 from downloader import download_with_webtorrent, open_magnet
 from filters import FilterConfig
 from providers import PROVIDERS, get_provider
-from ui.prompts import clear_screen, download_method_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt
+from ui.prompts import clear_screen, download_method_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
 from ui.table import interactive_select
 from utils import build_magnet
 
@@ -62,7 +63,8 @@ def main() -> None:
             if not current_provider:
                 console.print("\n[info]Goodbye![/info]")
                 break
-                
+            clear_screen()
+
         provider = current_provider
 
         # 2. Get query
@@ -78,6 +80,7 @@ def main() -> None:
                 
             if query == "SPECIAL_FILTER":
                 filter_menu(provider)
+                clear_screen()
                 query = None
                 continue
             elif query == "GO_BACK":
@@ -99,75 +102,67 @@ def main() -> None:
             query = None
             continue
 
-        # Interactive table selection (single unified view)
-        idx = interactive_select(results)
+        # Torrent selection + download loop (allows going back to results)
+        while True:
+            clear_screen()
+            idx = interactive_select(results)
+            if idx is None:
+                query = None
+                break
+
+            selected = results[idx]
+            name = selected.get("name", "Unknown")
+            info_hash = selected.get("info_hash", "")
+
+            # Download method selection
+            magnet = build_magnet(info_hash, name)
+
+            go_back_to_results = False
+            while True:
+                show_subs = hasattr(provider, "name") and provider.name in ("Movies", "Anime")
+                method = download_method_prompt(magnet=magnet, show_subtitles=show_subs)
+
+                if method == "t":
+                    clear_screen()
+                    console.print("[info]Opening magnet link with default torrent client...[/info]")
+                    open_magnet(magnet)
+                    console.print("[success] Magnet link sent to torrent client![/success]\n")
+                    console.print("[dim]Press any key to continue...[/dim]")
+                    readchar.readkey()
+                    break
+                elif method == "d":
+                    clear_screen()
+                    download_with_webtorrent(magnet)
+                    console.print("\n[dim]Press any key to continue...[/dim]")
+                    readchar.readkey()
+                    break
+                elif method == "s":
+                    from subtitles import download_subtitles
+                    download_subtitles(name)
+                    console.print("\n[dim]Press any key to continue...[/dim]")
+                    readchar.readkey()
+                    continue
+                elif method == "back":
+                    go_back_to_results = True
+                    break
+                else:
+                    break
+
+            if go_back_to_results:
+                continue  # Back to torrent selection
+            break  # Proceed to "what's next?"
+
         if idx is None:
-            console.print("[info]Selection cancelled.[/info]\n")
-            query = None
             continue
 
-        selected = results[idx]
-        name = selected.get("name", "Unknown")
-        info_hash = selected.get("info_hash", "")
-
-        console.print(f"\n[success] Selected:[/success] [highlight]{name}[/highlight]\n")
-
-        # Download method selection
-        magnet = build_magnet(info_hash, name)
-        
-        while True:
-            show_subs = hasattr(provider, "name") and provider.name in ("Movies", "Anime")
-            method = download_method_prompt(show_subtitles=show_subs)
-
-            if method == "t":
-                clear_screen()
-                console.print("[info]Opening magnet link with default torrent client...[/info]")
-                open_magnet(magnet)
-                console.print("[success] Magnet link sent to torrent client![/success]\n")
-                break
-            elif method == "d":
-                clear_screen()
-                download_with_webtorrent(magnet)
-                break
-            elif method == "s":
-                from subtitles import download_subtitles
-                download_subtitles(name)
-                # Loop back so they can still download the video!
-                console.print()
-                continue
-            elif method == "l":
-                console.print(f"\n[info]Magnet link:[/info]\n[highlight]{magnet}[/highlight]\n")
-                try:
-                    import subprocess, platform
-                    if platform.system() == "Windows":
-                        subprocess.run("clip", input=magnet.encode(), check=True)
-                    elif platform.system() == "Darwin":
-                        subprocess.run("pbcopy", input=magnet.encode(), check=True)
-                    else:
-                        subprocess.run(["xclip", "-selection", "clipboard"], input=magnet.encode(), check=True)
-                    console.print("[success] Copied to clipboard![/success]\n")
-                except Exception:
-                    console.print("[dim]Could not copy to clipboard automatically.[/dim]\n")
-                # Loop back so they can still download
-                continue
-            else:
-                clear_screen()
-                console.print("[info]Download cancelled.[/info]\n")
-                break
-
-        # Continue?
-        try:
-            again = console.input("[info]Search again? (Y/n/p):[/info] ").strip().lower()
-            if again in ("n", "no"):
-                console.print("[info]Goodbye![/info]")
-                break
-            elif again == "p":
-                current_provider = None
-            else:
-                # User typed 'y' or pressed Enter. Clear the screen to maintain cleanliness.
-                clear_screen()
-        except (EOFError, KeyboardInterrupt):
-            console.print("\n[info]Goodbye![/info]")
+        # What's next?
+        choice = search_again_prompt()
+        if choice == "search":
+            clear_screen()
+        elif choice == "provider":
+            current_provider = None
+        else:
+            console.print("[info]Goodbye![/info]")
             break
 
         query = None
