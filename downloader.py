@@ -160,3 +160,57 @@ def download_with_peerflix(magnet_link: str) -> None:
         console.print("\n[warning] Download cancelled.[/warning]\n")
     except FileNotFoundError:
         console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
+
+
+def stream_with_webtorrent(magnet_link: str) -> None:
+    """Stream torrent content directly to VLC using webtorrent-cli."""
+    wt_path = shutil.which("webtorrent")
+    if not wt_path:
+        console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
+        return
+
+    console.print("[info]Starting streaming server and waiting for VLC to open...[/info]")
+    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
+
+    try:
+        result = subprocess.run(
+            [wt_path, "download", magnet_link, "--vlc"],
+        )
+
+        console.print()
+        if result.returncode == 0:
+            console.print("[success] Streaming session ended![/success]")
+        else:
+            console.print(f"[error] Streaming failed (exit code {result.returncode}).[/error]\n")
+
+    except KeyboardInterrupt:
+        console.print("\n[warning] Streaming cancelled.[/warning]\n")
+    except FileNotFoundError:
+        console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
+
+
+def stream_with_peerflix(magnet_link: str) -> None:
+    """Stream torrent content directly to VLC using peerflix."""
+    pf_path = shutil.which("peerflix")
+    if not pf_path:
+        console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
+        return
+
+    console.print("[info]Starting streaming server and waiting for VLC to open...[/info]")
+    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
+
+    try:
+        result = subprocess.run(
+            [pf_path, magnet_link, "--vlc", "--remove"],
+        )
+
+        console.print()
+        if result.returncode == 0:
+            console.print("[success] Streaming session ended![/success]")
+        else:
+            console.print(f"[error] Streaming failed (exit code {result.returncode}).[/error]\n")
+
+    except KeyboardInterrupt:
+        console.print("\n[warning] Streaming cancelled.[/warning]\n")
+    except FileNotFoundError:
+        console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")

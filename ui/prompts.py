@@ -147,6 +147,18 @@ def download_method_prompt(magnet: str = "", show_subtitles: bool = True) -> str
             value="t",
         ),
         SelectItem(
+            label="Stream to VLC (peerflix)",
+            value="stream_p",
+            enabled=pf_available,
+            hint="Requires VLC installed" if pf_available else "(not installed)",
+        ),
+        SelectItem(
+            label="Stream to VLC (webtorrent)",
+            value="stream_w",
+            enabled=wt_available,
+            hint="Requires VLC installed" if wt_available else "(not installed)",
+        ),
+        SelectItem(
             label="Download directly (peerflix)",
             value="p",
             enabled=pf_available,

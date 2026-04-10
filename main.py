@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 from constants import console
 import readchar
-from downloader import download_with_webtorrent, download_with_peerflix, open_magnet
+from downloader import download_with_webtorrent, download_with_peerflix, open_magnet, stream_with_peerflix, stream_with_webtorrent
 from filters import FilterConfig
 from providers import PROVIDERS, get_provider
 from ui.prompts import clear_screen, download_method_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
@@ -96,7 +96,9 @@ def main() -> None:
         # Search using provider
         console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{query}[/highlight]...")
 
-        results = provider.search(query, cli_filters=cli_filters)
+        with console.status(f"[bold cyan]Searching {provider.name}...[/bold cyan]", spinner="dots"):
+            results = provider.search(query, cli_filters=cli_filters)
+        
         if not results:
             console.print("[warning] No results found.[/warning]\n")
             query = None
@@ -128,6 +130,18 @@ def main() -> None:
                     open_magnet(magnet)
                     console.print("[success] Magnet link sent to torrent client![/success]\n")
                     console.print("[dim]Press any key to continue...[/dim]")
+                    readchar.readkey()
+                    break
+                elif method == "stream_p":
+                    clear_screen()
+                    stream_with_peerflix(magnet)
+                    console.print("\n[dim]Press any key to continue...[/dim]")
+                    readchar.readkey()
+                    break
+                elif method == "stream_w":
+                    clear_screen()
+                    stream_with_webtorrent(magnet)
+                    console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     break
                 elif method == "p":
@@ -174,4 +188,7 @@ def main() -> None:
         query = None
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[info]Goodbye![/info]")

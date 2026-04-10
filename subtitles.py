@@ -37,8 +37,9 @@ def download_subtitles(torrent_name: str) -> Optional[str]:
         # Append .mkv to trick subliminal into treating it as a standard video file
         video = Video.fromname(f"{torrent_name}.mkv")
         
-        # Download best subtitles for the given languages
-        best_subtitles = download_best_subtitles([video], {language})
+        with console.status(f"[bold cyan]Downloading {language.name} subtitles for '[highlight]{torrent_name}[/highlight]'...[/bold cyan]", spinner="dots"):
+            # Download best subtitles for the given languages
+            best_subtitles = download_best_subtitles([video], {language})
         
         subs = best_subtitles.get(video, [])
         if not subs:
