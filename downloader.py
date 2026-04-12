@@ -5,8 +5,39 @@ import platform
 import re
 import shutil
 import subprocess
+import threading
+import time
 
 from constants import DOWNLOADS_DIR, console
+
+
+def _start_vlc_hotkey_thread(stream_url: str) -> threading.Event:
+    """Start a background thread to listen for the 'v' key and reopen VLC while a stream is running."""
+    stop_event = threading.Event()
+
+    def listener():
+        vlc_path = shutil.which("vlc")
+        if not vlc_path and platform.system() == "Windows":
+            for p in [r"C:\Program Files\VideoLAN\VLC\vlc.exe", r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe"]:
+                if os.path.exists(p):
+                    vlc_path = p
+                    break
+
+        while not stop_event.is_set():
+            if platform.system() == "Windows":
+                import msvcrt
+                if msvcrt.kbhit():
+                    key = msvcrt.getch()
+                    if key.lower() == b'v':
+                        if vlc_path:
+                            subprocess.Popen([vlc_path, stream_url])
+                        else:
+                            os.startfile(stream_url)
+            time.sleep(0.2)
+
+    t = threading.Thread(target=listener, daemon=True)
+    t.start()
+    return stop_event
 
 
 def detect_torrent_client() -> str:
@@ -170,12 +201,15 @@ def stream_with_webtorrent(magnet_link: str) -> None:
         return
 
     console.print("[info]Starting streaming server and waiting for VLC to open...[/info]")
-    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
+    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]")
+    console.print("[bold yellow]Tip: Press 'v' at any time to reopen VLC without losing download progress![/bold yellow]\n")
 
     try:
+        stop_event = _start_vlc_hotkey_thread("http://127.0.0.1:8080/0")
         result = subprocess.run(
-            [wt_path, "download", magnet_link, "--vlc"],
+            [wt_path, "download", magnet_link, "--vlc", "--no-quit", "--port", "8080"],
         )
+        stop_event.set()
 
         console.print()
         if result.returncode == 0:
@@ -197,12 +231,15 @@ def stream_with_peerflix(magnet_link: str) -> None:
         return
 
     console.print("[info]Starting streaming server and waiting for VLC to open...[/info]")
-    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
+    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]")
+    console.print("[bold yellow]Tip: Press 'v' at any time to reopen VLC without losing download progress![/bold yellow]\n")
 
     try:
+        stop_event = _start_vlc_hotkey_thread("http://127.0.0.1:8888/")
         result = subprocess.run(
-            [pf_path, magnet_link, "--vlc", "--remove"],
+            [pf_path, magnet_link, "--vlc", "--remove", "--port", "8888"],
         )
+        stop_event.set()
 
         console.print()
         if result.returncode == 0:

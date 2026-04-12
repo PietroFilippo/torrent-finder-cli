@@ -137,13 +137,13 @@ def main() -> None:
                     stream_with_peerflix(magnet)
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
-                    break
+                    continue
                 elif method == "stream_w":
                     clear_screen()
                     stream_with_webtorrent(magnet)
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
-                    break
+                    continue
                 elif method == "p":
                     clear_screen()
                     download_with_peerflix(magnet)
