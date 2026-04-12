@@ -9,9 +9,10 @@ A interactive command-line application for searching and downloading torrents di
 - **Advanced Filtering:** 
   - Toggle built-in presets (e.g., preferred resolutions, known uploaders/repackers) using an interactive checklist.
   - Add custom include/exclude keywords to quickly find the exact release you want.
-- **Flexible Downloading:**
+- **Flexible Downloading & Streaming:**
   - **System Client:** Automatically send generated magnet links to your default system torrent client (like qBittorrent, Transmission, etc.).
   - **Direct Terminal Download:** Use `webtorrent-cli` integration to download files directly within the terminal, featuring native interactive progress bars.
+  - **Stream to VLC:** Stream media directly to VLC Media Player using `webtorrent-cli` or `peerflix`. You can press the `v` hotkey at any time during a streaming session to reopen VLC without losing your torrent download/buffering progress.
   - **Subtitle Download:** Search and download the best matching subtitles directly from the terminal using `subliminal`.
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
 - **Pagination & Navigation:** Navigate through large sets of search results cleanly, with the ability to safely go back to your previous search results after viewing download options.
