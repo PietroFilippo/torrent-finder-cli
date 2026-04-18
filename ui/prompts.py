@@ -263,20 +263,38 @@ def download_method_prompt(magnet: str = "", show_subtitles: bool = True) -> str
 
 
 def provider_select_prompt() -> object | None:
-    """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled."""
+    """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled.
+
+    Press F on a highlighted provider to configure its filters without leaving the menu.
+    """
     items = [SelectItem(label=p.label, value=p) for p in PROVIDERS]
+    start = 0
 
-    idx = arrow_select(
-        items,
-        title="Select Provider",
-        footer="↑/↓ navigate  •  Enter select  •  Esc cancel\n   Tip: For the best results, search using the complete name.",
-        banner=_make_banner_panel(),
-    )
+    while True:
+        result = arrow_select(
+            items,
+            title="Select Provider",
+            footer=(
+                "↑/↓ navigate  •  Enter select  •  "
+                "[bold yellow]F[/bold yellow] configure filters  •  Esc cancel\n"
+                "   Tip: For the best results, search using the complete name."
+            ),
+            banner=_make_banner_panel(),
+            start_index=start,
+            hotkeys={"F": "filter", "f": "filter"},
+        )
 
-    if idx is None:
-        return None
+        if result is None:
+            return None
 
-    return items[idx].value
+        if isinstance(result, tuple) and result[0] == "hotkey":
+            _, action, cursor = result
+            if action == "filter":
+                filter_menu(items[cursor].value)
+                start = cursor
+                continue
+
+        return items[result].value
 
 
 def search_again_prompt() -> str | None:

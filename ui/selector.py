@@ -91,7 +91,7 @@ def _build_panel(
             footer = "↑/↓ navigate  •  Enter select  •  Esc cancel"
 
     body.append("\n")
-    body.append(f" {footer}", style="dim")
+    body.append_text(Text.from_markup(f" {footer}", style="dim"))
 
     return Panel(
         body,
@@ -139,7 +139,8 @@ def arrow_select(
     start_index: int = 0,
     banner: object = None,
     on_action: Callable[[int, list[SelectItem]], bool] | None = None,
-) -> int | list[int] | None:
+    hotkeys: dict[str, str] | None = None,
+) -> int | list[int] | tuple | None:
     """Interactive arrow-key selector.
 
     Uses the terminal's alternate screen buffer for a clean, flicker-free
@@ -229,6 +230,8 @@ def arrow_select(
                 return None
             elif key in (readchar.key.CTRL_C, "\x03"):
                 return None
+            elif hotkeys and key in hotkeys:
+                return ("hotkey", hotkeys[key], cursor)
 
             state["cursor"] = cursor
             _render(banner, _build_panel(items, cursor, title, multi, footer))

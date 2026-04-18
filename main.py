@@ -77,7 +77,12 @@ def main() -> None:
             engine_str = ", ".join(engine_names) if engine_names else "None"
             active_names = [p.name for p in provider.active_presets]
             active_name = ", ".join(active_names) if active_names else "None"
-            console.print(f"[dim]Engines: {engine_str} | Filters: {active_name} | Press Shift+F to change | Esc to go back[/dim]")
+            console.print(f"[dim]Engines:[/dim] [cyan]{engine_str}[/cyan]   [dim]Filters:[/dim] [cyan]{active_name}[/cyan]")
+            console.print(
+                "[bold yellow on grey23] Shift+F [/bold yellow on grey23] "
+                "[white]configure engines & filters[/white]   "
+                "[bold]Esc[/bold] [dim]go back[/dim]"
+            )
             try:
                 query = get_query_with_shortcut(f"[title] Search {provider.name}:[/title] ")
             except (EOFError, KeyboardInterrupt):
