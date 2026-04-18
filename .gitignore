@@ -4,4 +4,7 @@ __pycache__/
 *.pyo
 
 # Downloaded files
-downloads/
+downloads/
+
+# Persisted filter/engine state
+filter_state.json

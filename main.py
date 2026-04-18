@@ -18,9 +18,12 @@ import readchar
 from downloader import download_with_webtorrent, download_with_peerflix, open_magnet, stream_with_peerflix, stream_with_webtorrent
 from filters import FilterConfig
 from providers import PROVIDERS, get_provider
+from state import load_state
 from ui.prompts import clear_screen, download_method_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
 from ui.table import interactive_select
 from utils import build_magnet
+
+load_state(PROVIDERS)
 
 
 def main() -> None:

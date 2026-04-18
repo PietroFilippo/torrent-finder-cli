@@ -103,15 +103,15 @@ def filter_menu(provider) -> None:
             preset_indices.append(len(items) - 1)
 
     # --- Action buttons ---
-    items.append(SelectItem(label="Clear all", value="clear", is_action=True))
+    items.append(SelectItem(label="Clear filters", value="clear", is_action=True))
     items.append(SelectItem(label="✅ Confirm", value="confirm", is_action=True))
     items.append(SelectItem(label="↩ Go Back", value="back", is_action=True))
 
     def handle_filter_action(idx, items):
         if items[idx].value == "clear":
-            for it in items:
-                if not it.is_action and it.value != "section_header":
-                    it.toggled = False
+            # Clear preset toggles only — leave engine toggles alone
+            for pi in preset_indices:
+                items[pi].toggled = False
             return True  # Stay in menu
         return False  # Exit for Confirm / Go Back
 
@@ -146,6 +146,9 @@ def filter_menu(provider) -> None:
             if item.toggled:
                 _type, preset = item.value
                 provider.active_presets.append(preset)
+
+        from state import save_state
+        save_state(PROVIDERS)
     # "back" — just return
 
 
