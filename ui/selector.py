@@ -22,6 +22,22 @@ class SelectItem:
     is_action: bool = False  # Action buttons: Enter returns instead of toggling
 
 
+def _compute_window(n: int, cursor: int, max_visible: int) -> tuple[int, int]:
+    """Return [start, end) indexes for a window that fits max_visible rows.
+
+    The window keeps the cursor in view; it never slides past the list ends.
+    """
+    if n <= max_visible:
+        return 0, n
+    half = max_visible // 2
+    start = max(0, cursor - half)
+    end = start + max_visible
+    if end > n:
+        end = n
+        start = end - max_visible
+    return start, end
+
+
 def _build_panel(
     items: list[SelectItem],
     cursor: int,
@@ -29,11 +45,51 @@ def _build_panel(
     multi: bool,
     footer: str = "",
 ) -> Panel:
-    """Render the selector as a Rich Panel."""
+    """Render the selector as a Rich Panel.
+
+    When the item list is too tall for the terminal, the main (non-action)
+    section is windowed around the cursor. Action buttons (Confirm/Cancel/
+    Select all, etc.) always render so they can't be scrolled out of reach.
+    """
     body = Text()
     has_actions = any(it.is_action for it in items)
 
+    # Partition into [leading actions … main items … trailing actions].
+    # Leading section headers count as "actions" (always visible).
+    # Only the main list gets windowed.
+    n = len(items)
+    main_start = 0
+    while main_start < n and items[main_start].is_action:
+        main_start += 1
+    main_end = n
+    while main_end > main_start and items[main_end - 1].is_action:
+        main_end -= 1
+    main_len = main_end - main_start
+
+    # Reserve chrome: banner (~4) + panel borders (4) + padding (2) + footer (2)
+    # + action rows at top/bottom of the list.
+    chrome = 12 + main_start + (n - main_end)
+    max_visible = max(6, console.size.height - chrome)
+
+    win_start_rel, win_end_rel = _compute_window(main_len, cursor - main_start, max_visible)
+    win_start = main_start + win_start_rel
+    win_end = main_start + win_end_rel
+
+    # If cursor is outside the main list (on an action button), clamp window
+    # so we still show a sensible slice of the main list.
+    if cursor < main_start or cursor >= main_end:
+        win_start_rel, win_end_rel = _compute_window(main_len, 0, max_visible)
+        win_start = main_start + win_start_rel
+        win_end = main_start + win_end_rel
+
     for i, item in enumerate(items):
+        in_main = main_start <= i < main_end
+        if in_main and (i < win_start or i >= win_end):
+            continue
+
+        if in_main and i == win_start and win_start > main_start:
+            body.append(f"    … {win_start - main_start} more above\n", style="dim italic")
+
         is_cursor = i == cursor
 
         # Check if this is a section header (visual-only, non-interactive)
@@ -82,6 +138,9 @@ def _build_panel(
             body.append(f"  {item.hint}", style="dim yellow")
 
         body.append("\n")
+
+        if in_main and i == win_end - 1 and win_end < main_end:
+            body.append(f"    … {main_end - win_end} more below\n", style="dim italic")
 
     # Footer / help text
     if not footer:

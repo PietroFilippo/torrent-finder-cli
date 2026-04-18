@@ -15,12 +15,13 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 from constants import console
 import readchar
-from downloader import download_with_webtorrent, download_with_peerflix, open_magnet, stream_with_peerflix, stream_with_webtorrent
+from downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, stream_with_peerflix, stream_with_webtorrent
 from filters import FilterConfig
 from providers import PROVIDERS, get_provider
 from security import show_security_warning
 from state import load_state
-from ui.prompts import clear_screen, download_method_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
+from torrent_meta import fetch_file_list
+from ui.prompts import clear_screen, download_method_prompt, episode_select_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
 from ui.table import interactive_select
 from utils import build_magnet
 
@@ -138,13 +139,54 @@ def main() -> None:
             magnet = build_magnet(info_hash, name)
 
             go_back_to_results = False
+            selected_files: list[int] | None = None
+            files_meta = None
             while True:
                 show_subs = hasattr(provider, "name") and provider.name in ("Movies", "Anime")
-                method = download_method_prompt(magnet=magnet, show_subtitles=show_subs)
+                show_picker = hasattr(provider, "name") and provider.name == "Anime"
+                method = download_method_prompt(
+                    magnet=magnet,
+                    show_subtitles=show_subs,
+                    show_episode_picker=show_picker,
+                    selected_indexes=selected_files,
+                )
+
+                if method == "pick_episodes":
+                    clear_screen()
+                    if not has_aria2():
+                        console.print("[error]aria2c required to list files. Install from https://aria2.github.io/[/error]\n")
+                        console.print("[dim]Press any key to continue...[/dim]")
+                        readchar.readkey()
+                        continue
+                    console.print("[info]Fetching torrent metadata via DHT (this can take 30–60s)...[/info]\n")
+                    with console.status("[bold cyan]Fetching file list...[/bold cyan]", spinner="dots"):
+                        metadata = fetch_file_list(magnet)
+                    if not metadata or not metadata.files:
+                        console.print("[error] Could not fetch file list (timeout or no metadata peers).[/error]\n")
+                        console.print("[dim]Press any key to continue...[/dim]")
+                        readchar.readkey()
+                        continue
+                    if len(metadata.files) == 1:
+                        console.print("[warning] Torrent contains a single file — nothing to pick.[/warning]\n")
+                        console.print("[dim]Press any key to continue...[/dim]")
+                        readchar.readkey()
+                        continue
+                    picked = episode_select_prompt(metadata.files)
+                    if picked:
+                        selected_files = picked
+                        files_meta = metadata
+                    clear_screen()
+                    continue
 
                 if method == "t":
                     clear_screen()
                     console.print("[info]Opening magnet link with default torrent client...[/info]")
+                    if selected_files:
+                        console.print(
+                            "[warning] External torrent clients cannot be pre-filtered from here.[/warning]\n"
+                            "[dim]When the client's 'Add new torrent' dialog appears, uncheck the files you don't want.[/dim]\n"
+                            "[dim]If your client skipped the dialog, pause the torrent and deselect unwanted files in its Content/Files tab.[/dim]"
+                        )
                     open_magnet(magnet)
                     console.print("[success] Magnet link sent to torrent client![/success]\n")
                     console.print("[dim]Press any key to continue...[/dim]")
@@ -152,25 +194,31 @@ def main() -> None:
                     break
                 elif method == "stream_p":
                     clear_screen()
-                    stream_with_peerflix(magnet)
+                    stream_with_peerflix(magnet, select_indexes=selected_files, files=files_meta)
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
                 elif method == "stream_w":
                     clear_screen()
-                    stream_with_webtorrent(magnet)
+                    stream_with_webtorrent(magnet, select_indexes=selected_files, files=files_meta)
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
+                elif method == "aria":
+                    clear_screen()
+                    download_with_aria2(magnet, select_indexes=selected_files)
+                    console.print("\n[dim]Press any key to continue...[/dim]")
+                    readchar.readkey()
+                    break
                 elif method == "p":
                     clear_screen()
-                    download_with_peerflix(magnet)
+                    download_with_peerflix(magnet, select_indexes=selected_files)
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     break
                 elif method == "d":
                     clear_screen()
-                    download_with_webtorrent(magnet)
+                    download_with_webtorrent(magnet, select_indexes=selected_files)
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     break

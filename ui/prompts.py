@@ -10,6 +10,7 @@ from constants import console
 from downloader import (
     detect_torrent_client,
     download_with_webtorrent,
+    has_aria2,
     has_webtorrent,
     has_peerflix,
     open_magnet,
@@ -152,6 +153,74 @@ def filter_menu(provider) -> None:
     # "back" — just return
 
 
+def episode_select_prompt(files: list) -> list[int] | None:
+    """Multi-select menu for picking episodes from a torrent's file list.
+
+    Takes a list of TorrentFile. Returns a list of 1-based indexes selected,
+    or None if cancelled or nothing was picked.
+    """
+    import os
+    from torrent_meta import extract_episode_number, format_size
+
+    if not files:
+        console.print("[warning] No files in torrent.[/warning]")
+        return None
+
+    items: list[SelectItem] = []
+    file_item_indexes: list[int] = []
+    for f in files:
+        ep = extract_episode_number(f.name)
+        ep_label = f"Ep {ep.rjust(3, '0') if ep.isdigit() else ep}" if ep else "      "
+        label = f"{ep_label}  {os.path.basename(f.name)}"
+        items.append(SelectItem(
+            label=label,
+            value=("file", f),
+            toggled=False,
+            hint=format_size(f.size_bytes),
+        ))
+        file_item_indexes.append(len(items) - 1)
+
+    items.append(SelectItem(label="Select all", value="all", is_action=True))
+    items.append(SelectItem(label="Invert selection", value="invert", is_action=True))
+    items.append(SelectItem(label="Clear", value="clear", is_action=True))
+    items.append(SelectItem(label="✅ Confirm", value="confirm", is_action=True))
+    items.append(SelectItem(label="↩ Cancel", value="cancel", is_action=True))
+
+    def on_action(idx, items):
+        val = items[idx].value
+        if val == "all":
+            for i in file_item_indexes:
+                items[i].toggled = True
+            return True
+        if val == "invert":
+            for i in file_item_indexes:
+                items[i].toggled = not items[i].toggled
+            return True
+        if val == "clear":
+            for i in file_item_indexes:
+                items[i].toggled = False
+            return True
+        return False
+
+    result = arrow_select(
+        items,
+        title=f"Select Episodes — {len(files)} files",
+        multi=True,
+        banner=_make_banner_panel(),
+        on_action=on_action,
+        footer="↑/↓ navigate  •  Enter toggle/select  •  Esc cancel",
+    )
+
+    if result is None:
+        return None
+    action = items[result].value
+    if action != "confirm":
+        return None
+
+    selected = [items[i].value[1].index for i in file_item_indexes if items[i].toggled]
+    return selected or None
+
+
 def _make_banner_panel() -> Panel:
     """Return the app banner as a Rich Panel renderable."""
     banner = Text()
@@ -177,44 +246,81 @@ def clear_screen() -> None:
     print_banner()
 
 
-def download_method_prompt(magnet: str = "", show_subtitles: bool = True) -> str | None:
+def download_method_prompt(
+    magnet: str = "",
+    show_subtitles: bool = True,
+    show_episode_picker: bool = False,
+    selected_indexes: list[int] | None = None,
+) -> str | None:
     """
     Prompt the user to choose a download method.
-    Returns 't', 'd', 's', 'back', or None.
-    'l' (copy magnet) is handled internally.
+    Returns 't', 'd', 'p', 'aria', 'stream_w', 'stream_p', 's', 'pick_episodes',
+    'back', or None. 'l' (copy magnet) is handled internally.
     """
     wt_available = has_webtorrent()
     pf_available = has_peerflix()
+    aria_available = has_aria2()
     client_name = detect_torrent_client()
+    has_selection = bool(selected_indexes)
+    n_sel = len(selected_indexes) if selected_indexes else 0
 
     items = [
         SelectItem(
             label=f"Open in {client_name}",
             value="t",
+            hint=(
+                "⚠  Uncheck unwanted files in the client's dialog"
+                if has_selection else ""
+            ),
         ),
         SelectItem(
             label="Stream to VLC (peerflix)",
             value="stream_p",
             enabled=pf_available,
-            hint="Requires VLC installed" if pf_available else "(not installed)",
+            hint=(
+                f"Plays {n_sel} episode(s) sequentially"
+                if has_selection and pf_available
+                else ("Requires VLC installed" if pf_available else "(not installed)")
+            ),
         ),
         SelectItem(
             label="Stream to VLC (webtorrent)",
             value="stream_w",
             enabled=wt_available,
-            hint="Requires VLC installed" if wt_available else "(not installed)",
+            hint=(
+                f"Plays {n_sel} episode(s) sequentially"
+                if has_selection and wt_available
+                else ("Requires VLC installed" if wt_available else "(not installed)")
+            ),
+        ),
+        SelectItem(
+            label="Download with aria2c",
+            value="aria",
+            enabled=aria_available,
+            hint=(
+                "Multi-file in one process, won't seed" if aria_available
+                else "(not installed — https://aria2.github.io/)"
+            ),
         ),
         SelectItem(
             label="Download directly (peerflix)",
             value="p",
             enabled=pf_available,
-            hint="Slower, won't seed" if pf_available else "(not installed)",
+            hint=(
+                f"{n_sel} sequential session(s), won't seed"
+                if has_selection and pf_available
+                else ("Slower, won't seed" if pf_available else "(not installed)")
+            ),
         ),
         SelectItem(
             label="Download directly (webtorrent)",
             value="d",
             enabled=wt_available,
-            hint="Slower, won't seed" if wt_available else "(not installed)",
+            hint=(
+                f"{n_sel} sequential session(s), won't seed"
+                if has_selection and wt_available
+                else ("Slower, won't seed" if wt_available else "(not installed)")
+            ),
         ),
     ]
 
@@ -222,6 +328,20 @@ def download_method_prompt(magnet: str = "", show_subtitles: bool = True) -> str
         items.append(SelectItem(
             label="Search & Download Subtitles",
             value="s",
+        ))
+
+    if show_episode_picker:
+        ep_label = (
+            f"📺 Change episode selection ({n_sel} selected)"
+            if has_selection
+            else "📺 Pick specific episodes..."
+        )
+        items.append(SelectItem(
+            label=ep_label,
+            value="pick_episodes",
+            is_action=True,
+            hint="Requires aria2c to fetch file list" if not aria_available else "",
+            enabled=aria_available,
         ))
 
     items.append(SelectItem(
@@ -249,9 +369,14 @@ def download_method_prompt(magnet: str = "", show_subtitles: bool = True) -> str
             return True  # Stay in menu
         return False
 
+    title = "Download Method"
+    if has_selection:
+        from torrent_meta import compact_ranges
+        title = f"Download Method — {n_sel} episode(s) selected [{compact_ranges(selected_indexes)}]"
+
     idx = arrow_select(
         items,
-        title="Download Method",
+        title=title,
         banner=_make_banner_panel(),
         on_action=handle_download_action,
     )
