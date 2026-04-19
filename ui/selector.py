@@ -84,7 +84,9 @@ def _build_panel(
 
     for i, item in enumerate(items):
         in_main = main_start <= i < main_end
-        if in_main and (i < win_start or i >= win_end):
+        # Interspersed action rows (section headers, mid-list actions) always
+        # render — only regular list items get windowed out.
+        if in_main and not item.is_action and (i < win_start or i >= win_end):
             continue
 
         if in_main and i == win_start and win_start > main_start:

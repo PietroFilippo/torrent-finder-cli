@@ -264,94 +264,108 @@ def download_method_prompt(
     has_selection = bool(selected_indexes)
     n_sel = len(selected_indexes) if selected_indexes else 0
 
-    items = [
-        SelectItem(
-            label=f"Open in {client_name}",
-            value="t",
-            hint=(
-                "⚠  Uncheck unwanted files in the client's dialog"
-                if has_selection else ""
-            ),
-        ),
-        SelectItem(
-            label="Stream to VLC (peerflix)",
-            value="stream_p",
-            enabled=pf_available,
-            hint=(
-                f"Plays {n_sel} episode(s) sequentially"
-                if has_selection and pf_available
-                else ("Requires VLC installed" if pf_available else "(not installed)")
-            ),
-        ),
-        SelectItem(
-            label="Stream to VLC (webtorrent)",
-            value="stream_w",
-            enabled=wt_available,
-            hint=(
-                f"Plays {n_sel} episode(s) sequentially"
-                if has_selection and wt_available
-                else ("Requires VLC installed" if wt_available else "(not installed)")
-            ),
-        ),
-        SelectItem(
-            label="Download with aria2c",
-            value="aria",
-            enabled=aria_available,
-            hint=(
-                "Multi-file in one process, won't seed" if aria_available
-                else "(not installed — https://aria2.github.io/)"
-            ),
-        ),
-        SelectItem(
-            label="Download directly (peerflix)",
-            value="p",
-            enabled=pf_available,
-            hint=(
-                f"{n_sel} sequential session(s), won't seed"
-                if has_selection and pf_available
-                else ("Slower, won't seed" if pf_available else "(not installed)")
-            ),
-        ),
-        SelectItem(
-            label="Download directly (webtorrent)",
-            value="d",
-            enabled=wt_available,
-            hint=(
-                f"{n_sel} sequential session(s), won't seed"
-                if has_selection and wt_available
-                else ("Slower, won't seed" if wt_available else "(not installed)")
-            ),
-        ),
-    ]
+    def _section(label: str) -> SelectItem:
+        return SelectItem(
+            label=f"─── {label} ───",
+            value="section_header",
+            enabled=False,
+            is_action=True,
+        )
 
-    if show_subtitles:
-        items.append(SelectItem(
-            label="Search & Download Subtitles",
-            value="s",
-        ))
+    items: list[SelectItem] = []
 
+    # --- Episode selection (only for providers that support it) ---
     if show_episode_picker:
+        items.append(_section("Episode selection"))
         ep_label = (
-            f"📺 Change episode selection ({n_sel} selected)"
+            f"📺 Change selection ({n_sel} picked)"
             if has_selection
-            else "📺 Pick specific episodes..."
+            else "📺 Pick specific episodes…"
         )
         items.append(SelectItem(
             label=ep_label,
             value="pick_episodes",
             is_action=True,
-            hint="Requires aria2c to fetch file list" if not aria_available else "",
+            hint=("requires aria2c to fetch file list" if not aria_available else ""),
             enabled=aria_available,
         ))
 
+    # --- Stream to VLC ---
+    items.append(_section("Stream to VLC"))
     items.append(SelectItem(
-        label="Copy magnet link",
+        label="▶  peerflix",
+        value="stream_p",
+        enabled=pf_available,
+        hint=(
+            "(not installed)" if not pf_available
+            else f"plays {n_sel} episode(s) sequentially" if has_selection
+            else "requires VLC installed"
+        ),
+    ))
+    items.append(SelectItem(
+        label="▶  webtorrent",
+        value="stream_w",
+        enabled=wt_available,
+        hint=(
+            "(not installed)" if not wt_available
+            else f"plays {n_sel} episode(s) sequentially" if has_selection
+            else "requires VLC installed"
+        ),
+    ))
+
+    # --- Download ---
+    items.append(_section("Download"))
+    items.append(SelectItem(
+        label="⬇  aria2c",
+        value="aria",
+        enabled=aria_available,
+        hint=(
+            "(not installed — https://aria2.github.io/)" if not aria_available
+            else "fastest, multi-file in one process, won't seed"
+        ),
+    ))
+    items.append(SelectItem(
+        label="⬇  peerflix",
+        value="p",
+        enabled=pf_available,
+        hint=(
+            "(not installed)" if not pf_available
+            else f"{n_sel} sequential session(s), won't seed" if has_selection
+            else "slower, won't seed"
+        ),
+    ))
+    items.append(SelectItem(
+        label="⬇  webtorrent",
+        value="d",
+        enabled=wt_available,
+        hint=(
+            "(not installed)" if not wt_available
+            else f"{n_sel} sequential session(s), won't seed" if has_selection
+            else "slower, won't seed"
+        ),
+    ))
+
+    # --- Other ---
+    items.append(_section("Other"))
+    items.append(SelectItem(
+        label=f"🧲 Open in {client_name}",
+        value="t",
+        hint=("⚠  uncheck unwanted files in the client's dialog" if has_selection else ""),
+    ))
+    items.append(SelectItem(
+        label="📋 Copy magnet link",
         value="l",
         is_action=True,
     ))
+    if show_subtitles:
+        items.append(SelectItem(
+            label="📝 Search & download subtitles",
+            value="s",
+        ))
 
-    items.append(SelectItem(label="↩ Go back to results", value="back"))
-    items.append(SelectItem(label="Cancel", value=None))
+    # --- Trailing actions ---
+    items.append(SelectItem(label="↩  Go back to results", value="back", is_action=True))
+    items.append(SelectItem(label="✕  Cancel", value=None, is_action=True))
 
     def handle_download_action(idx, items):
         if items[idx].value == "l" and magnet:
