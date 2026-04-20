@@ -49,6 +49,22 @@ def leech_style(leeches: int) -> str:
     return "red"
 
 
+def marquee(text: str, width: int, tick: int, sep: str = "   •   ") -> str:
+    """Return a `width`-char window into `text`, shifted left by `tick` chars.
+
+    For text shorter than `width`, returns it unchanged. Otherwise wraps
+    around with `sep` between repetitions so the scroll loops smoothly.
+    """
+    if width <= 0:
+        return ""
+    if len(text) <= width:
+        return text
+    period = len(text) + len(sep)
+    offset = tick % period
+    full = text + sep + text + sep
+    return full[offset:offset + width]
+
+
 def build_magnet(info_hash: str, name: str) -> str:
     """Build a magnet URI from an info hash."""
     trackers = "&".join(f"tr={t}" for t in TRACKERS)

@@ -1,7 +1,8 @@
 """Reusable arrow-key interactive selector using readchar + Rich."""
 
 import sys
-from dataclasses import dataclass, field
+import time
+from dataclasses import dataclass
 from typing import Callable
 
 import readchar
@@ -9,6 +10,13 @@ from rich.panel import Panel
 from rich.text import Text
 
 from constants import console
+from utils import marquee
+
+
+# Marquee timing
+_MARQUEE_DWELL_S = 1.0      # delay before scrolling starts
+_MARQUEE_RATE = 6           # chars/sec scroll speed
+_TICK_INTERVAL_S = 0.12     # how often the watcher wakes up
 
 
 @dataclass
@@ -39,12 +47,34 @@ def _compute_window(n: int, cursor: int, max_visible: int) -> tuple[int, int]:
     return start, end
 
 
+def _label_avail_width(item: "SelectItem", multi: bool) -> int:
+    """Approximate visible chars available for the label of one item."""
+    # Panel: 1 border + 2 padding on each side = 6 chars chrome.
+    inner = max(20, console.size.width - 6)
+    if multi and not item.is_action:
+        prefix_len = 8   # "  ❯ [✓] "
+    else:
+        prefix_len = 4   # "  ❯ " or "    "
+    hint_len = (2 + len(item.hint)) if item.hint else 0
+    return max(10, inner - prefix_len - hint_len)
+
+
+def _cursor_overflows(items: list["SelectItem"], cursor: int, multi: bool) -> bool:
+    if not (0 <= cursor < len(items)):
+        return False
+    it = items[cursor]
+    if it.is_action and (isinstance(it.value, str) and it.value == "section_header"):
+        return False
+    return len(it.label) > _label_avail_width(it, multi)
+
+
 def _build_panel(
     items: list[SelectItem],
     cursor: int,
     title: str,
     multi: bool,
     footer: str = "",
+    tick: int = 0,
 ) -> Panel:
     """Render the selector as a Rich Panel.
 
@@ -134,7 +164,13 @@ def _build_panel(
             style = "white"
 
         body.append(prefix, style=style)
-        body.append(item.label, style=style)
+
+        # Marquee the cursor item's label when it overflows the panel.
+        label_text = item.label
+        if is_cursor and not is_section_header:
+            avail = _label_avail_width(item, multi)
+            label_text = marquee(item.label, avail, tick)
+        body.append(label_text, style=style)
 
         # Show hint if present
         if item.hint:
@@ -182,7 +218,11 @@ def _next_enabled(items: list[SelectItem], current: int, direction: int) -> int:
 
 
 def _render(banner: object, panel: Panel) -> None:
-    """Redraw inside the alternate screen buffer — home, print, clear rest."""
+    """Redraw inside the alternate screen buffer.
+
+    Clears the viewport first (cheap inside an alt-screen) so a previous
+    render that overflowed and scrolled can't leave ghost borders behind.
+    """
     from io import StringIO
     from rich.console import Console as _Console
 
@@ -195,8 +235,10 @@ def _render(banner: object, panel: Panel) -> None:
     tmp.print(panel)
     content = buf.getvalue()
 
-    # Move to home, write content, clear anything below
-    sys.stdout.write("\033[H" + content + "\033[J")
+    # Home + clear entire screen + write content. The 2J clear avoids
+    # ghost borders when a prior render overflowed and scrolled the
+    # viewport (which was leaving leftover top borders visible).
+    sys.stdout.write("\033[H\033[2J" + content)
     sys.stdout.flush()
 
 
@@ -245,32 +287,60 @@ def arrow_select(
     if not items[cursor].enabled:
         cursor = _next_enabled(items, cursor, 1)
 
-    # Shared state for resize watcher
-    state = {"cursor": cursor}
+    # Shared state for resize watcher + marquee ticker
+    state = {
+        "cursor": cursor,
+        "tick": 0,
+        "cursor_changed_at": time.monotonic(),
+    }
     stop_event = threading.Event()
 
-    def resize_watcher():
+    def watcher():
         prev_size = console.size
+        last_cursor = state["cursor"]
+        last_rendered_tick = -1
         while not stop_event.is_set():
-            stop_event.wait(0.25)
-            cur_size = console.size
-            if cur_size != prev_size:
-                prev_size = cur_size
-                _render(banner, _build_panel(items, state["cursor"], title, multi, footer))
+            if stop_event.wait(_TICK_INTERVAL_S):
+                break
 
-    # Enter alternate screen buffer + hide cursor
-    sys.stdout.write("\033[?1049h\033[?25l")
+            cur_size = console.size
+            size_changed = cur_size != prev_size
+            prev_size = cur_size
+
+            # Reset marquee on cursor move
+            if state["cursor"] != last_cursor:
+                last_cursor = state["cursor"]
+                state["cursor_changed_at"] = time.monotonic()
+                state["tick"] = 0
+                last_rendered_tick = -1
+
+            elapsed = time.monotonic() - state["cursor_changed_at"]
+            overflows = _cursor_overflows(items, state["cursor"], multi)
+
+            new_tick = 0
+            if overflows and elapsed > _MARQUEE_DWELL_S:
+                new_tick = int((elapsed - _MARQUEE_DWELL_S) * _MARQUEE_RATE)
+
+            need_redraw = size_changed or (overflows and new_tick != last_rendered_tick)
+            if need_redraw:
+                state["tick"] = new_tick
+                last_rendered_tick = new_tick
+                _render(banner, _build_panel(items, state["cursor"], title, multi, footer, tick=new_tick))
+
+    # Enter alternate screen buffer + hide cursor + clear it
+    sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
     sys.stdout.flush()
 
-    watcher = threading.Thread(target=resize_watcher, daemon=True)
-    watcher.start()
+    watcher_thread = threading.Thread(target=watcher, daemon=True)
+    watcher_thread.start()
 
     try:
         # Initial render
-        _render(banner, _build_panel(items, cursor, title, multi, footer))
+        _render(banner, _build_panel(items, cursor, title, multi, footer, tick=0))
 
         while True:
             key = readchar.readkey()
+            prev_cursor = cursor
 
             if key == readchar.key.UP:
                 cursor = _next_enabled(items, cursor, -1)
@@ -302,12 +372,17 @@ def arrow_select(
             elif hotkeys and key in hotkeys:
                 return ("hotkey", hotkeys[key], cursor)
 
+            # Reset marquee state on cursor move
+            if cursor != prev_cursor:
+                state["tick"] = 0
+                state["cursor_changed_at"] = time.monotonic()
+
             state["cursor"] = cursor
-            _render(banner, _build_panel(items, cursor, title, multi, footer))
+            _render(banner, _build_panel(items, cursor, title, multi, footer, tick=state["tick"]))
 
     finally:
         stop_event.set()
-        watcher.join(timeout=1)
+        watcher_thread.join(timeout=1)
         # Show cursor + exit alt screen + clear main screen — all in one write
         # to prevent any flash of stale content
         sys.stdout.write("\033[?25h\033[?1049l\033[2J\033[H")
