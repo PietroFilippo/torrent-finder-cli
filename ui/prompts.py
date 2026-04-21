@@ -180,27 +180,97 @@ def episode_select_prompt(files: list) -> list[int] | None:
         ))
         file_item_indexes.append(len(items) - 1)
 
-    items.append(SelectItem(label="Select all", value="all", is_action=True))
-    items.append(SelectItem(label="Invert selection", value="invert", is_action=True))
-    items.append(SelectItem(label="Clear", value="clear", is_action=True))
-    items.append(SelectItem(label="✅ Confirm", value="confirm", is_action=True))
+    items.append(SelectItem(label="Select all  [a]", value="all", is_action=True))
+    items.append(SelectItem(label="Invert selection  [i]", value="invert", is_action=True))
+    items.append(SelectItem(label="Clear  [c]", value="clear", is_action=True))
+    items.append(SelectItem(label="✅ Confirm  [w]", value="confirm", is_action=True))
     items.append(SelectItem(label="↩ Cancel", value="cancel", is_action=True))
+
+    # Index of the Confirm action — returned when `w` is pressed
+    confirm_idx = len(items) - 2
+
+    # Anchor state for range-toggle (v/V)
+    anchor = {"idx": None}
+
+    def _file_item_set() -> set[int]:
+        return set(file_item_indexes)
+
+    def _select_all(cursor, items):
+        for i in file_item_indexes:
+            if items[i].enabled:
+                items[i].toggled = True
+        return True
+
+    def _invert(cursor, items):
+        for i in file_item_indexes:
+            if items[i].enabled:
+                items[i].toggled = not items[i].toggled
+        return True
+
+    def _clear(cursor, items):
+        for i in file_item_indexes:
+            items[i].toggled = False
+        return True
+
+    def _confirm_now(cursor, items):
+        return confirm_idx
+
+    def _set_anchor(cursor, items):
+        file_set = _file_item_set()
+        if cursor not in file_set:
+            return True  # ignore on non-file rows
+        # Clear any previous anchor marker
+        if anchor["idx"] is not None and 0 <= anchor["idx"] < len(items):
+            items[anchor["idx"]].marker = ""
+        anchor["idx"] = cursor
+        items[cursor].marker = "📍"
+        return True
+
+    def _range_toggle(cursor, items):
+        if anchor["idx"] is None:
+            # No anchor yet — treat as anchor set
+            return _set_anchor(cursor, items)
+        file_set = _file_item_set()
+        lo, hi = sorted([anchor["idx"], cursor])
+        # Derive target toggle state from anchor row (flip it for the whole range)
+        anchor_now = items[anchor["idx"]].toggled
+        target = not anchor_now
+        for i in range(lo, hi + 1):
+            if i in file_set and items[i].enabled:
+                items[i].toggled = target
+        # Clear anchor after range apply
+        items[anchor["idx"]].marker = ""
+        anchor["idx"] = None
+        return True
+
+    def _toggle_current(cursor, items):
+        if cursor in _file_item_set() and items[cursor].enabled:
+            items[cursor].toggled = not items[cursor].toggled
+        return True
 
     def on_action(idx, items):
         val = items[idx].value
         if val == "all":
-            for i in file_item_indexes:
-                items[i].toggled = True
-            return True
+            return _select_all(idx, items)
         if val == "invert":
-            for i in file_item_indexes:
-                items[i].toggled = not items[i].toggled
-            return True
+            return _invert(idx, items)
         if val == "clear":
-            for i in file_item_indexes:
-                items[i].toggled = False
-            return True
+            return _clear(idx, items)
         return False
+
+    key_actions = {
+        "a": _select_all,
+        "A": _select_all,
+        "i": _invert,
+        "I": _invert,
+        "c": _clear,
+        "C": _clear,
+        "w": _confirm_now,
+        "W": _confirm_now,
+        "v": _set_anchor,
+        "V": _range_toggle,
+        " ": _toggle_current,
+    }
 
     result = arrow_select(
         items,
@@ -208,7 +278,13 @@ def episode_select_prompt(files: list) -> list[int] | None:
         multi=True,
         banner=_make_banner_panel(),
         on_action=on_action,
-        footer="↑/↓ navigate  •  Enter toggle/select  •  Esc cancel",
+        key_actions=key_actions,
+        footer=(
+            "↑/↓ nav  •  Space/Enter toggle  •  "
+            "[bold yellow]v[/bold yellow] anchor  •  [bold yellow]shift + v or V[/bold yellow] range  •  "
+            "[bold yellow]a[/bold yellow]ll/[bold yellow]i[/bold yellow]nvert/[bold yellow]c[/bold yellow]lear  •  "
+            "[bold green]w[/bold green] save  •  Esc cancel"
+        ),
     )
 
     if result is None:

@@ -29,6 +29,7 @@ class SelectItem:
     hint: str = ""        # Dim subtext shown next to the label
     is_action: bool = False  # Action buttons: Enter returns instead of toggling
     description: str = ""  # Dim context-help shown above the footer when cursor on this item
+    marker: str = ""      # Inline marker (e.g. 📍 for range-select anchor)
 
 
 def _compute_window(n: int, cursor: int, max_visible: int) -> tuple[int, int]:
@@ -56,7 +57,8 @@ def _label_avail_width(item: "SelectItem", multi: bool) -> int:
     else:
         prefix_len = 4   # "  ❯ " or "    "
     hint_len = (2 + len(item.hint)) if item.hint else 0
-    return max(10, inner - prefix_len - hint_len)
+    marker_len = (len(item.marker) + 1) if item.marker else 0
+    return max(10, inner - prefix_len - hint_len - marker_len)
 
 
 def _cursor_overflows(items: list["SelectItem"], cursor: int, multi: bool) -> bool:
@@ -165,6 +167,10 @@ def _build_panel(
 
         body.append(prefix, style=style)
 
+        # Optional inline marker (anchor pin, etc.) — rendered before label
+        if item.marker:
+            body.append(f"{item.marker} ", style="bold yellow")
+
         # Marquee the cursor item's label when it overflows the panel.
         label_text = item.label
         if is_cursor and not is_section_header:
@@ -251,6 +257,7 @@ def arrow_select(
     banner: object = None,
     on_action: Callable[[int, list[SelectItem]], bool] | None = None,
     hotkeys: dict[str, str] | None = None,
+    key_actions: dict[str, Callable[[int, list[SelectItem]], object]] | None = None,
 ) -> int | list[int] | tuple | None:
     """Interactive arrow-key selector.
 
@@ -371,6 +378,18 @@ def arrow_select(
                 return None
             elif hotkeys and key in hotkeys:
                 return ("hotkey", hotkeys[key], cursor)
+            elif key_actions and key in key_actions:
+                outcome = key_actions[key](cursor, items)
+                # bool True = stay; int = return that index; "jump:N" = move cursor
+                if isinstance(outcome, bool):
+                    pass  # stay and redraw
+                elif isinstance(outcome, int):
+                    return outcome
+                elif isinstance(outcome, tuple) and len(outcome) == 2 and outcome[0] == "jump":
+                    new = outcome[1]
+                    if 0 <= new < len(items) and items[new].enabled:
+                        cursor = new
+                # else: no-op (None/other) — still redraw
 
             # Reset marquee state on cursor move
             if cursor != prev_cursor:
