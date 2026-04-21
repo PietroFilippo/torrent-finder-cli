@@ -9,6 +9,8 @@ An interactive command-line application for searching and downloading torrents d
 - **Arrow-Key Driven UI:** Fully interactive, flicker-free terminal interface.
   - Utilizes an alternate screen buffer so your scrollback history remains flawlessly clean.
   - **Dynamic Viewport Windowing:** Capable of rendering massive 500+ item checklists (like huge anime seasons) by automatically windowing the active selection while pinning crucial action buttons tightly to the top and bottom of your screen to prevent terminal overflow.
+  - **Marquee Scrolling:** Automatically scrolls long torrent names and checklist items that exceed the physical terminal width when hovered over.
+  - **Contextual Footers:** Displays dynamic helper text explaining the trade-offs, speeds, and seeding behaviors of different download options as you highlight them.
 - **Advanced Filtering:**
   - Toggle built-in presets (preferred resolutions, known uploaders/repackers, trusted release groups) using an interactive checklist.
   - Toggle individual search engines on and off per provider from the same menu.
@@ -17,10 +19,11 @@ An interactive command-line application for searching and downloading torrents d
 - **Flexible Downloading & Streaming:**
   - **System Client:** Automatically send generated magnet links to your default system torrent client (like qBittorrent, Transmission, etc.).
   - **Direct Terminal Download:** Use `aria2c`, `webtorrent-cli`, or `peerflix` integration to download files directly within the terminal, with native progress UIs.
-  - **Episode Picker (Anime):** For multi-file torrents (batches, seasons, complete collections), fetch the torrent's file list via `aria2c` and pick any subset of episodes — single, multiple, or a range — before downloading or streaming. Works natively with `aria2c` (`--select-file=1,3,5-7`) in a single process; falls back to sequential `webtorrent`/`peerflix` sessions per episode.
+  - **Episode Picker (Anime):** For multi-file torrents (batches, seasons, complete collections), fetch the torrent's file list via `aria2c` and pick any subset of episodes. Features ultra-fast vim-style visual range selection (`v` to set an anchor, `shift+v` to toggle the block) and rapid hotkeys (`a`, `i`, `c`, `w`). Works natively with `aria2c` (`--select-file=1,3,5-7`) in a single process; falls back to sequential `webtorrent`/`peerflix` sessions per episode.
   - **Stream to VLC:** Stream media directly to VLC Media Player using `webtorrent-cli` or `peerflix`. Press the `v` hotkey at any time during a streaming session to reopen VLC without losing your torrent download/buffering progress. When an episode is selected, streams that specific file.
   - **Subtitle Download:** Search and download the best matching subtitles directly from the terminal using `subliminal`.
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
+  - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
 - **Network Exposure Warning:** At startup a red panel queries `ip-api.com` and shows your public IP, ISP, ASN, location, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
 - **Pagination & Navigation:** Navigate through large sets of search results cleanly, with the ability to safely go back to your previous search results after viewing download options.
 
@@ -100,7 +103,11 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 
 - **Lists & Menus**: Use `Up` and `Down` arrows to navigate.
 - **Select**: Press `Enter` to confirm a choice or open a torrent.
-- **Toggle**: In multi-select menus (like Filters), press `Enter` on an item to toggle its checkbox.
+- **Toggle**: In multi-select menus (like Filters), press `Enter` or `Space` on an item to toggle its checkbox.
+- **Range Selection (Episode Picker)**: 
+  - `v`: Drop a visual anchor on the current item.
+  - `Shift + V`: Instantly mass-toggle all items between the anchor and your cursor.
+  - `a` (Select All) • `i` (Invert Selection) • `c` (Clear) • `w` (Save & Continue).
 - **Configure filters from the provider screen**: Press `F` while a provider is highlighted to jump straight into its engines + filter presets menu, then return to the provider list.
 - **Configure filters during search**: Press `Shift+F` at the search prompt to open the filter menu for the current provider. The status line above the prompt shows the active engines / presets and the hotkey.
 - **Clear filters**: The "Clear filters" button in the filter menu only clears preset toggles — your engine selections are preserved.
