@@ -67,3 +67,53 @@ def save_setting(key: str, value) -> None:
     data = _read_state()
     data.setdefault("settings", {})[key] = value
     _write_state(data)
+
+
+# ---------------------------------------------------------------------------
+# Search history
+# ---------------------------------------------------------------------------
+
+_HISTORY_MAX = 50
+
+
+def load_history() -> list[dict]:
+    """Return the saved search history (newest first).
+
+    Each entry is ``{"query": str, "provider": str, "timestamp": str}``.
+    """
+    return _read_state().get("history", [])
+
+
+def save_history(entries: list[dict]) -> None:
+    """Persist a history list, capping at *_HISTORY_MAX* entries."""
+    data = _read_state()
+    data["history"] = entries[:_HISTORY_MAX]
+    _write_state(data)
+
+
+def add_history_entry(query: str, provider_name: str) -> None:
+    """Record a search.  Deduplicates: if the same query+provider already
+    exists, the old entry is removed so the new one lands on top."""
+    from datetime import datetime, timezone
+
+    history = load_history()
+
+    # Remove any previous duplicate (same query text + same provider)
+    history = [
+        e for e in history
+        if not (e.get("query", "").lower() == query.lower()
+                and e.get("provider") == provider_name)
+    ]
+
+    entry = {
+        "query": query,
+        "provider": provider_name,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    history.insert(0, entry)
+    save_history(history)
+
+
+def clear_history() -> None:
+    """Wipe all history entries."""
+    save_history([])

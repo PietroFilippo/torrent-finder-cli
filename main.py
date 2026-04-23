@@ -70,10 +70,15 @@ def main() -> None:
 
     while True:
         if not current_provider:
-            current_provider = provider_select_prompt()
-            if not current_provider:
+            result = provider_select_prompt()
+            if result is None:
                 console.print("\n[info]Goodbye![/info]")
                 break
+            # History selection returns ("history", query, provider)
+            if isinstance(result, tuple) and result[0] == "history":
+                _, query, current_provider = result
+            else:
+                current_provider = result
             clear_screen()
 
         provider = current_provider
@@ -88,7 +93,9 @@ def main() -> None:
             console.print(f"[dim]Engines:[/dim] [cyan]{engine_str}[/cyan]   [dim]Filters:[/dim] [cyan]{active_name}[/cyan]")
             console.print(
                 "[bold yellow on grey23] Shift+F [/bold yellow on grey23] "
-                "[white]configure engines & filters[/white]   "
+                "[white]engines & filters[/white]   "
+                "[bold yellow on grey23] Shift+H [/bold yellow on grey23] "
+                "[white]history[/white]   "
                 "[bold]Esc[/bold] [dim]go back[/dim]"
             )
             try:
@@ -101,6 +108,19 @@ def main() -> None:
                 filter_menu(provider)
                 clear_screen()
                 query = None
+                continue
+            elif query == "SPECIAL_HISTORY":
+                from ui.history import history_select_prompt
+                pick = history_select_prompt()
+                if pick:
+                    query, prov_name = pick
+                    from providers import get_provider
+                    hist_prov = get_provider(prov_name)
+                    if hist_prov:
+                        current_provider = hist_prov
+                else:
+                    query = None
+                clear_screen()
                 continue
             elif query == "GO_BACK":
                 current_provider = None
@@ -122,6 +142,10 @@ def main() -> None:
             console.print("[warning] No results found.[/warning]\n")
             query = None
             continue
+
+        # Record successful search in history
+        from state import add_history_entry
+        add_history_entry(query, provider.name)
 
         # Torrent selection + download loop (allows going back to results)
         while True:

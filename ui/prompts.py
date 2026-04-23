@@ -31,6 +31,10 @@ def get_query_with_shortcut(prompt_str: str) -> str | None:
         if not buffer and key == "F":
             print()
             return "SPECIAL_FILTER"
+
+        if not buffer and key == "H":
+            print()
+            return "SPECIAL_HISTORY"
             
         if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
             print()
@@ -495,7 +499,13 @@ def provider_select_prompt() -> object | None:
     """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled.
 
     Press F on a highlighted provider to configure its filters without leaving the menu.
+    Press H to browse search history.
     A "Network exposure info" action re-opens the security warning on demand.
+
+    Returns:
+        - A provider object for normal selection.
+        - A ``("history", query, provider_obj)`` tuple when the user picks a history entry.
+        - ``None`` if cancelled.
     """
     provider_items = [SelectItem(label=p.label, value=p) for p in PROVIDERS]
     info_item = SelectItem(
@@ -512,12 +522,13 @@ def provider_select_prompt() -> object | None:
             title="Select Provider",
             footer=(
                 "↑/↓ navigate  •  Enter select  •  "
-                "[bold yellow]F[/bold yellow] configure filters  •  Esc cancel\n"
+                "[bold yellow]F[/bold yellow] filters  •  "
+                "[bold yellow]H[/bold yellow] history  •  Esc cancel\n"
                 "   Tip: For the best results, search using the complete name."
             ),
             banner=_make_banner_panel(),
             start_index=start,
-            hotkeys={"F": "filter", "f": "filter"},
+            hotkeys={"F": "filter", "f": "filter", "H": "history", "h": "history"},
         )
 
         if result is None:
@@ -530,6 +541,17 @@ def provider_select_prompt() -> object | None:
                 # Skip filter hotkey for the network-info action item
                 if target != "__network_info__":
                     filter_menu(target)
+                start = cursor
+                continue
+            elif action == "history":
+                from ui.history import history_select_prompt
+                pick = history_select_prompt()
+                if pick:
+                    query, prov_name = pick
+                    from providers import get_provider
+                    prov = get_provider(prov_name)
+                    if prov:
+                        return ("history", query, prov)
                 start = cursor
                 continue
 
