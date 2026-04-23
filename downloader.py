@@ -5,6 +5,7 @@ import platform
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import urllib.parse
@@ -22,12 +23,43 @@ def _resolve_vlc_path() -> str | None:
     return vlc_path
 
 
-def _start_vlc_hotkey_thread(url_holder: list, advance_event: threading.Event | None = None) -> threading.Event:
-    """Listen for 'v' (reopen VLC) and optionally 'n' (advance to next session).
+def _kill_vlc() -> None:
+    """Terminate all running VLC instances."""
+    system = platform.system()
+    try:
+        if system == "Windows":
+            subprocess.run(
+                ["taskkill", "/IM", "vlc.exe", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        elif system == "Darwin":
+            subprocess.run(
+                ["pkill", "-f", "VLC"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        else:
+            subprocess.run(
+                ["pkill", "vlc"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+    except Exception:
+        pass
+
+
+def _start_vlc_hotkey_thread(
+    url_holder: list,
+    advance_event: threading.Event | None = None,
+    back_event: threading.Event | None = None,
+) -> threading.Event:
+    """Listen for 'v' (reopen VLC), 'n' (next episode), and 'b' (previous episode).
 
     url_holder is a single-element list so callers can update the URL after
     capturing it from a subprocess's stdout. advance_event, when provided,
     is set on 'n' so the caller can terminate the current session and move on.
+    back_event, when provided, is set on 'b' to go back to the previous episode.
     """
     stop_event = threading.Event()
 
@@ -51,6 +83,8 @@ def _start_vlc_hotkey_thread(url_holder: list, advance_event: threading.Event | 
                                 pass
                     elif key.lower() == b'n' and advance_event is not None:
                         advance_event.set()
+                    elif key.lower() == b'b' and back_event is not None:
+                        back_event.set()
             time.sleep(0.2)
 
     t = threading.Thread(target=listener, daemon=True)
@@ -298,46 +332,70 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
         return False
 
 
+def _kill_process_tree(proc: subprocess.Popen) -> None:
+    """Kill a subprocess and all its children.
+
+    On Windows, ``proc.terminate()`` only kills the parent process — child
+    processes (e.g. peerflix spawns node children for streaming) keep running.
+    Using ``taskkill /T`` (tree kill) ensures the entire process tree dies.
+    """
+    pid = proc.pid
+    if platform.system() == "Windows":
+        subprocess.run(
+            ["taskkill", "/T", "/F", "/PID", str(pid)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    else:
+        # On Unix, kill the process group
+        try:
+            import signal
+            os.killpg(os.getpgid(pid), signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            proc.kill()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
 def _run_stream(
     cmd: list[str],
     vlc_url: str | None,
-    allow_advance: bool,
-) -> tuple[int, bool]:
+    allow_navigate: bool,
+) -> tuple[int, str]:
     """Run a streaming subprocess with native TTY (no stdout piping).
 
     vlc_url, if provided, is what the 'v' hotkey will relaunch VLC with.
-    When allow_advance is True, 'n' terminates the subprocess so the caller
-    can advance to the next session (multi-ep flow). Returns (returncode,
-    advanced) — advanced=True means the user explicitly pressed 'n'.
+    When allow_navigate is True, 'n'/'b' terminate the subprocess so the
+    caller can advance or go back in a multi-ep flow. Returns (returncode,
+    nav_action) where nav_action is 'next', 'back', or 'none'.
     """
     url_holder: list[str | None] = [vlc_url]
-    advance_event = threading.Event() if allow_advance else None
-    stop_event = _start_vlc_hotkey_thread(url_holder, advance_event)
+    advance_event = threading.Event() if allow_navigate else None
+    back_event = threading.Event() if allow_navigate else None
+    stop_event = _start_vlc_hotkey_thread(url_holder, advance_event, back_event)
 
     proc = subprocess.Popen(cmd)
-    advanced = False
+    nav_action = "none"
     try:
         while proc.poll() is None:
             if advance_event is not None and advance_event.is_set():
-                advanced = True
-                proc.terminate()
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
+                nav_action = "next"
+                _kill_process_tree(proc)
+                break
+            if back_event is not None and back_event.is_set():
+                nav_action = "back"
+                _kill_process_tree(proc)
                 break
             time.sleep(0.25)
     except KeyboardInterrupt:
         if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+            _kill_process_tree(proc)
         raise
     finally:
         stop_event.set()
-    return proc.returncode or 0, advanced
+    return proc.returncode or 0, nav_action
 
 
 def _extract_infohash(magnet_link: str) -> str:
@@ -389,6 +447,98 @@ def _webtorrent_vlc_url(
     return base
 
 
+# Fixed header height for multi-episode streaming.  We always reserve this
+# many lines so the scroll region boundary never shifts between episodes.
+_STREAM_HEADER_LINES = 7
+
+
+def _clear_terminal() -> None:
+    """Clear the terminal screen."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+
+def _set_terminal_title(title: str) -> None:
+    """Set the terminal window title via OSC escape."""
+    sys.stdout.write(f"\033]0;{title}\007")
+    sys.stdout.flush()
+
+
+def _print_stream_header(
+    ep_idx: int,
+    total: int,
+    file_idx: int | None,
+    multi: bool,
+    vlc_url: str | None = None,
+    use_scroll_region: bool = True,
+) -> None:
+    """Print the episode header and optionally pin it with a scroll region.
+
+    When *use_scroll_region* is True (peerflix), the header is pinned at
+    the top of the terminal and a scroll region is set below it.
+    When False (webtorrent), only the terminal **window title** is used
+    for persistent episode info, since webtorrent's ANSI rendering
+    clears through scroll regions.
+    """
+    # Reset any previous scroll region so clear works on the full screen
+    sys.stdout.write("\033[r")
+    sys.stdout.flush()
+    _clear_terminal()
+
+    n = ep_idx + 1
+
+    # Always set the terminal title — persists regardless of screen content
+    if multi:
+        _set_terminal_title(f"Episode {n}/{total} — file {file_idx} | n: next  b: back  v: VLC  Ctrl+C: cancel")
+    elif file_idx is not None:
+        _set_terminal_title(f"Streaming file {file_idx} | v: VLC  Ctrl+C: cancel")
+
+    # Build header lines
+    lines: list[str] = []
+    if multi:
+        lines.append(f"[info]Episode {n}/{total} \u2014 file index {file_idx}[/info]")
+    elif file_idx is not None:
+        lines.append(f"[info]Streaming file index:[/info] [highlight]{file_idx}[/highlight]")
+    lines.append("[bold red]CTRL+C to cancel.[/bold red]")
+    if vlc_url:
+        lines.append("[bold yellow]Press 'v' to reopen VLC without losing download progress.[/bold yellow]")
+    if multi:
+        lines.append("[bold yellow]Press 'n' to skip to the next episode.[/bold yellow]")
+        if ep_idx > 0:
+            lines.append("[bold yellow]Press 'b' to go back to the previous episode (will re-download).[/bold yellow]")
+        lines.append("[dim]VLC will be closed automatically when switching episodes.[/dim]")
+
+    # Print the header lines
+    for line in lines:
+        console.print(line)
+
+    if use_scroll_region:
+        # Pad to fixed height so the scroll region boundary is stable
+        for _ in range(len(lines), _STREAM_HEADER_LINES):
+            console.print()
+        # Set scroll region: rows _STREAM_HEADER_LINES+1 .. terminal height
+        term_h = console.size.height
+        top = _STREAM_HEADER_LINES + 1
+        if top < term_h:
+            sys.stdout.write(f"\033[{top};{term_h}r")
+            # Move cursor into the scroll region and clear it
+            sys.stdout.write(f"\033[{top};1H")
+            sys.stdout.write("\033[J")  # erase from cursor to end of region
+            sys.stdout.flush()
+    else:
+        console.print()  # just a blank separator line
+
+
+def _reset_scroll_region() -> None:
+    """Remove the scroll region so the full terminal is usable again."""
+    sys.stdout.write("\033[r")
+    sys.stdout.flush()
+
+
+def _reset_terminal_title() -> None:
+    """Restore the terminal title to the default."""
+    _set_terminal_title("Torrent Search CLI")
+
+
 def stream_with_webtorrent(
     magnet_link: str,
     select_indexes: list[int] | None = None,
@@ -399,6 +549,10 @@ def stream_with_webtorrent(
     `files` is a TorrentMetadata whose .name (info.name) gives the exact
     torrent root for 'v' hotkey URL reconstruction, and whose .files list
     maps 1-based indexes to internal file paths.
+
+    webtorrent-cli uses full-screen ANSI rendering (``\033[2J``) that
+    clears through scroll regions, so we use the terminal window title
+    for persistent episode info instead.
     """
     wt_path = shutil.which("webtorrent")
     if not wt_path:
@@ -413,36 +567,46 @@ def stream_with_webtorrent(
     torrent_name = files.name if files is not None else None
 
     try:
-        for n, idx in enumerate(targets, 1):
+        ep_idx = 0
+        while 0 <= ep_idx < len(targets):
+            idx = targets[ep_idx]
             file_path = name_by_idx.get(idx) if idx is not None else None
             vlc_url = _webtorrent_vlc_url(magnet_link, torrent_name, file_path, is_multi_file)
 
-            if multi:
-                console.print(f"[info]Session {n}/{len(targets)} — file index {idx}[/info]")
-            elif idx is not None:
-                console.print(f"[info]Streaming file index:[/info] [highlight]{idx}[/highlight]")
-            console.print("[bold red]CTRL+C to cancel.[/bold red]")
-            if vlc_url:
-                console.print("[bold yellow]Tip: Press 'v' to reopen VLC without losing download progress![/bold yellow]")
-            if multi:
-                console.print("[bold yellow]Press 'n' to skip to the next episode.[/bold yellow]")
-            console.print()
+            # No scroll region — webtorrent clears through them.
+            # Episode info goes in the terminal title bar instead.
+            _print_stream_header(ep_idx, len(targets), idx, multi, vlc_url, use_scroll_region=False)
 
             cmd = [wt_path, "download", magnet_link, "--vlc", "--no-quit", "--port", "8080"]
             if idx is not None:
                 cmd.extend(["--select", str(idx - 1)])
 
-            rc, advanced = _run_stream(cmd, vlc_url, allow_advance=multi)
-            console.print()
-            if not advanced:
-                # Subprocess exited on its own (VLC close in --no-quit kept it
-                # running, so this means webtorrent actually died — cancel).
+            rc, nav = _run_stream(cmd, vlc_url, allow_navigate=multi)
+
+            if nav == "next":
+                _kill_vlc()
+                time.sleep(1)
+                ep_idx += 1
+                continue
+            elif nav == "back":
+                _kill_vlc()
+                time.sleep(1)
+                ep_idx -= 1
+                continue
+            else:
                 break
 
-        console.print("[success] Streaming session(s) ended![/success]")
+        _reset_terminal_title()
+        time.sleep(0.5)  # let dying processes flush their final output
+        _clear_terminal()
+        console.print("\n[success] Streaming session(s) ended![/success]")
     except KeyboardInterrupt:
+        _reset_terminal_title()
+        time.sleep(0.5)
+        _clear_terminal()
         console.print("\n[warning] Streaming cancelled.[/warning]\n")
     except FileNotFoundError:
+        _reset_terminal_title()
         console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
 
 
@@ -467,28 +631,44 @@ def stream_with_peerflix(
     _ = files  # kept for API symmetry with stream_with_webtorrent
 
     try:
-        for n, idx in enumerate(targets, 1):
-            if multi:
-                console.print(f"[info]Session {n}/{len(targets)} — file index {idx}[/info]")
-            elif idx is not None:
-                console.print(f"[info]Streaming file index:[/info] [highlight]{idx}[/highlight]")
-            console.print("[bold red]CTRL+C to cancel.[/bold red]")
-            console.print("[bold yellow]Tip: Press 'v' to reopen VLC without losing download progress![/bold yellow]")
-            if multi:
-                console.print("[bold yellow]Press 'n' to skip to the next episode.[/bold yellow]")
-            console.print()
+        ep_idx = 0
+        while 0 <= ep_idx < len(targets):
+            idx = targets[ep_idx]
+
+            _print_stream_header(ep_idx, len(targets), idx, multi, vlc_url)
 
             cmd = [pf_path, magnet_link, "--vlc", "--port", "8888"]
             if idx is not None:
                 cmd.extend(["-i", str(idx - 1)])
 
-            rc, advanced = _run_stream(cmd, vlc_url, allow_advance=multi)
-            console.print()
-            if not advanced:
+            rc, nav = _run_stream(cmd, vlc_url, allow_navigate=multi)
+
+            if nav == "next":
+                _kill_vlc()
+                time.sleep(1)
+                ep_idx += 1
+                continue
+            elif nav == "back":
+                _kill_vlc()
+                time.sleep(1)
+                ep_idx -= 1
+                continue
+            else:
                 break
 
-        console.print("[success] Streaming session(s) ended![/success]")
+        _reset_scroll_region()
+        _reset_terminal_title()
+        time.sleep(0.5)  # let dying processes flush their final output
+        _clear_terminal()
+        console.print("\n[success] Streaming session(s) ended![/success]")
     except KeyboardInterrupt:
+        _reset_scroll_region()
+        _reset_terminal_title()
+        time.sleep(0.5)
+        _clear_terminal()
         console.print("\n[warning] Streaming cancelled.[/warning]\n")
     except FileNotFoundError:
+        _reset_scroll_region()
+        _reset_terminal_title()
         console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
+
