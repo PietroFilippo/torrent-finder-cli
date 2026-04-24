@@ -35,6 +35,10 @@ def get_query_with_shortcut(prompt_str: str) -> str | None:
         if not buffer and key == "H":
             print()
             return "SPECIAL_HISTORY"
+
+        if not buffer and key == "S":
+            print()
+            return "SPECIAL_STATS"
             
         if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
             print()
@@ -165,10 +169,13 @@ def episode_select_prompt(files: list) -> list[int] | None:
     """
     import os
     from torrent_meta import extract_episode_number, format_size
+    from stats import record_episode_picker_used
 
     if not files:
         console.print("[warning] No files in torrent.[/warning]")
         return None
+
+    record_episode_picker_used()
 
     items: list[SelectItem] = []
     file_item_indexes: list[int] = []
@@ -542,12 +549,13 @@ def provider_select_prompt() -> object | None:
             footer=(
                 "↑/↓ navigate  •  Enter select  •  "
                 "[bold yellow]F[/bold yellow] filters  •  "
-                "[bold yellow]H[/bold yellow] history  •  Esc cancel\n"
+                "[bold yellow]H[/bold yellow] history  •  "
+                "[bold yellow]S[/bold yellow] stats  •  Esc cancel\n"
                 "   Tip: For the best results, search using the complete name."
             ),
             banner=_make_banner_panel(),
             start_index=start,
-            hotkeys={"H": "history", "h": "history"},
+            hotkeys={"H": "history", "h": "history", "S": "stats", "s": "stats"},
             key_actions={"F": _handle_f, "f": _handle_f},
         )
 
@@ -560,7 +568,7 @@ def provider_select_prompt() -> object | None:
             start = result  # result is the cursor index returned by key_action
             continue
 
-        # H key — open history
+        # H/S hotkeys — open history / stats
         if isinstance(result, tuple) and result[0] == "hotkey":
             _, action, cursor = result
             if action == "history":
@@ -572,6 +580,11 @@ def provider_select_prompt() -> object | None:
                     prov = get_provider(prov_name)
                     if prov:
                         return ("history", query, prov)
+                start = cursor
+                continue
+            if action == "stats":
+                from ui.stats import stats_page
+                stats_page()
                 start = cursor
                 continue
 

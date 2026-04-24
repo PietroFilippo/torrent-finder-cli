@@ -30,6 +30,7 @@ class SelectItem:
     is_action: bool = False  # Action buttons: Enter returns instead of toggling
     description: str = ""  # Dim context-help shown above the footer when cursor on this item
     marker: str = ""      # Inline marker (e.g. 📍 for range-select anchor)
+    passive: bool = False  # Navigable but Enter is a no-op (for read-only rows in a scroll view)
 
 
 def _compute_window(n: int, cursor: int, max_visible: int) -> tuple[int, int]:
@@ -65,7 +66,7 @@ def _cursor_overflows(items: list["SelectItem"], cursor: int, multi: bool) -> bo
     if not (0 <= cursor < len(items)):
         return False
     it = items[cursor]
-    if it.is_action and (isinstance(it.value, str) and it.value == "section_header"):
+    if isinstance(it.value, str) and it.value == "section_header":
         return False
     return len(it.label) > _label_avail_width(it, multi)
 
@@ -129,7 +130,7 @@ def _build_panel(
 
         # Check if this is a section header (visual-only, non-interactive)
         is_section_header = (
-            item.is_action and not item.enabled
+            not item.enabled
             and isinstance(item.value, str) and item.value == "section_header"
         )
 
@@ -376,8 +377,9 @@ def arrow_select(
                             items[cursor].toggled = not items[cursor].toggled
                 else:
                     if items[cursor].enabled:
-                        # Check if callback wants us to stay
-                        if items[cursor].is_action and on_action and on_action(cursor, items):
+                        if items[cursor].passive:
+                            pass  # Passive row: Enter is a no-op (scroll-view read-only)
+                        elif items[cursor].is_action and on_action and on_action(cursor, items):
                             pass  # Stay in the menu
                         else:
                             return cursor

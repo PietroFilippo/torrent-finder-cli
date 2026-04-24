@@ -7,6 +7,7 @@ Usage:
     python main.py -q "query"   # Direct search
 """
 import argparse
+import time
 import warnings
 
 # Suppress requests dependency warnings (urllib3/chardet version mismatch)
@@ -20,6 +21,15 @@ from filters import FilterConfig
 from providers import PROVIDERS, get_provider
 from security import show_security_warning
 from state import load_state
+from stats import (
+    add_runtime_seconds,
+    record_magnet_dispatch,
+    record_method_complete,
+    record_method_pick,
+    record_search,
+    record_session_start,
+    record_torrent_picked,
+)
 from torrent_meta import fetch_file_list
 from ui.prompts import clear_screen, download_method_prompt, episode_select_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
 from ui.table import interactive_select
@@ -28,7 +38,20 @@ from utils import build_magnet
 load_state(PROVIDERS)
 
 
-def main() -> None:
+# Maps download-method values returned by download_method_prompt to the
+# stable method names stored in stats.
+_METHOD_TRACK = {
+    "t": "open_magnet",
+    "stream_p": "stream_peerflix",
+    "stream_w": "stream_webtorrent",
+    "aria": "aria",
+    "p": "peerflix_download",
+    "d": "webtorrent_download",
+    "s": "subtitles",
+}
+
+
+def _main_loop() -> None:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
     parser.add_argument("-t", "--type", type=str, choices=["movie", "game", "anime"], help="Search type (default: movie if used with -q)")
@@ -96,6 +119,8 @@ def main() -> None:
                 "[white]engines & filters[/white]   "
                 "[bold yellow on grey23] Shift+H [/bold yellow on grey23] "
                 "[white]history[/white]   "
+                "[bold yellow on grey23] Shift+S [/bold yellow on grey23] "
+                "[white]stats[/white]   "
                 "[bold]Esc[/bold] [dim]go back[/dim]"
             )
             try:
@@ -122,6 +147,12 @@ def main() -> None:
                     query = None
                 clear_screen()
                 continue
+            elif query == "SPECIAL_STATS":
+                from ui.stats import stats_page
+                stats_page()
+                clear_screen()
+                query = None
+                continue
             elif query == "GO_BACK":
                 current_provider = None
                 query = None
@@ -143,9 +174,14 @@ def main() -> None:
             query = None
             continue
 
-        # Record successful search in history
+        # Record successful search in history + stats
         from state import add_history_entry
         add_history_entry(query, provider.name)
+        record_search(
+            provider.name,
+            query,
+            [pr.name for pr in getattr(provider, "active_presets", [])],
+        )
 
         # Torrent selection + download loop (allows going back to results)
         while True:
@@ -158,6 +194,7 @@ def main() -> None:
             selected = results[idx]
             name = selected.get("name", "Unknown")
             info_hash = selected.get("info_hash", "")
+            record_torrent_picked(provider.name, int(selected.get("seeders", 0) or 0))
 
             # Download method selection
             magnet = build_magnet(info_hash, name)
@@ -174,6 +211,9 @@ def main() -> None:
                     show_episode_picker=show_picker,
                     selected_indexes=selected_files,
                 )
+
+                if method in _METHOD_TRACK:
+                    record_method_pick(_METHOD_TRACK[method])
 
                 if method == "pick_episodes":
                     clear_screen()
@@ -212,6 +252,7 @@ def main() -> None:
                             "[dim]If your client skipped the dialog, pause the torrent and deselect unwanted files in its Content/Files tab.[/dim]"
                         )
                     open_magnet(magnet)
+                    record_magnet_dispatch()
                     console.print("[success] Magnet link sent to torrent client![/success]\n")
                     console.print("[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
@@ -231,6 +272,8 @@ def main() -> None:
                 elif method == "aria":
                     clear_screen()
                     ok = download_with_aria2(magnet, select_indexes=selected_files)
+                    if ok:
+                        record_method_complete("aria")
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     if not ok:
@@ -239,6 +282,8 @@ def main() -> None:
                 elif method == "p":
                     clear_screen()
                     ok = download_with_peerflix(magnet, select_indexes=selected_files)
+                    if ok:
+                        record_method_complete("peerflix_download")
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     if not ok:
@@ -247,6 +292,8 @@ def main() -> None:
                 elif method == "d":
                     clear_screen()
                     ok = download_with_webtorrent(magnet, select_indexes=selected_files)
+                    if ok:
+                        record_method_complete("webtorrent_download")
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     if not ok:
@@ -255,6 +302,7 @@ def main() -> None:
                 elif method == "s":
                     from subtitles import download_subtitles
                     download_subtitles(name)
+                    record_method_complete("subtitles")
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
@@ -285,6 +333,15 @@ def main() -> None:
         else:
             console.print("[info]Goodbye![/info]")
             break
+
+def main() -> None:
+    record_session_start()
+    t0 = time.monotonic()
+    try:
+        _main_loop()
+    finally:
+        add_runtime_seconds(time.monotonic() - t0)
+
 
 if __name__ == "__main__":
     try:
