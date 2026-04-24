@@ -112,17 +112,90 @@ def filter_menu(provider) -> None:
             preset_indices.append(len(items) - 1)
 
     # --- Action buttons ---
-    items.append(SelectItem(label="Clear filters", value="clear", is_action=True))
-    items.append(SelectItem(label="✅ Confirm", value="confirm", is_action=True))
+    items.append(SelectItem(label="Clear filters  [c]", value="clear", is_action=True))
+    items.append(SelectItem(label="✅ Confirm  [w]", value="confirm", is_action=True))
     items.append(SelectItem(label="↩ Go Back", value="back", is_action=True))
+
+    # Index of Confirm action — returned when `w` is pressed
+    confirm_idx = len(items) - 2
+
+    # All toggleable rows (engines + presets)
+    toggle_indexes = engine_indices + preset_indices
+
+    # Anchor state for range-toggle (v/V)
+    anchor = {"idx": None}
+
+    def _toggle_set() -> set[int]:
+        return set(toggle_indexes)
+
+    def _select_all(cursor, items_list):
+        for i in toggle_indexes:
+            if items_list[i].enabled:
+                items_list[i].toggled = True
+        return True
+
+    def _invert(cursor, items_list):
+        for i in toggle_indexes:
+            if items_list[i].enabled:
+                items_list[i].toggled = not items_list[i].toggled
+        return True
+
+    def _clear(cursor, items_list):
+        # Clear preset toggles only — leave engine toggles alone
+        for pi in preset_indices:
+            items_list[pi].toggled = False
+        return True
+
+    def _confirm_now(cursor, items_list):
+        return confirm_idx
+
+    def _set_anchor(cursor, items_list):
+        t_set = _toggle_set()
+        if cursor not in t_set:
+            return True
+        if anchor["idx"] is not None and 0 <= anchor["idx"] < len(items_list):
+            items_list[anchor["idx"]].marker = ""
+        anchor["idx"] = cursor
+        items_list[cursor].marker = "📍"
+        return True
+
+    def _range_toggle(cursor, items_list):
+        if anchor["idx"] is None:
+            return _set_anchor(cursor, items_list)
+        t_set = _toggle_set()
+        lo, hi = sorted([anchor["idx"], cursor])
+        anchor_now = items_list[anchor["idx"]].toggled
+        target = not anchor_now
+        for i in range(lo, hi + 1):
+            if i in t_set and items_list[i].enabled:
+                items_list[i].toggled = target
+        items_list[anchor["idx"]].marker = ""
+        anchor["idx"] = None
+        return True
+
+    def _toggle_current(cursor, items_list):
+        if cursor in _toggle_set() and items_list[cursor].enabled:
+            items_list[cursor].toggled = not items_list[cursor].toggled
+        return True
 
     def handle_filter_action(idx, items):
         if items[idx].value == "clear":
-            # Clear preset toggles only — leave engine toggles alone
-            for pi in preset_indices:
-                items[pi].toggled = False
-            return True  # Stay in menu
+            return _clear(idx, items)
         return False  # Exit for Confirm / Go Back
+
+    key_actions = {
+        "a": _select_all,
+        "A": _select_all,
+        "i": _invert,
+        "I": _invert,
+        "c": _clear,
+        "C": _clear,
+        "w": _confirm_now,
+        "W": _confirm_now,
+        "v": _set_anchor,
+        "V": _range_toggle,
+        " ": _toggle_current,
+    }
 
     # Start cursor on first enabled item (skip header)
     start = 1 if has_engines else 0
@@ -134,6 +207,13 @@ def filter_menu(provider) -> None:
         banner=_make_banner_panel(),
         on_action=handle_filter_action,
         start_index=start,
+        key_actions=key_actions,
+        footer=(
+            "↑/↓ nav  •  Space/Enter toggle  •  "
+            "[bold yellow]v[/bold yellow] anchor  •  [bold yellow]shift + v or V[/bold yellow] range  •  "
+            "[bold yellow]a[/bold yellow]ll/[bold yellow]i[/bold yellow]nvert/[bold yellow]c[/bold yellow]lear  •  "
+            "[bold green]w[/bold green] save  •  Esc cancel"
+        ),
     )
 
     if result_idx is None:
@@ -317,6 +397,28 @@ def _make_banner_panel() -> Panel:
         border_style="bright_blue",
         padding=(1, 2),
     )
+
+
+def confirm_prompt(message: str, title: str = "Confirm") -> bool:
+    """Show a Y/N confirmation modal in the alt-screen. Returns True on Y."""
+    panel = Panel(
+        Text.from_markup(
+            f"{message}\n\n"
+            "[bold yellow]Y[/bold yellow] confirm  •  any other key cancel"
+        ),
+        title=f"[bold red]{title}[/bold red]",
+        border_style="red",
+        padding=(1, 2),
+    )
+    sys.stdout.write("\033[?1049h\033[?25l\033[H\033[2J")
+    sys.stdout.flush()
+    try:
+        console.print(panel)
+        key = readchar.readkey()
+        return key.lower() == "y"
+    finally:
+        sys.stdout.write("\033[?25h\033[?1049l\033[2J\033[H")
+        sys.stdout.flush()
 
 
 def print_banner() -> None:

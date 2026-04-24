@@ -91,9 +91,17 @@ def save_history(entries: list[dict]) -> None:
     _write_state(data)
 
 
-def add_history_entry(query: str, provider_name: str) -> None:
+def add_history_entry(
+    query: str,
+    provider_name: str,
+    presets: list[str] | None = None,
+) -> None:
     """Record a search.  Deduplicates: if the same query+provider already
-    exists, the old entry is removed so the new one lands on top."""
+    exists, the old entry is removed so the new one lands on top.
+
+    *presets* is the list of active preset names at search time, shown in
+    the history menu so users can see which filters a past search used.
+    """
     from datetime import datetime, timezone
 
     history = load_history()
@@ -109,6 +117,7 @@ def add_history_entry(query: str, provider_name: str) -> None:
         "query": query,
         "provider": provider_name,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "presets": list(presets) if presets else [],
     }
     history.insert(0, entry)
     save_history(history)

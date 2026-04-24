@@ -176,12 +176,9 @@ def _main_loop() -> None:
 
         # Record successful search in history + stats
         from state import add_history_entry
-        add_history_entry(query, provider.name)
-        record_search(
-            provider.name,
-            query,
-            [pr.name for pr in getattr(provider, "active_presets", [])],
-        )
+        active_preset_names = [pr.name for pr in getattr(provider, "active_presets", [])]
+        add_history_entry(query, provider.name, active_preset_names)
+        record_search(provider.name, query, active_preset_names)
 
         # Torrent selection + download loop (allows going back to results)
         while True:

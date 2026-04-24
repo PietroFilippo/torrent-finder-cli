@@ -6,7 +6,7 @@ from constants import console
 from providers import PROVIDERS
 from state import clear_history, load_history
 from ui.selector import SelectItem, arrow_select
-from ui.prompts import _make_banner_panel
+from ui.prompts import _make_banner_panel, confirm_prompt
 
 # Helpers
 
@@ -151,10 +151,13 @@ def history_select_prompt() -> tuple[str, str] | None:
                 query = entry.get("query", "")
                 prov = entry.get("provider", "")
                 ts = entry.get("timestamp", "")
+                presets = entry.get("presets", [])
                 icon = _provider_icon(prov)
                 time_str = _relative_time(ts)
                 label = f"{icon}  {query}"
                 hint = f"{prov}  •  {time_str}" if time_str else prov
+                if presets:
+                    hint += f"  •  filters: {', '.join(presets)}"
                 items.append(SelectItem(label=label, value=entry, hint=hint))
 
             items.append(SelectItem(label="🗑  Clear history", value="clear", is_action=True))
@@ -205,6 +208,11 @@ def history_select_prompt() -> tuple[str, str] | None:
     def on_action(idx, items_list):
         nonlocal history
         if items_list[idx].value == "clear":
+            if not confirm_prompt(
+                "[bold red]Clear all search history?[/bold red]\n\n"
+                "This will delete every saved search permanently."
+            ):
+                return True  # stay
             clear_history()
             history = []
             _rebuild(items_list)

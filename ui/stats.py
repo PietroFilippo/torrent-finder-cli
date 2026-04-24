@@ -5,12 +5,6 @@ section headers. arrow_select's built-in windowing handles scrolling, so
 there's no bespoke redraw/overscroll logic and no flicker.
 """
 
-import sys
-
-import readchar
-from rich.panel import Panel
-from rich.text import Text
-
 from constants import console
 from stats import (
     average_seeders,
@@ -18,7 +12,7 @@ from stats import (
     get_all_stats,
     reset_stats,
 )
-from ui.prompts import _make_banner_panel
+from ui.prompts import _make_banner_panel, confirm_prompt
 from ui.selector import SelectItem, arrow_select
 
 
@@ -147,28 +141,6 @@ def _build_items(stats: dict) -> list[SelectItem]:
     return items
 
 
-def _confirm_reset() -> bool:
-    panel = Panel(
-        Text.from_markup(
-            "[bold red]Reset all stats?[/bold red]\n\n"
-            "This will delete all usage counters permanently.\n\n"
-            "[bold yellow]Y[/bold yellow] confirm  •  any other key cancel"
-        ),
-        title="[bold red]Confirm[/bold red]",
-        border_style="red",
-        padding=(1, 2),
-    )
-    sys.stdout.write("\033[?1049h\033[?25l\033[H\033[2J")
-    sys.stdout.flush()
-    try:
-        console.print(panel)
-        key = readchar.readkey()
-        return key.lower() == "y"
-    finally:
-        sys.stdout.write("\033[?25h\033[?1049l\033[2J\033[H")
-        sys.stdout.flush()
-
-
 def stats_page() -> None:
     """Show the stats menu. Loops until the user picks Go Back or hits Esc."""
     while True:
@@ -178,7 +150,10 @@ def stats_page() -> None:
         def on_action(idx, items_list):
             val = items_list[idx].value
             if val == "reset":
-                if _confirm_reset():
+                if confirm_prompt(
+                    "[bold red]Reset all stats?[/bold red]\n\n"
+                    "This will delete all usage counters permanently."
+                ):
                     reset_stats()
                     return False  # exit to outer loop → rebuild
                 return True  # stay
