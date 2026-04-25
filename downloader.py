@@ -44,6 +44,32 @@ def _resolve_vlc_path() -> str | None:
     return vlc_path
 
 
+def _vlc_running() -> bool:
+    """Return True if any VLC process is currently running."""
+    system = platform.system()
+    try:
+        if system == "Windows":
+            r = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq vlc.exe", "/NH"],
+                capture_output=True, text=True, timeout=2,
+            )
+            return "vlc.exe" in r.stdout.lower()
+        elif system == "Darwin":
+            r = subprocess.run(
+                ["pgrep", "-x", "VLC"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2,
+            )
+            return r.returncode == 0
+        else:
+            r = subprocess.run(
+                ["pgrep", "-x", "vlc"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2,
+            )
+            return r.returncode == 0
+    except Exception:
+        return False
+
+
 def _kill_vlc() -> None:
     """Terminate all running VLC instances."""
     system = platform.system()
@@ -94,6 +120,9 @@ def _start_vlc_hotkey_thread(
                     if key.lower() == b'v':
                         url = url_holder[0] if url_holder else None
                         if not url:
+                            continue
+                        # Skip relaunch if VLC already running — avoids spawning duplicates
+                        if _vlc_running():
                             continue
                         if vlc_path:
                             subprocess.Popen([vlc_path, url])
