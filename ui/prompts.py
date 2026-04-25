@@ -241,11 +241,16 @@ def filter_menu(provider) -> None:
     # "back" — just return
 
 
-def episode_select_prompt(files: list) -> list[int] | None:
+def episode_select_prompt(files: list, preselected: list[int] | None = None) -> list[int] | None:
     """Multi-select menu for picking episodes from a torrent's file list.
 
-    Takes a list of TorrentFile. Returns a list of 1-based indexes selected,
-    or None if cancelled or nothing was picked.
+    Takes a list of TorrentFile. ``preselected`` is a list of 1-based file
+    indexes to pre-toggle (so re-entering the picker shows current selection).
+
+    Returns:
+        - ``None`` if cancelled (Esc / Cancel button) — caller keeps prior selection.
+        - ``list[int]`` (possibly empty) on Confirm — caller replaces prior selection.
+          Empty list means "clear selection".
     """
     import os
     from torrent_meta import extract_episode_number, format_size
@@ -257,6 +262,8 @@ def episode_select_prompt(files: list) -> list[int] | None:
 
     record_episode_picker_used()
 
+    pre_set = set(preselected or [])
+
     items: list[SelectItem] = []
     file_item_indexes: list[int] = []
     for f in files:
@@ -266,7 +273,7 @@ def episode_select_prompt(files: list) -> list[int] | None:
         items.append(SelectItem(
             label=label,
             value=("file", f),
-            toggled=False,
+            toggled=(f.index in pre_set),
             hint=format_size(f.size_bytes),
         ))
         file_item_indexes.append(len(items) - 1)
@@ -384,8 +391,7 @@ def episode_select_prompt(files: list) -> list[int] | None:
     if action != "confirm":
         return None
 
-    selected = [items[i].value[1].index for i in file_item_indexes if items[i].toggled]
-    return selected or None
+    return [items[i].value[1].index for i in file_item_indexes if items[i].toggled]
 
 
 def _make_banner_panel() -> Panel:
@@ -486,17 +492,6 @@ def download_method_prompt(
     # --- Stream to VLC ---
     items.append(_section("Stream to VLC"))
     items.append(SelectItem(
-        label="▶  peerflix",
-        value="stream_p",
-        enabled=pf_available,
-        hint=(
-            "(not installed)" if not pf_available
-            else f"plays {n_sel} episode(s) sequentially" if has_selection
-            else "requires VLC installed"
-        ),
-        description="Watch while downloading via VLC (peerflix) — good streaming default",
-    ))
-    items.append(SelectItem(
         label="▶  webtorrent",
         value="stream_w",
         enabled=wt_available,
@@ -505,7 +500,18 @@ def download_method_prompt(
             else f"plays {n_sel} episode(s) sequentially" if has_selection
             else "requires VLC installed"
         ),
-        description="Stream via webtorrent — try if peerflix stalls or finds no peers",
+        description="Stream via webtorrent — good streaming default",
+    ))
+    items.append(SelectItem(
+        label="▶  peerflix",
+        value="stream_p",
+        enabled=pf_available,
+        hint=(
+            "(not installed)" if not pf_available
+            else f"plays {n_sel} episode(s) sequentially" if has_selection
+            else "requires VLC installed"
+        ),
+        description="Watch while downloading via VLC (peerflix) — try if webtorrent stalls or finds no peers",
     ))
 
     # --- Download ---
@@ -521,21 +527,6 @@ def download_method_prompt(
         description="Best downloader — native multi-file, resumes, fastest for batches",
     ))
     items.append(SelectItem(
-        label="⬇  peerflix",
-        value="p",
-        enabled=pf_available,
-        hint=(
-            "(not installed)" if not pf_available
-            else f"⚠  ignores file selection ({n_sel} picked) — downloads full torrent" if has_selection
-            else "slower, won't seed"
-        ),
-        description=(
-            "Plain download via peerflix — slower than aria2, no seeding. "
-            "⚠ Does NOT honor file selection: peerflix always downloads the whole torrent. "
-            "Use aria2c if you need strict file picking."
-        ),
-    ))
-    items.append(SelectItem(
         label="⬇  webtorrent",
         value="d",
         enabled=wt_available,
@@ -547,6 +538,21 @@ def download_method_prompt(
         description=(
             "Plain download via webtorrent — one file per run, no seeding. "
             "⚠ --select is not strict; webtorrent-cli often downloads the whole torrent anyway. "
+            "Use aria2c if you need strict file picking."
+        ),
+    ))
+    items.append(SelectItem(
+        label="⬇  peerflix",
+        value="p",
+        enabled=pf_available,
+        hint=(
+            "(not installed)" if not pf_available
+            else f"⚠  ignores file selection ({n_sel} picked) — downloads full torrent" if has_selection
+            else "slower, won't seed"
+        ),
+        description=(
+            "Plain download via peerflix — slower than aria2, no seeding. "
+            "⚠ Does NOT honor file selection: peerflix always downloads the whole torrent. "
             "Use aria2c if you need strict file picking."
         ),
     ))

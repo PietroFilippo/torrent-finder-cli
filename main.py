@@ -232,10 +232,11 @@ def _main_loop() -> None:
                         console.print("[dim]Press any key to continue...[/dim]")
                         readchar.readkey()
                         continue
-                    picked = episode_select_prompt(metadata.files)
-                    if picked:
-                        selected_files = picked
-                        files_meta = metadata
+                    picked = episode_select_prompt(metadata.files, preselected=selected_files)
+                    if picked is not None:
+                        # Confirm pressed — replace selection (empty list clears it)
+                        selected_files = picked or None
+                        files_meta = metadata if picked else None
                     clear_screen()
                     continue
 
