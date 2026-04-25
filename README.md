@@ -4,8 +4,8 @@ An interactive command-line application for searching and downloading torrents d
 
 ## Features
 
-- **Multi-Category Search:** Torrents across different providers (Movies, Games, Anime), each with its own tailored search backends.
-- **Multi-Engine Fan-Out:** Each provider queries several sources in parallel (e.g. Apibay + SolidTorrents + YTS for Movies, Nyaa for Anime) and merges results, deduplicating by info hash and sorting by seeders.
+- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Anime), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files.
+- **Multi-Engine Fan-Out:** Each provider queries several sources in parallel (e.g. Apibay + SolidTorrents + YTS for Movies & Series, Nyaa for Anime) and merges results, deduplicating by info hash and sorting by seeders.
 - **Arrow-Key Driven UI:** Fully interactive, flicker-free terminal interface.
   - Utilizes an alternate screen buffer so your scrollback history remains flawlessly clean.
   - **Dynamic Viewport Windowing:** Capable of rendering massive 500+ item checklists (like huge anime seasons) by automatically windowing the active selection while pinning crucial action buttons tightly to the top and bottom of your screen to prevent terminal overflow.
@@ -20,11 +20,14 @@ An interactive command-line application for searching and downloading torrents d
 - **Search History:** Press `Shift+H` at the search prompt (or `H` on the provider screen) to browse past searches. Filter by provider (`P`), date range (`D`, today/week/month), and sort order (`S`). Each entry shows the provider, relative timestamp, and the filter presets that were active at search time. Pick an entry to re-run the query; clear history with a confirmation modal.
 - **Usage Stats:** Press `Shift+S` at the search prompt (or `S` on the provider screen) to open a scrollable stats page showing session count, total runtime, searches, top queries, torrents picked, method picks vs. completions (with success rate), avg seeders of picks, and preset usage counters. Reset all stats from the same screen, guarded by a confirmation modal.
 - **Confirmation Modals:** Destructive actions (clear history, reset stats) share a unified red Y/N panel so you can't nuke state with a stray keypress.
+- **Dynamic Contextual Tips:** Random hints (`💡 Tip: ...`) are displayed in the footers of the provider selector and post-download menus to remind you about hotkeys, quiet mode, episode picking, and UI shortcuts.
+- **Quiet Mode:** Toggle **🔇 Quiet mode** from the Download Method menu to suppress the native progress UIs of `aria2c`, `webtorrent-cli`, and `peerflix` (full-screen progress bars, peer lists, speed graphs) and replace them with a single minimal spinner. The toggle redraws in place with no flicker and persists across runs (stored as `hide_stream_output` in `filter_state.json`). Episode info, VLC hotkey hints, and `Ctrl+C` all still work.
 - **Flexible Downloading & Streaming:**
   - **System Client:** Automatically send generated magnet links to your default system torrent client (like qBittorrent, Transmission, etc.).
   - **Direct Terminal Download:** Use `aria2c`, `webtorrent-cli`, or `peerflix` integration to download files directly within the terminal, with native progress UIs.
-  - **Episode Picker (Anime):** For multi-file torrents (batches, seasons, complete collections), fetch the torrent's file list via `aria2c` and pick any subset of episodes. Features ultra-fast vim-style visual range selection (`v` to set an anchor, `shift+v` to toggle the block) and rapid hotkeys (`a`, `i`, `c`, `w`). Works natively with `aria2c` (`--select-file=1,3,5-7`) in a single process; falls back to sequential `webtorrent`/`peerflix` sessions per episode.
+  - **File Browser / Episode Picker (Anime + Movies & Series):** Open **📂 Browse torrent files…** from the download menu to list every file in the torrent (videos, subs, artwork, .nfo, samples) and pick any subset. Features vim-style visual range selection (`v` anchor, `Shift+V` range-toggle) and rapid hotkeys (`a`, `i`, `c`, `w`). Downloads (`aria2c` / `webtorrent` / `peerflix`) grab exactly what you pick; **streams auto-skip non-video picks** and warn about it, so you can still e.g. download the .srt + .nfo alongside the video without breaking playback.
   - **Stream to VLC:** Stream media directly to VLC Media Player using `webtorrent-cli` or `peerflix`. Press the `v` hotkey at any time during a streaming session to reopen VLC without losing your torrent download/buffering progress. When an episode is selected, streams that specific file.
+  - **Auto Episode Navigation:** When streaming a multi-episode torrent (TV shows, anime batches, season packs) **without** pre-selecting anything, the CLI auto-detects the episode structure via `aria2c` metadata, queues every video file in episode order, and enables `n` (next) / `b` (previous) hotkeys so you can jump between episodes mid-session. Single-file movies still stream as-is — no forced picker, no extra wait. Heuristic: ≥ 2 video files whose sizes are within an order of magnitude of each other.
   - **Subtitle Download:** Search and download the best matching subtitles directly from the terminal using `subliminal`.
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
   - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
@@ -73,7 +76,7 @@ python main.py
 # Direct search (defaults to Movies)
 python main.py -q "The Matrix"
 
-# Specify the search type (movie, game, anime)
+# Specify the search type (movie, game, anime). `movie` covers both films and series.
 python main.py -q "Elden Ring" -t game
 
 # Apply custom filters (include "1080p", exclude "cam")

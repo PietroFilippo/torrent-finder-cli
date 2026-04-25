@@ -200,8 +200,8 @@ def _main_loop() -> None:
             selected_files: list[int] | None = None
             files_meta = None
             while True:
-                show_subs = hasattr(provider, "name") and provider.name in ("Movies", "Anime")
-                show_picker = hasattr(provider, "name") and provider.name == "Anime"
+                show_subs = hasattr(provider, "name") and provider.name in ("Movies & Series", "Anime")
+                show_picker = hasattr(provider, "name") and provider.name in ("Movies & Series", "Anime")
                 method = download_method_prompt(
                     magnet=magnet,
                     show_subtitles=show_subs,

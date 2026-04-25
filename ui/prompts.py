@@ -465,11 +465,11 @@ def download_method_prompt(
 
     # --- Episode selection (only for providers that support it) ---
     if show_episode_picker:
-        items.append(_section("Episode selection"))
+        items.append(_section("File selection"))
         ep_label = (
-            f"📺 Change selection ({n_sel} picked)"
+            f"📂 Change selection ({n_sel} picked)"
             if has_selection
-            else "📺 Pick specific episodes…"
+            else "📂 Browse torrent files… (Episode Selection for animes/series)"
         )
         items.append(SelectItem(
             label=ep_label,
@@ -477,7 +477,10 @@ def download_method_prompt(
             is_action=True,
             hint=("requires aria2c to fetch file list" if not aria_available else ""),
             enabled=aria_available,
-            description="Pick files from the torrent — downstream downloads grab only those",
+            description=(
+                "Browse every file in the torrent and pick any subset. "
+                "Downloads grab exactly what you pick; streams auto-skip non-video files."
+            ),
         ))
 
     # --- Stream to VLC ---
@@ -513,7 +516,7 @@ def download_method_prompt(
         enabled=aria_available,
         hint=(
             "(not installed — https://aria2.github.io/)" if not aria_available
-            else "fastest, multi-file in one process, won't seed"
+            else "fastest, multi-file in one process, won't seed - downloads only selected files"
         ),
         description="Best downloader — native multi-file, resumes, fastest for batches",
     ))
@@ -523,10 +526,14 @@ def download_method_prompt(
         enabled=pf_available,
         hint=(
             "(not installed)" if not pf_available
-            else f"{n_sel} sequential session(s), won't seed" if has_selection
+            else f"⚠  ignores file selection ({n_sel} picked) — downloads full torrent" if has_selection
             else "slower, won't seed"
         ),
-        description="Plain download via peerflix — slower than aria2, no seeding",
+        description=(
+            "Plain download via peerflix — slower than aria2, no seeding. "
+            "⚠ Does NOT honor file selection: peerflix always downloads the whole torrent. "
+            "Use aria2c if you need strict file picking."
+        ),
     ))
     items.append(SelectItem(
         label="⬇  webtorrent",
@@ -534,10 +541,14 @@ def download_method_prompt(
         enabled=wt_available,
         hint=(
             "(not installed)" if not wt_available
-            else f"{n_sel} sequential session(s), won't seed" if has_selection
+            else f"⚠  may ignore selection ({n_sel} picked) — can pull full torrent" if has_selection
             else "slower, won't seed"
         ),
-        description="Plain download via webtorrent — one file per run, no seeding",
+        description=(
+            "Plain download via webtorrent — one file per run, no seeding. "
+            "⚠ --select is not strict; webtorrent-cli often downloads the whole torrent anyway. "
+            "Use aria2c if you need strict file picking."
+        ),
     ))
 
     # --- Other ---

@@ -7,7 +7,7 @@ from providers.base import BaseProvider, SearchEngine
 
 
 class MovieProvider(BaseProvider):
-    name = "Movies"
+    name = "Movies & Series"
     icon = "🎬"
     categories = [201, 207]  # Movies, HD Movies
     solidtorrents_category = "Movie"

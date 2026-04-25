@@ -162,6 +162,48 @@ def extract_episode_number(filename: str) -> str | None:
     return None
 
 
+VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".m4v", ".mov", ".webm", ".ts", ".m2ts", ".wmv", ".flv"}
+
+
+def is_video_file(name: str) -> bool:
+    """True if *name* has a common video container extension."""
+    ext = os.path.splitext(name.lower())[1]
+    return ext in VIDEO_EXTENSIONS
+
+
+def video_files(files: list[TorrentFile]) -> list[TorrentFile]:
+    """Filter a file list down to video containers (skips .nfo / .txt / samples)."""
+    return [f for f in files if is_video_file(f.name)]
+
+
+def is_multi_episode(files: list[TorrentFile]) -> bool:
+    """Heuristic: treat the torrent as a multi-episode release.
+
+    Requires at least 2 video files whose sizes are within an order of
+    magnitude of each other (filters out e.g. a single movie + small extras).
+    """
+    vids = video_files(files)
+    if len(vids) < 2:
+        return False
+    sizes = [f.size_bytes for f in vids if f.size_bytes > 0]
+    if len(sizes) < 2:
+        return False
+    return min(sizes) >= max(sizes) * 0.2
+
+
+def sort_episodes(files: list[TorrentFile]) -> list[TorrentFile]:
+    """Return video files sorted by extracted episode number, name as tiebreaker.
+
+    Files without an extractable episode number sort to the end but retain
+    their original relative order via the filename fallback.
+    """
+    def key(f: TorrentFile):
+        ep = extract_episode_number(f.name)
+        ep_num = int(ep) if ep and ep.isdigit() else 1_000_000
+        return (ep_num, f.name.lower())
+    return sorted(video_files(files), key=key)
+
+
 def format_size(size_bytes: int) -> str:
     for unit, factor in (("TB", 1024**4), ("GB", 1024**3), ("MB", 1024**2), ("KB", 1024)):
         if size_bytes >= factor:

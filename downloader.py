@@ -232,7 +232,10 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
         "--bt-remove-unselected-file=true",
     ]
     if select_indexes:
+        # --file-allocation=none skips pre-allocating unselected files so
+        # `--select-file` really gives you just what you picked on disk.
         cmd.append(f"--select-file={compact_ranges(select_indexes)}")
+        cmd.append("--file-allocation=none")
     cmd.append(magnet_link)
 
     quiet = is_quiet_mode()
@@ -279,12 +282,17 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
 
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
     console.print(f"[info]Downloading to:[/info] [highlight]{DOWNLOADS_DIR}[/highlight]")
-    if select_indexes and len(select_indexes) > 1:
+    if select_indexes:
         console.print(
-            f"[warning] webtorrent-cli downloads one file at a time; "
-            f"running {len(select_indexes)} sequential sessions. "
-            f"Use aria2c for a single-process multi-file download.[/warning]"
+            "[warning] webtorrent-cli's --select does NOT always limit download to the picked "
+            "file(s) — it can still pull the whole torrent. "
+            "Use [bold]aria2c[/bold] for strict file selection.[/warning]"
         )
+        if len(select_indexes) > 1:
+            console.print(
+                f"[warning] Running {len(select_indexes)} sequential sessions "
+                "(webtorrent-cli downloads one file per run).[/warning]"
+            )
     console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
 
     targets: list[int | None] = [i for i in (select_indexes or [])] or [None]
@@ -341,12 +349,17 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
 
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
     console.print(f"[info]Downloading to:[/info] [highlight]{DOWNLOADS_DIR}[/highlight]")
-    if select_indexes and len(select_indexes) > 1:
+    if select_indexes:
         console.print(
-            f"[warning] peerflix handles one file at a time; "
-            f"running {len(select_indexes)} sequential sessions. "
-            f"Use aria2c for a single-process multi-file download.[/warning]"
+            "[warning] peerflix is a streaming tool — its -i flag only picks which file is "
+            "served at the root, NOT which pieces are downloaded. The whole torrent will "
+            "still be pulled to disk. Use [bold]aria2c[/bold] for strict file selection.[/warning]"
         )
+        if len(select_indexes) > 1:
+            console.print(
+                f"[warning] Running {len(select_indexes)} sequential sessions "
+                "(peerflix handles one file per run).[/warning]"
+            )
     console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
 
     targets: list[int | None] = [i for i in (select_indexes or [])] or [None]
@@ -642,21 +655,46 @@ def stream_with_webtorrent(
         console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
         return
 
-    from torrent_meta import fetch_file_list
-    
+    from torrent_meta import fetch_file_list, is_multi_episode, sort_episodes, video_files
+
     if files is None:
         console.print("[info]Fetching metadata to resolve exact stream URL...[/info]")
         with console.status("[bold cyan]Fetching metadata...", spinner="dots"):
             files = fetch_file_list(magnet_link)
-            
+
     targets: list[int | None] = list(select_indexes) if select_indexes else []
     file_list = files.files if files is not None else []
-    
+
+    if targets and file_list:
+        # User-supplied selection may include non-video files (artwork, .nfo,
+        # subs). Stream only the playable ones, warn about the rest. If the
+        # selection is *entirely* non-video, respect the user's pick and bail
+        # — don't silently substitute a video they didn't choose.
+        video_idxs = {f.index for f in video_files(file_list)}
+        filtered = [i for i in targets if i in video_idxs]
+        skipped = len(targets) - len(filtered)
+        if skipped and filtered:
+            console.print(
+                f"[warning] Skipping {skipped} non-video file(s) — streamable files only.[/warning]"
+            )
+        if not filtered:
+            console.print(
+                "[error] Selection contains no streamable video files. "
+                "Pick a video file or use a download method instead.[/error]\n"
+            )
+            return
+        targets = filtered
+
     if not targets and file_list:
-        # If no specific files were selected, webtorrent defaults to the largest file.
-        # explicitly resolve that file here so the URL reconstruction matches it
-        largest_file = max(file_list, key=lambda f: f.size_bytes)
-        targets = [largest_file.index]
+        if is_multi_episode(file_list):
+            # Multi-episode release — queue every video file in episode order so
+            # `n`/`b` navigation works even without an explicit picker selection.
+            targets = [f.index for f in sort_episodes(file_list)]
+        else:
+            # Single-episode / movie — webtorrent defaults to the largest file;
+            # resolve it explicitly so the VLC URL reconstruction matches.
+            largest_file = max(file_list, key=lambda f: f.size_bytes)
+            targets = [largest_file.index]
     elif not targets:
         # Fallback if there are no metadata
         targets = [None]
@@ -721,22 +759,62 @@ def stream_with_webtorrent(
 def stream_with_peerflix(
     magnet_link: str,
     select_indexes: list[int] | None = None,
-    files: list | None = None,
+    files=None,  # TorrentMetadata | None
 ) -> None:
     """Stream selected files to VLC using peerflix.
 
     One session per selected 1-based index. peerflix serves the currently
     streaming file at the server root, so the 'v' hotkey URL is fixed.
+
+    When no explicit selection is passed, aria2c is available, and the
+    torrent looks like a multi-episode release, every video file is queued
+    in episode order so `n`/`b` navigation works seamlessly.
     """
     pf_path = shutil.which("peerflix")
     if not pf_path:
         console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
         return
 
-    targets: list[int | None] = list(select_indexes) if select_indexes else [None]
+    from torrent_meta import fetch_file_list, is_multi_episode, sort_episodes, video_files
+
+    targets: list[int | None] = list(select_indexes) if select_indexes else []
+
+    if targets:
+        # Fetch metadata (if available) so we can filter out non-video picks.
+        if files is None and has_aria2():
+            console.print("[info]Fetching metadata to validate selection...[/info]")
+            with console.status("[bold cyan]Fetching metadata...", spinner="dots"):
+                files = fetch_file_list(magnet_link)
+        file_list = files.files if files is not None else []
+        if file_list:
+            video_idxs = {f.index for f in video_files(file_list)}
+            filtered = [i for i in targets if i in video_idxs]
+            skipped = len(targets) - len(filtered)
+            if skipped and filtered:
+                console.print(
+                    f"[warning] Skipping {skipped} non-video file(s) — streamable files only.[/warning]"
+                )
+            if not filtered:
+                console.print(
+                    "[error] Selection contains no streamable video files. "
+                    "Pick a video file or use a download method instead.[/error]\n"
+                )
+                return
+            targets = filtered
+    else:
+        # No explicit picker selection — try auto-detect so n/b nav can work.
+        if files is None and has_aria2():
+            console.print("[info]Fetching metadata to detect episodes...[/info]")
+            with console.status("[bold cyan]Fetching metadata...", spinner="dots"):
+                files = fetch_file_list(magnet_link)
+        file_list = files.files if files is not None else []
+        if file_list and is_multi_episode(file_list):
+            targets = [f.index for f in sort_episodes(file_list)]
+        else:
+            targets = [None]
+
     multi = len(targets) > 1
     vlc_url = "http://127.0.0.1:8888/"
-    _ = files  # kept for API symmetry with stream_with_webtorrent
     quiet = is_quiet_mode()
 
     try:
