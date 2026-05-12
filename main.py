@@ -315,6 +315,7 @@ def _main_loop() -> None:
             break  # Proceed to "what's next?"
 
         if idx is None:
+            clear_screen()
             continue
 
         # What's next?
