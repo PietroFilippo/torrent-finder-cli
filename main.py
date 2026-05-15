@@ -199,6 +199,7 @@ def _main_loop() -> None:
             go_back_to_results = False
             selected_files: list[int] | None = None
             files_meta = None
+            sub_choice: dict | None = None  # None / {"mode": "auto"} → auto-detect
             while True:
                 show_subs = hasattr(provider, "name") and provider.name in ("Movies & Series", "Anime")
                 show_picker = hasattr(provider, "name") and provider.name in ("Movies & Series", "Anime")
@@ -207,10 +208,17 @@ def _main_loop() -> None:
                     show_subtitles=show_subs,
                     show_episode_picker=show_picker,
                     selected_indexes=selected_files,
+                    sub_choice=sub_choice,
                 )
 
                 if method in _METHOD_TRACK:
                     record_method_pick(_METHOD_TRACK[method])
+
+                if method == "set_subs":
+                    from ui.prompts import subtitle_source_prompt
+                    sub_choice = subtitle_source_prompt(sub_choice)
+                    clear_screen()
+                    continue
 
                 if method == "pick_episodes":
                     clear_screen()
@@ -257,13 +265,13 @@ def _main_loop() -> None:
                     break
                 elif method == "stream_p":
                     clear_screen()
-                    stream_with_peerflix(magnet, select_indexes=selected_files, files=files_meta)
+                    stream_with_peerflix(magnet, select_indexes=selected_files, files=files_meta, sub_choice=sub_choice)
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
                 elif method == "stream_w":
                     clear_screen()
-                    stream_with_webtorrent(magnet, select_indexes=selected_files, files=files_meta)
+                    stream_with_webtorrent(magnet, select_indexes=selected_files, files=files_meta, sub_choice=sub_choice)
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
@@ -298,9 +306,17 @@ def _main_loop() -> None:
                         continue
                     break
                 elif method == "s":
+                    import os as _os
                     from subtitles import download_subtitles
-                    download_subtitles(name)
+                    sub_path = download_subtitles(name)
                     record_method_complete("subtitles")
+                    if sub_path and _os.path.exists(sub_path):
+                        sub_choice = {"mode": "external", "path": _os.path.abspath(sub_path)}
+                        console.print(
+                            f"[success]Saved. Next stream will use[/success] "
+                            f"[highlight]{_os.path.basename(sub_path)}[/highlight] "
+                            f"[success]as the subtitle source.[/success]"
+                        )
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
