@@ -70,6 +70,112 @@ def _vlc_running() -> bool:
         return False
 
 
+def _wait_for_port(host: str, port: int, timeout: float = 30.0) -> bool:
+    """Block until *host:port* accepts a TCP connection, or *timeout* elapses."""
+    import socket
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                return True
+        except (ConnectionRefusedError, OSError):
+            time.sleep(0.25)
+    return False
+
+
+def _build_vlc_cmd(url: str, sub_paths: list[str] | None) -> list[str] | None:
+    """Construct the VLC argv list. None if VLC isn't installed.
+
+    VLC's first ``--sub-file`` is the primary subtitle track; additional subs
+    can be attached as input slaves so the user can toggle between them in
+    VLC's Subtitle menu.
+    """
+    vlc_path = _resolve_vlc_path()
+    if not vlc_path:
+        return None
+    cmd = [vlc_path, url]
+    if sub_paths:
+        cmd.extend(["--sub-file", sub_paths[0]])
+        for extra in sub_paths[1:]:
+            cmd.extend(["--input-slave", extra])
+    return cmd
+
+
+def _launch_vlc(url: str, sub_paths: list[str] | None) -> bool:
+    """Spawn VLC with the stream URL (+ optional subs). Returns True on launch."""
+    cmd = _build_vlc_cmd(url, sub_paths)
+    if cmd is not None:
+        try:
+            subprocess.Popen(cmd)
+            return True
+        except Exception:
+            pass
+    # Fallback: hand the URL to the OS — won't carry sub args
+    try:
+        if platform.system() == "Windows":
+            os.startfile(url)  # type: ignore[attr-defined]
+        elif platform.system() == "Darwin":
+            subprocess.Popen(["open", url])
+        else:
+            subprocess.Popen(["xdg-open", url])
+        return True
+    except Exception:
+        return False
+
+
+def _fetch_torrent_subs(magnet: str, files_meta, indexes: list[int]) -> dict[int, str]:
+    """Download a subset of torrent files (subtitles) via aria2c.
+
+    Returns ``{file_index: local_path}`` for files that successfully landed
+    on disk. Used to make in-torrent subs available to VLC's ``--sub-file``
+    before the stream starts.
+    """
+    if not has_aria2() or not indexes or files_meta is None:
+        return {}
+
+    import tempfile
+
+    tmpdir = tempfile.mkdtemp(prefix="trnt_subs_")
+    cmd = [
+        "aria2c",
+        f"--select-file={compact_ranges(indexes)}",
+        "--bt-remove-unselected-file=true",
+        "--file-allocation=none",
+        "--follow-torrent=false",
+        "--seed-time=0",
+        "--summary-interval=0",
+        "--console-log-level=warn",
+        "--bt-stop-timeout=90",
+        "-d", tmpdir,
+        magnet,
+    ]
+    try:
+        subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=180,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return {}
+
+    idx_to_file = {f.index: f for f in files_meta.files}
+    multi_file = len(files_meta.files) > 1
+    result: dict[int, str] = {}
+    for i in indexes:
+        f = idx_to_file.get(i)
+        if not f:
+            continue
+        path = (
+            os.path.join(tmpdir, files_meta.name, *f.name.split("/"))
+            if multi_file
+            else os.path.join(tmpdir, f.name)
+        )
+        if os.path.exists(path):
+            result[i] = path
+    return result
+
+
 def _kill_vlc() -> None:
     """Terminate all running VLC instances."""
     system = platform.system()
@@ -98,20 +204,22 @@ def _kill_vlc() -> None:
 
 def _start_vlc_hotkey_thread(
     url_holder: list,
+    subs_holder: list | None = None,
     advance_event: threading.Event | None = None,
     back_event: threading.Event | None = None,
 ) -> threading.Event:
     """Listen for 'v' (reopen VLC), 'n' (next episode), and 'b' (previous episode).
 
     url_holder is a single-element list so callers can update the URL after
-    capturing it from a subprocess's stdout. advance_event, when provided,
-    is set on 'n' so the caller can terminate the current session and move on.
-    back_event, when provided, is set on 'b' to go back to the previous episode.
+    capturing it from a subprocess's stdout. subs_holder, when provided, holds
+    ``list[str] | None`` of subtitle file paths to attach when relaunching VLC.
+    advance_event, when provided, is set on 'n' so the caller can terminate the
+    current session and move on. back_event, when provided, is set on 'b' to go
+    back to the previous episode.
     """
     stop_event = threading.Event()
 
     def listener():
-        vlc_path = _resolve_vlc_path()
         while not stop_event.is_set():
             if platform.system() == "Windows":
                 import msvcrt
@@ -124,13 +232,8 @@ def _start_vlc_hotkey_thread(
                         # Skip relaunch if VLC already running — avoids spawning duplicates
                         if _vlc_running():
                             continue
-                        if vlc_path:
-                            subprocess.Popen([vlc_path, url])
-                        else:
-                            try:
-                                os.startfile(url)
-                            except Exception:
-                                pass
+                        subs = subs_holder[0] if subs_holder else None
+                        _launch_vlc(url, subs)
                     elif key.lower() == b'n' and advance_event is not None:
                         advance_event.set()
                     elif key.lower() == b'b' and back_event is not None:
@@ -462,10 +565,18 @@ def _run_stream(
     vlc_url: str | None,
     allow_navigate: bool,
     quiet: bool = False,
+    sub_paths: list[str] | None = None,
+    launch_vlc_when_ready: tuple[str, int] | None = None,
 ) -> tuple[int, str]:
     """Run a streaming subprocess with native TTY (no stdout piping).
 
     vlc_url, if provided, is what the 'v' hotkey will relaunch VLC with.
+    sub_paths, if provided, is the list of subtitle file paths attached to
+    each VLC relaunch (primary = first entry; rest become input slaves).
+    launch_vlc_when_ready, when set to ``(host, port)``, makes ``_run_stream``
+    poll that TCP socket and spawn VLC ourselves with ``vlc_url`` + ``sub_paths``
+    as soon as the streaming server is up — replaces webtorrent/peerflix's own
+    ``--vlc`` flag so we control VLC's argv (and can attach ``--sub-file``).
     When allow_navigate is True, 'n'/'b' terminate the subprocess so the
     caller can advance or go back in a multi-ep flow. Returns (returncode,
     nav_action) where nav_action is 'next', 'back', or 'none'.
@@ -474,13 +585,26 @@ def _run_stream(
     (full-screen UI suppressed) and a rich spinner renders in its place.
     """
     url_holder: list[str | None] = [vlc_url]
+    subs_holder: list[list[str] | None] = [sub_paths]
     advance_event = threading.Event() if allow_navigate else None
     back_event = threading.Event() if allow_navigate else None
-    stop_event = _start_vlc_hotkey_thread(url_holder, advance_event, back_event)
+    stop_event = _start_vlc_hotkey_thread(url_holder, subs_holder, advance_event, back_event)
 
     stdout_arg, stderr_arg = _quiet_streams(quiet)
     proc = subprocess.Popen(cmd, stdout=stdout_arg, stderr=stderr_arg)
     nav_action = "none"
+
+    if launch_vlc_when_ready and vlc_url:
+        host, port = launch_vlc_when_ready
+
+        def vlc_waiter():
+            if _wait_for_port(host, port, timeout=60):
+                # Tiny grace period for the server to finish wiring routes
+                time.sleep(0.5)
+                if not _vlc_running():
+                    _launch_vlc(vlc_url, sub_paths)
+
+        threading.Thread(target=vlc_waiter, daemon=True).start()
 
     def _poll_loop() -> str:
         while proc.poll() is None:
@@ -595,6 +719,7 @@ def _print_stream_header(
     multi: bool,
     vlc_url: str | None = None,
     use_scroll_region: bool = True,
+    sub_paths: list[str] | None = None,
 ) -> None:
     """Print the episode header and optionally pin it with a scroll region.
 
@@ -603,6 +728,9 @@ def _print_stream_header(
     When False (webtorrent), only the terminal **window title** is used
     for persistent episode info, since webtorrent's ANSI rendering
     clears through scroll regions.
+
+    ``sub_paths``, if provided, is shown as a one-line confirmation that
+    subtitles will be attached to VLC for this episode.
     """
     # Reset any previous scroll region so clear works on the full screen
     sys.stdout.write("\033[r")
@@ -631,6 +759,10 @@ def _print_stream_header(
         if ep_idx > 0:
             lines.append("[bold yellow]Press 'b' to go back to the previous episode (will re-download).[/bold yellow]")
         lines.append("[dim]VLC will be closed automatically when switching episodes.[/dim]")
+    if sub_paths:
+        primary = os.path.basename(sub_paths[0])
+        extras = f" (+{len(sub_paths) - 1} more)" if len(sub_paths) > 1 else ""
+        lines.append(f"[success]📝 Subtitles attached:[/success] [highlight]{primary}[/highlight]{extras}")
 
     # Print the header lines
     for line in lines:
@@ -664,16 +796,93 @@ def _reset_terminal_title() -> None:
     _set_terminal_title("Torrent Search CLI")
 
 
+def _resolve_subs_for_session(
+    magnet_link: str,
+    files_meta,
+    file_list: list,
+    sub_choice: dict | None,
+) -> dict[int, list[str]]:
+    """Return ``{video_file_index: [local_sub_paths]}`` for the current session.
+
+    Modes (via ``sub_choice``):
+      * ``"off"`` — no subs.
+      * ``"external"`` — pin ``sub_choice["path"]`` to every video index.
+      * ``"auto"`` (default) — scan ``file_list`` for sub files paired with each
+        video (by basename / language tag / sibling-folder + ep number),
+        batch-fetch them with aria2c, and map by video index.
+
+    Empty dict means "no subtitles to attach"; callers should pass ``None``
+    as the ``sub_paths`` arg to ``_run_stream`` in that case.
+    """
+    from torrent_meta import match_subtitles_for, video_files as _vids
+
+    mode = (sub_choice or {}).get("mode", "auto")
+    external_path = (sub_choice or {}).get("path")
+
+    if mode == "off":
+        return {}
+
+    if mode == "external":
+        if not external_path or not os.path.exists(external_path):
+            console.print(
+                "[warning] External subtitle path missing or not found — streaming without subs.[/warning]"
+            )
+            return {}
+        abs_path = os.path.abspath(external_path)
+        if file_list:
+            return {f.index: [abs_path] for f in _vids(file_list)}
+        return {-1: [abs_path]}  # single-file / no metadata: use sentinel index
+
+    # auto-detect from torrent
+    if not file_list:
+        return {}
+    per_video: dict[int, list[int]] = {}
+    needed: set[int] = set()
+    for f in _vids(file_list):
+        matches = match_subtitles_for(f.name, file_list)
+        if matches:
+            ids = [m.index for m in matches]
+            per_video[f.index] = ids
+            needed.update(ids)
+    if not needed:
+        return {}
+
+    console.print(
+        f"[info]Found {len(needed)} subtitle file(s) inside torrent — fetching via aria2c…[/info]"
+    )
+    with console.status("[bold cyan]Downloading subtitles…[/bold cyan]", spinner="dots"):
+        local = _fetch_torrent_subs(magnet_link, files_meta, sorted(needed))
+
+    if not local:
+        console.print(
+            "[warning] Could not fetch in-torrent subtitles — streaming without subs.[/warning]"
+        )
+        return {}
+
+    result: dict[int, list[str]] = {}
+    for vid_idx, sub_ids in per_video.items():
+        paths = [local[i] for i in sub_ids if i in local]
+        if paths:
+            result[vid_idx] = paths
+    return result
+
+
 def stream_with_webtorrent(
     magnet_link: str,
     select_indexes: list[int] | None = None,
     files=None,  # TorrentMetadata | None
+    sub_choice: dict | None = None,
 ) -> None:
     """Stream selected files to VLC using webtorrent-cli.
 
     `files` is a TorrentMetadata whose .name (info.name) gives the exact
     torrent root for 'v' hotkey URL reconstruction, and whose .files list
     maps 1-based indexes to internal file paths.
+
+    ``sub_choice`` controls subtitle handling:
+        - ``None`` or ``{"mode": "auto"}``: auto-detect in-torrent subs.
+        - ``{"mode": "off"}``: stream without subs.
+        - ``{"mode": "external", "path": "<path>"}``: attach the given .srt/.ass.
 
     webtorrent-cli uses full-screen ANSI rendering (``\033[2J``) that
     clears through scroll regions, so we use the terminal window title
@@ -734,6 +943,8 @@ def stream_with_webtorrent(
     torrent_name = files.name if files is not None else None
     quiet = is_quiet_mode()
 
+    sub_map = _resolve_subs_for_session(magnet_link, files, file_list, sub_choice)
+
     try:
         ep_idx = 0
         while 0 <= ep_idx < len(targets):
@@ -748,15 +959,31 @@ def stream_with_webtorrent(
 
             vlc_url = _webtorrent_vlc_url(magnet_link, torrent_name, file_path, is_multi_file)
 
+            # Subs for this episode: prefer per-video map entry, fall back to
+            # sentinel index (-1) used by external-mode single-file torrents.
+            if idx is not None and idx in sub_map:
+                ep_subs = sub_map[idx]
+            elif -1 in sub_map:
+                ep_subs = sub_map[-1]
+            else:
+                ep_subs = None
+
             # No scroll region- webtorrent clears through them.
             # Episode info goes in the terminal title bar instead.
-            _print_stream_header(ep_idx, len(targets), idx, multi, vlc_url, use_scroll_region=False)
+            _print_stream_header(
+                ep_idx, len(targets), idx, multi, vlc_url,
+                use_scroll_region=False, sub_paths=ep_subs,
+            )
 
-            cmd = [wt_path, "download", magnet_link, "--vlc", "--no-quit", "--port", "8080"]
+            cmd = [wt_path, "download", magnet_link, "--port", "8080"]
             if idx is not None:
                 cmd.extend(["--select", str(idx - 1)])
 
-            rc, nav = _run_stream(cmd, vlc_url, allow_navigate=multi, quiet=quiet)
+            rc, nav = _run_stream(
+                cmd, vlc_url, allow_navigate=multi, quiet=quiet,
+                sub_paths=ep_subs,
+                launch_vlc_when_ready=("127.0.0.1", 8080),
+            )
 
             if nav == "next":
                 _kill_vlc()
@@ -789,6 +1016,7 @@ def stream_with_peerflix(
     magnet_link: str,
     select_indexes: list[int] | None = None,
     files=None,  # TorrentMetadata | None
+    sub_choice: dict | None = None,
 ) -> None:
     """Stream selected files to VLC using peerflix.
 
@@ -798,6 +1026,9 @@ def stream_with_peerflix(
     When no explicit selection is passed, aria2c is available, and the
     torrent looks like a multi-episode release, every video file is queued
     in episode order so `n`/`b` navigation works seamlessly.
+
+    ``sub_choice`` (same shape as in :func:`stream_with_webtorrent`) governs
+    subtitle resolution — auto-detect from torrent, off, or an external file.
     """
     pf_path = shutil.which("peerflix")
     if not pf_path:
@@ -846,23 +1077,36 @@ def stream_with_peerflix(
     vlc_url = "http://127.0.0.1:8888/"
     quiet = is_quiet_mode()
 
+    sub_map = _resolve_subs_for_session(magnet_link, files, file_list, sub_choice)
+
     try:
         ep_idx = 0
         while 0 <= ep_idx < len(targets):
             idx = targets[ep_idx]
 
+            if idx is not None and idx in sub_map:
+                ep_subs = sub_map[idx]
+            elif -1 in sub_map:
+                ep_subs = sub_map[-1]
+            else:
+                ep_subs = None
+
             # Quiet mode suppresses subprocess UI — no need for a scroll
             # region since nothing scrolls below the header.
             _print_stream_header(
                 ep_idx, len(targets), idx, multi, vlc_url,
-                use_scroll_region=not quiet,
+                use_scroll_region=not quiet, sub_paths=ep_subs,
             )
 
-            cmd = [pf_path, magnet_link, "--vlc", "--port", "8888"]
+            cmd = [pf_path, magnet_link, "--port", "8888"]
             if idx is not None:
                 cmd.extend(["-i", str(idx - 1)])
 
-            rc, nav = _run_stream(cmd, vlc_url, allow_navigate=multi, quiet=quiet)
+            rc, nav = _run_stream(
+                cmd, vlc_url, allow_navigate=multi, quiet=quiet,
+                sub_paths=ep_subs,
+                launch_vlc_when_ready=("127.0.0.1", 8888),
+            )
 
             if nav == "next":
                 _kill_vlc()

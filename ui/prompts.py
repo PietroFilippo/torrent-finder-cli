@@ -405,6 +405,115 @@ def _make_banner_panel() -> Panel:
     )
 
 
+def subtitle_source_prompt(current: dict | None = None) -> dict:
+    """Pick the subtitle source for the next stream.
+
+    Returns a dict ``{"mode": "auto"|"off"|"external", "path": str | None}``.
+    Falls back to *current* (or auto-detect) when cancelled.
+    """
+    import os
+    from constants import DOWNLOADS_DIR
+
+    current = current or {"mode": "auto", "path": None}
+
+    items = [
+        SelectItem(
+            label="🔍 Auto-detect from torrent",
+            value="auto",
+            description="Scan the torrent for .srt/.ass files alongside each video and attach them automatically.",
+        ),
+        SelectItem(
+            label="📁 Use external subtitle file…",
+            value="external",
+            description="Pick a .srt/.ass file from your downloads folder or type a custom path.",
+            is_action=True,
+        ),
+        SelectItem(
+            label="🚫 No subtitles",
+            value="off",
+            description="Stream without attaching any subtitles.",
+        ),
+        SelectItem(label="↩ Back", value="back", is_action=True),
+    ]
+
+    mode_to_index = {"auto": 0, "external": 1, "off": 2}
+    start = mode_to_index.get(current.get("mode", "auto"), 0)
+
+    result = arrow_select(
+        items,
+        title="Subtitle Source",
+        banner=_make_banner_panel(),
+        start_index=start,
+    )
+
+    if result is None:
+        return current
+    val = items[result].value
+    if val == "back":
+        return current
+    if val in ("auto", "off"):
+        return {"mode": val, "path": None}
+
+    # external — open file picker
+    sub_files: list[tuple[str, str]] = []  # (label, abs_path)
+    if os.path.isdir(DOWNLOADS_DIR):
+        try:
+            entries = [
+                (n, os.path.getmtime(os.path.join(DOWNLOADS_DIR, n)))
+                for n in os.listdir(DOWNLOADS_DIR)
+                if n.lower().endswith((".srt", ".ass", ".ssa", ".vtt", ".sub", ".idx"))
+            ]
+            entries.sort(key=lambda t: -t[1])
+            for fname, _ in entries[:15]:
+                sub_files.append((fname, os.path.join(DOWNLOADS_DIR, fname)))
+        except OSError:
+            pass
+
+    picker_items: list[SelectItem] = []
+    for label, path in sub_files:
+        picker_items.append(SelectItem(label=f"📄 {label}", value=path))
+    if not sub_files:
+        picker_items.append(SelectItem(
+            label="[no .srt/.ass files found in downloads folder]",
+            value="__none__",
+            enabled=False,
+            is_action=True,
+        ))
+    picker_items.append(SelectItem(
+        label="✍️  Type custom path…",
+        value="__type__",
+        is_action=True,
+        description="Type or paste the absolute path to a subtitle file.",
+    ))
+    picker_items.append(SelectItem(label="↩ Back", value="back", is_action=True))
+
+    pick = arrow_select(
+        picker_items,
+        title="External Subtitle File",
+        banner=_make_banner_panel(),
+    )
+
+    if pick is None:
+        return current
+    chosen = picker_items[pick].value
+    if chosen == "back" or chosen == "__none__":
+        return current
+    if chosen == "__type__":
+        try:
+            path = console.input("[info]Path to subtitle file: [/info]").strip().strip('"').strip("'")
+        except (EOFError, KeyboardInterrupt):
+            return current
+        if not path:
+            return current
+        if not os.path.exists(path):
+            console.print(f"[warning] File not found: {path}[/warning]")
+            console.print("[dim]Press any key to continue...[/dim]")
+            readchar.readkey()
+            return current
+        return {"mode": "external", "path": os.path.abspath(path)}
+    return {"mode": "external", "path": chosen}
+
+
 def confirm_prompt(message: str, title: str = "Confirm") -> bool:
     """Show a Y/N confirmation modal in the alt-screen. Returns True on Y."""
     panel = Panel(
@@ -446,11 +555,12 @@ def download_method_prompt(
     show_subtitles: bool = True,
     show_episode_picker: bool = False,
     selected_indexes: list[int] | None = None,
+    sub_choice: dict | None = None,
 ) -> str | None:
     """
     Prompt the user to choose a download method.
     Returns 't', 'd', 'p', 'aria', 'stream_w', 'stream_p', 's', 'pick_episodes',
-    'back', or None. 'l' (copy magnet) is handled internally.
+    'set_subs', 'back', or None. 'l' (copy magnet) is handled internally.
     """
     wt_available = has_webtorrent()
     pf_available = has_peerflix()
@@ -486,6 +596,28 @@ def download_method_prompt(
             description=(
                 "Browse every file in the torrent and pick any subset. "
                 "Downloads grab exactly what you pick; streams auto-skip non-video files."
+            ),
+        ))
+
+    # --- Subtitle source (for streaming) ---
+    if show_subtitles:
+        import os as _os
+        mode = (sub_choice or {}).get("mode", "auto")
+        path = (sub_choice or {}).get("path")
+        if mode == "auto":
+            sub_label = "auto-detect from torrent"
+        elif mode == "off":
+            sub_label = "disabled"
+        else:
+            sub_label = f"file: {_os.path.basename(path) if path else '?'}"
+        items.append(_section("Subtitles (for streaming)"))
+        items.append(SelectItem(
+            label=f"📝 Source: [highlight]{sub_label}[/highlight]",
+            value="set_subs",
+            is_action=True,
+            description=(
+                "Choose how VLC gets subtitles: auto-detect inside the torrent, "
+                "use an external .srt/.ass file, or disable subtitles."
             ),
         ))
 

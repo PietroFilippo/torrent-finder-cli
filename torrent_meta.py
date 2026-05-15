@@ -150,6 +150,10 @@ def _metadata_from_torrent_dict(data: dict) -> TorrentMetadata | None:
 def extract_episode_number(filename: str) -> str | None:
     """Best-effort extraction of an episode number from an anime filename."""
     basename = os.path.basename(filename)
+    stem = os.path.splitext(basename)[0]
+    # Bare-number filename (e.g. `01.ass` in a `Subs/` folder)
+    if stem.isdigit():
+        return stem.lstrip("0") or "0"
     for pat in (
         r"[Ss]\d+[Ee](\d{1,4})",
         r" - (\d{1,4})(?:v\d+)?(?=\D)",
@@ -163,6 +167,8 @@ def extract_episode_number(filename: str) -> str | None:
 
 
 VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".m4v", ".mov", ".webm", ".ts", ".m2ts", ".wmv", ".flv"}
+SUBTITLE_EXTENSIONS = {".srt", ".ass", ".ssa", ".vtt", ".sub", ".idx"}
+ENGLISH_LANG_TAGS = {"en", "eng", "english"}
 
 
 def is_video_file(name: str) -> bool:
@@ -176,15 +182,91 @@ def video_files(files: list[TorrentFile]) -> list[TorrentFile]:
     return [f for f in files if is_video_file(f.name)]
 
 
+def is_subtitle_file(name: str) -> bool:
+    """True if *name* has a known subtitle extension."""
+    ext = os.path.splitext(name.lower())[1]
+    return ext in SUBTITLE_EXTENSIONS
+
+
+def subtitle_files(files: list[TorrentFile]) -> list[TorrentFile]:
+    """Filter a file list down to subtitle files."""
+    return [f for f in files if is_subtitle_file(f.name)]
+
+
+def match_subtitles_for(video_path: str, files: list[TorrentFile]) -> list[TorrentFile]:
+    """Find subtitle files inside a torrent that pair with *video_path*.
+
+    Match rules, in priority order:
+    1. Same basename (stem) — e.g. ``Show.S01E01.mkv`` ↔ ``Show.S01E01.srt``.
+    2. Same stem plus a language tag — e.g. ``Show.S01E01.en.srt``.
+    3. Subs sitting in the same parent folder as the video, with an extractable
+       episode number matching the video's. Catches anime batches where the
+       ``Subs/`` folder houses ``01.ass``, ``02.ass``, … alongside videos
+       named ``[Group] Show - 01.mkv``.
+
+    English-tagged candidates float to the front of the returned list so the
+    caller's primary sub pick is English when one is available.
+    """
+    if not video_path or not files:
+        return []
+
+    v_dir = os.path.dirname(video_path)
+    v_stem = os.path.splitext(os.path.basename(video_path))[0]
+    v_ep = extract_episode_number(video_path)
+
+    exact: list[TorrentFile] = []
+    tagged: list[TorrentFile] = []
+    episode: list[TorrentFile] = []
+
+    for f in subtitle_files(files):
+        f_base = os.path.basename(f.name)
+        f_stem = os.path.splitext(f_base)[0]
+        if f_stem == v_stem:
+            exact.append(f)
+            continue
+        if f_stem.startswith(v_stem + "."):
+            tagged.append(f)
+            continue
+        if v_ep is not None:
+            f_ep = extract_episode_number(f.name)
+            f_dir = os.path.dirname(f.name)
+            # accept subs under a sibling folder (e.g. Subs/) too — anime norm
+            same_branch = (
+                f_dir == v_dir
+                or f_dir.startswith(v_dir + "/")
+                or v_dir.startswith(f_dir + "/")
+            )
+            if f_ep == v_ep and (same_branch or not v_dir):
+                episode.append(f)
+
+    ordered = exact + tagged + episode
+
+    def _eng_first(f: TorrentFile) -> int:
+        stem = os.path.splitext(os.path.basename(f.name))[0].lower()
+        parts = set(stem.replace("-", ".").split("."))
+        return 0 if (parts & ENGLISH_LANG_TAGS) else 1
+
+    return sorted(ordered, key=_eng_first)
+
+
 def is_multi_episode(files: list[TorrentFile]) -> bool:
     """Heuristic: treat the torrent as a multi-episode release.
 
-    Requires at least 2 video files whose sizes are within an order of
-    magnitude of each other (filters out e.g. a single movie + small extras).
+    Two-stage check:
+    1. If ≥ 2 video files carry explicit episode markers (S01E02, " - 03",
+       "[04]", "Episode 05"), treat as multi-episode regardless of size —
+       robust for anime batches and TV seasons where finales / specials are
+       2-3× larger than the average episode.
+    2. Otherwise fall back to a size-similarity check: ≥ 2 video files whose
+       sizes are within an order of magnitude — filters out a single movie
+       plus tiny extras/samples.
     """
     vids = video_files(files)
     if len(vids) < 2:
         return False
+    numbered = sum(1 for f in vids if extract_episode_number(f.name) is not None)
+    if numbered >= 2:
+        return True
     sizes = [f.size_bytes for f in vids if f.size_bytes > 0]
     if len(sizes) < 2:
         return False
