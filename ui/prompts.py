@@ -612,7 +612,7 @@ def download_method_prompt(
             sub_label = f"file: {_os.path.basename(path) if path else '?'}"
         items.append(_section("Subtitles (for streaming)"))
         items.append(SelectItem(
-            label=f"📝 Source: [highlight]{sub_label}[/highlight]",
+            label=f"📝 Source: {sub_label}",
             value="set_subs",
             is_action=True,
             description=(
