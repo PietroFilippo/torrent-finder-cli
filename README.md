@@ -16,7 +16,7 @@ An interactive command-line application for searching and downloading torrents d
   - Toggle individual search engines on and off per provider from the same menu.
   - Add custom include/exclude keywords to quickly find the exact release you want.
   - **Shared keybinds with the episode picker:** `a` select all • `i` invert • `c` clear presets • `w` save • `v` / `Shift+V` visual anchor + range toggle • `Space` toggle current.
-  - **Persistent across runs:** your engine toggles and active filter presets are saved to `filter_state.json` next to the script, so configuration sticks after you close the program.
+  - **Persistent across runs:** engine toggles, active filter presets, search history, usage stats, the quiet-mode flag, and the dismissed-warning state all live in `filter_state.json` next to the script, so configuration sticks after you close the program.
 - **Search History:** Press `Shift+H` at the search prompt (or `H` on the provider screen) to browse past searches. Filter by provider (`P`), date range (`D`, today/week/month), and sort order (`S`). Each entry shows the provider, relative timestamp, and the filter presets that were active at search time. Pick an entry to re-run the query; clear history with a confirmation modal.
 - **Usage Stats:** Press `Shift+S` at the search prompt (or `S` on the provider screen) to open a scrollable stats page showing session count, total runtime, searches, top queries, torrents picked, method picks vs. completions (with success rate), avg seeders of picks, and preset usage counters. Reset all stats from the same screen, guarded by a confirmation modal.
 - **Confirmation Modals:** Destructive actions (clear history, reset stats) share a unified red Y/N panel so you can't nuke state with a stray keypress.
@@ -27,7 +27,12 @@ An interactive command-line application for searching and downloading torrents d
   - **Direct Terminal Download:** Use `aria2c`, `webtorrent-cli`, or `peerflix` integration to download files directly within the terminal, with native progress UIs.
   - **File Browser / Episode Picker (Anime + Movies & Series):** Open **📂 Browse torrent files…** from the download menu to list every file in the torrent (videos, subs, artwork, .nfo, samples) and pick any subset. Features vim-style visual range selection (`v` anchor, `Shift+V` range-toggle) and rapid hotkeys (`a`, `i`, `c`, `w`). **Selection persists across re-entries** — reopening the picker shows your existing checkboxes already ticked, so you can refine without rebuilding from scratch. Confirming with nothing checked clears the selection; `Esc` cancels and keeps the prior picks intact. Only `aria2c` honors strict file selection on download — `webtorrent` and `peerflix` ignore `--select` and pull the whole torrent (the menu warns you when a selection is active). **Streams auto-skip non-video picks** and warn about it, so you can still e.g. download the .srt + .nfo alongside the video without breaking playback. If a stream selection contains zero video files, the stream errors out instead of silently substituting another file.
   - **Stream to VLC:** Stream media directly to VLC Media Player using `webtorrent-cli` (default) or `peerflix` (fallback). Both stream and download menus list **webtorrent before peerflix** to match this preference. Press the `v` hotkey at any time during a streaming session to reopen VLC without losing your torrent download/buffering progress. The CLI checks active processes (`tasklist` on Windows, `pgrep -x` on Mac/Linux) and silently ignores the hotkey if VLC is already running, preventing accidental duplicate windows. When an episode is selected, streams that specific file.
-  - **Auto Episode Navigation:** When streaming a multi-episode torrent (TV shows, anime batches, season packs) **without** pre-selecting anything, the CLI auto-detects the episode structure via `aria2c` metadata, queues every video file in episode order, and enables `n` (next) / `b` (previous) hotkeys so you can jump between episodes mid-session. Single-file movies still stream as-is — no forced picker, no extra wait. Heuristic: ≥ 2 video files whose sizes are within an order of magnitude of each other.
+  - **Subtitles for streams (auto + manual):** A `📝 Source: <mode>` row in the Download Method menu controls how VLC gets subtitles for the next stream:
+    - `auto-detect from torrent` *(default)* — scans the torrent for `.srt/.ass/.ssa/.vtt/.sub` files paired with each video (matched by basename, language tag like `.en.srt`, or a sibling `Subs/` folder with episode-numbered files like `01.ass`). Matches are pre-downloaded via aria2c and attached to VLC via `--sub-file` before playback starts. English subs are prioritized as the primary track when available.
+    - `external file` — pick a `.srt/.ass` from a list of recent files in your `downloads/` folder, or type a custom path. The same file is attached to every episode in the session.
+    - `off` — stream with no subtitles.
+    - After downloading subs via **📝 Search & download subtitles** (the existing subliminal flow), the saved file is auto-promoted to external mode so your next stream just picks it up.
+  - **Auto Episode Navigation:** When streaming a multi-episode torrent (TV shows, anime batches, season packs) **without** pre-selecting anything, the CLI auto-detects the episode structure via `aria2c` metadata, queues every video file in episode order, and enables `n` (next) / `b` (previous) hotkeys so you can jump between episodes mid-session. Single-file movies still stream as-is — no forced picker, no extra wait. Detection accepts either: (1) ≥ 2 video files carrying explicit episode markers (`S01E01`, ` - 01`, `[01]`, `Episode 01`) regardless of size — robust for releases where finales/specials run 2-3× the average ep — or (2) ≥ 2 video files whose sizes are within an order of magnitude of each other.
   - **Subtitle Download:** Search and download the best matching subtitles directly from the terminal using `subliminal`.
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
   - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
@@ -39,7 +44,7 @@ An interactive command-line application for searching and downloading torrents d
 - **Python 3.x**
 - (Optional but recommended) **Node.js** & **npm** for installing `webtorrent-cli` or `peerflix`.
 - (Optional) **VLC Media Player** — required for streaming.
-- (Optional) **aria2** — required for the anime episode picker and for single-process multi-file downloads. Install with `winget install aria2.aria2` (Windows), `brew install aria2` (macOS), or `apt install aria2` / `dnf install aria2` (Linux).
+- (Optional) **aria2** — required for the file browser / episode picker, the in-torrent subtitle auto-detect path, auto episode navigation on the peerflix backend, and single-process multi-file downloads. Install with `winget install aria2.aria2` (Windows), `brew install aria2` (macOS), or `apt install aria2` / `dnf install aria2` (Linux).
 
 ## Installation
 
@@ -127,15 +132,15 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 The application is structured into a modular, provider-based architecture:
 
 - `main.py`: The main entry point and CLI argument parser.
-- `providers/`: Directory containing different search categories (Movies, Games, Anime). Each provider declares its own search engines, default filters, and toggleable presets.
-- `ui/`: Controls the interactive terminal prompts and rendering of tables using the `rich` library. Includes `prompts.py` (menus + `confirm_prompt` modal), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), and `stats.py` (usage stats page).
+- `providers/`: Directory containing different search categories (Movies & Series, Games, Anime). Each provider declares its own search engines, default filters, and toggleable presets.
+- `ui/`: Controls the interactive terminal prompts and rendering of tables using the `rich` library. Includes `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt`), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), and `tips.py` (rotating contextual hints).
 - `filters.py`: Logic processing for including or excluding keywords.
-- `downloader.py`: Logic handling torrent client detection and `webtorrent-cli` / `peerflix` execution.
+- `downloader.py`: Torrent-client detection, `aria2c` / `webtorrent-cli` / `peerflix` execution, VLC launch + sub injection, quiet-mode plumbing, and `v` / `n` / `b` hotkey handling.
 - `subtitles.py`: Logic for searching and downloading subtitles using `subliminal`.
 - `security.py`: Network exposure warning, public-IP/VPN detection via `ip-api.com`.
-- `state.py`: Persists engine toggles, active presets, misc settings (dismissed-warning flag), and search history to `filter_state.json`.
+- `state.py`: Persists engine toggles, active presets, misc settings (dismissed-warning flag, quiet-mode flag), and search history to `filter_state.json`.
 - `stats.py`: Usage counter recorders and read helpers; stores under the `stats` subtree of `filter_state.json`.
-- `torrent_meta.py`: Fetches a torrent's file list from a magnet via `aria2c`; helpers for episode-number extraction and `--select-file` range formatting.
+- `torrent_meta.py`: Fetches a torrent's file list from a magnet via `aria2c`. Helpers for episode-number extraction, video/subtitle classification, multi-episode detection, sub-to-video matching (`match_subtitles_for`), and `--select-file` range formatting.
 - `constants.py`: Stores configuration constants, trackers, and UI themes.
 
 ## Security Notes
