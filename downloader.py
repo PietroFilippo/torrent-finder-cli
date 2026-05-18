@@ -9,10 +9,14 @@ import sys
 import threading
 import time
 import urllib.parse
+from typing import TYPE_CHECKING
 
 from constants import DOWNLOADS_DIR, console
 from state import load_setting
 from torrent_meta import compact_ranges
+
+if TYPE_CHECKING:
+    from torrent_session import TorrentSession
 
 
 _QUIET_SETTING_KEY = "hide_stream_output"
@@ -867,83 +871,47 @@ def _resolve_subs_for_session(
     return result
 
 
-def stream_with_webtorrent(
-    magnet_link: str,
-    select_indexes: list[int] | None = None,
-    files=None,  # TorrentMetadata | None
-    sub_choice: dict | None = None,
-) -> None:
-    """Stream selected files to VLC using webtorrent-cli.
+def stream_with_webtorrent(session: "TorrentSession") -> None:
+    """Stream selected files from *session* to VLC using webtorrent-cli.
 
-    `files` is a TorrentMetadata whose .name (info.name) gives the exact
-    torrent root for 'v' hotkey URL reconstruction, and whose .files list
-    maps 1-based indexes to internal file paths.
-
-    ``sub_choice`` controls subtitle handling:
-        - ``None`` or ``{"mode": "auto"}``: auto-detect in-torrent subs.
-        - ``{"mode": "off"}``: stream without subs.
-        - ``{"mode": "external", "path": "<path>"}``: attach the given .srt/.ass.
-
-    webtorrent-cli uses full-screen ANSI rendering (``\033[2J``) that
-    clears through scroll regions, so we use the terminal window title
-    for persistent episode info instead.
+    Reads precedence + metadata + sub paths off the session; renders the
+    per-episode subprocess loop here. webtorrent-cli uses full-screen ANSI
+    rendering (``\033[2J``) that clears through scroll regions, so we use
+    the terminal window title for persistent episode info instead.
     """
     wt_path = shutil.which("webtorrent")
     if not wt_path:
         console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
         return
 
-    from torrent_meta import fetch_file_list, is_multi_episode, sort_episodes, video_files
+    magnet_link = session.magnet
 
-    if files is None:
-        console.print("[info]Fetching metadata to resolve exact stream URL...[/info]")
-        with console.status("[bold cyan]Fetching metadata...", spinner="dots"):
-            files = fetch_file_list(magnet_link)
-
-    targets: list[int | None] = list(select_indexes) if select_indexes else []
-    file_list = files.files if files is not None else []
-
-    if targets and file_list:
+    if session.selected_files:
         # User-supplied selection may include non-video files (artwork, .nfo,
-        # subs). Stream only the playable ones, warn about the rest. If the
-        # selection is *entirely* non-video, respect the user's pick and bail
-        # — don't silently substitute a video they didn't choose.
-        video_idxs = {f.index for f in video_files(file_list)}
-        filtered = [i for i in targets if i in video_idxs]
-        skipped = len(targets) - len(filtered)
-        if skipped and filtered:
+        # subs). Session.stream_indexes already filters them out; warn about
+        # the skipped count, and bail if everything was non-video.
+        n_skipped = len(session.selected_files) - len(session.stream_indexes)
+        if n_skipped and session.stream_indexes:
             console.print(
-                f"[warning] Skipping {skipped} non-video file(s) — streamable files only.[/warning]"
+                f"[warning] Skipping {n_skipped} non-video file(s) — streamable files only.[/warning]"
             )
-        if not filtered:
+        if not session.stream_indexes and session.file_list:
             console.print(
                 "[error] Selection contains no streamable video files. "
                 "Pick a video file or use a download method instead.[/error]\n"
             )
             return
-        targets = filtered
 
-    if not targets and file_list:
-        if is_multi_episode(file_list):
-            # Multi-episode release — queue every video file in episode order so
-            # `n`/`b` navigation works even without an explicit picker selection.
-            targets = [f.index for f in sort_episodes(file_list)]
-        else:
-            # Single-episode / movie — webtorrent defaults to the largest file;
-            # resolve it explicitly so the VLC URL reconstruction matches.
-            largest_file = max(file_list, key=lambda f: f.size_bytes)
-            targets = [largest_file.index]
-    elif not targets:
-        # Fallback if there are no metadata
-        targets = [None]
-        
+    file_list = session.file_list
+    targets: list[int | None] = list(session.stream_indexes) if session.stream_indexes else [None]
+
     multi = len(targets) > 1
     name_by_idx = {f.index: f.name for f in file_list}
     is_multi_file = len(file_list) > 1
-    torrent_name = files.name if files is not None else None
+    torrent_name = session.torrent_name
     quiet = is_quiet_mode()
 
-    sub_map = _resolve_subs_for_session(magnet_link, files, file_list, sub_choice)
+    sub_map = session.sub_paths
 
     try:
         ep_idx = 0
@@ -1012,72 +980,41 @@ def stream_with_webtorrent(
         console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
 
 
-def stream_with_peerflix(
-    magnet_link: str,
-    select_indexes: list[int] | None = None,
-    files=None,  # TorrentMetadata | None
-    sub_choice: dict | None = None,
-) -> None:
-    """Stream selected files to VLC using peerflix.
+def stream_with_peerflix(session: "TorrentSession") -> None:
+    """Stream selected files from *session* to VLC using peerflix.
 
-    One session per selected 1-based index. peerflix serves the currently
-    streaming file at the server root, so the 'v' hotkey URL is fixed.
-
-    When no explicit selection is passed, aria2c is available, and the
-    torrent looks like a multi-episode release, every video file is queued
-    in episode order so `n`/`b` navigation works seamlessly.
-
-    ``sub_choice`` (same shape as in :func:`stream_with_webtorrent`) governs
-    subtitle resolution — auto-detect from torrent, off, or an external file.
+    One subprocess per selected 1-based index; peerflix serves the currently
+    streaming file at the server root, so the VLC URL is fixed. Reads
+    precedence + metadata + sub paths off the session.
     """
     pf_path = shutil.which("peerflix")
     if not pf_path:
         console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
         return
 
-    from torrent_meta import fetch_file_list, is_multi_episode, sort_episodes, video_files
+    magnet_link = session.magnet
 
-    targets: list[int | None] = list(select_indexes) if select_indexes else []
+    if session.selected_files:
+        n_skipped = len(session.selected_files) - len(session.stream_indexes)
+        if n_skipped and session.stream_indexes:
+            console.print(
+                f"[warning] Skipping {n_skipped} non-video file(s) — streamable files only.[/warning]"
+            )
+        if not session.stream_indexes and session.file_list:
+            console.print(
+                "[error] Selection contains no streamable video files. "
+                "Pick a video file or use a download method instead.[/error]\n"
+            )
+            return
 
-    if targets:
-        # Fetch metadata (if available) so we can filter out non-video picks.
-        if files is None and has_aria2():
-            console.print("[info]Fetching metadata to validate selection...[/info]")
-            with console.status("[bold cyan]Fetching metadata...", spinner="dots"):
-                files = fetch_file_list(magnet_link)
-        file_list = files.files if files is not None else []
-        if file_list:
-            video_idxs = {f.index for f in video_files(file_list)}
-            filtered = [i for i in targets if i in video_idxs]
-            skipped = len(targets) - len(filtered)
-            if skipped and filtered:
-                console.print(
-                    f"[warning] Skipping {skipped} non-video file(s) — streamable files only.[/warning]"
-                )
-            if not filtered:
-                console.print(
-                    "[error] Selection contains no streamable video files. "
-                    "Pick a video file or use a download method instead.[/error]\n"
-                )
-                return
-            targets = filtered
-    else:
-        # No explicit picker selection — try auto-detect so n/b nav can work.
-        if files is None and has_aria2():
-            console.print("[info]Fetching metadata to detect episodes...[/info]")
-            with console.status("[bold cyan]Fetching metadata...", spinner="dots"):
-                files = fetch_file_list(magnet_link)
-        file_list = files.files if files is not None else []
-        if file_list and is_multi_episode(file_list):
-            targets = [f.index for f in sort_episodes(file_list)]
-        else:
-            targets = [None]
+    file_list = session.file_list
+    targets: list[int | None] = list(session.stream_indexes) if session.stream_indexes else [None]
 
     multi = len(targets) > 1
     vlc_url = "http://127.0.0.1:8888/"
     quiet = is_quiet_mode()
 
-    sub_map = _resolve_subs_for_session(magnet_link, files, file_list, sub_choice)
+    sub_map = session.sub_paths
 
     try:
         ep_idx = 0

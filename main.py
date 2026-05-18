@@ -30,7 +30,7 @@ from stats import (
     record_session_start,
     record_torrent_picked,
 )
-from torrent_meta import fetch_file_list
+from torrent_session import TorrentSession
 from ui.prompts import clear_screen, download_method_prompt, episode_select_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
 from ui.table import interactive_select
 from utils import build_magnet
@@ -195,20 +195,18 @@ def _main_loop() -> None:
 
             # Download method selection
             magnet = build_magnet(info_hash, name)
+            session = TorrentSession(selected, magnet)
 
             go_back_to_results = False
-            selected_files: list[int] | None = None
-            files_meta = None
-            sub_choice: dict | None = None  # None / {"mode": "auto"} → auto-detect
             while True:
                 show_subs = hasattr(provider, "name") and provider.name in ("Movies & Series", "Anime")
                 show_picker = hasattr(provider, "name") and provider.name in ("Movies & Series", "Anime")
                 method = download_method_prompt(
-                    magnet=magnet,
+                    magnet=session.magnet,
                     show_subtitles=show_subs,
                     show_episode_picker=show_picker,
-                    selected_indexes=selected_files,
-                    sub_choice=sub_choice,
+                    selected_indexes=session.selected_files,
+                    sub_choice=session.sub_choice,
                 )
 
                 if method in _METHOD_TRACK:
@@ -216,7 +214,7 @@ def _main_loop() -> None:
 
                 if method == "set_subs":
                     from ui.prompts import subtitle_source_prompt
-                    sub_choice = subtitle_source_prompt(sub_choice)
+                    session.set_sub_choice(subtitle_source_prompt(session.sub_choice))
                     clear_screen()
                     continue
 
@@ -229,7 +227,7 @@ def _main_loop() -> None:
                         continue
                     console.print("[info]Fetching torrent metadata via DHT (this can take 30–60s)...[/info]\n")
                     with console.status("[bold cyan]Fetching file list...[/bold cyan]", spinner="dots"):
-                        metadata = fetch_file_list(magnet)
+                        metadata = session.files_meta
                     if not metadata or not metadata.files:
                         console.print("[error] Could not fetch file list (timeout or no metadata peers).[/error]\n")
                         console.print("[dim]Press any key to continue...[/dim]")
@@ -240,24 +238,23 @@ def _main_loop() -> None:
                         console.print("[dim]Press any key to continue...[/dim]")
                         readchar.readkey()
                         continue
-                    picked = episode_select_prompt(metadata.files, preselected=selected_files)
+                    picked = episode_select_prompt(metadata.files, preselected=session.selected_files)
                     if picked is not None:
                         # Confirm pressed — replace selection (empty list clears it)
-                        selected_files = picked or None
-                        files_meta = metadata if picked else None
+                        session.set_selected_files(picked or None)
                     clear_screen()
                     continue
 
                 if method == "t":
                     clear_screen()
                     console.print("[info]Opening magnet link with default torrent client...[/info]")
-                    if selected_files:
+                    if session.selected_files:
                         console.print(
                             "[warning] External torrent clients cannot be pre-filtered from here.[/warning]\n"
                             "[dim]When the client's 'Add new torrent' dialog appears, uncheck the files you don't want.[/dim]\n"
                             "[dim]If your client skipped the dialog, pause the torrent and deselect unwanted files in its Content/Files tab.[/dim]"
                         )
-                    open_magnet(magnet)
+                    open_magnet(session.magnet)
                     record_magnet_dispatch()
                     console.print("[success] Magnet link sent to torrent client![/success]\n")
                     console.print("[dim]Press any key to continue...[/dim]")
@@ -265,19 +262,19 @@ def _main_loop() -> None:
                     break
                 elif method == "stream_p":
                     clear_screen()
-                    stream_with_peerflix(magnet, select_indexes=selected_files, files=files_meta, sub_choice=sub_choice)
+                    stream_with_peerflix(session)
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
                 elif method == "stream_w":
                     clear_screen()
-                    stream_with_webtorrent(magnet, select_indexes=selected_files, files=files_meta, sub_choice=sub_choice)
+                    stream_with_webtorrent(session)
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
                 elif method == "aria":
                     clear_screen()
-                    ok = download_with_aria2(magnet, select_indexes=selected_files)
+                    ok = download_with_aria2(session.magnet, session.download_indexes)
                     if ok:
                         record_method_complete("aria")
                     console.print("\n[dim]Press any key to continue...[/dim]")
@@ -287,7 +284,7 @@ def _main_loop() -> None:
                     break
                 elif method == "p":
                     clear_screen()
-                    ok = download_with_peerflix(magnet, select_indexes=selected_files)
+                    ok = download_with_peerflix(session.magnet, session.download_indexes)
                     if ok:
                         record_method_complete("peerflix_download")
                     console.print("\n[dim]Press any key to continue...[/dim]")
@@ -297,7 +294,7 @@ def _main_loop() -> None:
                     break
                 elif method == "d":
                     clear_screen()
-                    ok = download_with_webtorrent(magnet, select_indexes=selected_files)
+                    ok = download_with_webtorrent(session.magnet, session.download_indexes)
                     if ok:
                         record_method_complete("webtorrent_download")
                     console.print("\n[dim]Press any key to continue...[/dim]")
@@ -308,10 +305,10 @@ def _main_loop() -> None:
                 elif method == "s":
                     import os as _os
                     from subtitles import download_subtitles
-                    sub_path = download_subtitles(name)
+                    sub_path = download_subtitles(session.name)
                     record_method_complete("subtitles")
                     if sub_path and _os.path.exists(sub_path):
-                        sub_choice = {"mode": "external", "path": _os.path.abspath(sub_path)}
+                        session.set_sub_choice({"mode": "external", "path": _os.path.abspath(sub_path)})
                         console.print(
                             f"[success]Saved. Next stream will use[/success] "
                             f"[highlight]{_os.path.basename(sub_path)}[/highlight] "
