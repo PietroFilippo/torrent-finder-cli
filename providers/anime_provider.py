@@ -10,6 +10,7 @@ from providers.base import BaseProvider, SearchEngine
 
 class AnimeProvider(BaseProvider):
     name = "Anime"
+    slug = "anime"
     icon = "🍙"
     categories = [201, 205, 207, 208]  # Movies, TV, HD Movies, HD TV
     solidtorrents_category = "Anime"

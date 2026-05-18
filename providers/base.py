@@ -30,7 +30,8 @@ class BaseProvider(ABC):
       - categories: list of apibay numeric category IDs to search
     """
 
-    name: str
+    name: str  # display label, free to change
+    slug: str  # immutable identity used for persistence keys (history, stats, settings)
     icon: str
     categories: list[int]
     solidtorrents_category: str = "all"

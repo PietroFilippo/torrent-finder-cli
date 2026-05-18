@@ -6,6 +6,7 @@ there's no bespoke redraw/overscroll logic and no flicker.
 """
 
 from constants import console
+from providers import display_name_for
 from stats import (
     average_seeders,
     days_since_first_use,
@@ -14,6 +15,11 @@ from stats import (
 )
 from ui.prompts import _make_banner_panel, confirm_prompt
 from ui.selector import SelectItem, arrow_select
+
+
+def _by_display_name(by_slug: dict) -> dict:
+    """Reshape a slug-keyed counter dict into a display-name-keyed one for rendering."""
+    return {display_name_for(slug): count for slug, count in by_slug.items()}
 
 
 def _fmt_runtime(seconds: float) -> str:
@@ -118,8 +124,8 @@ def _build_items(stats: dict) -> list[SelectItem]:
     items: list[SelectItem] = []
     items.extend(_summary_items(stats))
     items.extend(_method_items(stats))
-    items.extend(_kv_items("Searches by Provider", stats.get("searches_by_provider", {})))
-    items.extend(_kv_items("Torrents Picked by Provider", stats.get("torrents_picked_by_provider", {})))
+    items.extend(_kv_items("Searches by Provider", _by_display_name(stats.get("searches_by_provider", {}))))
+    items.extend(_kv_items("Torrents Picked by Provider", _by_display_name(stats.get("torrents_picked_by_provider", {}))))
     items.extend(_kv_items("Top 10 Queries", stats.get("top_queries", {}), top_n=10))
     items.extend(_kv_items("Filter Preset Usage", stats.get("preset_usage", {})))
 

@@ -6,6 +6,7 @@ from providers.base import BaseProvider
 
 class GameProvider(BaseProvider):
     name = "Games"
+    slug = "games"
     icon = "🎮"
     categories = [400, 401, 403, 404, 405, 406]  # All, PC, PSX, Xbox, Wii, Handheld
     solidtorrents_category = "Game"

@@ -34,12 +34,24 @@ def _relative_time(iso_ts: str) -> str:
     return f"{months}mo ago"
 
 
-def _provider_icon(name: str) -> str:
-    """Look up the emoji icon for a provider by name."""
+def _provider_icon(slug_or_name: str) -> str:
+    """Emoji icon for a provider, identified by either slug (entry field) or name (filter label)."""
     for p in PROVIDERS:
-        if p.name == name:
+        if p.slug == slug_or_name or p.name == slug_or_name:
             return p.icon
     return "🔍"
+
+
+def _provider_display(slug: str) -> str:
+    """Current display name for a stored slug; falls back to the slug for unknown providers."""
+    for p in PROVIDERS:
+        if p.slug == slug:
+            return p.name
+    return slug
+
+
+# Map filter-dropdown display names to slugs for entry comparison.
+_NAME_TO_SLUG = {p.name: p.slug for p in PROVIDERS}
 
 
 def _parse_ts(iso_ts: str) -> datetime | None:
@@ -64,7 +76,8 @@ _SORT_OPTIONS = ["Newest first", "Oldest first"]
 def _filter_by_provider(entries: list[dict], provider: str) -> list[dict]:
     if provider == "All":
         return entries
-    return [e for e in entries if e.get("provider") == provider]
+    slug = _NAME_TO_SLUG.get(provider, provider)
+    return [e for e in entries if e.get("provider") == slug]
 
 
 def _filter_by_date(entries: list[dict], date_range: str) -> list[dict]:
@@ -101,8 +114,9 @@ def _sort_entries(entries: list[dict], order: str) -> list[dict]:
 def history_select_prompt() -> tuple[str, str] | None:
     """Display the search history menu with filtering hotkeys.
 
-    Returns ``(query, provider_name)`` when the user picks an entry,
-    or ``None`` on cancel / empty history / go-back.
+    Returns ``(query, provider_slug)`` when the user picks an entry,
+    or ``None`` on cancel / empty history / go-back. Callers resolve the
+    slug back to a provider via ``get_provider(slug)``.
     """
     # Mutable filter state — shared by key_action callbacks and callable title/footer
     fstate = {
@@ -153,9 +167,10 @@ def history_select_prompt() -> tuple[str, str] | None:
                 ts = entry.get("timestamp", "")
                 presets = entry.get("presets", [])
                 icon = _provider_icon(prov)
+                display = _provider_display(prov)
                 time_str = _relative_time(ts)
                 label = f"{icon}  {query}"
-                hint = f"{prov}  •  {time_str}" if time_str else prov
+                hint = f"{display}  •  {time_str}" if time_str else display
                 if presets:
                     hint += f"  •  filters: {', '.join(presets)}"
                 items.append(SelectItem(label=label, value=entry, hint=hint))

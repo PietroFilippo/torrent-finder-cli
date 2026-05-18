@@ -11,9 +11,37 @@ PROVIDERS: list = [
     AnimeProvider(),
 ]
 
-def get_provider(name: str):
-    """Look up a provider by name (case-insensitive, allows prefix like 'game' for 'Games')."""
+
+def get_provider(slug_or_prefix: str):
+    """Look up a provider by slug (case-insensitive, allows prefix like 'movie' for 'movies').
+
+    Used by the ``-t`` CLI flag and by the history menu to re-resolve a saved
+    search. Match is on ``slug`` only — display ``name`` is no longer an
+    identity key (see CONTEXT.md → "Provider").
+    """
+    needle = slug_or_prefix.lower()
     for p in PROVIDERS:
-        if p.name.lower().startswith(name.lower()):
+        if p.slug.lower().startswith(needle):
             return p
     return None
+
+
+def get_provider_by_slug(slug: str):
+    """Strict slug lookup. Returns None if no exact match."""
+    for p in PROVIDERS:
+        if p.slug == slug:
+            return p
+    return None
+
+
+def display_name_for(slug: str) -> str:
+    """Return the current display name for a provider slug, or the slug itself
+    when unknown (orphaned history rows, removed providers)."""
+    p = get_provider_by_slug(slug)
+    return p.name if p else slug
+
+
+def icon_for(slug: str) -> str:
+    """Return the icon for a provider slug, or a generic fallback."""
+    p = get_provider_by_slug(slug)
+    return p.icon if p else "🔍"

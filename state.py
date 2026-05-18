@@ -58,12 +58,64 @@ def _flush() -> None:
         pass
 
 
+# One-shot rename: legacy persistence keyed on display ``name``; new schema
+# keys on immutable ``slug``. Map covers every display name that ever existed
+# in this codebase. Idempotent — if keys are already slugs, no rewrites.
+_LEGACY_NAME_TO_SLUG = {
+    "Movies": "movies",
+    "Movies & Series": "movies",
+    "Games": "games",
+    "Anime": "anime",
+}
+
+
+def _migrate_legacy_names(data: dict) -> bool:
+    """Rewrite display-name keys to slugs across providers, history, and stats
+    subtrees. Returns True if anything changed (caller should mark dirty)."""
+    changed = False
+
+    providers = data.get("providers")
+    if isinstance(providers, dict) and any(k in _LEGACY_NAME_TO_SLUG for k in providers):
+        renamed = {}
+        for k, v in providers.items():
+            renamed[_LEGACY_NAME_TO_SLUG.get(k, k)] = v
+        data["providers"] = renamed
+        changed = True
+
+    history = data.get("history")
+    if isinstance(history, list):
+        for entry in history:
+            prov = entry.get("provider") if isinstance(entry, dict) else None
+            if prov in _LEGACY_NAME_TO_SLUG:
+                entry["provider"] = _LEGACY_NAME_TO_SLUG[prov]
+                changed = True
+
+    stats = data.get("stats")
+    if isinstance(stats, dict):
+        for subkey in ("searches_by_provider", "torrents_picked_by_provider"):
+            sub = stats.get(subkey)
+            if not isinstance(sub, dict):
+                continue
+            if not any(k in _LEGACY_NAME_TO_SLUG for k in sub):
+                continue
+            merged: dict = {}
+            for k, v in sub.items():
+                slug = _LEGACY_NAME_TO_SLUG.get(k, k)
+                merged[slug] = merged.get(slug, 0) + v
+            stats[subkey] = merged
+            changed = True
+
+    return changed
+
+
 def load_state(providers) -> None:
     """Apply saved engine/preset selections onto the given provider instances in place."""
     data = _read_state()
+    if _migrate_legacy_names(data):
+        _write_state(data)
     provider_states = data.get("providers", {})
     for provider in providers:
-        pstate = provider_states.get(provider.name)
+        pstate = provider_states.get(provider.slug)
         if not pstate:
             continue
 
@@ -86,7 +138,7 @@ def save_state(providers) -> None:
     """
     data = _read_state()
     data["providers"] = {
-        p.name: {
+        p.slug: {
             "engines": {e.name: e.enabled for e in p.engines},
             "active_presets": [pr.name for pr in p.active_presets],
         }

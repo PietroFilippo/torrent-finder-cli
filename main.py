@@ -177,8 +177,8 @@ def _main_loop() -> None:
         # Record successful search in history + stats
         from state import add_history_entry
         active_preset_names = [pr.name for pr in getattr(provider, "active_presets", [])]
-        add_history_entry(query, provider.name, active_preset_names)
-        record_search(provider.name, query, active_preset_names)
+        add_history_entry(query, provider.slug, active_preset_names)
+        record_search(provider.slug, query, active_preset_names)
 
         # Torrent selection + download loop (allows going back to results)
         while True:
@@ -191,7 +191,7 @@ def _main_loop() -> None:
             selected = results[idx]
             name = selected.get("name", "Unknown")
             info_hash = selected.get("info_hash", "")
-            record_torrent_picked(provider.name, int(selected.get("seeders", 0) or 0))
+            record_torrent_picked(provider.slug, int(selected.get("seeders", 0) or 0))
 
             # Download method selection
             magnet = build_magnet(info_hash, name)
