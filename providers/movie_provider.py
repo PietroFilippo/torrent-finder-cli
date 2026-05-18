@@ -12,6 +12,9 @@ class MovieProvider(BaseProvider):
     categories = [201, 207]  # Movies, HD Movies
     solidtorrents_category = "Movie"
 
+    supports_subtitles = True
+    supports_episode_picker = True
+
     presets = [
         FilterPreset("720p", FilterConfig(quality=["720p"])),
         FilterPreset("1080p", FilterConfig(quality=["1080p"])),

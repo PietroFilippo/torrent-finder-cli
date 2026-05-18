@@ -35,6 +35,11 @@ class BaseProvider(ABC):
     categories: list[int]
     solidtorrents_category: str = "all"
 
+    # Capabilities — gate UI rows in download_method_prompt.
+    # Opt-in: subclasses override to True when applicable.
+    supports_subtitles: bool = False
+    supports_episode_picker: bool = False
+
     default_filters: FilterConfig | None = None
     presets: list[FilterPreset] = []
     

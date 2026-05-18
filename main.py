@@ -199,8 +199,8 @@ def _main_loop() -> None:
 
             go_back_to_results = False
             while True:
-                show_subs = hasattr(provider, "name") and provider.name in ("Movies & Series", "Anime")
-                show_picker = hasattr(provider, "name") and provider.name in ("Movies & Series", "Anime")
+                show_subs = getattr(provider, "supports_subtitles", False)
+                show_picker = getattr(provider, "supports_episode_picker", False)
                 method = download_method_prompt(
                     magnet=session.magnet,
                     show_subtitles=show_subs,

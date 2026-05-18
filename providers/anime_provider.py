@@ -14,6 +14,9 @@ class AnimeProvider(BaseProvider):
     categories = [201, 205, 207, 208]  # Movies, TV, HD Movies, HD TV
     solidtorrents_category = "Anime"
 
+    supports_subtitles = True
+    supports_episode_picker = True
+
     presets = [
         FilterPreset("720p", FilterConfig(quality=["720p"])),
         FilterPreset("1080p", FilterConfig(quality=["1080p"])),
