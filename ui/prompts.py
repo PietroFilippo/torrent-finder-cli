@@ -688,15 +688,15 @@ def download_method_prompt(
             "Use aria2c if you need strict file picking."
         ),
     ))
-
-    # --- Other ---
-    items.append(_section("Other"))
     items.append(SelectItem(
         label=f"🧲 Open in {client_name}",
         value="t",
         hint=("⚠  uncheck unwanted files in the client's dialog" if has_selection else ""),
         description="Hand magnet to your desktop client — use to seed or manage in a GUI",
     ))
+
+    # --- Other ---
+    items.append(_section("Other"))
     items.append(SelectItem(
         label="📋 Copy magnet link",
         value="l",
