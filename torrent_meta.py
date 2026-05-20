@@ -159,6 +159,9 @@ def extract_episode_number(filename: str) -> str | None:
         r" - (\d{1,4})(?:v\d+)?(?=\D)",
         r"\[(\d{1,4})(?:v\d+)?\]",
         r"Episode\s*(\d{1,4})",
+        # Standalone E-prefixed episode (e.g. ``Show - E09 [1080p].mkv``).
+        # Word-boundary guards prevent matching mid-word junk like "RE001".
+        r"(?:^|[\s._\-\[(])[Ee](\d{1,4})(?=\D|$)",
     ):
         m = re.search(pat, basename, re.IGNORECASE)
         if m:
@@ -250,27 +253,15 @@ def match_subtitles_for(video_path: str, files: list[TorrentFile]) -> list[Torre
 
 
 def is_multi_episode(files: list[TorrentFile]) -> bool:
-    """Heuristic: treat the torrent as a multi-episode release.
+    """Treat the torrent as a multi-episode release whenever it carries
+    ≥2 video files. Enables the n/b episode-navigation hotkeys for any
+    multi-video torrent the user picked without an explicit file selection.
 
-    Two-stage check:
-    1. If ≥ 2 video files carry explicit episode markers (S01E02, " - 03",
-       "[04]", "Episode 05"), treat as multi-episode regardless of size —
-       robust for anime batches and TV seasons where finales / specials are
-       2-3× larger than the average episode.
-    2. Otherwise fall back to a size-similarity check: ≥ 2 video files whose
-       sizes are within an order of magnitude — filters out a single movie
-       plus tiny extras/samples.
+    Trade-off: a single-movie torrent with 2+ tiny extra clips (trailer,
+    behind-the-scenes) is now classified as multi-episode. The user can
+    use the file picker to pin a single video when that's wrong.
     """
-    vids = video_files(files)
-    if len(vids) < 2:
-        return False
-    numbered = sum(1 for f in vids if extract_episode_number(f.name) is not None)
-    if numbered >= 2:
-        return True
-    sizes = [f.size_bytes for f in vids if f.size_bytes > 0]
-    if len(sizes) < 2:
-        return False
-    return min(sizes) >= max(sizes) * 0.2
+    return len(video_files(files)) >= 2
 
 
 def sort_episodes(files: list[TorrentFile]) -> list[TorrentFile]:

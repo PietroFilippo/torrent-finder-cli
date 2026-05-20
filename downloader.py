@@ -390,10 +390,10 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
                 spinner="dots",
             ):
                 result = subprocess.run(
-                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
                 )
         else:
-            result = subprocess.run(cmd)
+            result = subprocess.run(cmd, stdin=subprocess.DEVNULL)
         console.print()
         if result.returncode == 0:
             console.print("[success] Download complete![/success]")
@@ -457,10 +457,10 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
                     spinner="dots",
                 ):
                     result = subprocess.run(
-                        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
                     )
             else:
-                result = subprocess.run(cmd)
+                result = subprocess.run(cmd, stdin=subprocess.DEVNULL)
             if result.returncode != 0:
                 console.print(f"\n[error] Session {n} failed (exit code {result.returncode}).[/error]\n")
                 return False
@@ -525,10 +525,10 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
                     spinner="dots",
                 ):
                     result = subprocess.run(
-                        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
                     )
             else:
-                result = subprocess.run(cmd)
+                result = subprocess.run(cmd, stdin=subprocess.DEVNULL)
             if result.returncode != 0:
                 console.print(f"\n[error] Session {n} failed (exit code {result.returncode}).[/error]\n")
                 return False
@@ -604,7 +604,19 @@ def _run_stream(
     stop_event = _start_vlc_hotkey_thread(url_holder, subs_holder, advance_event, back_event)
 
     stdout_arg, stderr_arg = _quiet_streams(quiet)
-    proc = subprocess.Popen(cmd, stdout=stdout_arg, stderr=stderr_arg)
+    # stdin=DEVNULL so the child can't steal our v/n/b keystrokes — the hotkey
+    # thread owns stdin. Side-effect: webtorrent/peerflix's own SPACE/CTRL+L
+    # keybinds stop working, but those aren't surfaced in our header anyway.
+    # cwd=system tempdir keeps webtorrent's transient files out of the user's
+    # working directory.
+    import tempfile as _tempfile
+    proc = subprocess.Popen(
+        cmd,
+        stdout=stdout_arg,
+        stderr=stderr_arg,
+        stdin=subprocess.DEVNULL,
+        cwd=_tempfile.gettempdir(),
+    )
     nav_action = "none"
 
     if launch_vlc_when_ready and vlc_url:
@@ -612,8 +624,12 @@ def _run_stream(
 
         def vlc_waiter():
             if _wait_for_port(host, port, timeout=60):
-                # Tiny grace period for the server to finish wiring routes
-                time.sleep(0.5)
+                # Grace period for the server to register the selected file's
+                # route. webtorrent-cli accepts connections on the port well
+                # before /webtorrent/<infohash>/<encoded_path> resolves to a
+                # real BitTorrent piece, so VLC's first GET can 404 if we
+                # launch too eagerly. 2s smooths most multi-file torrents.
+                time.sleep(2.0)
                 if not _vlc_running():
                     _launch_vlc(vlc_url, sub_paths)
 
@@ -847,9 +863,13 @@ def stream_with_webtorrent(session: "TorrentSession") -> None:
 
             # No scroll region- webtorrent clears through them.
             # Episode info goes in the terminal title bar instead.
+            _file_info = next((f for f in file_list if f.index == idx), None) if idx is not None else None
             _print_stream_header(
                 ep_idx, len(targets), idx, multi, vlc_url,
                 use_scroll_region=False, sub_paths=ep_subs,
+                backend="webtorrent",
+                filename=_file_info.name if _file_info else "",
+                filesize_bytes=_file_info.size_bytes if _file_info else 0,
             )
 
             cmd = [wt_path, "download", magnet_link, "--port", "8080"]
@@ -939,9 +959,13 @@ def stream_with_peerflix(session: "TorrentSession") -> None:
 
             # Quiet mode suppresses subprocess UI — no need for a scroll
             # region since nothing scrolls below the header.
+            _file_info = next((f for f in file_list if f.index == idx), None) if idx is not None else None
             _print_stream_header(
                 ep_idx, len(targets), idx, multi, vlc_url,
                 use_scroll_region=not quiet, sub_paths=ep_subs,
+                backend="peerflix",
+                filename=_file_info.name if _file_info else "",
+                filesize_bytes=_file_info.size_bytes if _file_info else 0,
             )
 
             cmd = [pf_path, magnet_link, "--port", "8888"]
