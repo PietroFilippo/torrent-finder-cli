@@ -12,6 +12,7 @@ class MovieProvider(BaseProvider):
     icon = "🎬"
     categories = [201, 207]  # Movies, HD Movies
     solidtorrents_category = "Movie"
+    nyaa_category = "4_1"  # Live Action - English-translated (J-dramas, Asian films/TV)
 
     supports_subtitles = True
     supports_episode_picker = True
@@ -31,11 +32,12 @@ class MovieProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Movies use Apibay, SolidTorrents, and YTS."""
+        """Movies use Apibay, SolidTorrents, YTS, plus Nyaa (live-action) for Asian TV/film."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
             SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=True),
             SearchEngine("YTS", "🎥", self._search_yts, enabled=True),
+            SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),
         ]
 
     def _search_yts(self, query: str) -> list[dict]:
