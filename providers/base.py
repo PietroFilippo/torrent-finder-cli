@@ -125,12 +125,21 @@ class BaseProvider(ABC):
             return 0
 
     def _search_nyaa(self, query: str) -> list[dict]:
-        """Search the Nyaa.si RSS feed, scoped to ``self.nyaa_category``."""
+        """Search Nyaa scoped to ``self.nyaa_category`` (the provider default)."""
+        return self._search_nyaa_in(query, self.nyaa_category)
+
+    def _search_nyaa_in(self, query: str, category: str) -> list[dict]:
+        """Search the Nyaa.si RSS feed scoped to a specific ``c`` category.
+
+        Split out from ``_search_nyaa`` so one provider can register multiple
+        Nyaa engines on different categories (e.g. Manga's English-translated
+        ``3_1`` + Raw ``3_2``).
+        """
         results = []
         try:
             response = requests.get(
                 "https://nyaa.si/",
-                params={"page": "rss", "q": query, "c": self.nyaa_category},
+                params={"page": "rss", "q": query, "c": category},
                 timeout=10
             )
             response.raise_for_status()
