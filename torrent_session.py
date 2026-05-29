@@ -46,6 +46,21 @@ class TorrentSession:
             self._files_meta = fetch_file_list(self.magnet)
         return self._files_meta
 
+    def fetch_files_meta(self, cancel_event=None) -> TorrentMetadata | None:
+        """Cancellable variant of the ``files_meta`` property.
+
+        Caches a real result (success or genuine failure/timeout) so repeat
+        accesses are instant, but does NOT cache when the user cancelled —
+        leaving the cache unset so a later retry re-fetches.
+        """
+        if self._files_meta is not _UNSET:
+            return self._files_meta
+        result = fetch_file_list(self.magnet, cancel_event=cancel_event)
+        if cancel_event is not None and cancel_event.is_set():
+            return None  # aborted — keep cache unset for retry
+        self._files_meta = result
+        return result
+
     @property
     def file_list(self) -> list[TorrentFile]:
         m = self.files_meta
