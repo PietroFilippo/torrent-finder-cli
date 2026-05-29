@@ -35,6 +35,7 @@ from stats import (
 from torrent_session import TorrentSession
 from ui.prompts import clear_screen, download_method_prompt, episode_select_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
 from ui.table import interactive_select
+from updates import update_notice
 from utils import build_magnet
 
 load_state(PROVIDERS)
@@ -136,9 +137,16 @@ def _main_loop() -> None:
     if not (args.type and args.query):
         console.clear()
 
+    # One-shot update check (git-clone installs). Empty string when up to date
+    # or not checkable. Shown in the provider menu footer (interactive) and
+    # printed once here for direct -q/-t runs that skip the menu.
+    update_msg = update_notice()
+    if current_provider and update_msg:
+        console.print(update_msg + "\n")
+
     while True:
         if not current_provider:
-            result = provider_select_prompt()
+            result = provider_select_prompt(notice=update_msg)
             if result is None:
                 console.print("\n[info]Goodbye![/info]")
                 break
