@@ -7,6 +7,8 @@ Usage:
     python main.py -q "query"   # Direct search
 """
 import argparse
+import platform
+import threading
 import time
 import warnings
 
@@ -49,6 +51,49 @@ _METHOD_TRACK = {
     "d": "webtorrent_download",
     "s": "subtitles",
 }
+
+
+def _start_cancel_listener(cancel_event: threading.Event) -> threading.Event:
+    """Watch for Esc on a daemon thread and set ``cancel_event`` when pressed.
+
+    Lets a blocking, non-interactive wait (e.g. the slow DHT metadata fetch in
+    the episode picker) be aborted with Esc instead of Ctrl+C — which would
+    kill the whole program. Returns a ``stop`` event the caller sets to tear
+    the listener down once the wait completes.
+    """
+    stop = threading.Event()
+
+    def listen() -> None:
+        if platform.system() == "Windows":
+            import msvcrt
+            while not stop.is_set():
+                if msvcrt.kbhit():
+                    if msvcrt.getch() == b"\x1b":  # Esc
+                        cancel_event.set()
+                        return
+                time.sleep(0.1)
+        else:
+            import select
+            import sys
+            import termios
+            import tty
+            fd = sys.stdin.fileno()
+            try:
+                old = termios.tcgetattr(fd)
+            except Exception:
+                return  # not a real tty — no key cancel available
+            try:
+                tty.setcbreak(fd)
+                while not stop.is_set():
+                    if select.select([sys.stdin], [], [], 0.1)[0]:
+                        if sys.stdin.read(1) == "\x1b":  # Esc
+                            cancel_event.set()
+                            return
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+    threading.Thread(target=listen, daemon=True).start()
+    return stop
 
 
 def _main_loop() -> None:
@@ -233,9 +278,19 @@ def _main_loop() -> None:
                         console.print("[dim]Press any key to continue...[/dim]")
                         readchar.readkey()
                         continue
-                    console.print("[info]Fetching torrent metadata via DHT (this can take 30–60s)...[/info]\n")
-                    with console.status("[bold cyan]Fetching file list...[/bold cyan]", spinner="dots"):
-                        metadata = session.files_meta
+                    console.print("[info]Fetching torrent metadata via DHT (this can take 30–60s).[/info]")
+                    console.print("[dim]Press Esc to cancel and go back.[/dim]\n")
+                    cancel_event = threading.Event()
+                    stop_listener = _start_cancel_listener(cancel_event)
+                    try:
+                        with console.status("[bold cyan]Fetching file list...[/bold cyan]", spinner="dots"):
+                            metadata = session.fetch_files_meta(cancel_event=cancel_event)
+                    finally:
+                        stop_listener.set()
+                    if cancel_event.is_set():
+                        console.print("[warning] Cancelled — returning to the menu.[/warning]")
+                        clear_screen()
+                        continue
                     if not metadata or not metadata.files:
                         console.print("[error] Could not fetch file list (timeout or no metadata peers).[/error]\n")
                         console.print("[dim]Press any key to continue...[/dim]")

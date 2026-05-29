@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass
 
 
@@ -26,7 +27,19 @@ def has_aria2() -> bool:
     return shutil.which("aria2c") is not None
 
 
-def fetch_file_list(magnet: str, timeout: int = 120) -> TorrentMetadata | None:
+def _terminate(proc: subprocess.Popen) -> None:
+    """Best-effort stop of an aria2c child: terminate, then kill if it lingers."""
+    try:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    except Exception:
+        pass
+
+
+def fetch_file_list(magnet: str, timeout: int = 120, cancel_event=None) -> TorrentMetadata | None:
     """Fetch torrent metadata via aria2c and return its file list.
 
     aria2c `--show-files` only operates on `.torrent` files, not magnets,
@@ -36,7 +49,15 @@ def fetch_file_list(magnet: str, timeout: int = 120) -> TorrentMetadata | None:
     the file order in `info.files` is what aria2 uses for `--select-file`
     indexing (1-based).
 
-    Returns None on missing aria2c, invalid magnet, timeout, or parse failure.
+    ``cancel_event`` (a ``threading.Event``) lets a caller abort a slow DHT
+    fetch — on low-peer torrents this can otherwise block for the full
+    ``timeout``. We poll instead of using ``subprocess.run``'s blocking wait so
+    the event is observed within ~0.2s; on cancel the aria2c child is killed
+    and ``None`` is returned. The caller distinguishes cancel from failure by
+    checking ``cancel_event.is_set()``.
+
+    Returns None on missing aria2c, invalid magnet, timeout, cancel, or parse
+    failure.
     """
     if not has_aria2():
         return None
@@ -47,7 +68,7 @@ def fetch_file_list(magnet: str, timeout: int = 120) -> TorrentMetadata | None:
 
     with tempfile.TemporaryDirectory(prefix="tmeta_") as td:
         try:
-            subprocess.run(
+            proc = subprocess.Popen(
                 [
                     "aria2c",
                     "--bt-metadata-only=true",
@@ -59,11 +80,19 @@ def fetch_file_list(magnet: str, timeout: int = 120) -> TorrentMetadata | None:
                     "-d", td,
                     magnet,
                 ],
-                capture_output=True,
-                timeout=timeout,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
             )
-        except (subprocess.TimeoutExpired, OSError):
+        except OSError:
             return None
+
+        deadline = time.monotonic() + timeout
+        while proc.poll() is None:
+            if (cancel_event is not None and cancel_event.is_set()) or time.monotonic() > deadline:
+                _terminate(proc)
+                return None
+            time.sleep(0.2)
 
         torrent_path = os.path.join(td, f"{info_hash}.torrent")
         if not os.path.exists(torrent_path):
