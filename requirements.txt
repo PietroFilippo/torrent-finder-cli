@@ -2,4 +2,4 @@ requests
 rich
 readchar
 subliminal
-aria2
+babelfish
