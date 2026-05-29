@@ -54,7 +54,7 @@ _METHOD_TRACK = {
 def _main_loop() -> None:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
-    parser.add_argument("-t", "--type", type=str, choices=["movie", "game", "anime"], help="Search type (default: movie if used with -q)")
+    parser.add_argument("-t", "--type", type=str, choices=["movie", "game", "anime", "manga"], help="Search type (default: movie if used with -q)")
     parser.add_argument("-f", "--filter", action="append", help="Include keyword in results")
     parser.add_argument("-x", "--exclude", action="append", help="Exclude keyword from results")
     parser.add_argument("-y", "--skip-warning", action="store_true", help="Skip network exposure warning")
