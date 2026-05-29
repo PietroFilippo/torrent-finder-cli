@@ -201,12 +201,14 @@ def _main_loop() -> None:
             while True:
                 show_subs = getattr(provider, "supports_subtitles", False)
                 show_picker = getattr(provider, "supports_episode_picker", False)
+                show_stream = getattr(provider, "supports_streaming", True)
                 method = download_method_prompt(
                     magnet=session.magnet,
                     show_subtitles=show_subs,
                     show_episode_picker=show_picker,
                     selected_indexes=session.selected_files,
                     sub_choice=session.sub_choice,
+                    show_streaming=show_stream,
                 )
 
                 if method in _METHOD_TRACK:

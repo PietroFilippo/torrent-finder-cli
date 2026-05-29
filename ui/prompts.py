@@ -635,6 +635,7 @@ def download_method_prompt(
     show_episode_picker: bool = False,
     selected_indexes: list[int] | None = None,
     sub_choice: dict | None = None,
+    show_streaming: bool = True,
 ) -> str | None:
     """
     Prompt the user to choose a download method.
@@ -700,30 +701,31 @@ def download_method_prompt(
             ),
         ))
 
-    # --- Stream to VLC ---
-    items.append(_section("Stream to VLC"))
-    items.append(SelectItem(
-        label="▶  webtorrent",
-        value="stream_w",
-        enabled=wt_available,
-        hint=(
-            "(not installed)" if not wt_available
-            else f"plays {n_sel} episode(s) sequentially" if has_selection
-            else "requires VLC installed"
-        ),
-        description="Stream via webtorrent — good streaming default",
-    ))
-    items.append(SelectItem(
-        label="▶  peerflix",
-        value="stream_p",
-        enabled=pf_available,
-        hint=(
-            "(not installed)" if not pf_available
-            else f"plays {n_sel} episode(s) sequentially" if has_selection
-            else "requires VLC installed"
-        ),
-        description="Watch while downloading via VLC (peerflix) — try if webtorrent stalls or finds no peers",
-    ))
+    # --- Stream to VLC (hidden for non-video providers, e.g. Manga) ---
+    if show_streaming:
+        items.append(_section("Stream to VLC"))
+        items.append(SelectItem(
+            label="▶  webtorrent",
+            value="stream_w",
+            enabled=wt_available,
+            hint=(
+                "(not installed)" if not wt_available
+                else f"plays {n_sel} episode(s) sequentially" if has_selection
+                else "requires VLC installed"
+            ),
+            description="Stream via webtorrent — good streaming default",
+        ))
+        items.append(SelectItem(
+            label="▶  peerflix",
+            value="stream_p",
+            enabled=pf_available,
+            hint=(
+                "(not installed)" if not pf_available
+                else f"plays {n_sel} episode(s) sequentially" if has_selection
+                else "requires VLC installed"
+            ),
+            description="Watch while downloading via VLC (peerflix) — try if webtorrent stalls or finds no peers",
+        ))
 
     # --- Download ---
     items.append(_section("Download"))
