@@ -875,12 +875,15 @@ def download_method_prompt(
     return items[idx].value
 
 
-def provider_select_prompt() -> object | None:
+def provider_select_prompt(notice: str = "") -> object | None:
     """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled.
 
     Press F on a highlighted provider to configure its filters without leaving the menu.
     Press H to browse search history.
     A "Network exposure info" action re-opens the security warning on demand.
+
+    ``notice`` is an optional Rich-markup line (e.g. an "update available"
+    banner) prepended to the footer; pass "" to show nothing.
 
     Returns:
         - A provider object for normal selection.
@@ -926,7 +929,8 @@ def provider_select_prompt() -> object | None:
             items,
             title="Select Provider",
             footer=(
-                "↑/↓ navigate  •  Enter select  •  "
+                (notice + "\n" if notice else "")
+                + "↑/↓ navigate  •  Enter select  •  "
                 "[bold yellow]F[/bold yellow] filters  •  "
                 "[bold yellow]H[/bold yellow] history  •  "
                 "[bold yellow]S[/bold yellow] stats  •  Esc cancel\n"
