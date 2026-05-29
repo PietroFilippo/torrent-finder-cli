@@ -4,8 +4,8 @@ An interactive command-line application for searching and downloading torrents d
 
 ## Features
 
-- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Anime), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files.
-- **Multi-Engine Fan-Out:** Each provider queries several sources in parallel (e.g. Apibay + SolidTorrents + YTS for Movies & Series, Nyaa for Anime) and merges results, deduplicating by info hash and sorting by seeders.
+- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Anime, Manga), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files.
+- **Multi-Engine Fan-Out:** Each provider queries several sources in parallel (e.g. Apibay + SolidTorrents + YTS + Nyaa live-action for Movies & Series, Nyaa for Anime, Nyaa Literature + Apibay Comics for Manga) and merges results, deduplicating by info hash and sorting by seeders.
 - **Arrow-Key Driven UI:** Fully interactive, flicker-free terminal interface.
   - Utilizes an alternate screen buffer so your scrollback history remains flawlessly clean.
   - **Dynamic Viewport Windowing:** Capable of rendering massive 500+ item checklists (like huge anime seasons) by automatically windowing the active selection while pinning crucial action buttons tightly to the top and bottom of your screen to prevent terminal overflow.
@@ -25,7 +25,7 @@ An interactive command-line application for searching and downloading torrents d
 - **Flexible Downloading & Streaming:**
   - **System Client:** Automatically send generated magnet links to your default system torrent client (like qBittorrent, Transmission, etc.).
   - **Direct Terminal Download:** Use `aria2c`, `webtorrent-cli`, or `peerflix` integration to download files directly within the terminal, with native progress UIs.
-  - **File Browser / Episode Picker (Anime + Movies & Series):** Open **📂 Browse torrent files…** from the download menu to list every file in the torrent (videos, subs, artwork, .nfo, samples) and pick any subset. Features vim-style visual range selection (`v` anchor, `Shift+V` range-toggle) and rapid hotkeys (`a`, `i`, `c`, `w`). **Selection persists across re-entries** — reopening the picker shows your existing checkboxes already ticked, so you can refine without rebuilding from scratch. Confirming with nothing checked clears the selection; `Esc` cancels and keeps the prior picks intact. Only `aria2c` honors strict file selection on download — `webtorrent` and `peerflix` ignore `--select` and pull the whole torrent (the menu warns you when a selection is active). **Streams auto-skip non-video picks** and warn about it, so you can still e.g. download the .srt + .nfo alongside the video without breaking playback. If a stream selection contains zero video files, the stream errors out instead of silently substituting another file.
+  - **File Browser / Episode Picker (Anime, Movies & Series, Manga):** Open **📂 Browse torrent files…** from the download menu to list every file in the torrent (videos, subs, artwork, .nfo, samples — or individual volumes/chapters for Manga) and pick any subset. Opening it fetches the torrent's file list over DHT via `aria2c`, which can take 30–60s (or stall on low-peer torrents) — press **Esc** during the load to cancel and return to the menu. Features vim-style visual range selection (`v` anchor, `Shift+V` range-toggle) and rapid hotkeys (`a`, `i`, `c`, `w`). **Selection persists across re-entries** — reopening the picker shows your existing checkboxes already ticked, so you can refine without rebuilding from scratch. Confirming with nothing checked clears the selection; `Esc` cancels and keeps the prior picks intact. Only `aria2c` honors strict file selection on download — `webtorrent` and `peerflix` ignore `--select` and pull the whole torrent (the menu warns you when a selection is active). **Streams auto-skip non-video picks** and warn about it, so you can still e.g. download the .srt + .nfo alongside the video without breaking playback. If a stream selection contains zero video files, the stream errors out instead of silently substituting another file.
   - **Stream to VLC:** Stream media directly to VLC Media Player using `webtorrent-cli` (default) or `peerflix` (fallback). Both stream and download menus list **webtorrent before peerflix** to match this preference. Press the `v` hotkey at any time during a streaming session to reopen VLC without losing your torrent download/buffering progress. The CLI checks active processes (`tasklist` on Windows, `pgrep -x` on Mac/Linux) and silently ignores the hotkey if VLC is already running, preventing accidental duplicate windows. When an episode is selected, streams that specific file.
   - **Subtitles for streams (auto + manual):** A `📝 Source: <mode>` row in the Download Method menu controls how VLC gets subtitles for the next stream:
     - `auto-detect from torrent` *(default)* — scans the torrent for `.srt/.ass/.ssa/.vtt/.sub` files paired with each video (matched by basename, language tag like `.en.srt`, or a sibling `Subs/` folder with episode-numbered files like `01.ass`). Matches are pre-downloaded via aria2c and attached to VLC via `--sub-file` before playback starts. English subs are prioritized as the primary track when available.
@@ -82,8 +82,11 @@ python main.py
 # Direct search (defaults to Movies)
 python main.py -q "The Matrix"
 
-# Specify the search type (movie, game, anime). `movie` covers both films and series.
+# Specify the search type (movie, game, anime, manga). `movie` covers both films and series.
 python main.py -q "Elden Ring" -t game
+
+# Search manga (Nyaa Literature English + Apibay Comics; Raw Nyaa available as a toggle)
+python main.py -q "Berserk" -t manga
 
 # Apply custom filters (include "1080p", exclude "cam")
 python main.py -q "Dune" -t movie -f "1080p" -x "cam"
@@ -133,7 +136,7 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 The application is structured into a modular, provider-based architecture:
 
 - `main.py`: The main entry point and CLI argument parser.
-- `providers/`: Different search categories (Movies & Series, Games, Anime). Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets.
+- `providers/`: Different search categories (Movies & Series, Games, Anime, Manga). Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga).
 - `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt`), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), and `tips.py` (rotating contextual hints).
 - `filters.py`: Logic processing for including or excluding keywords.
 - `torrent_session.py`: Post-torrent-pick state owner. Holds the picked magnet + user file selection + sub choice, and lazily resolves `files_meta` / `targets` / `stream_indexes` / `download_indexes` / `sub_paths`. Stream adapters consume the session directly; download adapters take `(magnet, indexes)` projections and stay session-unaware.
