@@ -42,6 +42,9 @@ class BaseProvider(ABC):
     # Opt-in: subclasses override to True when applicable.
     supports_subtitles: bool = False
     supports_episode_picker: bool = False
+    # Opt-out: True by default; set False for non-video providers (e.g. Manga)
+    # to hide the "Stream to VLC" section.
+    supports_streaming: bool = True
 
     default_filters: FilterConfig | None = None
     presets: list[FilterPreset] = []
