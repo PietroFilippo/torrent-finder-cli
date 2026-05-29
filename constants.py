@@ -68,4 +68,7 @@ CATEGORIES = {
     "games_handheld": 406,
     "games_ios": 407,
     "games_android": 408,
+    # Other
+    "other_ebooks": 601,
+    "other_comics": 602,  # manga / scanlation packs land here on apibay/TPB
 }
