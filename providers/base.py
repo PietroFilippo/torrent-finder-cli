@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 
 import concurrent.futures
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Callable
 
@@ -35,6 +36,7 @@ class BaseProvider(ABC):
     icon: str
     categories: list[int]
     solidtorrents_category: str = "all"
+    nyaa_category: str = "1_2"  # Nyaa "c" filter; e.g. "1_2" anime EngSub, "4_1" live-action EngSub
 
     # Capabilities — gate UI rows in download_method_prompt.
     # Opt-in: subclasses override to True when applicable.
@@ -104,6 +106,58 @@ class BaseProvider(ABC):
                     "size": str(r.get("size", 0)),
                     "source": "SolidTorrents"
                 })
+        except Exception:
+            pass
+        return results
+
+    def _parse_nyaa_size(self, size_str: str) -> int:
+        """Parse a Nyaa size string (e.g. '1.5 GiB') into bytes."""
+        size_str = size_str.lower().strip()
+        try:
+            val, unit = size_str.split(" ", 1)
+            num = float(val)
+            if "kib" in unit: return int(num * 1024)
+            if "mib" in unit: return int(num * 1024**2)
+            if "gib" in unit: return int(num * 1024**3)
+            if "tib" in unit: return int(num * 1024**4)
+            return int(num)
+        except Exception:
+            return 0
+
+    def _search_nyaa(self, query: str) -> list[dict]:
+        """Search the Nyaa.si RSS feed, scoped to ``self.nyaa_category``."""
+        results = []
+        try:
+            response = requests.get(
+                "https://nyaa.si/",
+                params={"page": "rss", "q": query, "c": self.nyaa_category},
+                timeout=10
+            )
+            response.raise_for_status()
+
+            root = ET.fromstring(response.text)
+            nyaa_ns = "{https://nyaa.si/xmlns/nyaa}"
+
+            for item in root.findall(".//item"):
+                title = item.find("title")
+                info_hash = item.find(f"{nyaa_ns}infoHash")
+                seeders = item.find(f"{nyaa_ns}seeders")
+                leechers = item.find(f"{nyaa_ns}leechers")
+                size = item.find(f"{nyaa_ns}size")
+
+                if title is not None and info_hash is not None:
+                    size_bytes = 0
+                    if size is not None and size.text:
+                        size_bytes = self._parse_nyaa_size(size.text)
+
+                    results.append({
+                        "name": title.text,
+                        "info_hash": info_hash.text.lower(),
+                        "seeders": seeders.text if seeders is not None else "0",
+                        "leechers": leechers.text if leechers is not None else "0",
+                        "size": str(size_bytes),
+                        "source": "Nyaa"
+                    })
         except Exception:
             pass
         return results
