@@ -13,6 +13,7 @@ class MangaProvider(BaseProvider):
 
     supports_subtitles = False
     supports_episode_picker = True  # volume/chapter batches → aria2 file-selection
+    supports_streaming = False  # manga isn't video — hide the Stream to VLC section
 
     presets = [
         FilterPreset("Complete / Full", FilterConfig(include_keywords=["complete", "full series"])),
