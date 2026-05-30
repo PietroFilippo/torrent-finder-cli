@@ -1,68 +1,182 @@
-"""Rotating tip pool shown on menu screens — reminds users about non-obvious
-hotkeys, persisted behavior, and safety notes without stealing attention.
+"""Categorized help and tip catalog for the interactive UI.
 
-Tips are rendered as italic body text with a bold cyan "💡 Tip:" prefix —
-loud enough to actually catch the eye, quiet enough to stay subordinate to
-the menu it sits under.
+The random footer tip and the upcoming all-tips browser read from the same
+catalog so shortcut hints, menu guidance, and safety notes stay in one place.
 """
 
+from __future__ import annotations
+
 import random
+from dataclasses import dataclass
+
+from rich.markup import escape
 
 
-TIPS: list[str] = [
-    # — Search & navigation —
-    "For best results, search using the complete release name.",
-    "Press Shift+F at the search prompt to tweak engines or toggle filter presets.",
-    "Press F on a highlighted provider to configure its filters without leaving this menu.",
-    "Shift+H opens your search history — past queries re-run with one keypress.",
-    "Shift+S shows usage stats: runtime, top queries, method completion rates.",
-    "History entries remember the filter presets you had active at search time.",
-    "Use -f and -x on the CLI to add ad-hoc include/exclude keywords.",
-    "Looking for J-dramas or Asian live-action? Movies & Series now searches Nyaa too.",
-    "Reading manga? The Manga provider scans Nyaa Literature plus Apibay Comics — try -t manga.",
+@dataclass(frozen=True)
+class Tip:
+    """A single user-facing hint.
 
-    # — Filters & menus —
-    "Filter menu keybinds: a select all • i invert • c clear presets • w save.",
-    "Episode/filter pickers share keybinds: v anchor, Shift+V toggles the range.",
-    "Your engine + preset toggles persist across runs in filter_state.json.",
-    "Results are deduped by info hash across engines, then sorted by seeders.",
-    "Want untranslated manga? Turn on the Nyaa (Raw) engine via Shift+F — it's off by default.",
-    "Toggle 🔇 Quiet mode in the download menu to replace subprocess UIs with a minimal spinner.",
+    ``tags`` are intentionally plain text so the tips browser can later filter
+    by query without knowing about UI labels or categories.
+    """
 
-    # — Downloads —
-    "aria2c is the only downloader that strictly honors your file selection — webtorrent/peerflix may pull the whole torrent.",
-    "aria2c handles multi-file selection in a single process — fastest for batches.",
-    "Browse torrent files (📂) before downloading to pick just the episodes/extras you actually want.",
-    "The episode picker remembers your previous selection — re-open it to refine, not rebuild.",
-    "Confirming the picker with nothing checked clears the selection; Esc keeps your prior picks.",
-    "File-list fetch stalling on a low-seed torrent? Press Esc to cancel and go back.",
-    "Set a default save folder with 📁 Save to: — it applies to aria2/webtorrent/peerflix and subtitles.",
+    text: str
+    tags: tuple[str, ...] = ()
+    rotating: bool = True
 
-    # — Streaming —
-    "webtorrent is the default streaming backend; peerflix is the fallback if it stalls.",
-    "Press v while streaming to reopen VLC — it's a no-op if VLC is already running, so spamming it is safe.",
-    "Multi-episode streams: press n for next, b for previous episode.",
-    "Even without a picker selection, multi-episode torrents auto-enable n/b navigation in VLC.",
-    "Pick non-video files (.srt/.nfo/.jpg) in the browser — downloads grab them, streams skip them.",
 
-    # — Subtitles —
-    "📝 Source: auto-detect pulls .srt/.ass files out of the torrent and attaches them to VLC for you.",
-    "Need subs the torrent doesn't ship? 📝 Search & download subtitles auto-pins the result to the next stream.",
-    "Switch 📝 Source to 'external' to pick any .srt/.ass from your downloads folder.",
+@dataclass(frozen=True)
+class TipCategory:
+    """A named group of related tips."""
 
-    # — Safety —
-    "Your public IP is visible to every peer — a VPN is the only real mitigation.",
-    "The 'Trusted Uploaders' preset is a community reputation heuristic, not a safety guarantee.",
-    "Re-open the network exposure panel anytime from the 🔒 row on the Select Provider screen.",
-]
+    name: str
+    tips: tuple[Tip, ...]
+
+
+TIP_CATEGORIES: tuple[TipCategory, ...] = (
+    TipCategory(
+        "Search & Navigation",
+        (
+            Tip("For best results, search using the complete release name.", ("search", "query")),
+            Tip("Press Shift+F at the search prompt to tweak engines or toggle filter presets.", ("search", "filters", "hotkey")),
+            Tip("Press Shift+H at the search prompt to browse past searches.", ("search", "history", "hotkey")),
+            Tip("Press Shift+S at the search prompt to view usage stats.", ("search", "stats", "hotkey")),
+            Tip("Press Esc at the search prompt to go back to provider selection.", ("search", "navigation", "hotkey")),
+            Tip("Press F on a highlighted provider to configure its filters without leaving the provider menu.", ("provider", "filters", "hotkey")),
+            Tip("Press H on the provider screen to browse search history.", ("provider", "history", "hotkey")),
+            Tip("Press S on the provider screen to open usage stats.", ("provider", "stats", "hotkey")),
+            Tip("History entries remember the filter presets you had active at search time.", ("history", "filters", "presets")),
+            Tip("History can be filtered by provider, date range, and sort order with P, D, and S.", ("history", "filters", "hotkey")),
+            Tip("Use -f and -x on the CLI to add ad-hoc include or exclude keywords.", ("cli", "filters")),
+            Tip("Use -t movie, game, anime, or manga to choose a provider for direct CLI searches.", ("cli", "provider")),
+            Tip("Looking for J-dramas or Asian live-action? Movies & Series searches Nyaa too.", ("movies", "nyaa")),
+            Tip("Reading manga? The Manga provider scans Nyaa Literature plus Apibay Comics; try -t manga.", ("manga", "nyaa", "cli")),
+        ),
+    ),
+    TipCategory(
+        "Filters & Selection",
+        (
+            Tip("Filter menu keybinds: a select all, i invert, c clear presets, w save.", ("filters", "keybinds")),
+            Tip("Episode and filter pickers share keybinds: v drops an anchor, Shift+V toggles the range.", ("selection", "keybinds", "range")),
+            Tip("Press Space or Enter on toggleable rows to change their checkbox state.", ("selection", "keybinds")),
+            Tip("The Clear filters action clears preset toggles only; engine selections are preserved.", ("filters", "presets", "engines")),
+            Tip("Your engine and preset toggles persist across runs in filter_state.json.", ("filters", "state", "persistence")),
+            Tip("Results are deduped by info hash across engines, then sorted by seeders.", ("results", "dedupe", "sorting")),
+            Tip("Want untranslated manga? Turn on the Nyaa (Raw) engine via Shift+F; it is off by default.", ("manga", "nyaa", "filters")),
+            Tip("The result table stays on screen after selection so you can see what you picked.", ("results", "ui")),
+        ),
+    ),
+    TipCategory(
+        "Downloads",
+        (
+            Tip("aria2c is the only downloader that strictly honors your file selection.", ("downloads", "aria2c", "selection")),
+            Tip("webtorrent and peerflix may pull the whole torrent even when a file selection is active.", ("downloads", "webtorrent", "peerflix", "selection")),
+            Tip("aria2c handles multi-file selection in a single process, which is fastest for batches.", ("downloads", "aria2c", "selection")),
+            Tip("Browse torrent files before downloading to pick just the episodes or extras you want.", ("downloads", "episode picker", "selection")),
+            Tip("The episode picker remembers your previous selection; re-open it to refine, not rebuild.", ("episode picker", "selection", "state")),
+            Tip("Confirming the picker with nothing checked clears the selection; Esc keeps your prior picks.", ("episode picker", "selection", "hotkey")),
+            Tip("File-list fetch stalling on a low-seed torrent? Press Esc to cancel and go back.", ("episode picker", "metadata", "hotkey")),
+            Tip("The desktop-client magnet option cannot pre-filter files; uncheck unwanted files in the client dialog.", ("downloads", "magnet", "selection")),
+            Tip("Copy magnet link puts the selected torrent's magnet URI on your clipboard.", ("downloads", "magnet", "clipboard")),
+            Tip("Set a default save folder with Save to; it applies to aria2c, webtorrent, peerflix, and subtitles.", ("downloads", "settings", "folder")),
+            Tip("Quiet mode replaces aria2c, webtorrent, and peerflix native progress UIs with a minimal spinner.", ("downloads", "quiet mode", "settings")),
+            Tip("Direct download methods print a Ctrl+C reminder because the child process owns the active transfer.", ("downloads", "cancel", "keybinds")),
+        ),
+    ),
+    TipCategory(
+        "Streaming",
+        (
+            Tip("webtorrent is the default streaming backend; peerflix is the fallback if it stalls.", ("streaming", "webtorrent", "peerflix")),
+            Tip("VLC is required for Stream to VLC actions.", ("streaming", "vlc")),
+            Tip("Press v while streaming to reopen VLC without losing torrent progress.", ("streaming", "vlc", "hotkey")),
+            Tip("The v hotkey is a no-op while VLC is already running, which prevents duplicate VLC windows.", ("streaming", "vlc", "hotkey")),
+            Tip("Multi-episode streams show n for next and b for previous episode.", ("streaming", "episodes", "hotkey")),
+            Tip("Even without a picker selection, multi-episode torrents auto-enable n and b navigation.", ("streaming", "episodes", "metadata")),
+            Tip("Pick non-video files such as .srt, .nfo, or .jpg in the browser; downloads grab them, streams skip them.", ("streaming", "downloads", "selection")),
+            Tip("If a stream selection contains only non-video files, the stream errors instead of silently choosing another file.", ("streaming", "selection", "video")),
+            Tip('If VLC errors with "cannot open MRL", press v after a moment to retry the same stream.', ("streaming", "vlc", "retry")),
+            Tip("Quiet mode keeps stream headers and hotkeys visible while hiding backend progress noise.", ("streaming", "quiet mode")),
+        ),
+    ),
+    TipCategory(
+        "Subtitles",
+        (
+            Tip("Subtitle Source auto-detect pulls .srt and .ass files out of the torrent and attaches them to VLC.", ("subtitles", "auto-detect", "streaming")),
+            Tip("Auto-detected subtitle matches are downloaded before VLC launches so the first stream can attach them.", ("subtitles", "auto-detect", "vlc")),
+            Tip("English-tagged subtitles are prioritized as the primary VLC subtitle track when present.", ("subtitles", "language", "vlc")),
+            Tip("Need subs the torrent does not ship? Search & download subtitles auto-pins the result to the next stream.", ("subtitles", "download", "streaming")),
+            Tip("Switch Subtitle Source to external to pick any .srt or .ass file from your downloads folder.", ("subtitles", "external", "folder")),
+            Tip("Switch Subtitle Source to off when you want VLC to launch without attached subtitles.", ("subtitles", "off", "streaming")),
+        ),
+    ),
+    TipCategory(
+        "Safety & Privacy",
+        (
+            Tip("Your public IP is visible to every peer; a VPN is the only real mitigation.", ("safety", "privacy", "vpn")),
+            Tip("The network exposure warning shows public IP, ISP, ASN, location, and proxy or hosting flags.", ("safety", "network exposure")),
+            Tip("Press Enter on the network exposure warning to acknowledge and continue.", ("safety", "network exposure", "hotkey")),
+            Tip("Press D on the startup warning to permanently dismiss it in filter_state.json.", ("safety", "network exposure", "settings")),
+            Tip("Press Esc on the network exposure warning to abort before joining any swarm.", ("safety", "network exposure", "hotkey")),
+            Tip("Re-open the network exposure panel anytime from the Network exposure info row on the Select Provider screen.", ("safety", "network exposure", "provider")),
+            Tip("The Trusted Uploaders preset is a community reputation heuristic, not a safety guarantee.", ("safety", "filters", "presets")),
+            Tip("Seed counts, file names, and uploader tags are not proof that content is safe.", ("safety", "results", "risk")),
+        ),
+    ),
+    TipCategory(
+        "State & Stats",
+        (
+            Tip("Search history, usage stats, quiet mode, download folder, filters, and warning dismissal live in filter_state.json.", ("state", "persistence")),
+            Tip("Most state writes are cached in memory and flushed on exit for faster interactions.", ("state", "performance")),
+            Tip("Destructive actions such as clear history and reset stats ask for confirmation first.", ("state", "confirmation", "safety")),
+            Tip("Reset stats deletes only usage counters; filters, settings, and history are preserved.", ("stats", "reset", "state")),
+            Tip("Usage stats track searches, picked torrents, method picks, completions, runtime, and preset usage.", ("stats", "metrics")),
+            Tip("Method completion rates count only paths that can report a successful finish.", ("stats", "methods", "completion")),
+        ),
+    ),
+)
+
+
+def iter_tip_categories() -> tuple[TipCategory, ...]:
+    """Return the full categorized tip catalog."""
+    return TIP_CATEGORIES
+
+
+def iter_tips(*, rotating_only: bool = False) -> tuple[Tip, ...]:
+    """Return all tips in display order."""
+    return tuple(
+        tip
+        for category in TIP_CATEGORIES
+        for tip in category.tips
+        if not rotating_only or tip.rotating
+    )
+
+
+def find_tips(query: str = "", category: str | None = None) -> list[tuple[TipCategory, Tip]]:
+    """Return catalog tips matching a text query and optional category name.
+
+    Matching is case-insensitive across category name, tip text, and tags. The
+    viewer will use this in a later commit for in-page search and filtering.
+    """
+    needle = query.strip().lower()
+    category_key = category.strip().lower() if category else ""
+    matches: list[tuple[TipCategory, Tip]] = []
+
+    for tip_category in TIP_CATEGORIES:
+        if category_key and tip_category.name.lower() != category_key:
+            continue
+        for tip in tip_category.tips:
+            haystack = " ".join((tip_category.name, tip.text, *tip.tags)).lower()
+            if not needle or needle in haystack:
+                matches.append((tip_category, tip))
+
+    return matches
+
+
+# Backwards-compatible flat pool for existing callers.
+TIPS: list[str] = [tip.text for tip in iter_tips(rotating_only=True)]
 
 
 def random_tip() -> str:
-    """Return a randomly-picked tip rendered as Rich markup.
-
-    The prefix is bold cyan so it catches the eye; the body is italic at normal
-    intensity so it's readable without competing with the menu above it. Safe
-    to drop into an `arrow_select` footer.
-    """
+    """Return a randomly-picked tip rendered as Rich markup."""
     text = random.choice(TIPS)
-    return f"[bold cyan]💡 Tip:[/bold cyan] [italic]{text}[/italic]"
+    return f"[bold cyan]💡 Tip:[/bold cyan] [italic]{escape(text)}[/italic]"
