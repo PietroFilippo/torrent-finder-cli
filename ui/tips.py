@@ -18,12 +18,15 @@ TIPS: list[str] = [
     "Shift+S shows usage stats: runtime, top queries, method completion rates.",
     "History entries remember the filter presets you had active at search time.",
     "Use -f and -x on the CLI to add ad-hoc include/exclude keywords.",
+    "Looking for J-dramas or Asian live-action? Movies & Series now searches Nyaa too.",
+    "Reading manga? The Manga provider scans Nyaa Literature plus Apibay Comics — try -t manga.",
 
     # — Filters & menus —
     "Filter menu keybinds: a select all • i invert • c clear presets • w save.",
     "Episode/filter pickers share keybinds: v anchor, Shift+V toggles the range.",
     "Your engine + preset toggles persist across runs in filter_state.json.",
     "Results are deduped by info hash across engines, then sorted by seeders.",
+    "Want untranslated manga? Turn on the Nyaa (Raw) engine via Shift+F — it's off by default.",
     "Toggle 🔇 Quiet mode in the download menu to replace subprocess UIs with a minimal spinner.",
 
     # — Downloads —
@@ -32,6 +35,8 @@ TIPS: list[str] = [
     "Browse torrent files (📂) before downloading to pick just the episodes/extras you actually want.",
     "The episode picker remembers your previous selection — re-open it to refine, not rebuild.",
     "Confirming the picker with nothing checked clears the selection; Esc keeps your prior picks.",
+    "File-list fetch stalling on a low-seed torrent? Press Esc to cancel and go back.",
+    "Set a default save folder with 📁 Save to: — it applies to aria2/webtorrent/peerflix and subtitles.",
 
     # — Streaming —
     "webtorrent is the default streaming backend; peerflix is the fallback if it stalls.",
