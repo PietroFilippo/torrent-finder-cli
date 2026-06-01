@@ -20,7 +20,7 @@ from ui.selector import SelectItem, arrow_select
 
 
 def get_query_with_shortcut(prompt_str: str) -> str | None:
-    """Get input from user manually, returning 'SPECIAL_FILTER' instantly if they press Shift+F as first char."""
+    """Get input from user manually, returning special actions for Shift hotkeys."""
     console.print(prompt_str, end="")
     sys.stdout.flush()
     
@@ -39,6 +39,10 @@ def get_query_with_shortcut(prompt_str: str) -> str | None:
         if not buffer and key == "S":
             print()
             return "SPECIAL_STATS"
+
+        if not buffer and key == "T":
+            print()
+            return "SPECIAL_TIPS"
             
         if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
             print()
@@ -880,6 +884,7 @@ def provider_select_prompt(notice: str = "") -> object | None:
 
     Press F on a highlighted provider to configure its filters without leaving the menu.
     Press H to browse search history.
+    Press T to browse all tips and shortcuts.
     A "Network exposure info" action re-opens the security warning on demand.
 
     ``notice`` is an optional Rich-markup line (e.g. an "update available"
@@ -902,7 +907,12 @@ def provider_select_prompt(notice: str = "") -> object | None:
         value="__network_info__",
         is_action=True,
     )
-    items = provider_items + [separator, info_item]
+    tips_item = SelectItem(
+        label="💡 Tips & shortcuts",
+        value="__tips__",
+        is_action=True,
+    )
+    items = provider_items + [separator, tips_item, info_item]
     start = 0
 
     # Closure flag: set by key_action when F is pressed on a provider
@@ -933,12 +943,20 @@ def provider_select_prompt(notice: str = "") -> object | None:
                 + "↑/↓ navigate  •  Enter select  •  "
                 "[bold yellow]F[/bold yellow] filters  •  "
                 "[bold yellow]H[/bold yellow] history  •  "
-                "[bold yellow]S[/bold yellow] stats  •  Esc cancel\n"
+                "[bold yellow]S[/bold yellow] stats  •  "
+                "[bold yellow]T[/bold yellow] tips  •  Esc cancel\n"
                 f"   {tip_line}"
             ),
             banner=_make_banner_panel(),
             start_index=start,
-            hotkeys={"H": "history", "h": "history", "S": "stats", "s": "stats"},
+            hotkeys={
+                "H": "history",
+                "h": "history",
+                "S": "stats",
+                "s": "stats",
+                "T": "tips",
+                "t": "tips",
+            },
             key_actions={"F": _handle_f, "f": _handle_f},
         )
 
@@ -970,6 +988,17 @@ def provider_select_prompt(notice: str = "") -> object | None:
                 stats_page()
                 start = cursor
                 continue
+            if action == "tips":
+                from ui.tips_page import tips_page
+                tips_page()
+                start = cursor
+                continue
+
+        if items[result].value == "__tips__":
+            from ui.tips_page import tips_page
+            tips_page()
+            start = result
+            continue
 
         if items[result].value == "__network_info__":
             from security import show_security_warning
@@ -993,6 +1022,7 @@ def search_again_prompt() -> str | tuple | None:
         SelectItem(label="🔍 Search Again", value="search"),
         SelectItem(label="🔄 Change Provider", value="provider"),
         SelectItem(label="📜 Search History", value="history"),
+        SelectItem(label="💡 Tips & shortcuts", value="tips"),
         SelectItem(label="👋 Exit", value="exit"),
     ]
 
@@ -1027,6 +1057,12 @@ def search_again_prompt() -> str | tuple | None:
                 prov = get_provider(prov_name)
                 if prov:
                     return ("history", query, prov)
+            start = idx
+            continue
+
+        if selected == "tips":
+            from ui.tips_page import tips_page
+            tips_page()
             start = idx
             continue
 
