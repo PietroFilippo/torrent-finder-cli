@@ -174,6 +174,8 @@ def _main_loop() -> None:
                 "[white]history[/white]   "
                 "[bold yellow on grey23] Shift+S [/bold yellow on grey23] "
                 "[white]stats[/white]   "
+                "[bold yellow on grey23] Shift+T [/bold yellow on grey23] "
+                "[white]tips[/white]   "
                 "[bold]Esc[/bold] [dim]go back[/dim]"
             )
             try:
@@ -203,6 +205,12 @@ def _main_loop() -> None:
             elif query == "SPECIAL_STATS":
                 from ui.stats import stats_page
                 stats_page()
+                clear_screen()
+                query = None
+                continue
+            elif query == "SPECIAL_TIPS":
+                from ui.tips_page import tips_page
+                tips_page()
                 clear_screen()
                 query = None
                 continue
