@@ -2,6 +2,8 @@
 
 An interactive command-line application for searching and downloading torrents directly from your terminal. Built with Python and `rich`.
 
+On Windows, the included `torrent.bat` launcher can be added to your `PATH` so you can run `torrent` from any terminal directory.
+
 ## Features
 
 - **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Anime, Manga), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files.
@@ -20,7 +22,7 @@ An interactive command-line application for searching and downloading torrents d
 - **Search History:** Press `Shift+H` at the search prompt (or `H` on the provider screen) to browse past searches. Filter by provider (`P`), date range (`D`, today/week/month), and sort order (`S`). Each entry shows the provider, relative timestamp, and the filter presets that were active at search time. Pick an entry to re-run the query; clear history with a confirmation modal.
 - **Usage Stats:** Press `Shift+S` at the search prompt (or `S` on the provider screen) to open a scrollable stats page showing session count, total runtime, searches, top queries, torrents picked, method picks vs. completions (with success rate), avg seeders of picks, and preset usage counters. Reset all stats from the same screen, guarded by a confirmation modal.
 - **Confirmation Modals:** Destructive actions (clear history, reset stats) share a unified red Y/N panel so you can't nuke state with a stray keypress.
-- **Dynamic Contextual Tips:** Random hints (`💡 Tip: ...`) are displayed in the footers of the provider selector and post-download menus to remind you about hotkeys, quiet mode, episode picking, and UI shortcuts.
+- **Dynamic Contextual Tips:** Random hints (`💡 Tip: ...`) are displayed in the provider selector and post-download menus. A searchable tips browser is also available from the provider screen (`T`), the search prompt (`Shift+T`), and the post-download menu.
 - **Quiet Mode:** Toggle **🔇 Quiet mode** from the Download Method menu to suppress the native progress UIs of `aria2c`, `webtorrent-cli`, and `peerflix` (full-screen progress bars, peer lists, speed graphs) and replace them with a single minimal spinner. The toggle redraws in place with no flicker and persists across runs (stored as `hide_stream_output` in `filter_state.json`). Episode info, VLC hotkey hints, and `Ctrl+C` all still work.
 - **Flexible Downloading & Streaming:**
   - **System Client:** Automatically send generated magnet links to your default system torrent client (like qBittorrent, Transmission, etc.).
@@ -38,29 +40,69 @@ An interactive command-line application for searching and downloading torrents d
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
   - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
 - **Network Exposure Warning:** At startup a red panel queries `ip-api.com` and shows your public IP, ISP, ASN, location, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
+- **Update Notice for Git Clones:** When the project is installed from a git clone, the provider screen can show a lightweight update notice when the local branch is behind `origin`.
 - **Pagination & Navigation:** Navigate through large sets of search results cleanly, with the ability to safely go back to your previous search results after viewing download options.
 
 ## Prerequisites
 
-- **Python 3.x**
+- **Python 3.10+**
 - (Optional but recommended) **Node.js** & **npm** for installing `webtorrent-cli` or `peerflix`.
 - (Optional) **VLC Media Player** — required for streaming.
 - (Optional) **aria2** — required for the file browser / episode picker, the in-torrent subtitle auto-detect path, auto episode navigation on the peerflix backend, and single-process multi-file downloads. Install with `winget install aria2.aria2` (Windows), `brew install aria2` (macOS), or `apt install aria2` / `dnf install aria2` (Linux).
 
 ## Installation
 
-1. Clone or download the repository.
-2. Install the required Python dependencies:
+### Clone and install Python dependencies
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+git clone https://github.com/PietroFilippo/movie-finder-cli.git
+cd movie-finder-cli
+python -m pip install -r requirements.txt
+```
 
-3. (Optional) Install `webtorrent-cli` and/or `peerflix` if you want to download or stream files directly within the terminal:
+### Optional direct download / streaming tools
 
-   ```bash
-   npm install -g webtorrent-cli peerflix
-   ```
+Install these only if you want terminal-managed downloads or Stream to VLC:
+
+```bash
+npm install -g webtorrent-cli peerflix
+```
+
+`aria2c` is separate from Python/npm and is required for file browsing, strict multi-file selection, in-torrent subtitle extraction, and some auto episode metadata flows.
+
+```bash
+# Windows
+winget install aria2.aria2
+
+# macOS
+brew install aria2
+
+# Debian/Ubuntu
+sudo apt install aria2
+```
+
+### Run `torrent` from anywhere on Windows
+
+The repository includes `torrent.bat`, which launches `main.py` relative to the repo folder. Add the repo folder to your user `PATH`, then open a new terminal:
+
+```powershell
+# Run from the repository root in PowerShell
+$repo = (Get-Location).Path
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($userPath -split ';') -notcontains $repo) {
+    $newPath = @($userPath, $repo) -join ';'
+    [Environment]::SetEnvironmentVariable("Path", $newPath.Trim(';'), "User")
+}
+```
+
+After opening a new terminal, this works from any directory:
+
+```bash
+torrent
+torrent -q "The Matrix" -t movie -y
+```
+
+If you do not add the repo folder to `PATH`, run `torrent.bat` or `python main.py` from the repository folder.
 
 ## Usage
 
@@ -69,10 +111,11 @@ An interactive command-line application for searching and downloading torrents d
 The easiest way to use the CLI is to run it interactively. The arrow-key driven UI will guide you through selecting a category, searching, filtering, and downloading.
 
 ```bash
-# On Windows, you can use the provided batch script
-torrent.bat
+# If the repo folder is on your PATH (Windows)
+torrent
 
-# Or run the main Python script directly
+# From the repository folder
+torrent.bat
 python main.py
 ```
 
@@ -80,22 +123,24 @@ python main.py
 
 ```bash
 # Direct search (defaults to Movies)
-python main.py -q "The Matrix"
+torrent -q "The Matrix"
 
 # Specify the search type (movie, game, anime, manga). `movie` covers both films and series.
-python main.py -q "Elden Ring" -t game
+torrent -q "Elden Ring" -t game
 
 # Search manga (Nyaa Literature English + Apibay Comics; Raw Nyaa available as a toggle)
-python main.py -q "Berserk" -t manga
+torrent -q "Berserk" -t manga
 
 # Apply custom filters (include "1080p", exclude "cam")
-python main.py -q "Dune" -t movie -f "1080p" -x "cam"
+torrent -q "Dune" -t movie -f "1080p" -x "cam"
 
 # Skip the network exposure warning at startup
-python main.py -y
+torrent -y
 ```
 
 You can also suppress the warning with the environment variable `TORRENT_SKIP_WARNING=1`, or permanently dismiss it from inside the panel itself (see below).
+
+If you did not add the repo folder to `PATH`, replace `torrent` with `python main.py` in the examples above.
 
 ### Network Exposure Warning
 
@@ -127,7 +172,8 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 - **Configure filters from the provider screen**: Press `F` while a provider is highlighted to jump straight into its engines + filter presets menu, then return to the provider list.
 - **Configure filters during search**: Press `Shift+F` at the search prompt to open the filter menu for the current provider. The status line above the prompt shows the active engines / presets and the hotkey.
 - **Filter menu keybinds**: `a` select all, `i` invert, `c` clear presets, `w` save & confirm, `v` drop anchor, `Shift+V` range toggle between anchor and cursor, `Space` toggle current. The "Clear filters" button clears preset toggles only — your engine selections are preserved.
-- **Search history / stats from the search prompt**: `Shift+H` opens history, `Shift+S` opens usage stats. On the provider screen use `H` and `S`.
+- **Search history / stats / tips from the search prompt**: `Shift+H` opens history, `Shift+S` opens usage stats, and `Shift+T` opens the tips browser. On the provider screen use `H`, `S`, and `T`.
+- **Tips browser**: Use `/` to search across categories, tip text, and tags; `C` to cycle categories; `X` to clear the search/filter; and `Esc` to go back.
 - **Cancel / Back**: Press `Esc` to safely cancel an action, close a menu, or go back to the previous screen.
 
 
@@ -136,8 +182,9 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 The application is structured into a modular, provider-based architecture:
 
 - `main.py`: The main entry point and CLI argument parser.
+- `torrent.bat`: Windows launcher. It calls `main.py` relative to the batch file location, so adding the repo folder to `PATH` makes `torrent` usable from any directory.
 - `providers/`: Different search categories (Movies & Series, Games, Anime, Manga). Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga).
-- `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt`), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), and `tips.py` (rotating contextual hints).
+- `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt`), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), `tips.py` (categorized tip catalog), and `tips_page.py` (searchable tips browser).
 - `filters.py`: Logic processing for including or excluding keywords.
 - `torrent_session.py`: Post-torrent-pick state owner. Holds the picked magnet + user file selection + sub choice, and lazily resolves `files_meta` / `targets` / `stream_indexes` / `download_indexes` / `sub_paths`. Stream adapters consume the session directly; download adapters take `(magnet, indexes)` projections and stay session-unaware.
 - `downloader.py`: Subprocess orchestration — `aria2c` / `webtorrent-cli` / `peerflix` execution, VLC launch + sub injection, quiet-mode plumbing, in-torrent sub batch fetch, and `v` / `n` / `b` hotkey handling. Stream adapters take a `TorrentSession`; download adapters keep an explicit `(magnet, indexes)` signature for reuse outside the menu loop.
@@ -146,6 +193,7 @@ The application is structured into a modular, provider-based architecture:
 - `state.py`: Persists engine toggles, active presets, misc settings (dismissed-warning flag, quiet-mode flag, `download_dir`), and search history to `filter_state.json`. Backed by an in-memory cache: mutations mark dirty, disk write happens at `atexit` and at three destructive sites (`save_state`, `clear_history`, `reset_stats`). Includes a one-shot migration that rewrites legacy display-name keys (e.g. `"Movies & Series"`) to provider slugs.
 - `stats.py`: Usage counter recorders and read helpers; stores under the `stats` subtree, keyed by provider slug. Same in-memory cache flow as `state.py`.
 - `torrent_meta.py`: Fetches a torrent's file list from a magnet via `aria2c`. Helpers for episode-number extraction, video/subtitle classification, multi-episode detection (any torrent with ≥ 2 video files), sub-to-video matching (`match_subtitles_for`), and `--select-file` range formatting.
+- `updates.py`: Lightweight git-clone update notice. It rate-limits remote checks in `filter_state.json` and reports when the local branch is behind `origin`.
 - `constants.py`: Configuration constants, trackers, UI themes, and `get_download_dir()` (returns the user's chosen `download_dir` setting or falls back to `DOWNLOADS_DIR`).
 
 ## Security Notes
