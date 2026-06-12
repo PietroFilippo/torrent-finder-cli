@@ -640,11 +640,13 @@ def download_method_prompt(
     selected_indexes: list[int] | None = None,
     sub_choice: dict | None = None,
     show_streaming: bool = True,
+    page_url: str | None = None,
 ) -> str | None:
     """
     Prompt the user to choose a download method.
     Returns 't', 'd', 'p', 'aria', 'stream_w', 'stream_p', 's', 'pick_episodes',
-    'set_subs', 'back', or None. 'l' (copy magnet) is handled internally.
+    'set_subs', 'back', or None. 'l' (copy magnet) and 'open_page' (browser)
+    are handled internally.
     """
     wt_available = has_webtorrent()
     pf_available = has_peerflix()
@@ -788,6 +790,16 @@ def download_method_prompt(
         is_action=True,
         description="Copies the magnet URI to your clipboard",
     ))
+    if page_url:
+        from urllib.parse import urlparse as _urlparse
+        _page_domain = _urlparse(page_url).netloc or page_url
+        items.append(SelectItem(
+            label="🌐 Open torrent page",
+            value="open_page",
+            is_action=True,
+            hint=_page_domain,
+            description=f"Open this torrent's page on its source site in your browser.\n{page_url}",
+        ))
     if show_subtitles:
         items.append(SelectItem(
             label="📝 Search & download subtitles",
@@ -852,6 +864,14 @@ def download_method_prompt(
                 items[idx].hint = "✅ Copied!"
             except Exception:
                 items[idx].hint = "⚠ Could not copy"
+            return True  # Stay in menu
+        if items[idx].value == "open_page" and page_url:
+            try:
+                import webbrowser
+                webbrowser.open(page_url)
+                items[idx].hint = "✅ Opened!"
+            except Exception:
+                items[idx].hint = "⚠ Could not open browser"
             return True  # Stay in menu
         if items[idx].value == "toggle_quiet":
             from state import load_setting, save_setting

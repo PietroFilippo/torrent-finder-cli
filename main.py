@@ -270,6 +270,7 @@ def _main_loop() -> None:
                     selected_indexes=session.selected_files,
                     sub_choice=session.sub_choice,
                     show_streaming=show_stream,
+                    page_url=session.result.get("page_url") or None,
                 )
 
                 if method in _METHOD_TRACK:
