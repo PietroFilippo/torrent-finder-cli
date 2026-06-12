@@ -86,6 +86,9 @@ class BaseProvider(ABC):
 
             for item in data:
                 item["source"] = "Apibay"
+                tid = item.get("id")
+                if tid:
+                    item["page_url"] = f"https://thepiratebay.org/description.php?id={tid}"
             results.extend(data)
         return results
 
@@ -101,13 +104,16 @@ class BaseProvider(ABC):
             response.raise_for_status()
             data = response.json()
             for r in data.get("results", []):
+                # The slug segment is ignored by the site; only the id matters.
+                rid = r.get("_id") or r.get("id")
                 results.append({
                     "name": r.get("title", "Unknown"),
                     "info_hash": r.get("infohash", "").lower(),
                     "seeders": str(r.get("swarm", {}).get("seeders", 0)),
                     "leechers": str(r.get("swarm", {}).get("leechers", 0)),
                     "size": str(r.get("size", 0)),
-                    "source": "SolidTorrents"
+                    "source": "SolidTorrents",
+                    "page_url": f"https://solidtorrents.to/torrents/t/{rid}" if rid else "",
                 })
         except Exception:
             pass
@@ -156,6 +162,7 @@ class BaseProvider(ABC):
                 seeders = item.find(f"{nyaa_ns}seeders")
                 leechers = item.find(f"{nyaa_ns}leechers")
                 size = item.find(f"{nyaa_ns}size")
+                guid = item.find("guid")  # permalink to the nyaa.si view page
 
                 if title is not None and info_hash is not None:
                     size_bytes = 0
@@ -168,7 +175,8 @@ class BaseProvider(ABC):
                         "seeders": seeders.text if seeders is not None else "0",
                         "leechers": leechers.text if leechers is not None else "0",
                         "size": str(size_bytes),
-                        "source": "Nyaa"
+                        "source": "Nyaa",
+                        "page_url": guid.text if guid is not None and guid.text else "",
                     })
         except Exception:
             pass
