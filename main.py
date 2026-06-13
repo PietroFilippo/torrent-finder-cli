@@ -296,6 +296,7 @@ def _main_loop() -> None:
                         readchar.readkey()
                         continue
                     console.print("[info]Fetching torrent metadata via DHT (this can take 30–60s).[/info]")
+                    console.print("[dim]Needs peers — if the torrent has no seeders, this won't work.[/dim]")
                     console.print("[dim]Press Esc to cancel and go back.[/dim]\n")
                     cancel_event = threading.Event()
                     stop_listener = _start_cancel_listener(cancel_event)
@@ -310,11 +311,6 @@ def _main_loop() -> None:
                         continue
                     if not metadata or not metadata.files:
                         console.print("[error] Could not fetch file list (timeout or no metadata peers).[/error]\n")
-                        console.print("[dim]Press any key to continue...[/dim]")
-                        readchar.readkey()
-                        continue
-                    if len(metadata.files) == 1:
-                        console.print("[warning] Torrent contains a single file — nothing to pick.[/warning]\n")
                         console.print("[dim]Press any key to continue...[/dim]")
                         readchar.readkey()
                         continue
