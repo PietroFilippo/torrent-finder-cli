@@ -97,6 +97,18 @@ def _start_cancel_listener(cancel_event: threading.Event) -> threading.Event:
     return stop
 
 
+def _goodbye() -> None:
+    """Clear the leftover UI (results table / search prompt) and sign off.
+
+    Without the clear, whatever was last rendered stays on screen above the
+    exit message, leaving stray output before "Goodbye!". Cleared raw (no
+    banner reprint) so the exit screen shows only the farewell.
+    """
+    import os
+    os.system('cls' if os.name == 'nt' else 'clear')
+    console.print("[info]Goodbye![/info]")
+
+
 def _main_loop() -> None:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
@@ -153,7 +165,7 @@ def _main_loop() -> None:
         if not current_provider:
             result = provider_select_prompt(notice=update_msg)
             if result is None:
-                console.print("\n[info]Goodbye![/info]")
+                _goodbye()
                 break
             # History selection returns ("history", query, provider)
             if isinstance(result, tuple) and result[0] == "history":
@@ -189,7 +201,7 @@ def _main_loop() -> None:
             try:
                 query = get_query_with_shortcut(f"[title] Search {provider.name}:[/title] ")
             except (EOFError, KeyboardInterrupt):
-                console.print("\n[info]Goodbye![/info]")
+                _goodbye()
                 break
                 
             if query == "SPECIAL_FILTER":
@@ -458,7 +470,7 @@ def _main_loop() -> None:
             current_provider = None
             query = None
         else:
-            console.print("[info]Goodbye![/info]")
+            _goodbye()
             break
 
 def main() -> None:
@@ -474,4 +486,4 @@ if __name__ == "__main__":
     try:
         main()
     except (KeyboardInterrupt, EOFError):
-        console.print("\n[info]Goodbye![/info]")
+        _goodbye()
