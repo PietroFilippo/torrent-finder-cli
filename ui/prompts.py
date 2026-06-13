@@ -43,7 +43,26 @@ def get_query_with_shortcut(prompt_str: str) -> str | None:
     console.print(prompt_str, end="")
     sys.stdout.flush()
 
-    buffer = []
+    buffer: list[str] = []
+    pos = 0  # cursor index within buffer; physical cursor sits `pos` cols past the prompt
+
+    def repaint(prev_col: int, prev_len: int) -> None:
+        """Redraw the input after an edit, then park the cursor at `pos`.
+
+        Uses only backspaces and spaces (no ANSI) so it behaves the same on
+        every Windows console. `prev_col` is where the physical cursor was
+        (always the old `pos`); `prev_len` is the old text length, so we know
+        how many stale trailing chars to wipe when the text got shorter.
+        """
+        out = ['\b' * prev_col, ''.join(buffer)]
+        extra = prev_len - len(buffer)
+        if extra > 0:
+            out.append(' ' * extra)      # paint over leftover chars
+            out.append('\b' * extra)
+        out.append('\b' * (len(buffer) - pos))  # back to the cursor
+        sys.stdout.write(''.join(out))
+        sys.stdout.flush()
+
     while True:
         key = readchar.readkey()
         # A single-letter shortcut only counts when typed on its own. If text is
@@ -70,27 +89,59 @@ def get_query_with_shortcut(prompt_str: str) -> str | None:
         if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
             print()
             return "".join(buffer)
-            
+
         elif key == readchar.key.ESC:
             print()
             return "GO_BACK"
-            
-        elif key in (readchar.key.BACKSPACE, '\x08', '\x7f'):
-            if buffer:
-                buffer.pop()
-                sys.stdout.write('\b \b')
+
+        elif key == readchar.key.LEFT:
+            if pos > 0:
+                pos -= 1
+                sys.stdout.write('\b')
                 sys.stdout.flush()
-                
+
+        elif key == readchar.key.RIGHT:
+            if pos < len(buffer):
+                sys.stdout.write(buffer[pos])  # reprint char to advance cursor
+                pos += 1
+                sys.stdout.flush()
+
+        elif key == readchar.key.HOME or key == readchar.key.CTRL_A:
+            if pos > 0:
+                sys.stdout.write('\b' * pos)
+                pos = 0
+                sys.stdout.flush()
+
+        elif key == readchar.key.END or key == readchar.key.CTRL_E:
+            if pos < len(buffer):
+                sys.stdout.write(''.join(buffer[pos:]))
+                pos = len(buffer)
+                sys.stdout.flush()
+
+        elif key in (readchar.key.BACKSPACE, '\x08', '\x7f'):
+            if pos > 0:
+                prev_col, prev_len = pos, len(buffer)
+                del buffer[pos - 1]
+                pos -= 1
+                repaint(prev_col, prev_len)
+
+        elif key in (readchar.key.DELETE, readchar.key.SUPR):
+            if pos < len(buffer):
+                prev_col, prev_len = pos, len(buffer)
+                del buffer[pos]
+                repaint(prev_col, prev_len)
+
         elif key in (readchar.key.CTRL_C, '\x03'):
             raise KeyboardInterrupt
-            
+
         elif key in (readchar.key.CTRL_D, '\x04'):
             raise EOFError
-            
+
         elif len(key) == 1 and not key.startswith('\x1b') and not key.startswith('\x00') and not key.startswith('\xe0'):
-            buffer.append(key)
-            sys.stdout.write(key)
-            sys.stdout.flush()
+            prev_col, prev_len = pos, len(buffer)
+            buffer.insert(pos, key)
+            pos += 1
+            repaint(prev_col, prev_len)
 
 
 def filter_menu(provider) -> None:
