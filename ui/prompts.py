@@ -745,7 +745,7 @@ def download_method_prompt(
         ep_label = (
             f"📂 Change selection ({n_sel} picked)"
             if has_selection
-            else "📂 Browse torrent files… (Episode Selection for animes/series)"
+            else "📂 Browse torrent files… (Episode Selection, useful for animes/series)"
         )
         items.append(SelectItem(
             label=ep_label,
