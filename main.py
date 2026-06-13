@@ -144,6 +144,11 @@ def _main_loop() -> None:
     if current_provider and update_msg:
         console.print(update_msg + "\n")
 
+    # One-line status (e.g. "No results", "cancelled") carried to the next
+    # prompt render so it shows on the freshly-cleared screen instead of
+    # stacking another search header below the old one.
+    notice_msg = None
+
     while True:
         if not current_provider:
             result = provider_select_prompt(notice=update_msg)
@@ -178,6 +183,9 @@ def _main_loop() -> None:
                 "[white]tips[/white]   "
                 "[bold]Esc[/bold] [dim]go back[/dim]"
             )
+            if notice_msg:
+                console.print(notice_msg)
+                notice_msg = None
             try:
                 query = get_query_with_shortcut(f"[title] Search {provider.name}:[/title] ")
             except (EOFError, KeyboardInterrupt):
@@ -220,18 +228,49 @@ def _main_loop() -> None:
                 continue
 
         if not query:
-            console.print("[warning] Please enter a search term.[/warning]")
+            notice_msg = "[warning] Please enter a search term.[/warning]"
+            clear_screen()
             query = None
             continue
 
         # Search using provider
         console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{query}[/highlight]...")
+        console.print("[dim]Press Esc to cancel and go back.[/dim]")
 
-        with console.status(f"[bold cyan]Searching {provider.name}...[/bold cyan]", spinner="dots"):
-            results = provider.search(query, cli_filters=cli_filters)
-        
+        # Run the search on a worker thread so Esc can abort the wait instead of
+        # forcing the user to sit through the engine timeouts (or hit Ctrl+C).
+        search_result: dict = {}
+
+        def _run_search() -> None:
+            try:
+                search_result["results"] = provider.search(query, cli_filters=cli_filters)
+            except Exception:
+                search_result["results"] = []
+            finally:
+                search_result["done"] = True
+
+        cancel_event = threading.Event()
+        worker = threading.Thread(target=_run_search, daemon=True)
+        worker.start()
+        stop_listener = _start_cancel_listener(cancel_event)
+        try:
+            with console.status(f"[bold cyan]Searching {provider.name}...[/bold cyan]", spinner="dots"):
+                while not search_result.get("done") and not cancel_event.is_set():
+                    time.sleep(0.05)
+        finally:
+            stop_listener.set()
+
+        if cancel_event.is_set():
+            notice_msg = "[warning] Search cancelled — returning to the prompt.[/warning]\n"
+            clear_screen()
+            query = None
+            continue
+
+        results = search_result.get("results") or []
+
         if not results:
-            console.print("[warning] No results found.[/warning]\n")
+            notice_msg = "[warning] No results found.[/warning]\n"
+            clear_screen()
             query = None
             continue
 
