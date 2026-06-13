@@ -19,31 +19,54 @@ from providers import PROVIDERS
 from ui.selector import SelectItem, arrow_select
 
 
+def _input_pending() -> bool:
+    """True if more input is already queued in the terminal buffer.
+
+    Used to tell a deliberate single-key shortcut apart from pasted (or
+    rapidly streamed) text that merely happens to start with the shortcut
+    letter: a paste lands as a burst of keystrokes, so the rest of the text
+    is already waiting the instant we read the first character.
+    """
+    try:
+        import msvcrt
+        return bool(msvcrt.kbhit())
+    except ImportError:
+        import select
+        try:
+            return bool(select.select([sys.stdin], [], [], 0)[0])
+        except (OSError, ValueError):
+            return False
+
+
 def get_query_with_shortcut(prompt_str: str) -> str | None:
     """Get input from user manually, returning special actions for Shift hotkeys."""
     console.print(prompt_str, end="")
     sys.stdout.flush()
-    
+
     buffer = []
     while True:
         key = readchar.readkey()
-        
-        if not buffer and key == "F":
+        # A single-letter shortcut only counts when typed on its own. If text is
+        # still queued behind this key it's a paste/burst, so treat the letter as
+        # literal input instead of firing the shortcut.
+        is_shortcut_key = not buffer and not _input_pending()
+
+        if is_shortcut_key and key == "F":
             print()
             return "SPECIAL_FILTER"
 
-        if not buffer and key == "H":
+        if is_shortcut_key and key == "H":
             print()
             return "SPECIAL_HISTORY"
 
-        if not buffer and key == "S":
+        if is_shortcut_key and key == "S":
             print()
             return "SPECIAL_STATS"
 
-        if not buffer and key == "T":
+        if is_shortcut_key and key == "T":
             print()
             return "SPECIAL_TIPS"
-            
+
         if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
             print()
             return "".join(buffer)
