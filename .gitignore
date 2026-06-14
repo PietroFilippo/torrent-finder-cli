@@ -7,4 +7,7 @@ __pycache__/
 downloads/
 
 # Persisted filter/engine state
-filter_state.json
+filter_state.json
+
+# Subtitle provider credentials (OpenSubtitles / Jimaku) — never commit
+subtitle_credentials.json
