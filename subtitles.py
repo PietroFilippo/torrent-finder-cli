@@ -8,39 +8,83 @@ from typing import Optional
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from babelfish import Language
-from subliminal import Video, download_best_subtitles, save_subtitles
+from subliminal import Video, download_best_subtitles, save_subtitles, scan_video
 
 from constants import console, get_download_dir
+from credentials import opensubtitles_config, addic7ed_config
+
+# Curated provider set. subliminal ships ~12 providers; most are dead weight —
+# defunct legacy APIs (opensubtitles XML-RPC), VIP-only variants, single-language
+# scrapers (napiprojekt/subtitulamos/subtis), or redundant mirrors (gestdown
+# duplicates addic7ed). We keep the few broad, working ones.
+SUBTITLE_PROVIDERS = ["opensubtitlescom", "addic7ed", "podnapisi", "tvsubtitles"]
 
 
-def download_subtitles(torrent_name: str) -> Optional[str]:
-    """Search and download subtitles for the given torrent name."""
+def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> Optional[str]:
+    """Search and download subtitles for a torrent.
+
+    ``video_path`` — when a matching video file has already been downloaded,
+    pass its path so subliminal can hash-match against the real file
+    (frame-accurate sync) instead of guessing from the release name alone.
+    """
     console.print(f"\n[info]Subtitle Search for:[/info] [highlight]{torrent_name}[/highlight]")
-    
+
     # Prompt for language
     while True:
         lang_input = console.input("[info]Enter language code (e.g. eng, spa, por) [default: eng]: [/info]").strip().lower()
         if not lang_input:
             lang_input = "eng"
-            
+
         try:
             language = Language(lang_input)
             break
         except ValueError:
             console.print(f"[warning]Invalid language code '{lang_input}'. Please try again.[/warning]")
-        
+
     console.print(f"[info]Searching subtitles for {language.name}...[/info]")
-    
+
+    # Per-provider credentials (if configured) unlock the best sources; without
+    # them those providers still run anonymously with tighter limits.
+    provider_configs = {}
+    os_cfg = opensubtitles_config()
+    if os_cfg:
+        provider_configs["opensubtitlescom"] = os_cfg
+    add_cfg = addic7ed_config()
+    if add_cfg:
+        provider_configs["addic7ed"] = add_cfg
+    if not os_cfg:
+        console.print(
+            "[dim]Tip: set OpenSubtitles.com credentials for far better matches "
+            "(see README).[/dim]"
+        )
+
     try:
-        # Create a virtual video based entirely on the torrent name formatting
-        # Subliminal will extract title, year, group, resolution, etc from it
-        # Append .mkv to trick subliminal into treating it as a standard video file
-        video = Video.fromname(f"{torrent_name}.mkv")
-        
+        # Prefer hashing the real downloaded file — this lets OpenSubtitles match
+        # the exact release for accurate timing. Fall back to parsing the name.
+        video = None
+        if video_path and os.path.isfile(video_path):
+            try:
+                video = scan_video(video_path)
+                console.print(
+                    f"[dim]Matching against downloaded file "
+                    f"[/dim][highlight]{os.path.basename(video_path)}[/highlight] "
+                    f"[dim]for accurate sync.[/dim]"
+                )
+            except Exception:
+                video = None
+        if video is None:
+            # Virtual video from the release name; the .mkv suffix makes
+            # subliminal treat the string as a standard video filename.
+            video = Video.fromname(f"{torrent_name}.mkv")
+
         with console.status(f"[bold cyan]Downloading {language.name} subtitles for '[highlight]{torrent_name}[/highlight]'...[/bold cyan]", spinner="dots"):
             # Download best subtitles for the given languages
-            best_subtitles = download_best_subtitles([video], {language})
-        
+            best_subtitles = download_best_subtitles(
+                [video], {language},
+                providers=SUBTITLE_PROVIDERS,
+                provider_configs=provider_configs,
+            )
+
         subs = best_subtitles.get(video, [])
         if not subs:
             console.print("[warning]No subtitles found matching that release.[/warning]")
