@@ -35,7 +35,7 @@ On Windows, the included `torrent.bat` launcher can be added to your `PATH` so y
     - `off` — stream with no subtitles.
     - After downloading subs via **📝 Search & download subtitles** (the existing subliminal flow), the saved file is auto-promoted to external mode so your next stream just picks it up.
   - **Auto Episode Navigation:** When streaming a torrent with ≥ 2 video files **without** pre-selecting anything, the CLI fetches metadata via `aria2c`, queues every video file in episode order (using filename patterns like `S01E01`, ` - 01`, `[01]`, `Episode 01`, or ` E01` when present; alphabetical fallback otherwise), and enables `n` (next) / `b` (previous) hotkeys so you can jump between episodes mid-session. Single-file movies still stream as-is — no forced picker, no extra wait.
-  - **Subtitle Download:** Search and download the best matching subtitles directly from the terminal using `subliminal`.
+  - **Subtitle Download:** Search and download the best matching subtitles directly from the terminal using `subliminal`. If a matching video has already been downloaded, it hash-matches the real file for frame-accurate sync; otherwise it matches on the release name. Configuring OpenSubtitles.com credentials greatly improves results (see *Subtitle providers* below). For Anime searches, a dedicated **Jimaku** lookup (jimaku.cc) runs first when a `JIMAKU_API_KEY` is set, since the western-TV providers behind subliminal don't index anime fansubs well.
   - **Configurable Download Folder:** A **📁 Save to:** row in the Download Method menu lets you set a persistent default download directory used by `aria2c`, `webtorrent`, `peerflix` downloads and the subtitle downloader. Picker offers `Default (downloads/)`, `~/Downloads`, or a custom path (created on-the-fly if missing). Streams and magnet-to-client handoff are unaffected — they use their own paths.
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
   - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
@@ -80,6 +80,61 @@ brew install aria2
 # Debian/Ubuntu
 sudo apt install aria2
 ```
+
+### Subtitle providers (optional, recommended)
+
+Subtitle search works anonymously, but matches are far better with credentials.
+Credentials are read at runtime from environment variables (preferred) or a
+gitignored `subtitle_credentials.json` next to the code — **never commit real
+values**.
+
+- **OpenSubtitles.com** (movies & series): a free account dramatically improves
+  results and unlocks hash-accurate matching against a downloaded file.
+- **Addic7ed** (TV series): a free account raises rate limits and quality for
+  episodic content. Runs anonymously (limited) when no credentials are set.
+- **Jimaku** (anime): a free API key (jimaku.cc → account settings) enables a
+  dedicated anime subtitle lookup that runs before subliminal for Anime
+  searches. Without the key, Anime falls back to subliminal automatically.
+
+subliminal queries a curated set of providers — `opensubtitlescom`, `addic7ed`,
+`podnapisi`, `tvsubtitles` — chosen for broad coverage and reliability. The rest
+of subliminal's defaults (defunct legacy APIs, VIP-only variants, and
+single-language scrapers) are skipped.
+
+Set them as environment variables:
+
+```powershell
+# Windows (persists for new terminals)
+[Environment]::SetEnvironmentVariable("OPENSUBTITLES_USERNAME", "your_user", "User")
+[Environment]::SetEnvironmentVariable("OPENSUBTITLES_PASSWORD", "your_pass", "User")
+[Environment]::SetEnvironmentVariable("ADDIC7ED_USERNAME", "your_user", "User")
+[Environment]::SetEnvironmentVariable("ADDIC7ED_PASSWORD", "your_pass", "User")
+[Environment]::SetEnvironmentVariable("JIMAKU_API_KEY", "your_key", "User")
+```
+
+```bash
+# macOS / Linux (add to your shell profile)
+export OPENSUBTITLES_USERNAME="your_user"
+export OPENSUBTITLES_PASSWORD="your_pass"
+export ADDIC7ED_USERNAME="your_user"
+export ADDIC7ED_PASSWORD="your_pass"
+export JIMAKU_API_KEY="your_key"
+```
+
+Or create `subtitle_credentials.json` (already gitignored) in the repo folder:
+
+```json
+{
+  "opensubtitles_username": "your_user",
+  "opensubtitles_password": "your_pass",
+  "addic7ed_username": "your_user",
+  "addic7ed_password": "your_pass",
+  "jimaku_api_key": "your_key"
+}
+```
+
+Environment variables take precedence over the file. All keys are optional —
+anything unset just falls back to the anonymous provider set.
 
 ### Run `torrent` from anywhere on Windows
 
