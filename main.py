@@ -109,6 +109,37 @@ def _goodbye() -> None:
     console.print("[info]Goodbye![/info]")
 
 
+def _locate_downloaded_video(torrent_name: str) -> str | None:
+    """Best-effort: find an already-downloaded video file for this torrent.
+
+    Lets the subtitle search hash-match the real file for accurate sync.
+    Returns None when nothing in the download folder plausibly matches, so the
+    caller falls back to name-only matching.
+    """
+    import os
+    import re
+    from constants import get_download_dir
+
+    exts = (".mkv", ".mp4", ".avi", ".m4v", ".mov")
+
+    def toks(s: str) -> set:
+        return set(re.findall(r"[a-z0-9]+", s.lower()))
+
+    want = toks(torrent_name)
+    best, best_score = None, 0
+    try:
+        for root, _dirs, files in os.walk(get_download_dir()):
+            for fn in files:
+                if fn.lower().endswith(exts):
+                    score = len(want & toks(fn))
+                    if score > best_score:
+                        best, best_score = os.path.join(root, fn), score
+    except Exception:
+        return None
+    # Need a couple of shared tokens to avoid grabbing an unrelated video.
+    return best if best_score >= 2 else None
+
+
 def _main_loop() -> None:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
@@ -431,16 +462,32 @@ def _main_loop() -> None:
                     break
                 elif method == "s":
                     import os as _os
-                    from subtitles import download_subtitles
-                    sub_path = download_subtitles(session.name)
+                    sub_path = None
+                    # Anime: try Jimaku first (best anime coverage) when a key is
+                    # configured; it returns None to fall through to subliminal.
+                    if getattr(provider, "slug", "") == "anime":
+                        from jimaku import search_and_download
+                        sub_path = search_and_download(session.name)
+                    if not sub_path:
+                        from subtitles import download_subtitles
+                        video_path = _locate_downloaded_video(session.name)
+                        sub_path = download_subtitles(session.name, video_path=video_path)
                     record_method_complete("subtitles")
                     if sub_path and _os.path.exists(sub_path):
-                        session.set_sub_choice({"mode": "external", "path": _os.path.abspath(sub_path)})
-                        console.print(
-                            f"[success]Saved. Next stream will use[/success] "
-                            f"[highlight]{_os.path.basename(sub_path)}[/highlight] "
-                            f"[success]as the subtitle source.[/success]"
-                        )
+                        from jimaku import is_subtitle_file
+                        if is_subtitle_file(sub_path):
+                            session.set_sub_choice({"mode": "external", "path": _os.path.abspath(sub_path)})
+                            console.print(
+                                f"[success]Saved. Next stream will use[/success] "
+                                f"[highlight]{_os.path.basename(sub_path)}[/highlight] "
+                                f"[success]as the subtitle source.[/success]"
+                            )
+                        else:
+                            console.print(
+                                f"[success]Saved[/success] "
+                                f"[highlight]{_os.path.basename(sub_path)}[/highlight]"
+                                f"[success].[/success]"
+                            )
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
