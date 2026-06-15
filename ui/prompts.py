@@ -1019,63 +1019,103 @@ _CRED_PROVIDERS = [
 ]
 
 
-def _masked_input(prompt: str) -> str:
-    """Read a line, echoing '*' per character.
+def _credentials_form(meta: dict, buffers: dict) -> dict | None:
+    """Single-screen login form — edit every field inline, then Save.
 
-    ``console.input(password=True)`` shows nothing at all (getpass), which looks
-    broken to the user. This echoes a mask so they can see input registering,
-    while keeping the secret off-screen. Raises KeyboardInterrupt on Ctrl+C.
+    ``buffers`` maps env_key -> typed value and is mutated in place so values
+    persist if the caller re-opens the form. Returns ``buffers`` on Save, or
+    ``None`` on Esc / Cancel. Type to edit the focused field; Up/Down or Tab
+    move between fields; Enter on a field jumps to the next; Enter on Save/Cancel
+    finishes.
     """
-    console.print(prompt, end="")
-    sys.stdout.flush()
-    buf: list[str] = []
+    import credentials as C
+    from rich.panel import Panel
+    from rich.text import Text
+    from ui.selector import _render
 
-    def _backspace() -> None:
+    fields = meta["fields"]
+    n = len(fields)
+    SAVE, CANCEL = n, n + 1
+    focus = 0
+
+    notes = []
+    if meta["limit"]:
+        notes.append(meta["limit"])
+    if any(C.env_overrides(k) for k in meta["required"]):
+        notes.append("Env var overrides the saved file")
+    notes.append("Type to edit • ↑/↓ or Tab move • Enter on a field = next • Esc cancels")
+    notes.append("Stored in plaintext in subtitle_credentials.json")
+    footer = "  •  ".join(notes)
+
+    def _field_text(env_key, label, secret, focused):
+        buf = buffers.get(env_key, "")
+        if focused:
+            shown = ("*" * len(buf)) if secret else buf
+            return f"{label}: {shown}█"  # block = text cursor (real cursor is hidden)
         if buf:
-            buf.pop()
-            sys.stdout.write("\b \b")
-            sys.stdout.flush()
+            return f"{label}: " + (("*" * len(buf)) if secret else buf)
+        cur = C.get_credential(env_key)
+        if cur:
+            return f"{label}: " + (("*" * 8) if secret else cur) + "  (unchanged)"
+        return f"{label}: not set"
 
+    def _panel():
+        body = Text()
+        for i, (env_key, label, secret) in enumerate(fields):
+            foc = focus == i
+            sty = "bold cyan" if foc else "white"
+            body.append("  ❯ " if foc else "    ", style=sty)
+            body.append(_field_text(env_key, label, secret, foc), style=sty)
+            body.append("\n")
+        body.append("  ─────────────────────────\n", style="dim")
+        for idx_btn, lbl in ((SAVE, "✅  Save"), (CANCEL, "↩  Cancel")):
+            sty = "bold cyan" if focus == idx_btn else "white"
+            body.append("  ❯ " if focus == idx_btn else "    ", style=sty)
+            body.append(lbl, style=sty)
+            body.append("\n")
+        body.append("\n")
+        body.append_text(Text.from_markup(f" {footer}", style="dim"))
+        return Panel(
+            body,
+            title=f"[bold magenta]{meta['icon']} {meta['name']} — sign in[/bold magenta]",
+            border_style="bright_blue",
+            padding=(1, 2),
+        )
+
+    sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")  # alt screen + hide cursor
+    sys.stdout.flush()
     try:
-        import msvcrt
+        _render(_make_banner_panel(), _panel())
         while True:
-            ch = msvcrt.getwch()
-            if ch in ("\r", "\n"):
-                break
-            if ch == "\x03":
-                raise KeyboardInterrupt
-            if ch in ("\x00", "\xe0"):  # special-key prefix — consume & ignore
-                msvcrt.getwch()
-                continue
-            if ch == "\x08":  # backspace
-                _backspace()
-                continue
-            buf.append(ch)
-            sys.stdout.write("*")
-            sys.stdout.flush()
-    except ImportError:
-        import termios
-        import tty
-        fd = sys.stdin.fileno()
-        old = termios.tcgetattr(fd)
-        try:
-            tty.setcbreak(fd)
-            while True:
-                ch = sys.stdin.read(1)
-                if ch in ("\r", "\n"):
-                    break
-                if ch == "\x03":
-                    raise KeyboardInterrupt
-                if ch in ("\x7f", "\x08"):
-                    _backspace()
-                    continue
-                buf.append(ch)
-                sys.stdout.write("*")
-                sys.stdout.flush()
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old)
-    print()
-    return "".join(buf)
+            try:
+                key = readchar.readkey()
+            except KeyboardInterrupt:
+                return None
+            if key == readchar.key.ESC:
+                return None
+            elif key == readchar.key.UP:
+                focus = (focus - 1) % (n + 2)
+            elif key in (readchar.key.DOWN, "\t"):
+                focus = (focus + 1) % (n + 2)
+            elif key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
+                if focus == CANCEL:
+                    return None
+                if focus == SAVE:
+                    return buffers
+                focus = (focus + 1) % (n + 2)  # field → jump to next row
+            elif key in (readchar.key.BACKSPACE, "\x08", "\x7f"):
+                if focus < n:
+                    k = fields[focus][0]
+                    if buffers.get(k):
+                        buffers[k] = buffers[k][:-1]
+            elif len(key) == 1 and not key.startswith(("\x1b", "\x00", "\xe0")):
+                if focus < n:
+                    k = fields[focus][0]
+                    buffers[k] = buffers.get(k, "") + key
+            _render(_make_banner_panel(), _panel())
+    finally:
+        sys.stdout.write("\033[?25h\033[?1049l\033[2J\033[H")  # restore screen
+        sys.stdout.flush()
 
 
 def _inline_confirm(message: str, default: bool = False) -> bool:
@@ -1113,77 +1153,64 @@ def _test_provider_credentials(provider_id: str, effective: dict) -> tuple[bool,
     return False, "unknown provider"
 
 
-def _edit_provider_credentials(meta: dict) -> None:
-    """Prompt for one provider's credentials, verify, then save to the file."""
+def _finalize_credentials_save(meta: dict, entered: dict) -> bool:
+    """Validate, verify, and save entered credentials.
+
+    Returns True when the form is done (saved, or nothing to do), False to
+    stay in the form (required field missing, or the user declined to save
+    rejected credentials).
+    """
     import credentials as C
 
-    if meta["limit"]:
-        console.print(f"[warning]⚠ {meta['limit']}[/warning]")
-    if any(C.env_overrides(k) for k in meta["required"]):
-        console.print(
-            "[warning]Note: an environment variable is set for this provider and "
-            "overrides the saved file until you unset it.[/warning]"
-        )
-    console.print("[dim]Stored in plaintext in subtitle_credentials.json (gitignored). "
-                  "Leave a field blank to keep its current value.[/dim]")
-
-    updates: dict = {}
-    for env_key, label, secret in meta["fields"]:
-        existing = C.get_credential(env_key)
-        suffix = " [current kept if blank]" if existing else ""
-        try:
-            if secret:
-                val = _masked_input(f"[info]{label}{suffix}: [/info]").strip()
-            else:
-                val = console.input(f"[info]{label}{suffix}: [/info]").strip()
-        except (EOFError, KeyboardInterrupt):
-            console.print("\n[warning]Cancelled — nothing saved.[/warning]")
-            return
-        if val:
-            updates[env_key] = val
-
-    # Nothing typed → keep existing as-is. Don't "verify" here: with everything
-    # blank the test would fall back to get_credential(), which returns the
-    # env-shadowing value and could report a misleading success for credentials
-    # the user never re-entered.
-    if not updates:
+    if not entered:
+        # Nothing edited — don't verify (a blank form would fall back to the
+        # env-shadowing values and report a misleading success).
         console.print("[dim]No changes entered — existing credentials kept, nothing saved.[/dim]")
         console.print("[dim]Press any key to continue...[/dim]")
         readchar.readkey()
-        return
+        return True
 
-    # Effective = newly entered values, falling back to whatever is already set.
-    effective = {k: (updates.get(k) or C.get_credential(k)) for k, _, _ in meta["fields"]}
+    effective = {k: (entered.get(k) or C.get_credential(k)) for k, _, _ in meta["fields"]}
     missing = [k for k in meta["required"] if not effective.get(k)]
     if missing:
-        console.print("[warning]Required field(s) missing — nothing saved.[/warning]")
+        labels = ", ".join(lbl for k, lbl, _ in meta["fields"] if k in missing)
+        console.print(f"[warning]Required field(s) missing: {labels}.[/warning]")
         console.print("[dim]Press any key to continue...[/dim]")
         readchar.readkey()
-        return
+        return False  # back to the form to fill them in
 
     ok, msg = _test_provider_credentials(meta["id"], effective)
     if ok is True:
         console.print(f"[success]✓ Verified: {msg}[/success]")
     elif ok is None:
-        # Couldn't verify (rate limit / network / unverifiable provider) — don't
-        # block the save, just be honest about it.
+        # Couldn't verify (rate limit / network / unverifiable provider).
         console.print(f"[warning]⚠ {msg}[/warning]")
     else:  # definitively rejected
         console.print(f"[error]✗ Verification failed: {msg}[/error]")
-        # Ask inline, right under the failure, instead of a separate modal screen.
         if not _inline_confirm("Save these credentials anyway? — Y/Yes to save, anything else cancels:"):
             console.print("[warning]Not saved.[/warning]")
             console.print("[dim]Press any key to continue...[/dim]")
             readchar.readkey()
-            return
+            return False  # back to the form
 
-    if updates:
-        C.save_credentials(updates)
-        console.print(f"[success]Saved {meta['name']} credentials.[/success]")
-    else:
-        console.print("[dim]No changes to save.[/dim]")
+    C.save_credentials(entered)
+    console.print(f"[success]Saved {meta['name']} credentials.[/success]")
     console.print("[dim]Press any key to continue...[/dim]")
     readchar.readkey()
+    return True
+
+
+def _edit_provider_credentials(meta: dict) -> None:
+    """Single-screen login form for one provider. Esc cancels and goes back."""
+    buffers: dict = {}  # env_key -> typed value, kept across re-tries
+    while True:
+        result = _credentials_form(meta, buffers)
+        if result is None:
+            return  # Esc / Cancel
+        entered = {k: v.strip() for k, v in result.items() if v.strip()}
+        if _finalize_credentials_save(meta, entered):
+            return
+        # else: required field missing or save declined — reopen, values kept
 
 
 def _view_field_label(env_key: str, label: str, secret: bool, revealed: bool) -> str:
@@ -1240,12 +1267,16 @@ def _manage_provider_credentials(meta: dict) -> None:
     import credentials as C
 
     while True:
-        has_file_creds = any(C.file_has(env_key) for env_key, _, _ in meta["fields"])
+        # Offer Clear when credentials exist anywhere (file or environment), so
+        # env-set users can clear the file and get told about the env override.
+        has_creds = any(
+            C.file_has(k) or C.env_overrides(k) for k, _, _ in meta["fields"]
+        )
         sub_items = [
             SelectItem(label="👁  View credentials", value="view", is_action=True),
             SelectItem(label="✏  Enter / update credentials", value="edit", is_action=True),
         ]
-        if has_file_creds:
+        if has_creds:
             sub_items.append(SelectItem(label="🗑  Clear stored credentials", value="clear", is_action=True))
         sub_items.append(SelectItem(label="↩  Back", value="back", is_action=True))
 
@@ -1261,8 +1292,17 @@ def _manage_provider_credentials(meta: dict) -> None:
             _edit_provider_credentials(meta)
         elif action == "clear":
             if confirm_prompt(f"Clear stored {meta['name']} credentials?"):
-                C.save_credentials({env_key: None for env_key, _, _ in meta["fields"]})
-                console.print(f"[success]Cleared {meta['name']} credentials.[/success]")
+                C.save_credentials({k: None for k, _, _ in meta["fields"]})
+                console.print(f"[success]Cleared {meta['name']} credentials from the file.[/success]")
+                # Environment variables override the file and can't be removed
+                # from here — tell the user exactly which still apply.
+                shadow = [k for k, _, _ in meta["fields"] if C.env_overrides(k)]
+                if shadow:
+                    console.print(
+                        "[warning]Still set via environment (overrides the file): "
+                        + ", ".join(shadow) + ".[/warning]"
+                    )
+                    console.print("[dim]Unset those environment variables to fully remove them.[/dim]")
                 console.print("[dim]Press any key to continue...[/dim]")
                 readchar.readkey()
         # loop back to the sub-menu after any action
