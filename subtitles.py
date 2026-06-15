@@ -227,3 +227,46 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
     except Exception as e:
         console.print(f"\n[error]Subtitle download failed: {e}[/error]")
         return []
+
+
+def test_opensubtitles(username: str, password: str, apikey: str | None = None):
+    """Verify OpenSubtitles.com credentials by logging in.
+
+    Returns ``(ok, message)`` where ``ok`` is True (verified), False (rejected),
+    or None (couldn't verify — rate limit / network). Calls ``login()``
+    explicitly; ``initialize()`` only sets up the session and would reuse a
+    cached token, so it can't detect a wrong password on its own.
+    """
+    from subliminal.providers.opensubtitlescom import OpenSubtitlesComProvider
+    kwargs = {"username": username, "password": password}
+    if apikey:
+        kwargs["apikey"] = apikey
+    provider = OpenSubtitlesComProvider(**kwargs)
+    try:
+        provider.initialize()
+        provider.login()  # actually authenticate; raises on bad credentials
+        return True, "Login successful"
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        low = msg.lower()
+        if any(t in low for t in ("401", "unauthor", "invalid", "403", "forbidden")):
+            return False, "Invalid username or password"
+        if any(t in low for t in ("429", "too many", "rate")):
+            return None, "Rate limited by OpenSubtitles — try again shortly"
+        return None, f"Couldn't verify ({msg[:120]})"
+    finally:
+        try:
+            provider.terminate()
+        except Exception:
+            pass
+
+
+def test_addic7ed(username: str, password: str):
+    """Addic7ed can't be verified cheaply.
+
+    Its subliminal provider just stores the username/password as cookies and
+    flips ``logged_in`` without any login round-trip, so a wrong password would
+    look identical to a right one. Return None ("couldn't verify") rather than a
+    misleading success.
+    """
+    return None, "Addic7ed can't be verified automatically; it'll be used on the next search."

@@ -164,3 +164,24 @@ def search_and_download(torrent_name: str) -> Optional[str]:
 def is_subtitle_file(path: str) -> bool:
     """True if the path is a directly-usable subtitle (not e.g. a .zip)."""
     return path.lower().endswith(_SUB_EXTS)
+
+
+def validate_key(key: str):
+    """Check a Jimaku API key with a tiny search request.
+
+    Returns ``(ok, message)`` where ``ok`` is True (valid), False (rejected —
+    401), or None (couldn't verify — network/other).
+    """
+    try:
+        resp = requests.get(
+            f"{_BASE}/entries/search",
+            params={"query": "test"},
+            headers=_headers(key),
+            timeout=15,
+        )
+        if resp.status_code == 401:
+            return False, "Invalid API key (401)"
+        resp.raise_for_status()
+        return True, "API key accepted"
+    except Exception as e:
+        return None, f"Couldn't verify ({str(e)[:120] or type(e).__name__})"
