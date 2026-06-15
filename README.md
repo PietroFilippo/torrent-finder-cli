@@ -35,7 +35,7 @@ On Windows, the included `torrent.bat` launcher can be added to your `PATH` so y
     - `off` — stream with no subtitles.
     - After downloading subs via **📝 Search & download subtitles** (the existing subliminal flow), the saved file is auto-promoted to external mode so your next stream just picks it up.
   - **Auto Episode Navigation:** When streaming a torrent with ≥ 2 video files **without** pre-selecting anything, the CLI fetches metadata via `aria2c`, queues every video file in episode order (using filename patterns like `S01E01`, ` - 01`, `[01]`, `Episode 01`, or ` E01` when present; alphabetical fallback otherwise), and enables `n` (next) / `b` (previous) hotkeys so you can jump between episodes mid-session. Single-file movies still stream as-is — no forced picker, no extra wait.
-  - **Subtitle Download:** Search and download the best matching subtitles directly from the terminal using `subliminal`. If a matching video has already been downloaded, it hash-matches the real file for frame-accurate sync; otherwise it matches on the release name. Configuring OpenSubtitles.com credentials greatly improves results (see *Subtitle providers* below). For Anime searches, a dedicated **Jimaku** lookup (jimaku.cc) runs first when a `JIMAKU_API_KEY` is set, since the western-TV providers behind subliminal don't index anime fansubs well.
+  - **Subtitle Download:** Search and download the best matching subtitles directly from the terminal using `subliminal`. Enter one or more languages separated by commas (e.g. `eng, por` or `pt-BR`) — accepts ISO codes (`eng`/`en`) and regional variants (`pt-BR`, `pt-PT`). Every available language is downloaded, the first in your order becomes the primary VLC track (the rest attach as switchable tracks), and any language it couldn't find is reported. If a matching video has already been downloaded, it hash-matches the real file for frame-accurate sync; otherwise it matches on the release name. Configuring OpenSubtitles.com credentials greatly improves results (see *Subtitle providers* below). For Anime searches, a dedicated **Jimaku** lookup (jimaku.cc) runs first when a `JIMAKU_API_KEY` is set, since the western-TV providers behind subliminal don't index anime fansubs well.
   - **Configurable Download Folder:** A **📁 Save to:** row in the Download Method menu lets you set a persistent default download directory used by `aria2c`, `webtorrent`, `peerflix` downloads and the subtitle downloader. Picker offers `Default (downloads/)`, `~/Downloads`, or a custom path (created on-the-fly if missing). Streams and magnet-to-client handoff are unaffected — they use their own paths.
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
   - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
@@ -87,6 +87,16 @@ Subtitle search works anonymously, but matches are far better with credentials.
 Credentials are read at runtime from environment variables (preferred) or a
 gitignored `subtitle_credentials.json` next to the code — **never commit real
 values**.
+
+The easiest way to set them is in-program: on the **Select Provider** screen,
+choose **🔑 Subtitle credentials**. For each provider you can view, enter/update,
+or clear its login. Entering opens a single-screen form — edit every field in
+place (Up/Down or Tab to move, Enter to advance, **Esc** to cancel) and Save
+when done. Saved values are verified against the provider (where possible) and
+written to `subtitle_credentials.json`; the view screen masks the password / API
+key with a toggle to reveal them. Environment variables, if set, **override** the
+file (the menu flags this), and **Clear only empties the file** — unset the
+matching environment variables to remove a credential that's set there.
 
 - **OpenSubtitles.com** (movies & series): a free account dramatically improves
   results and unlocks hash-accurate matching against a downloaded file.
