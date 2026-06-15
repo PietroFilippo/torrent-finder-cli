@@ -990,7 +990,7 @@ _CRED_PROVIDERS = [
         "fields": [
             ("OPENSUBTITLES_USERNAME", "Username", False),
             ("OPENSUBTITLES_PASSWORD", "Password", True),
-            ("OPENSUBTITLES_APIKEY", "API key (optional, blank to skip)", False),
+            ("OPENSUBTITLES_APIKEY", "API key (optional, blank to skip)", True),
         ],
         "required": ["OPENSUBTITLES_USERNAME", "OPENSUBTITLES_PASSWORD"],
         "limit": "Free accounts have a small daily download limit; VIP raises it.",
@@ -1186,30 +1186,86 @@ def _edit_provider_credentials(meta: dict) -> None:
     readchar.readkey()
 
 
+def _view_field_label(env_key: str, label: str, secret: bool, revealed: bool) -> str:
+    """Render one credential row for the view screen (plain text, no markup)."""
+    import credentials as C
+    val = C.get_credential(env_key)
+    if not val:
+        return f"{label}: not set"
+    shown = val if (revealed or not secret) else "*" * 8
+    src = {"env": "from environment", "file": "from file"}.get(C.credential_source(env_key), "")
+    return f"{label}: {shown}" + (f"   [{src}]" if src else "")
+
+
+def _view_provider_credentials(meta: dict) -> None:
+    """Show a provider's current credentials, masking secrets with a reveal toggle."""
+    fields = meta["fields"]
+    state = {"revealed": False}
+
+    def _toggle_label() -> str:
+        return "🙈 Hide password / API key" if state["revealed"] else "👁  Show password / API key"
+
+    items = [
+        SelectItem(label=_view_field_label(k, lbl, sec, False), value=("field", k),
+                   enabled=False, is_action=True)
+        for k, lbl, sec in fields
+    ]
+    items.append(SelectItem(label="", value="__sep__", enabled=False, is_action=True))
+    items.append(SelectItem(
+        label=_toggle_label(), value="toggle", is_action=True,
+        description="Reveal or hide the stored password / API key.",
+    ))
+    items.append(SelectItem(label="↩  Back", value="back", is_action=True))
+
+    def on_action(idx, items_list):
+        if items_list[idx].value == "toggle":
+            state["revealed"] = not state["revealed"]
+            for j, (k, lbl, sec) in enumerate(fields):
+                items_list[j].label = _view_field_label(k, lbl, sec, state["revealed"])
+            items_list[idx].label = _toggle_label()
+            return True  # stay in menu — redraws in place
+        return False
+
+    arrow_select(
+        items,
+        title=f"{meta['icon']} {meta['name']} — stored credentials",
+        banner=_make_banner_panel(),
+        footer="Secrets are masked — pick Show password / API key to reveal.",
+        on_action=on_action,
+    )
+
+
 def _manage_provider_credentials(meta: dict) -> None:
-    """Per-provider sub-menu: enter/update or clear stored credentials."""
+    """Per-provider sub-menu: view, enter/update, or clear stored credentials."""
     import credentials as C
 
-    has_file_creds = any(C.file_has(env_key) for env_key, _, _ in meta["fields"])
-    sub_items = [SelectItem(label="✏  Enter / update credentials", value="edit", is_action=True)]
-    if has_file_creds:
-        sub_items.append(SelectItem(label="🗑  Clear stored credentials", value="clear", is_action=True))
-    sub_items.append(SelectItem(label="↩  Back", value="back", is_action=True))
+    while True:
+        has_file_creds = any(C.file_has(env_key) for env_key, _, _ in meta["fields"])
+        sub_items = [
+            SelectItem(label="👁  View credentials", value="view", is_action=True),
+            SelectItem(label="✏  Enter / update credentials", value="edit", is_action=True),
+        ]
+        if has_file_creds:
+            sub_items.append(SelectItem(label="🗑  Clear stored credentials", value="clear", is_action=True))
+        sub_items.append(SelectItem(label="↩  Back", value="back", is_action=True))
 
-    idx = arrow_select(sub_items, title=f"{meta['icon']} {meta['name']}", banner=_make_banner_panel())
-    if idx is None:
-        return
-    action = sub_items[idx].value
-    if action == "back":
-        return
-    if action == "clear":
-        if confirm_prompt(f"Clear stored {meta['name']} credentials?"):
-            C.save_credentials({env_key: None for env_key, _, _ in meta["fields"]})
-            console.print(f"[success]Cleared {meta['name']} credentials.[/success]")
-            console.print("[dim]Press any key to continue...[/dim]")
-            readchar.readkey()
-        return
-    _edit_provider_credentials(meta)
+        idx = arrow_select(sub_items, title=f"{meta['icon']} {meta['name']}", banner=_make_banner_panel())
+        if idx is None:
+            return
+        action = sub_items[idx].value
+        if action == "back":
+            return
+        if action == "view":
+            _view_provider_credentials(meta)
+        elif action == "edit":
+            _edit_provider_credentials(meta)
+        elif action == "clear":
+            if confirm_prompt(f"Clear stored {meta['name']} credentials?"):
+                C.save_credentials({env_key: None for env_key, _, _ in meta["fields"]})
+                console.print(f"[success]Cleared {meta['name']} credentials.[/success]")
+                console.print("[dim]Press any key to continue...[/dim]")
+                readchar.readkey()
+        # loop back to the sub-menu after any action
 
 
 def credentials_menu() -> None:
