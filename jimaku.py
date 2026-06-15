@@ -110,6 +110,11 @@ def search_and_download(torrent_name: str) -> Optional[str]:
 
     from ui.selector import SelectItem, arrow_select  # local: avoid UI coupling at import
 
+    console.print(
+        "[dim]Note: Jimaku lists community anime fansubs by series (mostly "
+        "Japanese/English) — you pick the file/episode manually, and the "
+        "comma-separated language option doesn't apply here.[/dim]"
+    )
     query = _clean_title(torrent_name)
     console.print(f"[info]Searching Jimaku for:[/info] [highlight]{query}[/highlight]")
 
