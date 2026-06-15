@@ -1,6 +1,7 @@
 """Subtitle downloading module using subliminal."""
 
 import os
+import re
 import warnings
 from typing import Optional
 
@@ -9,8 +10,18 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from babelfish import Language
 from subliminal import Video, download_best_subtitles, save_subtitles, scan_video
+from subliminal.cache import region as _subliminal_region
 
 from constants import console, get_download_dir
+
+# subliminal caches provider auth tokens (e.g. the OpenSubtitles.com session) in
+# a dogpile cache region that must be configured before use. As a library (not
+# the subliminal CLI) we configure it ourselves; otherwise downloads fail with
+# RegionNotConfigured. A per-process memory backend is enough for a CLI run.
+try:
+    _subliminal_region.configure("dogpile.cache.memory")
+except Exception:
+    pass  # already configured
 from credentials import opensubtitles_config, addic7ed_config
 
 # Curated provider set. subliminal ships ~12 providers; most are dead weight —
@@ -20,28 +31,105 @@ from credentials import opensubtitles_config, addic7ed_config
 SUBTITLE_PROVIDERS = ["opensubtitlescom", "addic7ed", "podnapisi", "tvsubtitles"]
 
 
-def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> Optional[str]:
-    """Search and download subtitles for a torrent.
+def _lang_label(language) -> str:
+    """Human-friendly language label, e.g. 'Portuguese (BR)' or 'English'."""
+    name = getattr(language, "name", str(language))
+    country = getattr(language, "country", None)
+    if country is not None:
+        return f"{name} ({country.alpha2})"
+    return name
 
-    ``video_path`` — when a matching video file has already been downloaded,
-    pass its path so subliminal can hash-match against the real file
-    (frame-accurate sync) instead of guessing from the release name alone.
+
+def _parse_one_language(token: str):
+    """Parse a single language token into a babelfish Language, or None.
+
+    Accepts alpha-3 (``eng``), alpha-2 (``en``), IETF region variants
+    (``pt-BR``), and OpenSubtitles codes (``pob`` = Brazilian Portuguese).
+    """
+    t = token.strip()
+    if not t:
+        return None
+    # IETF / region variant first (pt-BR, pt_BR) so the country is preserved.
+    if "-" in t or "_" in t:
+        try:
+            return Language.fromietf(t.replace("_", "-"))
+        except Exception:
+            pass
+    low = t.lower()
+    for parse in (
+        lambda: Language(low),                    # alpha-3: eng, por
+        lambda: Language.fromalpha2(low),         # alpha-2: en, pt
+        lambda: Language.fromopensubtitles(low),  # pob -> pt-BR
+        lambda: Language.fromname(t.title()),     # "portuguese"
+    ):
+        try:
+            return parse()
+        except Exception:
+            continue
+    return None
+
+
+def _parse_languages(raw: str):
+    """Parse a comma/space separated string into ordered, de-duped Languages.
+
+    Returns ``(languages, unknown_tokens)``, preserving the user's order since
+    the first language becomes the primary subtitle track.
+    """
+    tokens = [t for t in re.split(r"[,\s]+", raw.strip()) if t]
+    languages, unknown, seen = [], [], set()
+    for tok in tokens:
+        lang = _parse_one_language(tok)
+        if lang is None:
+            unknown.append(tok)
+            continue
+        key = (lang.alpha3, getattr(lang, "country", None))
+        if key not in seen:
+            seen.add(key)
+            languages.append(lang)
+    return languages, unknown
+
+
+def _saved_path_for(subtitle, video, dl_dir: str):
+    """Reconstruct the on-disk path that ``save_subtitles`` wrote, mirroring
+    its naming (``<video>.<lang>.<ext>``) so we can return real file paths."""
+    try:
+        rel = subtitle.get_path(video, language_format="alpha2")
+        return os.path.join(dl_dir, os.path.basename(rel))
+    except Exception:
+        return None
+
+
+def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> list[str]:
+    """Search and download subtitles, optionally in several languages.
+
+    The user may enter multiple language codes separated by commas; every
+    available one is downloaded and the saved paths are returned in the user's
+    priority order (first = primary track). ``video_path`` — when the matching
+    video has already been downloaded, hash-match the real file for accurate
+    sync instead of guessing from the release name.
     """
     console.print(f"\n[info]Subtitle Search for:[/info] [highlight]{torrent_name}[/highlight]")
+    console.print(
+        "[dim]Tip: enter one or more languages separated by commas (e.g. eng, por "
+        "or pt-BR). The first found becomes the primary track.[/dim]"
+    )
 
-    # Prompt for language
+    # Prompt for one or more languages.
     while True:
-        lang_input = console.input("[info]Enter language code (e.g. eng, spa, por) [default: eng]: [/info]").strip().lower()
-        if not lang_input:
-            lang_input = "eng"
-
-        try:
-            language = Language(lang_input)
+        raw = console.input("[info]Language code(s) [default: eng]: [/info]").strip()
+        if not raw:
+            languages, unknown = [Language("eng")], []
             break
-        except ValueError:
-            console.print(f"[warning]Invalid language code '{lang_input}'. Please try again.[/warning]")
+        languages, unknown = _parse_languages(raw)
+        if languages:
+            break
+        console.print("[warning]No valid language codes recognised. Try e.g. eng, por, pt-BR.[/warning]")
 
-    console.print(f"[info]Searching subtitles for {language.name}...[/info]")
+    if unknown:
+        console.print(f"[warning]Ignored unrecognised code(s): {', '.join(unknown)}[/warning]")
+
+    label_list = ", ".join(_lang_label(l) for l in languages)
+    console.print(f"[info]Searching subtitles for:[/info] [highlight]{label_list}[/highlight]")
 
     # Per-provider credentials (if configured) unlock the best sources; without
     # them those providers still run anonymously with tighter limits.
@@ -62,9 +150,11 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> O
         # Prefer hashing the real downloaded file — this lets OpenSubtitles match
         # the exact release for accurate timing. Fall back to parsing the name.
         video = None
+        hash_matched = False
         if video_path and os.path.isfile(video_path):
             try:
                 video = scan_video(video_path)
+                hash_matched = True
                 console.print(
                     f"[dim]Matching against downloaded file "
                     f"[/dim][highlight]{os.path.basename(video_path)}[/highlight] "
@@ -77,38 +167,63 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> O
             # subliminal treat the string as a standard video filename.
             video = Video.fromname(f"{torrent_name}.mkv")
 
-        with console.status(f"[bold cyan]Downloading {language.name} subtitles for '[highlight]{torrent_name}[/highlight]'...[/bold cyan]", spinner="dots"):
-            # Download best subtitles for the given languages
+        with console.status(f"[bold cyan]Downloading subtitles for '[highlight]{torrent_name}[/highlight]'...[/bold cyan]", spinner="dots"):
+            # subliminal downloads the best subtitle per requested language.
             best_subtitles = download_best_subtitles(
-                [video], {language},
+                [video], set(languages),
                 providers=SUBTITLE_PROVIDERS,
                 provider_configs=provider_configs,
             )
 
-        subs = best_subtitles.get(video, [])
-        if not subs:
-            console.print("[warning]No subtitles found matching that release.[/warning]")
-            return None
-            
+        found = best_subtitles.get(video, [])
+
         dl_dir = get_download_dir()
         os.makedirs(dl_dir, exist_ok=True)
+        # Normalise to UTF-8 so accented characters (e.g. Portuguese ç/ã/é)
+        # render correctly in players instead of as mojibake from the
+        # subtitle's original latin-1/cp1252 encoding.
+        saved = save_subtitles(video, found, directory=dl_dir, encoding="utf-8")
 
-        # Temporarily change directory so save_subtitles dumps it in dl_dir
-        original_cwd = os.getcwd()
-        os.chdir(dl_dir)
+        # Map each saved subtitle's language -> path.
+        saved_by_key = {}
+        for sub in saved:
+            p = _saved_path_for(sub, video, dl_dir)
+            if p:
+                saved_by_key[(sub.language.alpha3, getattr(sub.language, "country", None))] = p
 
-        saved_paths = save_subtitles(video, subs)
-        os.chdir(original_cwd)
+        # Report per requested language (in priority order) and collect the
+        # primary-first list of paths. A generic request (e.g. ``por``) matches
+        # any country of that language.
+        ordered_paths: list[str] = []
+        for lang in languages:
+            match = None
+            want_country = getattr(lang, "country", None)
+            for (a3, country), p in saved_by_key.items():
+                if a3 == lang.alpha3 and (want_country is None or country == want_country):
+                    match = p
+                    break
+            if match:
+                if match not in ordered_paths:
+                    ordered_paths.append(match)
+                console.print(f"[success]✓ {_lang_label(lang)} — {os.path.basename(match)}[/success]")
+            else:
+                console.print(f"[warning]✗ {_lang_label(lang)} — no subtitle found.[/warning]")
 
-        if saved_paths:
-            console.print(f"\n[success]Subtitles downloaded successfully to {dl_dir}![/success]")
-            return str(saved_paths[0])
-            
+        if not ordered_paths:
+            console.print("[warning]No subtitles found matching that release.[/warning]")
+            # Only meaningful when we matched by name — with a hashed file there's
+            # nothing better to fall back to.
+            if not hash_matched:
+                console.print(
+                    "[dim]Tip: searched by release name. If you've downloaded the "
+                    "video, search again to match by file hash — more reliable, "
+                    "especially for non-English titles.[/dim]"
+                )
+            return []
+
+        console.print(f"\n[success]Saved to {dl_dir}.[/success]")
+        return ordered_paths
+
     except Exception as e:
         console.print(f"\n[error]Subtitle download failed: {e}[/error]")
-        try:
-            os.chdir(original_cwd)
-        except Exception:
-            pass
-            
-    return None
+        return []

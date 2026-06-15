@@ -763,13 +763,20 @@ def download_method_prompt(
     if show_subtitles:
         import os as _os
         mode = (sub_choice or {}).get("mode", "auto")
-        path = (sub_choice or {}).get("path")
+        paths = (sub_choice or {}).get("paths")
+        if not paths:
+            _single = (sub_choice or {}).get("path")
+            paths = [_single] if _single else []
         if mode == "auto":
             sub_label = "auto-detect from torrent"
         elif mode == "off":
             sub_label = "disabled"
+        elif not paths:
+            sub_label = "file: ?"
+        elif len(paths) == 1:
+            sub_label = f"file: {_os.path.basename(paths[0])}"
         else:
-            sub_label = f"file: {_os.path.basename(path) if path else '?'}"
+            sub_label = f"{len(paths)} tracks: {_os.path.basename(paths[0])} +{len(paths) - 1}"
         items.append(_section("Subtitles (for streaming)"))
         items.append(SelectItem(
             label=f"📝 Source: {sub_label}",
