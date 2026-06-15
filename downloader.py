@@ -735,7 +735,9 @@ def _resolve_subs_for_session(
 
     Modes (via ``sub_choice``):
       * ``"off"`` — no subs.
-      * ``"external"`` — pin ``sub_choice["path"]`` to every video index.
+      * ``"external"`` — pin the chosen subtitle(s) to every video index.
+        Accepts ``sub_choice["paths"]`` (ordered list; first = primary track)
+        or the legacy single ``sub_choice["path"]``.
       * ``"auto"`` (default) — scan ``file_list`` for sub files paired with each
         video (by basename / language tag / sibling-folder + ep number),
         batch-fetch them with aria2c, and map by video index.
@@ -746,21 +748,26 @@ def _resolve_subs_for_session(
     from torrent_meta import match_subtitles_for, video_files as _vids
 
     mode = (sub_choice or {}).get("mode", "auto")
-    external_path = (sub_choice or {}).get("path")
 
     if mode == "off":
         return {}
 
     if mode == "external":
-        if not external_path or not os.path.exists(external_path):
+        raw_paths = (sub_choice or {}).get("paths")
+        if not raw_paths:
+            single = (sub_choice or {}).get("path")
+            raw_paths = [single] if single else []
+        # Keep order (primary first); VLC takes the first as --sub-file and the
+        # rest as input-slaves, so the user can switch tracks in VLC.
+        abs_paths = [os.path.abspath(p) for p in raw_paths if p and os.path.exists(p)]
+        if not abs_paths:
             console.print(
                 "[warning] External subtitle path missing or not found — streaming without subs.[/warning]"
             )
             return {}
-        abs_path = os.path.abspath(external_path)
         if file_list:
-            return {f.index: [abs_path] for f in _vids(file_list)}
-        return {-1: [abs_path]}  # single-file / no metadata: use sentinel index
+            return {f.index: list(abs_paths) for f in _vids(file_list)}
+        return {-1: list(abs_paths)}  # single-file / no metadata: use sentinel index
 
     # auto-detect from torrent
     if not file_list:

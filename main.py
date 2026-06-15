@@ -462,32 +462,49 @@ def _main_loop() -> None:
                     break
                 elif method == "s":
                     import os as _os
-                    sub_path = None
+                    from jimaku import is_subtitle_file
+                    sub_paths: list[str] = []
                     # Anime: try Jimaku first (best anime coverage) when a key is
                     # configured; it returns None to fall through to subliminal.
                     if getattr(provider, "slug", "") == "anime":
                         from jimaku import search_and_download
-                        sub_path = search_and_download(session.name)
-                    if not sub_path:
+                        jp = search_and_download(session.name)
+                        if jp:
+                            sub_paths = [jp]
+                    if not sub_paths:
                         from subtitles import download_subtitles
                         video_path = _locate_downloaded_video(session.name)
-                        sub_path = download_subtitles(session.name, video_path=video_path)
+                        sub_paths = download_subtitles(session.name, video_path=video_path)
                     record_method_complete("subtitles")
-                    if sub_path and _os.path.exists(sub_path):
-                        from jimaku import is_subtitle_file
-                        if is_subtitle_file(sub_path):
-                            session.set_sub_choice({"mode": "external", "path": _os.path.abspath(sub_path)})
+                    # Attach only real subtitle files (skip e.g. a Jimaku .zip) to
+                    # the next stream as selectable VLC tracks (first = primary).
+                    attachable = [
+                        _os.path.abspath(p) for p in (sub_paths or [])
+                        if p and _os.path.exists(p) and is_subtitle_file(p)
+                    ]
+                    if attachable:
+                        session.set_sub_choice({"mode": "external", "paths": attachable})
+                        primary = _os.path.basename(attachable[0])
+                        extra = len(attachable) - 1
+                        if extra > 0:
                             console.print(
                                 f"[success]Saved. Next stream will use[/success] "
-                                f"[highlight]{_os.path.basename(sub_path)}[/highlight] "
-                                f"[success]as the subtitle source.[/success]"
+                                f"[highlight]{primary}[/highlight] "
+                                f"[success]as primary, plus {extra} more track(s).[/success]"
                             )
                         else:
                             console.print(
-                                f"[success]Saved[/success] "
-                                f"[highlight]{_os.path.basename(sub_path)}[/highlight]"
-                                f"[success].[/success]"
+                                f"[success]Saved. Next stream will use[/success] "
+                                f"[highlight]{primary}[/highlight] "
+                                f"[success]as the subtitle source.[/success]"
                             )
+                    elif sub_paths:
+                        # Downloaded but not directly attachable (e.g. a .zip).
+                        console.print(
+                            f"[success]Saved[/success] "
+                            f"[highlight]{_os.path.basename(sub_paths[0])}[/highlight]"
+                            f"[success].[/success]"
+                        )
                     console.print("\n[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
