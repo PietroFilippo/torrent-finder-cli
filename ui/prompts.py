@@ -980,6 +980,278 @@ def download_method_prompt(
     return items[idx].value
 
 
+# Subtitle-provider metadata for the in-program credentials manager.
+# Each field is (env_var_name, prompt_label, is_secret).
+_CRED_PROVIDERS = [
+    {
+        "id": "opensubtitles",
+        "icon": "🎬",
+        "name": "OpenSubtitles.com",
+        "fields": [
+            ("OPENSUBTITLES_USERNAME", "Username", False),
+            ("OPENSUBTITLES_PASSWORD", "Password", True),
+            ("OPENSUBTITLES_APIKEY", "API key (optional, blank to skip)", False),
+        ],
+        "required": ["OPENSUBTITLES_USERNAME", "OPENSUBTITLES_PASSWORD"],
+        "limit": "Free accounts have a small daily download limit; VIP raises it.",
+    },
+    {
+        "id": "addic7ed",
+        "icon": "📺",
+        "name": "Addic7ed (TV series)",
+        "fields": [
+            ("ADDIC7ED_USERNAME", "Username", False),
+            ("ADDIC7ED_PASSWORD", "Password", True),
+        ],
+        "required": ["ADDIC7ED_USERNAME", "ADDIC7ED_PASSWORD"],
+        "limit": "Limits downloads per day (more with an account than anonymous).",
+    },
+    {
+        "id": "jimaku",
+        "icon": "🍙",
+        "name": "Jimaku (anime)",
+        "fields": [
+            ("JIMAKU_API_KEY", "API key", True),
+        ],
+        "required": ["JIMAKU_API_KEY"],
+        "limit": "",  # no notable daily limit
+    },
+]
+
+
+def _masked_input(prompt: str) -> str:
+    """Read a line, echoing '*' per character.
+
+    ``console.input(password=True)`` shows nothing at all (getpass), which looks
+    broken to the user. This echoes a mask so they can see input registering,
+    while keeping the secret off-screen. Raises KeyboardInterrupt on Ctrl+C.
+    """
+    console.print(prompt, end="")
+    sys.stdout.flush()
+    buf: list[str] = []
+
+    def _backspace() -> None:
+        if buf:
+            buf.pop()
+            sys.stdout.write("\b \b")
+            sys.stdout.flush()
+
+    try:
+        import msvcrt
+        while True:
+            ch = msvcrt.getwch()
+            if ch in ("\r", "\n"):
+                break
+            if ch == "\x03":
+                raise KeyboardInterrupt
+            if ch in ("\x00", "\xe0"):  # special-key prefix — consume & ignore
+                msvcrt.getwch()
+                continue
+            if ch == "\x08":  # backspace
+                _backspace()
+                continue
+            buf.append(ch)
+            sys.stdout.write("*")
+            sys.stdout.flush()
+    except ImportError:
+        import termios
+        import tty
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        try:
+            tty.setcbreak(fd)
+            while True:
+                ch = sys.stdin.read(1)
+                if ch in ("\r", "\n"):
+                    break
+                if ch == "\x03":
+                    raise KeyboardInterrupt
+                if ch in ("\x7f", "\x08"):
+                    _backspace()
+                    continue
+                buf.append(ch)
+                sys.stdout.write("*")
+                sys.stdout.flush()
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    print()
+    return "".join(buf)
+
+
+def _inline_confirm(message: str, default: bool = False) -> bool:
+    """Inline y/N confirmation printed in the current flow (no modal screen).
+
+    The caller supplies its own answer hint in ``message``.
+    """
+    try:
+        ans = console.input(f"[warning]{message}[/warning] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return False
+    if not ans:
+        return default
+    return ans in ("y", "yes")
+
+
+def _test_provider_credentials(provider_id: str, effective: dict) -> tuple[bool, str]:
+    """Verify credentials against the live provider. Returns (ok, message)."""
+    with console.status("[bold cyan]Verifying credentials…[/bold cyan]", spinner="dots"):
+        if provider_id == "opensubtitles":
+            from subtitles import test_opensubtitles
+            return test_opensubtitles(
+                effective["OPENSUBTITLES_USERNAME"],
+                effective["OPENSUBTITLES_PASSWORD"],
+                effective.get("OPENSUBTITLES_APIKEY"),
+            )
+        if provider_id == "addic7ed":
+            from subtitles import test_addic7ed
+            return test_addic7ed(
+                effective["ADDIC7ED_USERNAME"], effective["ADDIC7ED_PASSWORD"]
+            )
+        if provider_id == "jimaku":
+            from jimaku import validate_key
+            return validate_key(effective["JIMAKU_API_KEY"])
+    return False, "unknown provider"
+
+
+def _edit_provider_credentials(meta: dict) -> None:
+    """Prompt for one provider's credentials, verify, then save to the file."""
+    import credentials as C
+
+    if meta["limit"]:
+        console.print(f"[warning]⚠ {meta['limit']}[/warning]")
+    if any(C.env_overrides(k) for k in meta["required"]):
+        console.print(
+            "[warning]Note: an environment variable is set for this provider and "
+            "overrides the saved file until you unset it.[/warning]"
+        )
+    console.print("[dim]Stored in plaintext in subtitle_credentials.json (gitignored). "
+                  "Leave a field blank to keep its current value.[/dim]")
+
+    updates: dict = {}
+    for env_key, label, secret in meta["fields"]:
+        existing = C.get_credential(env_key)
+        suffix = " [current kept if blank]" if existing else ""
+        try:
+            if secret:
+                val = _masked_input(f"[info]{label}{suffix}: [/info]").strip()
+            else:
+                val = console.input(f"[info]{label}{suffix}: [/info]").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[warning]Cancelled — nothing saved.[/warning]")
+            return
+        if val:
+            updates[env_key] = val
+
+    # Nothing typed → keep existing as-is. Don't "verify" here: with everything
+    # blank the test would fall back to get_credential(), which returns the
+    # env-shadowing value and could report a misleading success for credentials
+    # the user never re-entered.
+    if not updates:
+        console.print("[dim]No changes entered — existing credentials kept, nothing saved.[/dim]")
+        console.print("[dim]Press any key to continue...[/dim]")
+        readchar.readkey()
+        return
+
+    # Effective = newly entered values, falling back to whatever is already set.
+    effective = {k: (updates.get(k) or C.get_credential(k)) for k, _, _ in meta["fields"]}
+    missing = [k for k in meta["required"] if not effective.get(k)]
+    if missing:
+        console.print("[warning]Required field(s) missing — nothing saved.[/warning]")
+        console.print("[dim]Press any key to continue...[/dim]")
+        readchar.readkey()
+        return
+
+    ok, msg = _test_provider_credentials(meta["id"], effective)
+    if ok is True:
+        console.print(f"[success]✓ Verified: {msg}[/success]")
+    elif ok is None:
+        # Couldn't verify (rate limit / network / unverifiable provider) — don't
+        # block the save, just be honest about it.
+        console.print(f"[warning]⚠ {msg}[/warning]")
+    else:  # definitively rejected
+        console.print(f"[error]✗ Verification failed: {msg}[/error]")
+        # Ask inline, right under the failure, instead of a separate modal screen.
+        if not _inline_confirm("Save these credentials anyway? — Y/Yes to save, anything else cancels:"):
+            console.print("[warning]Not saved.[/warning]")
+            console.print("[dim]Press any key to continue...[/dim]")
+            readchar.readkey()
+            return
+
+    if updates:
+        C.save_credentials(updates)
+        console.print(f"[success]Saved {meta['name']} credentials.[/success]")
+    else:
+        console.print("[dim]No changes to save.[/dim]")
+    console.print("[dim]Press any key to continue...[/dim]")
+    readchar.readkey()
+
+
+def _manage_provider_credentials(meta: dict) -> None:
+    """Per-provider sub-menu: enter/update or clear stored credentials."""
+    import credentials as C
+
+    has_file_creds = any(C.file_has(env_key) for env_key, _, _ in meta["fields"])
+    sub_items = [SelectItem(label="✏  Enter / update credentials", value="edit", is_action=True)]
+    if has_file_creds:
+        sub_items.append(SelectItem(label="🗑  Clear stored credentials", value="clear", is_action=True))
+    sub_items.append(SelectItem(label="↩  Back", value="back", is_action=True))
+
+    idx = arrow_select(sub_items, title=f"{meta['icon']} {meta['name']}", banner=_make_banner_panel())
+    if idx is None:
+        return
+    action = sub_items[idx].value
+    if action == "back":
+        return
+    if action == "clear":
+        if confirm_prompt(f"Clear stored {meta['name']} credentials?"):
+            C.save_credentials({env_key: None for env_key, _, _ in meta["fields"]})
+            console.print(f"[success]Cleared {meta['name']} credentials.[/success]")
+            console.print("[dim]Press any key to continue...[/dim]")
+            readchar.readkey()
+        return
+    _edit_provider_credentials(meta)
+
+
+def credentials_menu() -> None:
+    """Manage subtitle-provider credentials (stored in the gitignored JSON)."""
+    import credentials as C
+
+    while True:
+        items = []
+        for meta in _CRED_PROVIDERS:
+            configured = all(C.get_credential(k) for k in meta["required"])
+            sources = {C.credential_source(k) for k in meta["required"]}
+            if not configured:
+                status = "not set"
+            elif "env" in sources:
+                status = "set via environment"
+            else:
+                status = "saved"
+            # Labels/hints are rendered as literal text by the selector (no Rich
+            # markup), so keep the status plain.
+            items.append(SelectItem(
+                label=f"{meta['icon']} {meta['name']}",
+                value=meta,
+                is_action=True,
+                hint=status,
+                description=(meta["limit"] or "No notable daily limit."),
+            ))
+        items.append(SelectItem(label="↩  Back", value="__back__", is_action=True))
+
+        idx = arrow_select(
+            items,
+            title="Subtitle Credentials",
+            banner=_make_banner_panel(),
+            footer="Saved to subtitle_credentials.json (gitignored, plaintext). Env vars override the file.",
+        )
+        if idx is None:
+            return
+        choice = items[idx].value
+        if choice == "__back__":
+            return
+        _manage_provider_credentials(choice)
+
+
 def provider_select_prompt(notice: str = "") -> object | None:
     """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled.
 
@@ -1013,7 +1285,13 @@ def provider_select_prompt(notice: str = "") -> object | None:
         value="__tips__",
         is_action=True,
     )
-    items = provider_items + [separator, tips_item, info_item]
+    creds_item = SelectItem(
+        label="🔑 Subtitle credentials — for subtitle search & download",
+        value="__credentials__",
+        is_action=True,
+        description="Manage OpenSubtitles / Addic7ed / Jimaku logins used to find and download subtitles.",
+    )
+    items = provider_items + [separator, tips_item, info_item, creds_item]
     start = 0
 
     # Closure flag: set by key_action when F is pressed on a provider
@@ -1104,6 +1382,11 @@ def provider_select_prompt(notice: str = "") -> object | None:
         if items[result].value == "__network_info__":
             from security import show_security_warning
             show_security_warning(force=True)
+            start = result
+            continue
+
+        if items[result].value == "__credentials__":
+            credentials_menu()
             start = result
             continue
 
