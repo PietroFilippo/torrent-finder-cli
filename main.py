@@ -216,15 +216,8 @@ def _main_loop() -> None:
             active_name = ", ".join(active_names) if active_names else "None"
             console.print(f"[dim]Engines:[/dim] [cyan]{engine_str}[/cyan]   [dim]Filters:[/dim] [cyan]{active_name}[/cyan]")
             console.print(
-                "[bold yellow on grey23] Shift+F [/bold yellow on grey23] "
-                "[white]engines & filters[/white]   "
-                "[bold yellow on grey23] Shift+H [/bold yellow on grey23] "
-                "[white]history[/white]   "
-                "[bold yellow on grey23] Shift+S [/bold yellow on grey23] "
-                "[white]stats[/white]   "
-                "[bold yellow on grey23] Shift+T [/bold yellow on grey23] "
-                "[white]tips[/white]   "
-                "[bold]Esc[/bold] [dim]go back[/dim]"
+                "[dim]Type to search  •  [/dim][bold]Esc[/bold] "
+                "[dim]go back to providers (filters, history, stats, tips there)[/dim]"
             )
             if notice_msg:
                 console.print(notice_msg)
@@ -234,38 +227,8 @@ def _main_loop() -> None:
             except (EOFError, KeyboardInterrupt):
                 _goodbye()
                 break
-                
-            if query == "SPECIAL_FILTER":
-                filter_menu(provider)
-                clear_screen()
-                query = None
-                continue
-            elif query == "SPECIAL_HISTORY":
-                from ui.history import history_select_prompt
-                pick = history_select_prompt()
-                if pick:
-                    query, prov_name = pick
-                    from providers import get_provider
-                    hist_prov = get_provider(prov_name)
-                    if hist_prov:
-                        current_provider = hist_prov
-                else:
-                    query = None
-                clear_screen()
-                continue
-            elif query == "SPECIAL_STATS":
-                from ui.stats import stats_page
-                stats_page()
-                clear_screen()
-                query = None
-                continue
-            elif query == "SPECIAL_TIPS":
-                from ui.tips_page import tips_page
-                tips_page()
-                clear_screen()
-                query = None
-                continue
-            elif query == "GO_BACK":
+
+            if query == "GO_BACK":
                 current_provider = None
                 query = None
                 continue
@@ -353,6 +316,7 @@ def _main_loop() -> None:
                     sub_choice=session.sub_choice,
                     show_streaming=show_stream,
                     page_url=session.result.get("page_url") or None,
+                    info_source=session.result.get("source") or None,
                 )
 
                 if method in _METHOD_TRACK:
@@ -367,6 +331,13 @@ def _main_loop() -> None:
                 if method == "set_download_dir":
                     from ui.prompts import download_dir_prompt
                     download_dir_prompt()
+                    clear_screen()
+                    continue
+
+                if method == "torrent_info":
+                    clear_screen()
+                    from ui.prompts import torrent_info_screen
+                    torrent_info_screen(session.result)
                     clear_screen()
                     continue
 

@@ -19,27 +19,14 @@ from providers import PROVIDERS
 from ui.selector import SelectItem, arrow_select
 
 
-def _input_pending() -> bool:
-    """True if more input is already queued in the terminal buffer.
-
-    Used to tell a deliberate single-key shortcut apart from pasted (or
-    rapidly streamed) text that merely happens to start with the shortcut
-    letter: a paste lands as a burst of keystrokes, so the rest of the text
-    is already waiting the instant we read the first character.
-    """
-    try:
-        import msvcrt
-        return bool(msvcrt.kbhit())
-    except ImportError:
-        import select
-        try:
-            return bool(select.select([sys.stdin], [], [], 0)[0])
-        except (OSError, ValueError):
-            return False
-
-
 def get_query_with_shortcut(prompt_str: str) -> str | None:
-    """Get input from user manually, returning special actions for Shift hotkeys."""
+    """Read a search query with inline editing.
+
+    Returns the typed text, or "GO_BACK" on Esc. There are deliberately no
+    single-letter shortcuts here — a search box must be able to start with any
+    letter (including F/H/S/T). Filters, history, stats and tips live on the
+    provider screen instead.
+    """
     console.print(prompt_str, end="")
     sys.stdout.flush()
 
@@ -65,26 +52,6 @@ def get_query_with_shortcut(prompt_str: str) -> str | None:
 
     while True:
         key = readchar.readkey()
-        # A single-letter shortcut only counts when typed on its own. If text is
-        # still queued behind this key it's a paste/burst, so treat the letter as
-        # literal input instead of firing the shortcut.
-        is_shortcut_key = not buffer and not _input_pending()
-
-        if is_shortcut_key and key == "F":
-            print()
-            return "SPECIAL_FILTER"
-
-        if is_shortcut_key and key == "H":
-            print()
-            return "SPECIAL_HISTORY"
-
-        if is_shortcut_key and key == "S":
-            print()
-            return "SPECIAL_STATS"
-
-        if is_shortcut_key and key == "T":
-            print()
-            return "SPECIAL_TIPS"
 
         if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
             print()
@@ -707,6 +674,63 @@ def clear_screen() -> None:
     print_banner()
 
 
+def torrent_info_screen(result: dict) -> None:
+    """Fetch and display origin details for a torrent in a scrollable view."""
+    import textwrap
+    from torrent_info import fetch_torrent_info
+
+    with console.status("[bold cyan]Fetching torrent info…[/bold cyan]", spinner="dots"):
+        info, err = fetch_torrent_info(result)
+
+    if info is None:
+        console.print(f"[warning]{err}[/warning]")
+        console.print("[dim]Press any key to continue...[/dim]")
+        readchar.readkey()
+        return
+
+    width = max(40, console.size.width - 12)
+    rows: list[SelectItem] = []
+
+    def add(text: str = "") -> None:
+        rows.append(SelectItem(label=text, value="__line__", passive=True))
+
+    def add_wrapped(text: str, indent: str = "    ") -> None:
+        for para in text.splitlines() or [""]:
+            for line in (textwrap.wrap(para, width) or [""]):
+                add(indent + line)
+
+    def field(lbl: str, val: str) -> None:
+        if val:
+            add(f"  {lbl}: {val}")
+
+    field("Title", info.title)
+    field("Category", info.category)
+    field("Uploader", info.uploader)
+    field("Date", info.date)
+    if info.seeders or info.leechers:
+        add(f"  Seeders / Leechers: {info.seeders or '?'} / {info.leechers or '?'}")
+    field("Size", info.size)
+    field("Info hash", info.info_hash)
+    field("Embedded subs", info.embedded_subs)
+
+    if info.description:
+        add(); add("  ── Description ──")
+        add_wrapped(info.description, indent="  ")
+
+    if info.files:
+        add(); add(f"  ── Files ({len(info.files)}) ──")
+        for name, size in info.files:
+            add(f"    {name}  ({size})" if size else f"    {name}")
+
+    items = rows + [SelectItem(label="↩  Back", value="back", is_action=True)]
+    arrow_select(
+        items,
+        title=f"ℹ Torrent info — {info.source}",
+        banner=_make_banner_panel(),
+        footer="↑/↓ scroll  •  Esc / Back to return",
+    )
+
+
 def download_method_prompt(
     magnet: str = "",
     show_subtitles: bool = True,
@@ -715,12 +739,13 @@ def download_method_prompt(
     sub_choice: dict | None = None,
     show_streaming: bool = True,
     page_url: str | None = None,
+    info_source: str | None = None,
 ) -> str | None:
     """
     Prompt the user to choose a download method.
     Returns 't', 'd', 'p', 'aria', 'stream_w', 'stream_p', 's', 'pick_episodes',
-    'set_subs', 'back', or None. 'l' (copy magnet) and 'open_page' (browser)
-    are handled internally.
+    'torrent_info', 'set_subs', 'back', or None. 'l' (copy magnet) and
+    'open_page' (browser) are handled internally.
     """
     wt_available = has_webtorrent()
     pf_available = has_peerflix()
@@ -739,25 +764,37 @@ def download_method_prompt(
 
     items: list[SelectItem] = []
 
-    # --- Episode selection (only for providers that support it) ---
-    if show_episode_picker:
-        items.append(_section("File selection"))
-        ep_label = (
-            f"📂 Change selection ({n_sel} picked)"
-            if has_selection
-            else "📂 Browse torrent files… (Episode Selection, useful for animes/series)"
-        )
-        items.append(SelectItem(
-            label=ep_label,
-            value="pick_episodes",
-            is_action=True,
-            hint=("requires aria2c to fetch file list" if not aria_available else ""),
-            enabled=aria_available,
-            description=(
-                "Browse every file in the torrent and pick any subset. "
-                "Downloads grab exactly what you pick; streams auto-skip non-video files."
-            ),
-        ))
+    # --- Torrent & files ---
+    _info_available = info_source in ("Nyaa", "Apibay", "YTS")
+    if show_episode_picker or _info_available:
+        items.append(_section("Torrent & files"))
+        if show_episode_picker:
+            ep_label = (
+                f"📂 Change selection ({n_sel} picked)"
+                if has_selection
+                else "📂 Browse torrent files… (Episode Selection, useful for animes/series)"
+            )
+            items.append(SelectItem(
+                label=ep_label,
+                value="pick_episodes",
+                is_action=True,
+                hint=("requires aria2c to fetch file list" if not aria_available else ""),
+                enabled=aria_available,
+                description=(
+                    "Browse every file in the torrent and pick any subset. "
+                    "Downloads grab exactly what you pick; streams auto-skip non-video files."
+                ),
+            ))
+        if _info_available:
+            items.append(SelectItem(
+                label=f"ℹ  Torrent info (from {info_source})",
+                value="torrent_info",
+                is_action=True,
+                description=(
+                    "Fetch details from the source page: category, description, file "
+                    "list, comments, and whether subtitles are embedded in the video."
+                ),
+            ))
 
     # --- Subtitle source (for streaming) ---
     if show_subtitles:
