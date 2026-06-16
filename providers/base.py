@@ -65,31 +65,40 @@ class BaseProvider(ABC):
         return f"{self.icon} {self.name}"
 
     def _search_apibay(self, query: str) -> list[dict]:
-        """Search Apibay API for the query."""
+        """Search Apibay (The Pirate Bay) for the query.
+
+        apibay.org is reachable but slow (~20s behind Cloudflare), so instead of
+        one slow request per category we make a single ``cat=0`` (all) request
+        and filter client-side to this provider's categories. Otherwise a
+        multi-category provider would multiply that 20s by every category
+        (e.g. Games has 6 → ~2 minutes).
+        """
+        try:
+            response = requests.get(
+                API_URL,
+                params={"q": query, "cat": 0},
+                timeout=25,
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            response.raise_for_status()
+            data = response.json()
+        except (requests.RequestException, ValueError):
+            # Silently fail on network/DNS/Cloudflare blocks or malformed JSON.
+            return []
+
+        if not data or (len(data) == 1 and data[0].get("id") == "0"):
+            return []
+
+        wanted = {str(c) for c in self.categories}
         results = []
-        for cat in self.categories:
-            try:
-                response = requests.get(
-                    API_URL, params={"q": query, "cat": cat}, timeout=10
-                )
-                response.raise_for_status()
-                data = response.json()
-            except requests.RequestException:
-                # Silently fail on network/DNS/Cloudflare blocks
+        for item in data:
+            if str(item.get("category", "")) not in wanted:
                 continue
-            except ValueError:
-                # Silently fail on malformed JSON
-                continue
-
-            if not data or (len(data) == 1 and data[0].get("id") == "0"):
-                continue
-
-            for item in data:
-                item["source"] = "Apibay"
-                tid = item.get("id")
-                if tid:
-                    item["page_url"] = f"https://thepiratebay.org/description.php?id={tid}"
-            results.extend(data)
+            item["source"] = "Apibay"
+            tid = item.get("id")
+            if tid:
+                item["page_url"] = f"https://thepiratebay.org/description.php?id={tid}"
+            results.append(item)
         return results
 
     def _search_solidtorrents(self, query: str) -> list[dict]:
