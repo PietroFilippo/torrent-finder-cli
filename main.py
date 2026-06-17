@@ -192,6 +192,10 @@ def _main_loop() -> None:
     # stacking another search header below the old one.
     notice_msg = None
 
+    # In-progress query preserved across a Tab quick-action excursion, so popping
+    # into Filters/Stats/Tips and back doesn't lose what was typed.
+    pending_query = ""
+
     while True:
         if not current_provider:
             result = provider_select_prompt(notice=update_msg)
@@ -216,14 +220,15 @@ def _main_loop() -> None:
             active_name = ", ".join(active_names) if active_names else "None"
             console.print(f"[dim]Engines:[/dim] [cyan]{engine_str}[/cyan]   [dim]Filters:[/dim] [cyan]{active_name}[/cyan]")
             console.print(
-                "[dim]Type to search  •  [/dim][bold]Esc[/bold] "
-                "[dim]go back to providers (filters, history, stats, tips there)[/dim]"
+                "[dim]Type to search  •  [/dim][bold]Tab[/bold] [dim]actions "
+                "(filters, history, stats, tips)  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
             )
             if notice_msg:
                 console.print(notice_msg)
                 notice_msg = None
+            initial, pending_query = pending_query, ""
             try:
-                query = get_query_with_shortcut(f"[title] Search {provider.name}:[/title] ")
+                query = get_query_with_shortcut(f"[title] Search {provider.name}:[/title] ", initial=initial)
             except (EOFError, KeyboardInterrupt):
                 _goodbye()
                 break
@@ -231,6 +236,40 @@ def _main_loop() -> None:
             if query == "GO_BACK":
                 current_provider = None
                 query = None
+                continue
+
+            # Tab opened the quick-actions menu. Loop it so finishing or
+            # cancelling an action returns here (Esc inside an action goes back
+            # to this menu); only Esc in the menu itself drops to the prompt.
+            if isinstance(query, tuple) and query and query[0] == "ACTIONS":
+                typed = query[1]
+                from ui.prompts import quick_actions_menu
+                query = None
+                while True:
+                    action = quick_actions_menu()
+                    if action == "filter":
+                        filter_menu(provider)
+                    elif action == "history":
+                        from ui.history import history_select_prompt
+                        pick = history_select_prompt()
+                        if pick:
+                            query, prov_name = pick
+                            from providers import get_provider
+                            hist_prov = get_provider(prov_name)
+                            if hist_prov:
+                                current_provider = hist_prov
+                            break  # past search chosen → leave the menu and run it
+                    elif action == "stats":
+                        from ui.stats import stats_page
+                        stats_page()
+                    elif action == "tips":
+                        from ui.tips_page import tips_page
+                        tips_page()
+                    else:  # Back / Esc in the menu → return to the search prompt
+                        break
+                if not query:
+                    pending_query = typed
+                clear_screen()
                 continue
 
         if not query:

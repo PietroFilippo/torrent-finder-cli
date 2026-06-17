@@ -19,19 +19,20 @@ from providers import PROVIDERS
 from ui.selector import SelectItem, arrow_select
 
 
-def get_query_with_shortcut(prompt_str: str) -> str | None:
+def get_query_with_shortcut(prompt_str: str, initial: str = "") -> "str | tuple | None":
     """Read a search query with inline editing.
 
-    Returns the typed text, or "GO_BACK" on Esc. There are deliberately no
-    single-letter shortcuts here — a search box must be able to start with any
-    letter (including F/H/S/T). Filters, history, stats and tips live on the
-    provider screen instead.
+    Returns the typed text, "GO_BACK" on Esc, or ``("ACTIONS", typed)`` when Tab
+    is pressed — the caller opens the quick-actions menu and re-prompts with
+    ``initial=typed`` so the in-progress query is preserved. No single-letter
+    shortcuts here: a search box must be able to start with any letter.
     """
     console.print(prompt_str, end="")
+    buffer: list[str] = list(initial)
+    pos = len(buffer)  # cursor index within buffer; physical cursor sits `pos` cols past the prompt
+    if buffer:
+        sys.stdout.write(''.join(buffer))
     sys.stdout.flush()
-
-    buffer: list[str] = []
-    pos = 0  # cursor index within buffer; physical cursor sits `pos` cols past the prompt
 
     def repaint(prev_col: int, prev_len: int) -> None:
         """Redraw the input after an edit, then park the cursor at `pos`.
@@ -60,6 +61,10 @@ def get_query_with_shortcut(prompt_str: str) -> str | None:
         elif key == readchar.key.ESC:
             print()
             return "GO_BACK"
+
+        elif key in (readchar.key.TAB, '\t'):
+            print()
+            return ("ACTIONS", "".join(buffer))
 
         elif key == readchar.key.LEFT:
             if pos > 0:
@@ -109,6 +114,42 @@ def get_query_with_shortcut(prompt_str: str) -> str | None:
             buffer.insert(pos, key)
             pos += 1
             repaint(prev_col, prev_len)
+
+
+def quick_actions_menu() -> "str | None":
+    """Search-prompt quick actions, opened with Tab.
+
+    Returns "filter", "history", "stats", "tips", or None if cancelled. The
+    familiar F/H/S/T letters jump straight to each action; arrows + Enter also
+    work. Lives behind Tab so it never clashes with typing a query.
+    """
+    items = [
+        SelectItem(label="🔍 Filters & engines", value="filter", is_action=True, hint="F"),
+        SelectItem(label="🕑 Search history", value="history", is_action=True, hint="H"),
+        SelectItem(label="📊 Usage stats", value="stats", is_action=True, hint="S"),
+        SelectItem(label="💡 Tips & shortcuts", value="tips", is_action=True, hint="T"),
+        SelectItem(label="↩  Back", value=None, is_action=True),
+    ]
+
+    def _pick(index: int):
+        return lambda cursor, items_list: index
+
+    key_actions = {
+        "F": _pick(0), "f": _pick(0),
+        "H": _pick(1), "h": _pick(1),
+        "S": _pick(2), "s": _pick(2),
+        "T": _pick(3), "t": _pick(3),
+    }
+    idx = arrow_select(
+        items,
+        title="Quick actions",
+        banner=_make_banner_panel(),
+        footer="↑/↓ select  •  F / H / S / T jump  •  Esc back",
+        key_actions=key_actions,
+    )
+    if idx is None:
+        return None
+    return items[idx].value
 
 
 def filter_menu(provider) -> None:

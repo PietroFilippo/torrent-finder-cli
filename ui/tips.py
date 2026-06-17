@@ -38,7 +38,8 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
         "Search & Navigation",
         (
             Tip("For best results, search using the complete release name.", ("search", "query")),
-            Tip("The search prompt has no letter shortcuts, so a query can start with any letter (even F, H, S, or T).", ("search", "navigation", "query")),
+            Tip("The search prompt has no single-letter shortcuts, so a query can start with any letter (even F, H, S, or T).", ("search", "navigation", "query")),
+            Tip("Press Tab at the search prompt for quick actions — filters, history, stats, tips — then F/H/S/T or arrows; your typed query is kept.", ("search", "actions", "hotkey")),
             Tip("Press Esc at the search prompt to go back to provider selection.", ("search", "navigation", "hotkey")),
             Tip("Is a search slow? Press Esc to cancel it instead of waiting out the engine timeouts.", ("search", "cancel", "hotkey")),
             Tip("While typing a query, Left/Right move the cursor and Home/End jump to the ends, so you can fix a typo mid-word.", ("search", "editing", "cursor")),
