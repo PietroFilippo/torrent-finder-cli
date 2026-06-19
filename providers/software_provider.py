@@ -11,9 +11,15 @@ from providers.base import BaseProvider, SearchEngine
 
 
 class SoftwareProvider(BaseProvider):
-    name = "Software"
+    # Shown as "Desktop" under the Software group; slug stays "software" so the
+    # -t flag and existing history/stats keys keep working.
+    name = "Desktop"
     slug = "software"
-    icon = "💿"
+    # 💻 (laptop) is width-2 like the sibling icons; 🖥️ (desktop) is a
+    # variation-selector emoji that Rich miscounts as width-1, so its menu row
+    # overflows by a cell and wraps. Stick to clean width-2 emoji here.
+    icon = "💻"
+    search_note = "Desktop programs for Windows, macOS & Linux."
     # The Pirate Bay "Applications" categories: 300 Applications, 301 Windows,
     # 302 Mac, 303 UNIX/Linux, 399 Other OS. (Mobile parked: 305 iOS, 306 Android.)
     categories = [300, 301, 302, 303, 399]

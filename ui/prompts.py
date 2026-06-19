@@ -15,7 +15,7 @@ from downloader import (
     has_peerflix,
     open_magnet,
 )
-from providers import PROVIDERS
+from providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
 from ui.selector import SelectItem, arrow_select
 
 
@@ -1442,6 +1442,56 @@ def credentials_menu() -> None:
         _manage_provider_credentials(choice)
 
 
+def _provider_group_menu(group) -> object | None:
+    """Submenu for a provider group (e.g. Software → Desktop / Mobile / RuTracker).
+
+    Returns the chosen child provider, or None to go back to the provider list.
+    Mirrors the main screen: F opens a child's filter menu, Esc/Back returns None.
+    """
+    items = [
+        SelectItem(label=p.label, value=p, description=getattr(p, "search_note", ""))
+        for p in group.children
+    ]
+    items.append(SelectItem(label="↩  Back", value="__back__", is_action=True))
+
+    _filter_request = {"target": None}
+
+    def _handle_f(cursor, items_list):
+        target = items_list[cursor].value
+        if isinstance(target, str):
+            return True  # the Back row — no filters
+        _filter_request["target"] = target
+        return cursor
+
+    start = 0
+    while True:
+        _filter_request["target"] = None
+        result = arrow_select(
+            items,
+            title=f"{group.icon} {group.name} — choose a source",
+            footer=(
+                "↑/↓ navigate  •  Enter select  •  "
+                "[bold yellow]F[/bold yellow] filters  •  Esc back"
+            ),
+            banner=_make_banner_panel(),
+            start_index=start,
+            key_actions={"F": _handle_f, "f": _handle_f},
+        )
+
+        if result is None:
+            return None
+
+        if _filter_request["target"] is not None:
+            filter_menu(_filter_request["target"])
+            start = result
+            continue
+
+        chosen = items[result].value
+        if chosen == "__back__":
+            return None
+        return chosen
+
+
 def provider_select_prompt(notice: str = "") -> object | None:
     """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled.
 
@@ -1460,7 +1510,7 @@ def provider_select_prompt(notice: str = "") -> object | None:
     """
     provider_items = [
         SelectItem(label=p.label, value=p, description=getattr(p, "search_note", ""))
-        for p in PROVIDERS
+        for p in PROVIDER_MENU
     ]
     separator = SelectItem(
         label="───────────────────",
@@ -1492,8 +1542,9 @@ def provider_select_prompt(notice: str = "") -> object | None:
 
     def _handle_f(cursor, items_list):
         target = items_list[cursor].value
-        if isinstance(target, str):
-            # Non-provider row (separator, network info) — silently ignore
+        if isinstance(target, (str, ProviderGroup)):
+            # Non-provider row (separator, network info) or a group (no filters
+            # of its own — drill in with Enter instead) — silently ignore.
             return True  # stay in menu, no flicker
         _filter_request["target"] = target
         return cursor  # exit menu to open filter_menu outside
@@ -1582,6 +1633,15 @@ def provider_select_prompt(notice: str = "") -> object | None:
             credentials_menu()
             start = result
             continue
+
+        # A group row — drill into its submenu. Picking a child returns it to
+        # the caller; backing out stays on the provider screen.
+        if isinstance(items[result].value, ProviderGroup):
+            chosen = _provider_group_menu(items[result].value)
+            if chosen is None:
+                start = result
+                continue
+            return chosen
 
         return items[result].value
 
