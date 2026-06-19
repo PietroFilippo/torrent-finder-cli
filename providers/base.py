@@ -48,6 +48,10 @@ class BaseProvider(ABC):
 
     default_filters: FilterConfig | None = None
     presets: list[FilterPreset] = []
+
+    # Optional one-line caveat shown when this provider is selected/searched
+    # (e.g. Mobile noting it's Android-only). Empty = no note.
+    search_note: str = ""
     
     def __init__(self):
         self.active_presets: list[FilterPreset] = []

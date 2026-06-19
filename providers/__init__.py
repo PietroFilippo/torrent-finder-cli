@@ -3,6 +3,7 @@
 from providers.anime_provider import AnimeProvider
 from providers.game_provider import GameProvider
 from providers.manga_provider import MangaProvider
+from providers.mobile_provider import MobileProvider
 from providers.movie_provider import MovieProvider
 from providers.software_provider import SoftwareProvider
 
@@ -11,6 +12,7 @@ PROVIDERS: list = [
     MovieProvider(),
     GameProvider(),
     SoftwareProvider(),
+    MobileProvider(),
     AnimeProvider(),
     MangaProvider(),
 ]

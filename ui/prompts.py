@@ -1442,7 +1442,10 @@ def provider_select_prompt(notice: str = "") -> object | None:
         - A ``("history", query, provider_obj)`` tuple when the user picks a history entry.
         - ``None`` if cancelled.
     """
-    provider_items = [SelectItem(label=p.label, value=p) for p in PROVIDERS]
+    provider_items = [
+        SelectItem(label=p.label, value=p, description=getattr(p, "search_note", ""))
+        for p in PROVIDERS
+    ]
     separator = SelectItem(
         label="───────────────────",
         value="section_header",
