@@ -4,11 +4,13 @@ from providers.anime_provider import AnimeProvider
 from providers.game_provider import GameProvider
 from providers.manga_provider import MangaProvider
 from providers.movie_provider import MovieProvider
+from providers.software_provider import SoftwareProvider
 
 # Registry of all available providers (order = display order)
 PROVIDERS: list = [
     MovieProvider(),
     GameProvider(),
+    SoftwareProvider(),
     AnimeProvider(),
     MangaProvider(),
 ]
