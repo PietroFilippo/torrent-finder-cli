@@ -1094,6 +1094,17 @@ _CRED_PROVIDERS = [
         "required": ["JIMAKU_API_KEY"],
         "limit": "",  # no notable daily limit
     },
+    {
+        "id": "rutracker",
+        "icon": "🧲",
+        "name": "RuTracker",
+        "fields": [
+            ("RUTRACKER_USERNAME", "Username", False),
+            ("RUTRACKER_PASSWORD", "Password", True),
+        ],
+        "required": ["RUTRACKER_USERNAME", "RUTRACKER_PASSWORD"],
+        "limit": "Powers the RuTracker provider (login + scrape; may break if the site changes).",
+    },
 ]
 
 
@@ -1228,6 +1239,11 @@ def _test_provider_credentials(provider_id: str, effective: dict) -> tuple[bool,
         if provider_id == "jimaku":
             from jimaku import validate_key
             return validate_key(effective["JIMAKU_API_KEY"])
+        if provider_id == "rutracker":
+            import rutracker
+            return rutracker.test_credentials(
+                effective["RUTRACKER_USERNAME"], effective["RUTRACKER_PASSWORD"]
+            )
     return False, "unknown provider"
 
 
@@ -1414,7 +1430,7 @@ def credentials_menu() -> None:
 
         idx = arrow_select(
             items,
-            title="Subtitle Credentials",
+            title="Credentials",
             banner=_make_banner_panel(),
             footer="Saved to subtitle_credentials.json (gitignored, plaintext). Env vars override the file.",
         )
@@ -1463,10 +1479,10 @@ def provider_select_prompt(notice: str = "") -> object | None:
         is_action=True,
     )
     creds_item = SelectItem(
-        label="🔑 Subtitle credentials — for subtitle search & download",
+        label="🔑 Credentials — subtitle providers & RuTracker login",
         value="__credentials__",
         is_action=True,
-        description="Manage OpenSubtitles / Addic7ed / Jimaku logins used to find and download subtitles.",
+        description="Manage OpenSubtitles / Addic7ed / Jimaku subtitle logins and the RuTracker account.",
     )
     items = provider_items + [separator, tips_item, info_item, creds_item]
     start = 0

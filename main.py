@@ -143,7 +143,7 @@ def _locate_downloaded_video(torrent_name: str) -> str | None:
 def _main_loop() -> None:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
-    parser.add_argument("-t", "--type", type=str, choices=["movie", "game", "software", "mobile", "anime", "manga"], help="Search type (default: movie if used with -q)")
+    parser.add_argument("-t", "--type", type=str, choices=["movie", "game", "software", "mobile", "rutracker", "anime", "manga"], help="Search type (default: movie if used with -q)")
     parser.add_argument("-f", "--filter", action="append", help="Include keyword in results")
     parser.add_argument("-x", "--exclude", action="append", help="Exclude keyword from results")
     parser.add_argument("-y", "--skip-warning", action="store_true", help="Skip network exposure warning")
@@ -339,6 +339,21 @@ def _main_loop() -> None:
             name = selected.get("name", "Unknown")
             info_hash = selected.get("info_hash", "")
             record_torrent_picked(provider.slug, int(selected.get("seeders", 0) or 0))
+
+            # RuTracker results carry the topic id as a placeholder hash — the
+            # real magnet lives on the topic page, so resolve it on demand here.
+            if selected.get("source") == "RuTracker":
+                import rutracker
+                with console.status("[bold cyan]Fetching magnet from RuTracker…[/bold cyan]", spinner="dots"):
+                    real_hash = rutracker.resolve_info_hash(selected.get("rt_topic_id") or info_hash)
+                if not real_hash:
+                    console.print("[error] Couldn't get the magnet from RuTracker (login expired or topic unavailable).[/error]")
+                    console.print("[dim]Press any key to continue...[/dim]")
+                    readchar.readkey()
+                    clear_screen()
+                    continue
+                info_hash = real_hash
+                selected["info_hash"] = real_hash
 
             # Download method selection
             magnet = build_magnet(info_hash, name)

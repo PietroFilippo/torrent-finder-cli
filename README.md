@@ -6,7 +6,7 @@ On Windows, the included `torrent.bat` launcher can be added to your `PATH` so y
 
 ## Features
 
-- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. The Software provider covers desktop programs (Windows/macOS/Linux) via The Pirate Bay's Applications categories plus SolidTorrents.
+- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Mobile, RuTracker, Anime, Manga), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. The Software provider covers desktop programs (Windows/macOS/Linux) via The Pirate Bay's Applications categories plus SolidTorrents; the Mobile provider covers Android apps (APK/MOD/OBB) — it's Android-only and says so when you search. The RuTracker provider logs into [rutracker.org](https://rutracker.org) and searches it directly (great for software, audio, and rare content) — it needs an account, set under the credentials menu, and stays dormant until one is configured.
 - **Multi-Engine Fan-Out:** Each provider queries several sources in parallel (e.g. Apibay + SolidTorrents + YTS + Nyaa live-action for Movies & Series, Nyaa for Anime, Nyaa Literature + Apibay Comics for Manga) and merges results, deduplicating by info hash and sorting by seeders.
 - **Arrow-Key Driven UI:** Fully interactive, flicker-free terminal interface.
   - Utilizes an alternate screen buffer so your scrollback history remains flawlessly clean.
@@ -82,15 +82,15 @@ brew install aria2
 sudo apt install aria2
 ```
 
-### Subtitle providers (optional, recommended)
+### Credentials (optional)
 
-Subtitle search works anonymously, but matches are far better with credentials.
+Several features improve with — or, for RuTracker, require — an account.
 Credentials are read at runtime from environment variables (preferred) or a
 gitignored `subtitle_credentials.json` next to the code — **never commit real
 values**.
 
 The easiest way to set them is in-program: on the **Select Provider** screen,
-choose **🔑 Subtitle credentials**. For each provider you can view, enter/update,
+choose **🔑 Credentials**. For each provider you can view, enter/update,
 or clear its login. Entering opens a single-screen form — edit every field in
 place (Up/Down or Tab to move, Enter to advance, **Esc** to cancel) and Save
 when done. Saved values are verified against the provider (where possible) and
@@ -106,6 +106,10 @@ matching environment variables to remove a credential that's set there.
 - **Jimaku** (anime): a free API key (jimaku.cc → account settings) enables a
   dedicated anime subtitle lookup that runs before subliminal for Anime
   searches. Without the key, Anime falls back to subliminal automatically.
+- **RuTracker** (the RuTracker provider): a free [rutracker.org](https://rutracker.org)
+  account is **required** — the provider logs in to search and returns nothing
+  without one. This is the only credential that gates a whole provider rather
+  than just enhancing subtitle results.
 
 subliminal queries a curated set of providers — `opensubtitlescom`, `addic7ed`,
 `podnapisi`, `tvsubtitles` — chosen for broad coverage and reliability. The rest
@@ -121,6 +125,8 @@ Set them as environment variables:
 [Environment]::SetEnvironmentVariable("ADDIC7ED_USERNAME", "your_user", "User")
 [Environment]::SetEnvironmentVariable("ADDIC7ED_PASSWORD", "your_pass", "User")
 [Environment]::SetEnvironmentVariable("JIMAKU_API_KEY", "your_key", "User")
+[Environment]::SetEnvironmentVariable("RUTRACKER_USERNAME", "your_user", "User")
+[Environment]::SetEnvironmentVariable("RUTRACKER_PASSWORD", "your_pass", "User")
 ```
 
 ```bash
@@ -130,6 +136,8 @@ export OPENSUBTITLES_PASSWORD="your_pass"
 export ADDIC7ED_USERNAME="your_user"
 export ADDIC7ED_PASSWORD="your_pass"
 export JIMAKU_API_KEY="your_key"
+export RUTRACKER_USERNAME="your_user"
+export RUTRACKER_PASSWORD="your_pass"
 ```
 
 Or create `subtitle_credentials.json` (already gitignored) in the repo folder:
@@ -140,7 +148,9 @@ Or create `subtitle_credentials.json` (already gitignored) in the repo folder:
   "opensubtitles_password": "your_pass",
   "addic7ed_username": "your_user",
   "addic7ed_password": "your_pass",
-  "jimaku_api_key": "your_key"
+  "jimaku_api_key": "your_key",
+  "rutracker_username": "your_user",
+  "rutracker_password": "your_pass"
 }
 ```
 
@@ -191,11 +201,17 @@ python main.py
 # Direct search (defaults to Movies)
 torrent -q "The Matrix"
 
-# Specify the search type (movie, game, software, anime, manga). `movie` covers both films and series.
+# Specify the search type (movie, game, software, mobile, rutracker, anime, manga). `movie` covers both films and series.
 torrent -q "Elden Ring" -t game
 
 # Search desktop software (The Pirate Bay Applications + SolidTorrents)
 torrent -q "Photoshop" -t software
+
+# Search Android apps (The Pirate Bay Android category; Android-only)
+torrent -q "Spotify" -t mobile
+
+# Search RuTracker (requires a configured rutracker.org login)
+torrent -q "Photoshop" -t rutracker
 
 # Search manga (Nyaa Literature English + Apibay Comics; Raw Nyaa available as a toggle)
 torrent -q "Berserk" -t manga
@@ -251,7 +267,7 @@ The application is structured into a modular, provider-based architecture:
 
 - `main.py`: The main entry point and CLI argument parser.
 - `torrent.bat`: Windows launcher. It calls `main.py` relative to the batch file location, so adding the repo folder to `PATH` makes `torrent` usable from any directory.
-- `providers/`: Different search categories (Movies & Series, Games, Software, Anime, Manga). Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga).
+- `providers/`: Different search categories (Movies & Series, Games, Software, Mobile, RuTracker, Anime, Manga). Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga).
 - `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt`), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), `tips.py` (categorized tip catalog), and `tips_page.py` (searchable tips browser).
 - `filters.py`: Logic processing for including or excluding keywords.
 - `torrent_session.py`: Post-torrent-pick state owner. Holds the picked magnet + user file selection + sub choice, and lazily resolves `files_meta` / `targets` / `stream_indexes` / `download_indexes` / `sub_paths`. Stream adapters consume the session directly; download adapters take `(magnet, indexes)` projections and stay session-unaware.

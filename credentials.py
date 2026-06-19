@@ -24,6 +24,8 @@ _FILE_KEYS = {
     "ADDIC7ED_USERNAME": "addic7ed_username",
     "ADDIC7ED_PASSWORD": "addic7ed_password",
     "JIMAKU_API_KEY": "jimaku_api_key",
+    "RUTRACKER_USERNAME": "rutracker_username",
+    "RUTRACKER_PASSWORD": "rutracker_password",
 }
 
 _file_cache: dict | None = None
@@ -169,3 +171,12 @@ def addic7ed_config() -> dict | None:
 def jimaku_api_key() -> str | None:
     """Jimaku API key for anime subtitle lookups, or None if unset."""
     return get_credential("JIMAKU_API_KEY")
+
+
+def rutracker_config() -> dict | None:
+    """Username/password for the RuTracker provider, or None when unset."""
+    username = get_credential("RUTRACKER_USERNAME")
+    password = get_credential("RUTRACKER_PASSWORD")
+    if not username or not password:
+        return None
+    return {"username": username, "password": password}
