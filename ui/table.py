@@ -5,8 +5,10 @@ import threading
 import time
 
 import readchar
+from rich.console import Group
 from rich.live import Live
 from rich.table import Table
+from rich.text import Text
 
 from constants import RESULTS_PER_PAGE, console
 from utils import format_size, leech_style, marquee, seed_style
@@ -130,10 +132,12 @@ def interactive_select(results: list[dict]) -> int | None:
     total = len(page_items)
     global_offset = current_page * RESULTS_PER_PAGE
 
-    # Calculate how many rows fit: terminal height minus overhead
-    # (title, header, caption, border lines, prompt above/below ~ 8 lines)
+    # Rows that fit in the alternate-screen viewport (see screen=True below):
+    # terminal height minus the banner (5) + its spacer (1), the table's chrome
+    # (title, borders, header, caption ≈ 7) and a 1-line margin so the caption is
+    # never on the last row.
     term_height = console.size.height
-    overhead = 8
+    overhead = 14
     visible_count = max(3, term_height - overhead)
     visible_count = min(visible_count, total)  # Don't exceed result count
 
@@ -146,16 +150,28 @@ def interactive_select(results: list[dict]) -> int | None:
     }
     stop_event = threading.Event()
 
-    console.print()
+    # Render the app banner inside the alt-screen frame, with a 1-line spacer
+    # between it and the table (lazy import avoids a circular import).
+    from ui.prompts import _make_banner_panel
+    banner = _make_banner_panel()
 
+    def framed(tbl):
+        return Group(banner, Text(""), tbl)
+
+    # screen=True renders into the terminal's alternate-screen buffer — a fixed
+    # viewport that never scrolls. Without it, Live updates (e.g. the marquee on
+    # a long selected name) redraw on the scrolling main buffer and the bottom
+    # caption flickers in and out. The flicker-free menu selector uses the same
+    # alternate-screen trick.
     with Live(
-        build_table(
+        framed(build_table(
             page_items, current, scroll_offset, visible_count, total,
             current_page, total_pages, global_offset, tick=0,
-        ),
+        )),
         console=console,
         refresh_per_second=15,
         transient=False,
+        screen=True,
     ) as live:
 
         def ticker():
@@ -179,10 +195,10 @@ def interactive_select(results: list[dict]) -> int | None:
                 last_tick = new_tick
                 marquee_state["tick"] = new_tick
                 live.update(
-                    build_table(
+                    framed(build_table(
                         page_items, cur, scroll_offset, visible_count, total,
                         current_page, total_pages, global_offset, tick=new_tick,
-                    )
+                    ))
                 )
 
         ticker_thread = threading.Thread(target=ticker, daemon=True)
@@ -254,11 +270,11 @@ def interactive_select(results: list[dict]) -> int | None:
                     marquee_state["cursor_changed_at"] = time.monotonic()
 
                 live.update(
-                    build_table(
+                    framed(build_table(
                         page_items, current, scroll_offset, visible_count, total,
                         current_page, total_pages, global_offset,
                         tick=marquee_state["tick"],
-                    )
+                    ))
                 )
         finally:
             stop_event.set()
