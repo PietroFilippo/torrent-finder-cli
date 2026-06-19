@@ -85,7 +85,10 @@ def _build_panel(
     section is windowed around the cursor. Action buttons (Confirm/Cancel/
     Select all, etc.) always render so they can't be scrolled out of reach.
     """
-    body = Text()
+    # no_wrap keeps every logical row to exactly one terminal line, so the
+    # item-count windowing below can't be undercounted by a row that wraps
+    # (e.g. long tips in the browser, which were overflowing and cropping).
+    body = Text(no_wrap=True, overflow="ellipsis")
     has_actions = any(it.is_action for it in items)
 
     # Partition into [leading actions … main items … trailing actions].
@@ -100,10 +103,13 @@ def _build_panel(
         main_end -= 1
     main_len = main_end - main_start
 
-    # Reserve chrome: banner (~4) + panel borders (4) + padding (2) + footer (2)
-    # + description line (2) + action rows at top/bottom of the list.
-    chrome = 14 + main_start + (n - main_end)
-    max_visible = max(6, console.size.height - chrome)
+    # Reserve chrome so the banner + panel never overflow the alt-screen and
+    # crop. Every row is one line (body is no_wrap), so this is a fixed cost:
+    # banner panel + blank (6), panel borders + padding (4), the
+    # "… more above/below" indicators (2), the body footer block (blank +
+    # description + footer ~4), plus a couple of lines of bottom margin.
+    chrome = 18 + main_start + (n - main_end)
+    max_visible = max(4, console.size.height - chrome)
 
     win_start_rel, win_end_rel = _compute_window(main_len, cursor - main_start, max_visible)
     win_start = main_start + win_start_rel
@@ -172,11 +178,17 @@ def _build_panel(
         if item.marker:
             body.append(f"{item.marker} ", style="bold yellow")
 
-        # Marquee the cursor item's label when it overflows the panel.
+        # Keep every list row to a single line so the windowing stays accurate.
+        # The cursor row marquees its full label; other rows crop with an
+        # ellipsis. Without this, long labels (e.g. the tips browser) wrap to
+        # multiple lines and the panel overflows the alt-screen and gets cropped.
         label_text = item.label
-        if is_cursor and not is_section_header:
+        if not is_section_header:
             avail = _label_avail_width(item, multi)
-            label_text = marquee(item.label, avail, tick)
+            if is_cursor:
+                label_text = marquee(item.label, avail, tick)
+            elif len(item.label) > avail:
+                label_text = item.label[: max(1, avail - 1)] + "…"
         body.append(label_text, style=style)
 
         # Show hint if present
