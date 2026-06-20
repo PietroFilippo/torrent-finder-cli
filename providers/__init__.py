@@ -7,6 +7,7 @@ from providers.game_provider import GameProvider
 from providers.manga_provider import MangaProvider
 from providers.mobile_provider import MobileProvider
 from providers.movie_provider import MovieProvider
+from providers.online_fix_provider import OnlineFixProvider
 from providers.rutracker_provider import RuTrackerProvider
 from providers.software_provider import SoftwareProvider
 
@@ -14,6 +15,7 @@ from providers.software_provider import SoftwareProvider
 # under a group without changing the flat registry below.
 _movie = MovieProvider()
 _game = GameProvider()
+_online_fix = OnlineFixProvider()
 _desktop = SoftwareProvider()
 _mobile = MobileProvider()
 _rutracker = RuTrackerProvider()
@@ -26,6 +28,7 @@ _manga = MangaProvider()
 PROVIDERS: list = [
     _movie,
     _game,
+    _online_fix,
     _desktop,
     _mobile,
     _rutracker,
@@ -66,6 +69,7 @@ SOFTWARE_GROUP = ProviderGroup(
 PROVIDER_MENU: list = [
     _movie,
     _game,
+    _online_fix,
     SOFTWARE_GROUP,
     _anime,
     _manga,
