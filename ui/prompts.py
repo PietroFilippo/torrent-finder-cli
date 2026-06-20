@@ -855,15 +855,22 @@ def download_method_prompt(
             sub_label = f"file: {_os.path.basename(paths[0])}"
         else:
             sub_label = f"{len(paths)} tracks: {_os.path.basename(paths[0])} +{len(paths) - 1}"
-        items.append(_section("Subtitles (for streaming)"))
+        items.append(_section("Subtitles"))
         items.append(SelectItem(
             label=f"📝 Source: {sub_label}",
             value="set_subs",
             is_action=True,
             description=(
-                "Choose how VLC gets subtitles: auto-detect inside the torrent, "
-                "use an external .srt/.ass file, or disable subtitles."
+                "Choose how VLC gets subtitles when streaming: auto-detect inside "
+                "the torrent, use an external .srt/.ass file, or disable subtitles."
             ),
+        ))
+        # Co-located with Source: searching downloads a .srt and auto-promotes it
+        # to external source-mode, so the two subtitle rows belong together.
+        items.append(SelectItem(
+            label="📝 Search & download subtitles",
+            value="s",
+            description="Find a matching .srt via OpenSubtitles and save it next to the video",
         ))
 
     # --- Stream to VLC (hidden for non-video providers, e.g. Manga) ---
@@ -964,12 +971,9 @@ def download_method_prompt(
             hint=_page_domain,
             description=f"Open this torrent's page on its source site in your browser.\n{page_url}",
         ))
-    if show_subtitles:
-        items.append(SelectItem(
-            label="📝 Search & download subtitles",
-            value="s",
-            description="Find a matching .srt via OpenSubtitles and save it next to the video",
-        ))
+
+    # --- Settings (persistent across runs, unlike the one-shot actions above) ---
+    items.append(_section("Settings"))
 
     # Persistent download-folder override. Applies to aria2/webtorrent/peerflix
     # downloads + subtitle saves (not streams, not magnet handoff).
