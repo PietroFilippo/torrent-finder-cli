@@ -331,6 +331,23 @@ def open_magnet(magnet_link: str) -> None:
         console.print(f"[info]Magnet link:[/info] {magnet_link}")
 
 
+def open_torrent_file(path: str) -> bool:
+    """Open a ``.torrent`` file with the system default torrent client. Returns
+    True on success (used by the Online-Fix flow, which downloads a .torrent and
+    hands it off rather than building a magnet)."""
+    system = platform.system()
+    try:
+        if system == "Windows":
+            os.startfile(path)  # type: ignore[attr-defined]
+        elif system == "Darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+        return True
+    except Exception:
+        return False
+
+
 def has_peerflix() -> bool:
     """Check if peerflix is installed."""
     return shutil.which("peerflix") is not None

@@ -1,13 +1,13 @@
 """Online-Fix provider — credentialed search of online-fix.me (login + scrape).
 
-Games bundled with online / co-op cracks. Searching is public (no login); a free
-online-fix.me account is only needed to download, so ``search_note`` flags that
-and points the user at the credentials menu.
+Games bundled with online / co-op cracks. Both search and download work without
+an account: the post page is public and the file host is referer-gated, not
+login-gated.
 
 Results carry the post id as a placeholder ``info_hash`` — there is no public
-magnet, so selecting a result resolves the authenticated ``.torrent`` from the
-post page instead of building a magnet (see ``online_fix.resolve_torrent`` and
-main.py's Online-Fix branch). In-terminal download is a later phase.
+magnet, so selecting a result downloads the ``.torrent`` (resolved from the post
+page) and hands it to the system torrent client rather than building a magnet
+(see ``online_fix.fetch_torrent_for`` and main.py's Online-Fix branch).
 """
 
 import online_fix
@@ -19,7 +19,7 @@ class OnlineFixProvider(BaseProvider):
     slug = "online-fix"
     icon = "🔧"
     categories = []  # not Apibay-based; the engine talks to online-fix.me directly
-    search_note = "Co-op / online game cracks from online-fix.me. Search is open; downloading needs a free account (add it under the credentials menu)."
+    search_note = "Co-op / online game cracks from online-fix.me — no account needed; a pick downloads the .torrent and opens it in your torrent client."
 
     # Games behind a private tracker — no public swarm, so none of the video/
     # magnet-centric features apply.

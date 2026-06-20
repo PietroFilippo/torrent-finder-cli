@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 from constants import console
 import readchar
-from downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, stream_with_peerflix, stream_with_webtorrent
+from downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, open_torrent_file, stream_with_peerflix, stream_with_webtorrent
 from filters import FilterConfig
 from providers import PROVIDERS, get_provider
 from security import show_security_warning
@@ -140,40 +140,48 @@ def _locate_downloaded_video(torrent_name: str) -> str | None:
     return best if best_score >= 2 else None
 
 
-def _show_online_fix_pick(selected: dict) -> None:
-    """Show a picked Online-Fix result.
+def _online_fix_pick(selected: dict) -> None:
+    """Handle a picked Online-Fix result: fetch its ``.torrent`` and hand it to
+    the system torrent client.
 
-    Online-Fix games have no public magnet (they live on online-fix's own private
-    tracker as .torrent files), so a pick can't enter the magnet download menu
-    yet. Resolve the authenticated .torrent URL and show it alongside the archive
-    password — the read side of the bridge the download phase will build on.
+    Online-Fix has no public magnet (games are distributed as .torrent files), so
+    it can't use the magnet download menu. The post page is public and the file
+    host is referer-gated (no login), so we download the .torrent into the user's
+    download folder and open it in their client. On failure we show the page URL
+    so they can grab it manually.
     """
     import online_fix
+    from constants import get_download_dir
     from rich.panel import Panel
 
     name = selected.get("name", "Unknown")
     page_url = selected.get("page_url") or selected.get("of_post_url") or ""
-    with console.status("[bold cyan]Resolving .torrent from online-fix.me…[/bold cyan]", spinner="dots"):
-        torrent_url = online_fix.resolve_torrent(page_url)
+    with console.status("[bold cyan]Fetching .torrent from online-fix.me…[/bold cyan]", spinner="dots"):
+        path = online_fix.fetch_torrent_for(page_url, get_download_dir())
 
-    lines = [f"[bold]{name}[/bold]\n"]
-    if page_url:
-        lines.append(f"[cyan]Page:[/cyan]             {page_url}")
-    if torrent_url:
-        lines.append(f"[cyan]Torrent:[/cyan]          {torrent_url}")
-    else:
-        lines.append("[warning]Torrent:[/warning]          couldn't resolve "
-                     "(login expired or post layout changed).")
-    lines.append(f"[cyan]Archive password:[/cyan] {online_fix.ARCHIVE_PASSWORD}")
-    lines.append("\n[dim]The file host is auth-gated separately — open the Page (or Torrent "
-                 "link) in a browser logged into online-fix.me. In-terminal download is a "
-                 "later phase.[/dim]")
+    if not path:
+        console.print(Panel(
+            f"[bold]{name}[/bold]\n\n"
+            "[warning]Couldn't fetch the .torrent automatically[/warning] "
+            "(post layout changed or host blocked).\n"
+            f"[cyan]Open the page and grab it manually:[/cyan]\n{page_url}",
+            title="🔧 Online-Fix", border_style="yellow", padding=(1, 2),
+        ))
+        console.print("[dim]Press any key to continue...[/dim]")
+        readchar.readkey()
+        return
 
+    opened = open_torrent_file(path)
+    handoff = ("[success]✓ opened in your torrent client[/success]" if opened
+               else "[warning]saved, but couldn't auto-open — add it to your client manually[/warning]")
     console.print(Panel(
-        "\n".join(lines),
-        title="🔧 Online-Fix",
-        border_style="bright_blue",
-        padding=(1, 2),
+        f"[bold]{name}[/bold]\n\n"
+        f"[cyan].torrent saved:[/cyan]   {path}\n"
+        f"[cyan]Handed to client:[/cyan] {handoff}\n"
+        f"[cyan]Archive password:[/cyan] {online_fix.ARCHIVE_PASSWORD}\n\n"
+        "[dim]Your client downloads the game from online-fix's tracker; unpack the "
+        "archives with the password above.[/dim]",
+        title="🔧 Online-Fix", border_style="bright_blue", padding=(1, 2),
     ))
     console.print("[dim]Press any key to continue...[/dim]")
     readchar.readkey()
@@ -379,12 +387,11 @@ def _main_loop() -> None:
             info_hash = selected.get("info_hash", "")
             record_torrent_picked(provider.slug, int(selected.get("seeders", 0) or 0))
 
-            # Online-Fix has no public magnet — games sit on its private tracker
-            # as .torrent files. A pick can't enter the magnet download menu yet,
-            # so resolve the authenticated .torrent URL and show it (the bridge
-            # the download phase will build on), then return to the results.
+            # Online-Fix has no public magnet — games are distributed as .torrent
+            # files (public page, referer-gated host). Fetch the .torrent and hand
+            # it to the system client instead of the magnet menu, then return.
             if selected.get("source") == "Online-Fix":
-                _show_online_fix_pick(selected)
+                _online_fix_pick(selected)
                 clear_screen()
                 continue
 
