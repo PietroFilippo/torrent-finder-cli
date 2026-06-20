@@ -893,7 +893,18 @@ def download_method_prompt(
         ))
 
     # --- Download ---
+    # "Open in client" leads the section and is the default-focused row (see
+    # default_focus below): it's the only option that seeds and the natural
+    # primary for non-streaming providers (games/software). The terminal
+    # downloaders follow, aria2c first as the best of them.
     items.append(_section("Download"))
+    default_focus = len(items)  # index of the row the cursor should start on
+    items.append(SelectItem(
+        label=f"🧲 Open in {client_name}",
+        value="t",
+        hint=("⚠  uncheck unwanted files in the client's dialog" if has_selection else ""),
+        description="Hand magnet to your desktop client — use to seed or manage in a GUI",
+    ))
     items.append(SelectItem(
         label="⬇  aria2c",
         value="aria",
@@ -933,12 +944,6 @@ def download_method_prompt(
             "⚠ Does NOT honor file selection: peerflix always downloads the whole torrent. "
             "Use aria2c if you need strict file picking."
         ),
-    ))
-    items.append(SelectItem(
-        label=f"🧲 Open in {client_name}",
-        value="t",
-        hint=("⚠  uncheck unwanted files in the client's dialog" if has_selection else ""),
-        description="Hand magnet to your desktop client — use to seed or manage in a GUI",
     ))
 
     # --- Other ---
@@ -1050,6 +1055,7 @@ def download_method_prompt(
         title=title,
         banner=_make_banner_panel(),
         on_action=handle_download_action,
+        start_index=default_focus,  # land on "Open in client" (the primary action)
     )
 
     if idx is None:
