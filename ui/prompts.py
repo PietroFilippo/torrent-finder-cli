@@ -1593,7 +1593,7 @@ def provider_select_prompt(notice: str = "") -> object | None:
                 "[bold yellow]F[/bold yellow] filters  •  "
                 "[bold yellow]H[/bold yellow] history  •  "
                 "[bold yellow]S[/bold yellow] stats  •  "
-                "[bold yellow]T[/bold yellow] tips  •  Esc cancel\n"
+                "[bold yellow]T[/bold yellow] tips  •  Esc cancel\n\n"
                 f"   {tip_line}"
             ),
             banner=_make_banner_panel(),
@@ -1685,7 +1685,9 @@ def search_again_prompt() -> str | tuple | None:
         SelectItem(label="🔍 Search Again", value="search"),
         SelectItem(label="🔄 Change Provider", value="provider"),
         SelectItem(label="📜 Search History", value="history"),
+        SelectItem(label="📊 Usage Stats", value="stats"),
         SelectItem(label="💡 Tips & shortcuts", value="tips"),
+        SelectItem(label="🔑 Credentials", value="credentials"),
         SelectItem(label="👋 Exit", value="exit"),
     ]
 
@@ -1701,7 +1703,7 @@ def search_again_prompt() -> str | tuple | None:
             banner=_make_banner_panel(),
             start_index=start,
             footer=(
-                "↑/↓ navigate  •  Enter select  •  Esc cancel\n"
+                "↑/↓ navigate  •  Enter select  •  Esc cancel\n\n"
                 f"   {tip_line}"
             ),
         )
@@ -1723,9 +1725,20 @@ def search_again_prompt() -> str | tuple | None:
             start = idx
             continue
 
+        if selected == "stats":
+            from ui.stats import stats_page
+            stats_page()
+            start = idx
+            continue
+
         if selected == "tips":
             from ui.tips_page import tips_page
             tips_page()
+            start = idx
+            continue
+
+        if selected == "credentials":
+            credentials_menu()
             start = idx
             continue
 
