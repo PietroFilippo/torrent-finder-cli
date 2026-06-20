@@ -81,7 +81,12 @@ class BaseProvider(ABC):
             response = requests.get(
                 API_URL,
                 params={"q": query, "cat": 0},
-                timeout=25,
+                # apibay.org sits behind Cloudflare and routinely takes ~20s to
+                # answer, so 25s left almost no margin — a single slow response
+                # tipped it over and the engine returned nothing. Providers with
+                # only Apibay + SolidTorrents (e.g. Games) then showed "no
+                # results", while multi-engine providers (Movies) masked it.
+                timeout=45,
                 headers={"User-Agent": "Mozilla/5.0"},
             )
             response.raise_for_status()
