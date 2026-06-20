@@ -5,9 +5,12 @@ from providers.base import BaseProvider
 
 
 class GameProvider(BaseProvider):
-    name = "Games"
+    # Shown as "General" under the Games group; slug stays "games" so the -t flag
+    # and existing history/stats keys keep working.
+    name = "General"
     slug = "games"
     icon = "🎮"
+    search_note = "PC, consoles, ROMs & repacks from public trackers (Apibay + SolidTorrents)."
     categories = [400, 401, 403, 404, 405, 406]  # All, PC, PSX, Xbox, Wii, Handheld
     solidtorrents_category = "Game"
 

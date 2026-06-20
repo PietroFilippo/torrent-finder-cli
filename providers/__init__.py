@@ -55,6 +55,15 @@ class ProviderGroup:
         return f"{self.icon} {self.name}"
 
 
+# The "Games" umbrella collects the game sources. Picking it drills into General
+# (public-tracker search) / Online-Fix (co-op cracks from online-fix.me).
+GAMES_GROUP = ProviderGroup(
+    name="Games",
+    icon="🎮",
+    search_note="Games — General (public trackers) or Online-Fix (co-op / online cracks).",
+    children=[_game, _online_fix],
+)
+
 # The "Software" umbrella collects the three app sources so they don't crowd the
 # top-level list. Picking it drills into Desktop / Mobile / RuTracker.
 SOFTWARE_GROUP = ProviderGroup(
@@ -68,8 +77,7 @@ SOFTWARE_GROUP = ProviderGroup(
 # groups). Distinct from PROVIDERS, which stays flat for identity lookups.
 PROVIDER_MENU: list = [
     _movie,
-    _game,
-    _online_fix,
+    GAMES_GROUP,
     SOFTWARE_GROUP,
     _anime,
     _manga,
