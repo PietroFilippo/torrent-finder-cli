@@ -389,11 +389,13 @@ def _main_loop() -> None:
 
             # Online-Fix has no public magnet — games are distributed as .torrent
             # files (public page, referer-gated host). Fetch the .torrent and hand
-            # it to the system client instead of the magnet menu, then return.
+            # it to the system client instead of the magnet menu, then proceed to
+            # the "What's next?" screen (break with idx set, so the results loop
+            # exits past the `idx is None` guard below).
             if selected.get("source") == "Online-Fix":
                 _online_fix_pick(selected)
                 clear_screen()
-                continue
+                break
 
             # RuTracker results carry the topic id as a placeholder hash — the
             # real magnet lives on the topic page, so resolve it on demand here.
