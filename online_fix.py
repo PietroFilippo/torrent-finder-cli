@@ -13,38 +13,39 @@ pipeline:
   1. scrape the public DLE search listing for game posts (title + post URL) with
      no login, using the numeric post id as a placeholder ``info_hash`` so a
      search costs a single request,
-  2. log in only when needed (online-fix's JS ``authtoken`` DataLife Engine flow)
-     and cache that session for the download bridge,
-  3. expose ``resolve_torrent`` / ``download_torrent_file`` as the bridge the
-     download phase will use to pull the authenticated ``.torrent`` off a post
-     page. The search-only flow only *reads* the resolved URL to show the user.
+  2. resolve and download a post's ``.torrent`` — also without login: the post
+     page is public and online-fix's uploads host gates files by HTTP *referer*
+     (hotlink protection), not auth, so we just send the site referer,
+  3. (optional) log in for the credentials menu / future needs, via online-fix's
+     JS ``authtoken`` DataLife Engine flow.
 
-Credentials come from ``credentials.py`` (env var or gitignored file). Search
-works without them; they are only used for the download bridge (resolving and
-fetching the authenticated ``.torrent``). This is HTML scraping (and behind
-Cloudflare), so it is inherently fragile: an online-fix.me layout or auth change
-will need updates here. The selectors below are best-effort.
+Credentials are optional — search and ``.torrent`` download both work
+anonymously. This is HTML scraping (and behind Cloudflare), so it is inherently
+fragile: an online-fix.me layout change will need updates here. The selectors
+below are best-effort.
 """
 
+import os
 import re
 import threading
 from html import unescape
+from urllib.parse import urljoin, unquote
 
 import requests
 
-from credentials import online_fix_config
-
 _BASE = "https://online-fix.me"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+# The uploads host gates files by HTTP referer (hotlink protection), not login —
+# sending the site's own referer is enough to list a directory or fetch a .torrent.
+_REFERER = {"Referer": _BASE + "/"}
 
 # The single archive password online-fix.me uses for every release. Surfaced to
 # the user on select and consumed by the (future) post-download unpack step.
 ARCHIVE_PASSWORD = "online-fix.me"
 
-# Search is public (anonymous); login is only needed for the download bridge, so
-# the two paths keep separate cached sessions.
-_session: requests.Session | None = None        # logged-in (download)
-_anon_session: requests.Session | None = None    # anonymous (search)
+# Search and download are anonymous, so we cache one anonymous session. Login is
+# only used to verify credentials in the menu (see _do_login / test_credentials).
+_anon_session: requests.Session | None = None
 _session_lock = threading.Lock()
 
 # Game post links look like /games/<category>/<id>-<slug>.html — stable across
@@ -120,28 +121,6 @@ def _do_login(session: requests.Session, username: str, password: str) -> None:
     )
 
 
-def _post_login(username: str, password: str) -> requests.Session | None:
-    """Log in via the DataLife Engine form and return the session, or None."""
-    s = requests.Session()
-    s.headers.update(_UA)
-    try:
-        _do_login(s, username, password)
-    except requests.RequestException:
-        return None
-    return s if _logged_in(s) else None
-
-
-def _get_session() -> requests.Session | None:
-    """Return a logged-in session (cached for the process), or None."""
-    global _session
-    with _session_lock:
-        if _session is None:
-            cfg = online_fix_config()
-            if cfg:
-                _session = _post_login(cfg["username"], cfg["password"])
-        return _session
-
-
 def _anon_http() -> requests.Session:
     """Cached anonymous session for public reads (search). Visits the homepage
     once so PHPSESSID / Cloudflare cookies are in the jar."""
@@ -207,31 +186,7 @@ def search(query: str) -> list[dict]:
     return results
 
 
-def resolve_torrent(post_url: str) -> str | None:
-    """Download bridge (read side): fetch a post page and return the torrent
-    location, or None.
-
-    online-fix doesn't link the ``.torrent`` directly — the post points at a
-    per-game directory on its uploads host (e.g.
-    ``https://uploads.online-fix.me:2053/torrents/<Game>/``) that holds the file.
-    We return a direct ``.torrent`` link if present, else that directory.
-
-    NOTE for the download phase: the uploads host is auth-gated separately (nginx
-    401; the main-site session cookies do NOT carry over, and it isn't HTTP Basic
-    auth), so fetching the actual file needs that gateway solved — see the project
-    memory. A browser already logged into online-fix.me can open the returned URL.
-    """
-    session = _get_session()
-    if session is None or not post_url:
-        return None
-    try:
-        r = session.get(post_url, timeout=25)
-    except requests.RequestException:
-        return None
-    m = _TORRENT_HREF_RE.search(r.text) or _TORRENT_DIR_RE.search(r.text)
-    if not m:
-        return None
-    href = unescape(m.group(1))
+def _absolutize(href: str) -> str:
     if href.startswith("//"):
         return "https:" + href
     if href.startswith("/"):
@@ -239,19 +194,54 @@ def resolve_torrent(post_url: str) -> str | None:
     return href
 
 
-def download_torrent_file(torrent_url: str, dest_path) -> bool:
-    """Download bridge (fetch side): stream an authenticated ``.torrent`` to
-    ``dest_path``. Returns True on success.
+def _torrent_url_in_dir(dir_url: str) -> str | None:
+    """List an uploads-host directory (referer-gated nginx autoindex) and return
+    the first ``.torrent`` URL inside, or None."""
+    try:
+        r = _anon_http().get(dir_url, headers=_REFERER, timeout=25)
+    except requests.RequestException:
+        return None
+    if r.status_code != 200:
+        return None
+    for href in re.findall(r'href="([^"]+)"', r.text):
+        if href.lower().endswith(".torrent"):
+            return urljoin(dir_url, unescape(href))
+    return None
 
-    Not called by the search-only flow yet — this is the handoff point for the
-    download phase (save the file, then feed it to aria2c / the system client,
-    which is how online-fix's private-tracker torrents actually find peers).
+
+def resolve_torrent(post_url: str) -> str | None:
+    """Resolve the downloadable ``.torrent`` URL for a post, or None. No login
+    needed.
+
+    The post page is public; online-fix links a per-game directory on its uploads
+    host (e.g. ``https://uploads.online-fix.me:2053/torrents/<Game>/``) that holds
+    the file. We take a direct ``.torrent`` link if one is present, else list that
+    directory and pick the ``.torrent`` inside. The uploads host gates by HTTP
+    referer (not auth), handled in ``_torrent_url_in_dir`` / ``download_torrent_file``.
     """
-    session = _get_session()
-    if session is None or not torrent_url:
+    if not post_url:
+        return None
+    try:
+        r = _anon_http().get(post_url, timeout=25)
+    except requests.RequestException:
+        return None
+    m = _TORRENT_HREF_RE.search(r.text)
+    if m:
+        return _absolutize(unescape(m.group(1)))
+    m = _TORRENT_DIR_RE.search(r.text)
+    if not m:
+        return None
+    return _torrent_url_in_dir(_absolutize(unescape(m.group(1))))
+
+
+def download_torrent_file(torrent_url: str, dest_path) -> bool:
+    """Stream a ``.torrent`` to ``dest_path``. Returns True on success. The uploads
+    host is referer-gated (not login-gated), so every request carries the site
+    referer; no session/login required."""
+    if not torrent_url:
         return False
     try:
-        with session.get(torrent_url, timeout=30, stream=True) as resp:
+        with _anon_http().get(torrent_url, headers=_REFERER, timeout=30, stream=True) as resp:
             resp.raise_for_status()
             with open(dest_path, "wb") as fh:
                 for chunk in resp.iter_content(chunk_size=8192):
@@ -260,6 +250,25 @@ def download_torrent_file(torrent_url: str, dest_path) -> bool:
     except (requests.RequestException, OSError):
         return False
     return True
+
+
+def fetch_torrent_for(post_url: str, dest_dir: str) -> str | None:
+    """Resolve and download a post's ``.torrent`` into ``dest_dir``; return the
+    saved file path, or None. This is the 'hand to the system client' entry point
+    used by main.py — resolve the URL, then stream the file to disk.
+    """
+    turl = resolve_torrent(post_url)
+    if not turl:
+        return None
+    fname = unquote(turl.rsplit("/", 1)[-1]) or "online-fix.torrent"
+    if not fname.lower().endswith(".torrent"):
+        fname += ".torrent"
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+    except OSError:
+        return None
+    dest = os.path.join(dest_dir, fname)
+    return dest if download_torrent_file(turl, dest) else None
 
 
 def test_credentials(username: str, password: str) -> tuple[bool | None, str]:

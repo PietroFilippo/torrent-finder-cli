@@ -1114,7 +1114,7 @@ _CRED_PROVIDERS = [
             ("ONLINE_FIX_PASSWORD", "Password", True),
         ],
         "required": ["ONLINE_FIX_USERNAME", "ONLINE_FIX_PASSWORD"],
-        "limit": "Powers the Online-Fix provider (login + scrape; may break if the site changes).",
+        "limit": "Optional — Online-Fix search and download work without it; login is supported for completeness.",
     },
 ]
 
