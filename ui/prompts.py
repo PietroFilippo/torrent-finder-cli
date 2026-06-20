@@ -1105,6 +1105,17 @@ _CRED_PROVIDERS = [
         "required": ["RUTRACKER_USERNAME", "RUTRACKER_PASSWORD"],
         "limit": "Powers the RuTracker provider (login + scrape; may break if the site changes).",
     },
+    {
+        "id": "online_fix",
+        "icon": "🔧",
+        "name": "Online-Fix",
+        "fields": [
+            ("ONLINE_FIX_USERNAME", "Username", False),
+            ("ONLINE_FIX_PASSWORD", "Password", True),
+        ],
+        "required": ["ONLINE_FIX_USERNAME", "ONLINE_FIX_PASSWORD"],
+        "limit": "Powers the Online-Fix provider (login + scrape; may break if the site changes).",
+    },
 ]
 
 
@@ -1243,6 +1254,11 @@ def _test_provider_credentials(provider_id: str, effective: dict) -> tuple[bool,
             import rutracker
             return rutracker.test_credentials(
                 effective["RUTRACKER_USERNAME"], effective["RUTRACKER_PASSWORD"]
+            )
+        if provider_id == "online_fix":
+            import online_fix
+            return online_fix.test_credentials(
+                effective["ONLINE_FIX_USERNAME"], effective["ONLINE_FIX_PASSWORD"]
             )
     return False, "unknown provider"
 
@@ -1529,10 +1545,10 @@ def provider_select_prompt(notice: str = "") -> object | None:
         is_action=True,
     )
     creds_item = SelectItem(
-        label="🔑 Credentials — subtitle providers & RuTracker login",
+        label="🔑 Credentials — subtitle providers & RuTracker / Online-Fix logins",
         value="__credentials__",
         is_action=True,
-        description="Manage OpenSubtitles / Addic7ed / Jimaku subtitle logins and the RuTracker account.",
+        description="Manage OpenSubtitles / Addic7ed / Jimaku subtitle logins and the RuTracker / Online-Fix accounts.",
     )
     items = provider_items + [separator, tips_item, info_item, creds_item]
     start = 0

@@ -140,10 +140,49 @@ def _locate_downloaded_video(torrent_name: str) -> str | None:
     return best if best_score >= 2 else None
 
 
+def _show_online_fix_pick(selected: dict) -> None:
+    """Show a picked Online-Fix result.
+
+    Online-Fix games have no public magnet (they live on online-fix's own private
+    tracker as .torrent files), so a pick can't enter the magnet download menu
+    yet. Resolve the authenticated .torrent URL and show it alongside the archive
+    password — the read side of the bridge the download phase will build on.
+    """
+    import online_fix
+    from rich.panel import Panel
+
+    name = selected.get("name", "Unknown")
+    page_url = selected.get("page_url") or selected.get("of_post_url") or ""
+    with console.status("[bold cyan]Resolving .torrent from online-fix.me…[/bold cyan]", spinner="dots"):
+        torrent_url = online_fix.resolve_torrent(page_url)
+
+    lines = [f"[bold]{name}[/bold]\n"]
+    if page_url:
+        lines.append(f"[cyan]Page:[/cyan]             {page_url}")
+    if torrent_url:
+        lines.append(f"[cyan]Torrent:[/cyan]          {torrent_url}")
+    else:
+        lines.append("[warning]Torrent:[/warning]          couldn't resolve "
+                     "(login expired or post layout changed).")
+    lines.append(f"[cyan]Archive password:[/cyan] {online_fix.ARCHIVE_PASSWORD}")
+    lines.append("\n[dim]The file host is auth-gated separately — open the Page (or Torrent "
+                 "link) in a browser logged into online-fix.me. In-terminal download is a "
+                 "later phase.[/dim]")
+
+    console.print(Panel(
+        "\n".join(lines),
+        title="🔧 Online-Fix",
+        border_style="bright_blue",
+        padding=(1, 2),
+    ))
+    console.print("[dim]Press any key to continue...[/dim]")
+    readchar.readkey()
+
+
 def _main_loop() -> None:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
-    parser.add_argument("-t", "--type", type=str, choices=["movie", "game", "software", "mobile", "rutracker", "anime", "manga"], help="Search type (default: movie if used with -q)")
+    parser.add_argument("-t", "--type", type=str, choices=["movie", "game", "online-fix", "software", "mobile", "rutracker", "anime", "manga"], help="Search type (default: movie if used with -q)")
     parser.add_argument("-f", "--filter", action="append", help="Include keyword in results")
     parser.add_argument("-x", "--exclude", action="append", help="Exclude keyword from results")
     parser.add_argument("-y", "--skip-warning", action="store_true", help="Skip network exposure warning")
@@ -339,6 +378,15 @@ def _main_loop() -> None:
             name = selected.get("name", "Unknown")
             info_hash = selected.get("info_hash", "")
             record_torrent_picked(provider.slug, int(selected.get("seeders", 0) or 0))
+
+            # Online-Fix has no public magnet — games sit on its private tracker
+            # as .torrent files. A pick can't enter the magnet download menu yet,
+            # so resolve the authenticated .torrent URL and show it (the bridge
+            # the download phase will build on), then return to the results.
+            if selected.get("source") == "Online-Fix":
+                _show_online_fix_pick(selected)
+                clear_screen()
+                continue
 
             # RuTracker results carry the topic id as a placeholder hash — the
             # real magnet lives on the topic page, so resolve it on demand here.
