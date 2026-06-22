@@ -4,6 +4,7 @@ import requests
 
 from filters import FilterConfig, FilterPreset
 from providers.base import BaseProvider, SearchEngine
+from resolvers import CreatorFacet, tmdb
 
 
 class MovieProvider(BaseProvider):
@@ -29,6 +30,26 @@ class MovieProvider(BaseProvider):
             "yify", "yts", "rarbg", "fgt", "sparks", "evo",
             "qxr", "tgx", "anoxmous", "etrg", "mkvcage", "galaxy",
         ])),
+    ]
+
+    # Search by creator via TMDB (needs a free TMDB_API_KEY; the facets are
+    # hidden until one is configured). Director = combined movie + TV credits;
+    # Studio = a production company's films (popularity-ordered, paged).
+    creator_facets = [
+        CreatorFacet(
+            key="director", label="Director", icon="🎬",
+            search_entities=tmdb.person_search,
+            list_works=tmdb.director_works,
+            note="Find a director's films & shows via TMDB, then search each title.",
+            requires_cred="TMDB_API_KEY",
+        ),
+        CreatorFacet(
+            key="studio", label="Studio", icon="🏢",
+            search_entities=tmdb.company_search,
+            list_works=tmdb.company_works,
+            note="Find a studio/company's films via TMDB, then search each title.",
+            requires_cred="TMDB_API_KEY",
+        ),
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
