@@ -116,38 +116,35 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "") -> "str | tuple 
             repaint(prev_col, prev_len)
 
 
-def quick_actions_menu(show_creator: bool = False) -> "str | None":
+def quick_actions_menu() -> "str | None":
     """Search-prompt quick actions, opened with Tab.
 
-    Returns "filter", "history", "creator", "stats", "tips", or None if
-    cancelled. The familiar F/H/S/T letters (plus C for creator, when shown)
-    jump straight to each action; arrows + Enter also work. Lives behind Tab so
-    it never clashes with typing a query. ``show_creator`` adds the by-creator
-    action for providers that declare ``creator_facets``.
+    Returns "filter", "history", "stats", "tips", or None if cancelled. The
+    familiar F/H/S/T letters jump straight to each action; arrows + Enter also
+    work. Lives behind Tab so it never clashes with typing a query.
     """
-    items: list[SelectItem] = []
-    key_actions: dict = {}
+    items = [
+        SelectItem(label="🔍 Filters & engines", value="filter", is_action=True, hint="F"),
+        SelectItem(label="🕑 Search history", value="history", is_action=True, hint="H"),
+        SelectItem(label="📊 Usage stats", value="stats", is_action=True, hint="S"),
+        SelectItem(label="💡 Tips & shortcuts", value="tips", is_action=True, hint="T"),
+        SelectItem(label="↩  Back", value=None, is_action=True),
+    ]
 
-    def _add(label: str, value: str, keys: tuple, hint: str) -> None:
-        items.append(SelectItem(label=label, value=value, is_action=True, hint=hint))
-        i = len(items) - 1
-        for k in keys:
-            key_actions[k] = (lambda idx: (lambda cursor, items_list: idx))(i)
+    def _pick(index: int):
+        return lambda cursor, items_list: index
 
-    _add("🔍 Filters & engines", "filter", ("F", "f"), "F")
-    _add("🕑 Search history", "history", ("H", "h"), "H")
-    if show_creator:
-        _add("🎬 Search by creator", "creator", ("C", "c"), "C")
-    _add("📊 Usage stats", "stats", ("S", "s"), "S")
-    _add("💡 Tips & shortcuts", "tips", ("T", "t"), "T")
-    items.append(SelectItem(label="↩  Back", value=None, is_action=True))
-
-    jumps = "F / H / " + ("C / " if show_creator else "") + "S / T"
+    key_actions = {
+        "F": _pick(0), "f": _pick(0),
+        "H": _pick(1), "h": _pick(1),
+        "S": _pick(2), "s": _pick(2),
+        "T": _pick(3), "t": _pick(3),
+    }
     idx = arrow_select(
         items,
         title="Quick actions",
         banner=_make_banner_panel(),
-        footer=f"↑/↓ select  •  {jumps} jump  •  Esc back",
+        footer="↑/↓ select  •  F / H / S / T jump  •  Esc back",
         key_actions=key_actions,
     )
     if idx is None:
@@ -936,7 +933,7 @@ def download_method_prompt(
         ),
         description=(
             "Plain download via webtorrent — one file per run, no seeding. "
-            "⚠ --select is not strict; webtorrent-cli often downloads the whole torrent anyway. "
+            "⚠  --select is not strict; webtorrent-cli often downloads the whole torrent anyway. "
             "Use aria2c if you need strict file picking."
         ),
     ))
@@ -951,7 +948,7 @@ def download_method_prompt(
         ),
         description=(
             "Plain download via peerflix — slower than aria2, no seeding. "
-            "⚠ Does NOT honor file selection: peerflix always downloads the whole torrent. "
+            "⚠  Does NOT honor file selection: peerflix always downloads the whole torrent. "
             "Use aria2c if you need strict file picking."
         ),
     ))
@@ -1034,7 +1031,7 @@ def download_method_prompt(
                     subprocess.run(["xclip", "-selection", "clipboard"], input=magnet.encode(), check=True)
                 items[idx].hint = "✅ Copied!"
             except Exception:
-                items[idx].hint = "⚠ Could not copy"
+                items[idx].hint = "⚠  Could not copy"
             return True  # Stay in menu
         if items[idx].value == "open_page" and page_url:
             try:
@@ -1042,7 +1039,7 @@ def download_method_prompt(
                 webbrowser.open(page_url)
                 items[idx].hint = "✅ Opened!"
             except Exception:
-                items[idx].hint = "⚠ Could not open browser"
+                items[idx].hint = "⚠  Could not open browser"
             return True  # Stay in menu
         if items[idx].value == "toggle_quiet":
             from state import load_setting, save_setting
@@ -1307,7 +1304,7 @@ def _finalize_credentials_save(meta: dict, entered: dict) -> bool:
         console.print(f"[success]✓ Verified: {msg}[/success]")
     elif ok is None:
         # Couldn't verify (rate limit / network / unverifiable provider).
-        console.print(f"[warning]⚠ {msg}[/warning]")
+        console.print(f"[warning]⚠  {msg}[/warning]")
     else:  # definitively rejected
         console.print(f"[error]✗ Verification failed: {msg}[/error]")
         if not _inline_confirm("Save these credentials anyway? — Y/Yes to save, anything else cancels:"):
@@ -1519,6 +1516,54 @@ def _provider_group_menu(group) -> object | None:
         if chosen == "__back__":
             return None
         return chosen
+
+
+def _provider_source_menu(provider) -> "str | object | None":
+    """Choose how to search a creator-capable provider.
+
+    Shows normal keyword search up top, then one row per creator facet
+    (director/studio/author/…) under a "By <labels>" section header. Returns:
+      - ``"search"`` for the normal keyword search,
+      - a ``CreatorFacet`` to search by that facet,
+      - ``None`` to go back to the provider list.
+    """
+    facets = list(getattr(provider, "creator_facets", []) or [])
+    if not facets:
+        return "search"
+
+    items = [
+        SelectItem(label="─── Search ───", value="section_header", enabled=False, is_action=True),
+        SelectItem(
+            label=f"{provider.icon} {provider.name} — keyword search",
+            value="__search__",
+            description="Type a query and search the enabled engines, as usual.",
+        ),
+    ]
+    header = "By " + " / ".join(f.label for f in facets)
+    items.append(SelectItem(label=f"─── {header} ───", value="section_header", enabled=False, is_action=True))
+    for f in facets:
+        items.append(SelectItem(
+            label=f"{f.icon or '🎬'} By {f.label.lower()}",
+            value=("facet", f),
+            description=f.note,
+        ))
+    items.append(SelectItem(label="↩  Back", value="__back__", is_action=True))
+
+    idx = arrow_select(
+        items,
+        title=f"{provider.icon} {provider.name} — choose how to search",
+        banner=_make_banner_panel(),
+        footer="↑/↓ navigate  •  Enter select  •  Esc back",
+        start_index=1,  # land on the keyword-search row, skipping the header
+    )
+    if idx is None:
+        return None
+    val = items[idx].value
+    if val == "__search__":
+        return "search"
+    if isinstance(val, tuple) and val and val[0] == "facet":
+        return val[1]
+    return None  # __back__
 
 
 def provider_select_prompt(notice: str = "") -> object | None:
