@@ -6,7 +6,7 @@ On Windows, the included `torrent.bat` launcher can be added to your `PATH` so y
 
 ## Features
 
-- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs via The Pirate Bay's Applications categories plus SolidTorrents), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and stays dormant until one is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`.
+- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs via The Pirate Bay's Applications categories plus SolidTorrents), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and stays dormant until one is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`. **Games** is likewise a group: pick it and choose **General** (PC, consoles, ROMs & repacks from public trackers — The Pirate Bay's game categories plus SolidTorrents) or **Online-Fix** (scrapes [online-fix.me](https://online-fix.me) for co-op/online game cracks). On the CLI they're `-t game` and `-t online-fix`. Online-Fix needs **no account** — both search and download are anonymous (the file host is referer-gated, not login-gated); picking a result downloads the `.torrent` into your download folder and opens it in your system torrent client, showing the archive password (`online-fix.me`) to unpack the game with.
 - **Multi-Engine Fan-Out:** Each provider queries several sources in parallel (e.g. Apibay + SolidTorrents + YTS + Nyaa live-action for Movies & Series, Nyaa for Anime, Nyaa Literature + Apibay Comics for Manga) and merges results, deduplicating by info hash and sorting by seeders.
 - **Arrow-Key Driven UI:** Fully interactive, flicker-free terminal interface.
   - Utilizes an alternate screen buffer so your scrollback history remains flawlessly clean.
@@ -110,6 +110,10 @@ matching environment variables to remove a credential that's set there.
   account is **required** — the provider logs in to search and returns nothing
   without one. This is the only credential that gates a whole provider rather
   than just enhancing subtitle results.
+- **Online-Fix** (the Online-Fix provider): **optional.** Both search and
+  `.torrent` download work anonymously ([online-fix.me](https://online-fix.me)'s
+  file host is referer-gated, not login-gated). A login is supported (the site's
+  DataLife Engine `authtoken` flow) for completeness but isn't required.
 
 subliminal queries a curated set of providers — `opensubtitlescom`, `addic7ed`,
 `podnapisi`, `tvsubtitles` — chosen for broad coverage and reliability. The rest
@@ -127,6 +131,8 @@ Set them as environment variables:
 [Environment]::SetEnvironmentVariable("JIMAKU_API_KEY", "your_key", "User")
 [Environment]::SetEnvironmentVariable("RUTRACKER_USERNAME", "your_user", "User")
 [Environment]::SetEnvironmentVariable("RUTRACKER_PASSWORD", "your_pass", "User")
+[Environment]::SetEnvironmentVariable("ONLINE_FIX_USERNAME", "your_user", "User")
+[Environment]::SetEnvironmentVariable("ONLINE_FIX_PASSWORD", "your_pass", "User")
 ```
 
 ```bash
@@ -138,6 +144,8 @@ export ADDIC7ED_PASSWORD="your_pass"
 export JIMAKU_API_KEY="your_key"
 export RUTRACKER_USERNAME="your_user"
 export RUTRACKER_PASSWORD="your_pass"
+export ONLINE_FIX_USERNAME="your_user"
+export ONLINE_FIX_PASSWORD="your_pass"
 ```
 
 Or create `subtitle_credentials.json` (already gitignored) in the repo folder:
@@ -150,7 +158,9 @@ Or create `subtitle_credentials.json` (already gitignored) in the repo folder:
   "addic7ed_password": "your_pass",
   "jimaku_api_key": "your_key",
   "rutracker_username": "your_user",
-  "rutracker_password": "your_pass"
+  "rutracker_password": "your_pass",
+  "online_fix_username": "your_user",
+  "online_fix_password": "your_pass"
 }
 ```
 
@@ -201,8 +211,11 @@ python main.py
 # Direct search (defaults to Movies)
 torrent -q "The Matrix"
 
-# Specify the search type (movie, game, software, mobile, rutracker, anime, manga). `movie` covers both films and series.
+# Specify the search type (movie, game, online-fix, software, mobile, rutracker, anime, manga). `movie` covers both films and series.
 torrent -q "Elden Ring" -t game
+
+# Search Online-Fix (co-op / online game cracks from online-fix.me; no account needed)
+torrent -q "Elden Ring" -t online-fix
 
 # Search desktop software (The Pirate Bay Applications + SolidTorrents)
 torrent -q "Photoshop" -t software
@@ -267,7 +280,7 @@ The application is structured into a modular, provider-based architecture:
 
 - `main.py`: The main entry point and CLI argument parser.
 - `torrent.bat`: Windows launcher. It calls `main.py` relative to the batch file location, so adding the repo folder to `PATH` makes `torrent` usable from any directory.
-- `providers/`: Different search categories (Movies & Series, Games, Software, Mobile, RuTracker, Anime, Manga). Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga).
+- `providers/`: Different search categories (Movies & Series, General games, Online-Fix, Desktop, Mobile, RuTracker, Anime, Manga). The display menu nests some of these under groups — **Games** (General + Online-Fix) and **Software** (Desktop + Mobile + RuTracker) — via `ProviderGroup`, a display-only wrapper that changes menu shape without touching slugs. Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga).
 - `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt`), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), `tips.py` (categorized tip catalog), and `tips_page.py` (searchable tips browser).
 - `filters.py`: Logic processing for including or excluding keywords.
 - `torrent_session.py`: Post-torrent-pick state owner. Holds the picked magnet + user file selection + sub choice, and lazily resolves `files_meta` / `targets` / `stream_indexes` / `download_indexes` / `sub_paths`. Stream adapters consume the session directly; download adapters take `(magnet, indexes)` projections and stay session-unaware.
