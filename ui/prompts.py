@@ -1126,6 +1126,16 @@ _CRED_PROVIDERS = [
         "required": ["ONLINE_FIX_USERNAME", "ONLINE_FIX_PASSWORD"],
         "limit": "Optional — Online-Fix search and download work without it; login is supported for completeness.",
     },
+    {
+        "id": "tmdb",
+        "icon": "🎬",
+        "name": "TMDB (Movies & Series — search by director / studio)",
+        "fields": [
+            ("TMDB_API_KEY", "API key (v3)", True),
+        ],
+        "required": ["TMDB_API_KEY"],
+        "limit": "Free TMDB v3 API key — unlocks Movies & Series 'by director / studio'. Without it those facets are hidden.",
+    },
 ]
 
 
@@ -1270,6 +1280,9 @@ def _test_provider_credentials(provider_id: str, effective: dict) -> tuple[bool,
             return online_fix.test_credentials(
                 effective["ONLINE_FIX_USERNAME"], effective["ONLINE_FIX_PASSWORD"]
             )
+        if provider_id == "tmdb":
+            from resolvers import tmdb
+            return tmdb.test_api_key(effective["TMDB_API_KEY"])
     return False, "unknown provider"
 
 
@@ -1518,16 +1531,19 @@ def _provider_group_menu(group) -> object | None:
         return chosen
 
 
-def _provider_source_menu(provider) -> "str | object | None":
+def _provider_source_menu(provider, facets=None) -> "str | object | None":
     """Choose how to search a creator-capable provider.
 
     Shows normal keyword search up top, then one row per creator facet
-    (director/studio/author/…) under a "By <labels>" section header. Returns:
+    (director/studio/author/…) under a "By <labels>" section header. ``facets``
+    is the already-credential-filtered list (falls back to all when omitted).
+    Returns:
       - ``"search"`` for the normal keyword search,
       - a ``CreatorFacet`` to search by that facet,
       - ``None`` to go back to the provider list.
     """
-    facets = list(getattr(provider, "creator_facets", []) or [])
+    if facets is None:
+        facets = list(getattr(provider, "creator_facets", []) or [])
     if not facets:
         return "search"
 

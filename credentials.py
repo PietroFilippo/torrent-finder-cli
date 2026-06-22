@@ -28,6 +28,7 @@ _FILE_KEYS = {
     "RUTRACKER_PASSWORD": "rutracker_password",
     "ONLINE_FIX_USERNAME": "online_fix_username",
     "ONLINE_FIX_PASSWORD": "online_fix_password",
+    "TMDB_API_KEY": "tmdb_api_key",
 }
 
 _file_cache: dict | None = None

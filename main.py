@@ -371,6 +371,20 @@ def browse_results(provider, results) -> str:
         return "next"
 
 
+def _available_facets(provider) -> list:
+    """Creator facets whose required credential (if any) is configured.
+
+    Credential-gated facets (e.g. movies/games via TMDB/IGDB) are hidden until
+    their key is set, so the provider falls back to keyword-only search.
+    """
+    import credentials as C
+    out = []
+    for f in getattr(provider, "creator_facets", []) or []:
+        if not getattr(f, "requires_cred", "") or C.get_credential(f.requires_cred):
+            out.append(f)
+    return out
+
+
 def _provider_entry(provider, cli_filters) -> str:
     """Entry screen for a freshly selected provider.
 
@@ -381,12 +395,13 @@ def _provider_entry(provider, cli_filters) -> str:
     ``"next"`` (a creator download completed → "what's next?"), or ``"provider"``
     (user backed out → return to the provider list).
     """
-    if not getattr(provider, "creator_facets", []):
+    facets = _available_facets(provider)
+    if not facets:
         return "keyword"
     from ui.prompts import _provider_source_menu
     from ui.creator import creator_search_flow
     while True:
-        choice = _provider_source_menu(provider)
+        choice = _provider_source_menu(provider, facets)
         if choice is None:
             return "provider"
         if choice == "search":

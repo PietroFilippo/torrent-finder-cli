@@ -46,3 +46,4 @@ class CreatorFacet:
     list_works: Callable[..., tuple]           # (Entity, page=1) -> (list[Work], has_more)
     note: str = ""                             # optional one-line UI hint
     icon: str = ""                             # optional emoji for the source menu
+    requires_cred: str = ""                    # env-var key gating this facet (e.g. "TMDB_API_KEY"); "" = always on
