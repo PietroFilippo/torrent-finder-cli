@@ -106,12 +106,12 @@ def show_security_warning(force: bool = False) -> bool:
             body.append("✓ VPN provider name detected in network org.\n", style="bold green")
         elif is_mobile:
             body.append(
-                "⚠ Mobile carrier IP — no VPN. Carrier and peers see this IP.\n",
+                "⚠  Mobile carrier IP — no VPN. Carrier and peers see this IP.\n",
                 style="bold red",
             )
         else:
             body.append(
-                "⚠ Residential ISP IP — no VPN detected. Your real IP is visible.\n",
+                "⚠  Residential ISP IP — no VPN detected. Your real IP is visible.\n",
                 style="bold red",
             )
     else:

@@ -34,6 +34,7 @@ class Work:
     alt_titles: tuple = ()
     year: "int | None" = None
     subtitle: str = ""   # display hint, e.g. "2001 · MOVIE"
+    role: str = ""       # raw creator role, e.g. "Director" or "Director (eps 1-12)"
 
 
 @dataclass
@@ -44,3 +45,4 @@ class CreatorFacet:
     search_entities: Callable[[str], list]     # name -> list[Entity]
     list_works: Callable[[object], list]       # Entity -> list[Work]
     note: str = ""                             # optional one-line UI hint
+    icon: str = ""                             # optional emoji for the source menu

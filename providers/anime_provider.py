@@ -33,13 +33,13 @@ class AnimeProvider(BaseProvider):
     # studio to a filmography; each picked title is then searched on Nyaa.
     creator_facets = [
         CreatorFacet(
-            key="director", label="Director",
+            key="director", label="Director", icon="🎬",
             search_entities=anilist.staff_search,
             list_works=anilist.director_works,
             note="Find a director's anime via AniList, then search each title.",
         ),
         CreatorFacet(
-            key="studio", label="Studio",
+            key="studio", label="Studio", icon="🏢",
             search_entities=anilist.studio_search,
             list_works=anilist.studio_works,
             note="Find a studio's anime via AniList, then search each title.",

@@ -1,11 +1,14 @@
 """'Search by creator' interactive flow.
 
-Opened from the search-prompt quick-actions menu (Tab → Search by creator) for
-providers that declare ``creator_facets``. Walks the user through:
-facet → name → disambiguation → multi-select works → fan-out search, and hands
-the merged results back to the main loop for the normal results table.
+Opened from a creator-capable provider's source screen (choose how to search →
+by director/studio/…). Walks the user through: name → disambiguation →
+multi-select titles → torrent results → download, with Esc stepping back one
+screen at every stage (and backing out past the name prompt returning to the
+source screen). The shared torrent-results + download UI is supplied by the
+caller as ``browse_fn`` so this flow reuses the same path as keyword search.
 """
 
+import re
 import threading
 import time
 
@@ -13,7 +16,8 @@ import readchar
 
 from constants import console
 from creator_search import fan_out
-from ui.prompts import _make_banner_panel, clear_screen
+from stats import record_search
+from ui.prompts import _make_banner_panel, clear_screen, get_query_with_shortcut
 from ui.selector import SelectItem, arrow_select
 from utils import start_esc_listener
 
@@ -52,21 +56,26 @@ def _notice(msg: str) -> None:
     readchar.readkey()
 
 
-def _pick_facet(facets):
-    """Pick a facet (Director/Studio/…). Auto-picks when there's only one."""
-    if len(facets) == 1:
-        return facets[0]
-    items = [SelectItem(label=f.label, value=f, description=f.note) for f in facets]
-    items.append(SelectItem(label="↩  Back", value="__back__", is_action=True))
-    idx = arrow_select(items, title="Search by…", banner=_make_banner_panel())
-    if idx is None:
-        return None
-    val = items[idx].value
-    return None if val == "__back__" else val
+def _role_episode_note(role: str) -> str:
+    """Return the episode qualifier of a creator role, or "".
+
+    AniList writes partial-direction credits as e.g. "Director (eps 8, 10, 13-23)";
+    this returns "eps 8, 10, 13-23" for those and "" for a whole-series role.
+    """
+    if not role:
+        return ""
+    m = re.search(r"\(([^)]*)\)", role)
+    if not m:
+        return ""
+    inside = m.group(1).strip()
+    return inside if re.search(r"\beps?\b", inside, re.I) else ""
 
 
 def _pick_entity(entities, facet):
-    """Disambiguate between candidate people/studios. Auto-picks a lone match."""
+    """Disambiguate between candidate people/studios. Auto-picks a lone match.
+
+    Returns the chosen Entity, or None to go back.
+    """
     if len(entities) == 1:
         return entities[0]
     items = [SelectItem(label=e.name, value=e, description=e.detail) for e in entities]
@@ -84,21 +93,35 @@ def _pick_entity(entities, facet):
 
 
 def _works_select_prompt(works, entity, facet):
-    """Multi-select the titles to search. Defaults to all checked.
+    """Multi-select the titles to search. Nothing is checked by default.
 
-    Returns the chosen list[Work], or None if cancelled.
+    Titles the creator only partly directed (specific episodes) are flagged with
+    ⚠ and the episode list. Returns the chosen list[Work], or None if cancelled.
     """
     items: list[SelectItem] = []
     work_item_indexes: list[int] = []
+    any_partial = False
     for w in works:
-        items.append(SelectItem(label=w.title, value=("work", w), toggled=True, hint=w.subtitle))
+        note = _role_episode_note(w.role)
+        hint = w.subtitle
+        description = ""
+        if note:
+            any_partial = True
+            hint = f"{w.subtitle}  ⚠  {note}" if w.subtitle else f"⚠  {note}"
+            description = (
+                f"⚠  {entity.name} directed only specific episodes: {note}. "
+                "The torrent search still covers the whole title."
+            )
+        items.append(SelectItem(
+            label=w.title, value=("work", w), toggled=False, hint=hint, description=description,
+        ))
         work_item_indexes.append(len(items) - 1)
 
     items.append(SelectItem(label="Select all  [a]", value="all", is_action=True))
     items.append(SelectItem(label="Invert selection  [i]", value="invert", is_action=True))
     items.append(SelectItem(label="Clear  [c]", value="clear", is_action=True))
     items.append(SelectItem(label="✅ Confirm  [w]", value="confirm", is_action=True))
-    items.append(SelectItem(label="↩ Cancel", value="cancel", is_action=True))
+    items.append(SelectItem(label="↩ Back", value="cancel", is_action=True))
 
     confirm_idx = len(items) - 2
     anchor = {"idx": None}
@@ -170,6 +193,15 @@ def _works_select_prompt(works, entity, facet):
         " ": _toggle_current,
     }
 
+    footer = (
+        "↑/↓ nav  •  Space/Enter toggle  •  "
+        "[bold yellow]a[/bold yellow]ll/[bold yellow]i[/bold yellow]nvert/[bold yellow]c[/bold yellow]lear  •  "
+        "[bold green]w[/bold green] confirm  •  Esc back\n"
+        "Pick titles to search (none selected by default)."
+    )
+    if any_partial:
+        footer += "\n[bold yellow]⚠  = director handled only some episodes (highlight a title for details)[/bold yellow]"
+
     result = arrow_select(
         items,
         title=f"{facet.label}: {entity.name} — {len(works)} title(s)",
@@ -177,12 +209,7 @@ def _works_select_prompt(works, entity, facet):
         banner=_make_banner_panel(),
         on_action=on_action,
         key_actions=key_actions,
-        footer=(
-            "↑/↓ nav  •  Space/Enter toggle  •  "
-            "[bold yellow]a[/bold yellow]ll/[bold yellow]i[/bold yellow]nvert/[bold yellow]c[/bold yellow]lear  •  "
-            "[bold green]w[/bold green] confirm  •  Esc cancel\n"
-            "Confirm runs a torrent search for each checked title."
-        ),
+        footer=footer,
     )
 
     if result is None or items[result].value != "confirm":
@@ -190,68 +217,120 @@ def _works_select_prompt(works, entity, facet):
     return [items[i].value[1] for i in work_item_indexes if items[i].toggled]
 
 
-def creator_search_flow(provider, cli_filters=None):
-    """Run the by-creator flow for ``provider``.
-
-    Returns ``(label, results)`` on success (``results`` may be empty), or
-    None if the user cancelled at any step.
-    """
-    facets = list(getattr(provider, "creator_facets", []) or [])
-    if not facets:
-        return None
-
-    clear_screen()
-    facet = _pick_facet(facets)
-    if facet is None:
-        return None
-
+def _name_input(provider, facet, initial: str = ""):
+    """Prompt for a creator name. Returns the name, or None to go back (Esc)."""
     clear_screen()
     console.print(f"[title]Search {provider.name} by {facet.label}[/title]")
     if facet.note:
         console.print(f"[dim]{facet.note}[/dim]")
-    console.print("[dim]Type a name and press Enter. Leave empty to cancel.[/dim]")
+    console.print("[dim]Type a name and press Enter  •  Esc to go back[/dim]")
     try:
-        name = console.input(f"[info]{facet.label} name:[/info] ").strip()
+        name = get_query_with_shortcut(f"[info]{facet.label} name:[/info] ", initial=initial)
     except (EOFError, KeyboardInterrupt):
         return None
-    if not name:
+    # Esc -> "GO_BACK", Tab -> ("ACTIONS", ...); both go back here, as does empty.
+    if not isinstance(name, str) or name in ("GO_BACK", "") or not name.strip():
         return None
+    return name.strip()
 
-    cancelled, entities = _run_cancellable(
-        lambda: facet.search_entities(name), f"Looking up {facet.label.lower()}…"
-    )
-    if cancelled:
-        return None
-    entities = entities or []
-    if not entities:
-        _notice(f"No {facet.label.lower()} found for “{name}”.")
-        return None
 
-    entity = _pick_entity(entities, facet)
-    if entity is None:
-        return None
+def creator_search_flow(provider, cli_filters, facet, browse_fn):
+    """Drive the full by-creator journey with step-back navigation.
 
-    cancelled, works = _run_cancellable(
-        lambda: facet.list_works(entity), f"Fetching titles for {entity.name}…"
-    )
-    if cancelled:
-        return None
-    works = works or []
-    if not works:
-        _notice(f"No titles found for {entity.name}.")
-        return None
+    Stages: name → (disambiguation) → works → torrent results → download. Esc at
+    any stage steps back one screen; backing out past the name prompt returns to
+    the source screen. ``browse_fn(provider, results)`` runs the shared
+    results + download UI and returns "back" (Esc'd the results) or "next" (a
+    download completed).
 
-    picked = _works_select_prompt(works, entity, facet)
-    if not picked:
-        return None
+    Returns "back" (user left the journey → source screen) or "next" (a download
+    completed → caller shows "what's next?").
+    """
+    name = ""
+    entities = None
+    entity = None
+    disambig_shown = False
+    works_by_entity: dict = {}
+    picked = None
+    stage = "name"
 
-    cancel = threading.Event()
-    cancelled, results = _run_cancellable(
-        lambda: fan_out(provider, picked, cli_filters, cancel_event=cancel),
-        f"Searching {provider.name} for {len(picked)} title(s)…",
-        cancel=cancel,
-    )
-    if cancelled:
-        return None
+    while True:
+        if stage == "name":
+            new_name = _name_input(provider, facet, initial=name)
+            if new_name is None:
+                return "back"
+            if new_name != name:
+                entities = None  # different query → re-resolve
+            name = new_name
+            stage = "resolve"
 
-    return (f"{facet.label}: {entity.name}", results or [])
+        elif stage == "resolve":
+            if entities is None:
+                cancelled, entities = _run_cancellable(
+                    lambda: facet.search_entities(name),
+                    f"Looking up {facet.label.lower()}…",
+                )
+                if cancelled:
+                    stage = "name"
+                    continue
+                entities = entities or []
+            if not entities:
+                _notice(f"No {facet.label.lower()} found for “{name}”.")
+                stage = "name"
+                continue
+            stage = "entity"
+
+        elif stage == "entity":
+            if len(entities) == 1:
+                entity = entities[0]
+                disambig_shown = False
+            else:
+                entity = _pick_entity(entities, facet)
+                if entity is None:
+                    stage = "name"
+                    continue
+                disambig_shown = True
+            stage = "works"
+
+        elif stage == "works":
+            if entity.id not in works_by_entity:
+                cancelled, works = _run_cancellable(
+                    lambda: facet.list_works(entity),
+                    f"Fetching titles for {entity.name}…",
+                )
+                if cancelled:
+                    stage = "entity" if disambig_shown else "name"
+                    continue
+                works_by_entity[entity.id] = works or []
+            works = works_by_entity[entity.id]
+            if not works:
+                _notice(f"No titles found for {entity.name}.")
+                stage = "entity" if disambig_shown else "name"
+                continue
+            picked = _works_select_prompt(works, entity, facet)
+            if not picked:
+                stage = "entity" if disambig_shown else "name"
+                continue
+            stage = "results"
+
+        elif stage == "results":
+            cancel = threading.Event()
+            cancelled, results = _run_cancellable(
+                lambda: fan_out(provider, picked, cli_filters, cancel_event=cancel),
+                f"Searching {provider.name} for {len(picked)} title(s)…",
+                cancel=cancel,
+            )
+            if cancelled:
+                stage = "works"
+                continue
+            results = results or []
+            if not results:
+                _notice("No torrents found for the selected title(s).")
+                stage = "works"
+                continue
+            label = f"{facet.label}: {entity.name}"
+            record_search(provider.slug, label, [p.name for p in getattr(provider, "active_presets", [])])
+            if browse_fn(provider, results) == "back":
+                stage = "works"
+                continue
+            return "next"

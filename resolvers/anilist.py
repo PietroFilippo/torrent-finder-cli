@@ -39,6 +39,31 @@ def _post(query: str, variables: dict) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def _paginate_edges(query: str, base_vars: dict, extract, max_pages: int = 8) -> list:
+    """Page through an AniList connection and return all its edges.
+
+    ``extract(data)`` returns the connection dict (``{pageInfo, edges}``) for one
+    page, or None. Stops at the last page or ``max_pages``, whichever comes
+    first. Prolific staff/studios have many 50-edge pages of credits, and
+    staffMedia mixes every role — so a director's older *directed* works only
+    surface once we read past the recent (and non-director) credits.
+    """
+    edges: list = []
+    page = 1
+    while page <= max_pages:
+        data = _post(query, {**base_vars, "page": page})
+        if not data:
+            break
+        conn = extract(data)
+        if not conn:
+            break
+        edges.extend(conn.get("edges") or [])
+        if not (conn.get("pageInfo") or {}).get("hasNextPage"):
+            break
+        page += 1
+    return edges
+
+
 def _is_director_role(role: str) -> bool:
     r = (role or "").lower()
     if "director" not in r:
@@ -46,7 +71,7 @@ def _is_director_role(role: str) -> bool:
     return not any(bad in r for bad in _DIRECTOR_ROLE_EXCLUDE)
 
 
-def _node_to_work(node: dict) -> Work:
+def _node_to_work(node: dict, role: str = "") -> Work:
     """Build a Work from a media node, using romaji as primary + english as alt."""
     title = node.get("title") or {}
     romaji = title.get("romaji")
@@ -69,6 +94,7 @@ def _node_to_work(node: dict) -> Work:
         alt_titles=tuple(alts),
         year=year,
         subtitle=" · ".join(sub_bits),
+        role=role,
     )
 
 
@@ -90,9 +116,10 @@ query ($search: String) {
 """
 
 _STAFF_MEDIA_Q = """
-query ($id: Int) {
+query ($id: Int, $page: Int) {
   Staff(id: $id) {
-    staffMedia(type: ANIME, perPage: 50, sort: START_DATE_DESC) {
+    staffMedia(type: ANIME, page: $page, perPage: 50, sort: START_DATE_DESC) {
+      pageInfo { hasNextPage }
       edges {
         staffRole
         node { id title { romaji english native } startDate { year } format }
@@ -134,10 +161,10 @@ def staff_search(name: str) -> list[Entity]:
 
 def director_works(entity: Entity) -> list[Work]:
     """List a person's anime where they hold a show-director role."""
-    data = _post(_STAFF_MEDIA_Q, {"id": int(entity.id)})
-    if not data:
-        return []
-    edges = ((data.get("Staff") or {}).get("staffMedia") or {}).get("edges") or []
+    edges = _paginate_edges(
+        _STAFF_MEDIA_Q, {"id": int(entity.id)},
+        lambda d: (d.get("Staff") or {}).get("staffMedia"),
+    )
     seen: set = set()
     works: list[Work] = []
     for edge in edges:
@@ -148,7 +175,7 @@ def director_works(entity: Entity) -> list[Work]:
         if nid in seen:
             continue
         seen.add(nid)
-        works.append(_node_to_work(node))
+        works.append(_node_to_work(node, edge.get("staffRole") or ""))
     return works
 
 
@@ -170,9 +197,10 @@ query ($search: String) {
 """
 
 _STUDIO_MEDIA_Q = """
-query ($id: Int) {
+query ($id: Int, $page: Int) {
   Studio(id: $id) {
-    media(perPage: 50, sort: START_DATE_DESC) {
+    media(page: $page, perPage: 50, sort: START_DATE_DESC) {
+      pageInfo { hasNextPage }
       edges {
         isMainStudio
         node { id title { romaji english native } startDate { year } format }
@@ -206,10 +234,10 @@ def studio_search(name: str) -> list[Entity]:
 
 def studio_works(entity: Entity) -> list[Work]:
     """List a studio's anime (main-studio credits preferred)."""
-    data = _post(_STUDIO_MEDIA_Q, {"id": int(entity.id)})
-    if not data:
-        return []
-    edges = ((data.get("Studio") or {}).get("media") or {}).get("edges") or []
+    edges = _paginate_edges(
+        _STUDIO_MEDIA_Q, {"id": int(entity.id)},
+        lambda d: (d.get("Studio") or {}).get("media"),
+    )
     # Prefer titles where this studio was the main animator; fall back to all
     # credits if none are flagged main (keeps small/young studios usable).
     main = [e for e in edges if e.get("isMainStudio")]
