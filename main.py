@@ -7,7 +7,6 @@ Usage:
     python main.py -q "query"   # Direct search
 """
 import argparse
-import platform
 import threading
 import time
 import warnings
@@ -36,7 +35,7 @@ from torrent_session import TorrentSession
 from ui.prompts import clear_screen, download_method_prompt, episode_select_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
 from ui.table import interactive_select
 from updates import update_notice
-from utils import build_magnet
+from utils import build_magnet, start_esc_listener
 
 load_state(PROVIDERS)
 
@@ -52,49 +51,6 @@ _METHOD_TRACK = {
     "d": "webtorrent_download",
     "s": "subtitles",
 }
-
-
-def _start_cancel_listener(cancel_event: threading.Event) -> threading.Event:
-    """Watch for Esc on a daemon thread and set ``cancel_event`` when pressed.
-
-    Lets a blocking, non-interactive wait (e.g. the slow DHT metadata fetch in
-    the episode picker) be aborted with Esc instead of Ctrl+C — which would
-    kill the whole program. Returns a ``stop`` event the caller sets to tear
-    the listener down once the wait completes.
-    """
-    stop = threading.Event()
-
-    def listen() -> None:
-        if platform.system() == "Windows":
-            import msvcrt
-            while not stop.is_set():
-                if msvcrt.kbhit():
-                    if msvcrt.getch() == b"\x1b":  # Esc
-                        cancel_event.set()
-                        return
-                time.sleep(0.1)
-        else:
-            import select
-            import sys
-            import termios
-            import tty
-            fd = sys.stdin.fileno()
-            try:
-                old = termios.tcgetattr(fd)
-            except Exception:
-                return  # not a real tty — no key cancel available
-            try:
-                tty.setcbreak(fd)
-                while not stop.is_set():
-                    if select.select([sys.stdin], [], [], 0.1)[0]:
-                        if sys.stdin.read(1) == "\x1b":  # Esc
-                            cancel_event.set()
-                            return
-            finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old)
-
-    threading.Thread(target=listen, daemon=True).start()
-    return stop
 
 
 def _goodbye() -> None:
@@ -243,6 +199,11 @@ def _main_loop() -> None:
     # into Filters/Stats/Tips and back doesn't lose what was typed.
     pending_query = ""
 
+    # Results produced by the "search by creator" flow (Tab → Search by creator).
+    # When set, the search section below uses them directly instead of running a
+    # plain-text provider search; `query` carries a display label for the header.
+    creator_results = None
+
     while True:
         if not current_provider:
             result = provider_select_prompt(notice=update_msg)
@@ -266,9 +227,12 @@ def _main_loop() -> None:
             active_names = [p.name for p in provider.active_presets]
             active_name = ", ".join(active_names) if active_names else "None"
             console.print(f"[dim]Engines:[/dim] [cyan]{engine_str}[/cyan]   [dim]Filters:[/dim] [cyan]{active_name}[/cyan]")
+            _actions_hint = "filters, history, stats, tips"
+            if getattr(provider, "creator_facets", []):
+                _actions_hint = "filters, history, creator, stats, tips"
             console.print(
                 "[dim]Type to search  •  [/dim][bold]Tab[/bold] [dim]actions "
-                "(filters, history, stats, tips)  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
+                f"({_actions_hint})  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
             )
             if notice_msg:
                 console.print(notice_msg)
@@ -293,7 +257,9 @@ def _main_loop() -> None:
                 from ui.prompts import quick_actions_menu
                 query = None
                 while True:
-                    action = quick_actions_menu()
+                    action = quick_actions_menu(
+                        show_creator=bool(getattr(provider, "creator_facets", []))
+                    )
                     if action == "filter":
                         filter_menu(provider)
                     elif action == "history":
@@ -306,6 +272,12 @@ def _main_loop() -> None:
                             if hist_prov:
                                 current_provider = hist_prov
                             break  # past search chosen → leave the menu and run it
+                    elif action == "creator":
+                        from ui.creator import creator_search_flow
+                        outcome = creator_search_flow(provider, cli_filters)
+                        if outcome is not None:
+                            query, creator_results = outcome
+                            break  # creator results ready → leave the menu and show them
                     elif action == "stats":
                         from ui.stats import stats_page
                         stats_page()
@@ -325,54 +297,67 @@ def _main_loop() -> None:
             query = None
             continue
 
-        # Search using provider
-        console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{query}[/highlight]...")
-        if getattr(provider, "search_note", ""):
-            console.print(f"[dim]{provider.search_note}[/dim]")
-        console.print("[dim]Press Esc to cancel and go back.[/dim]")
+        # Search using provider — unless the by-creator flow already produced
+        # results (in which case `query` is a display label, not a search term).
+        if creator_results is not None:
+            results = creator_results
+            creator_results = None
+            if not results:
+                notice_msg = "[warning] No results found for that creator.[/warning]\n"
+                clear_screen()
+                query = None
+                continue
+            # A creator label isn't a replayable plain-text query, so record the
+            # stat (keeps the session search count honest) but skip history.
+            record_search(provider.slug, query, [pr.name for pr in getattr(provider, "active_presets", [])])
+        else:
+            console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{query}[/highlight]...")
+            if getattr(provider, "search_note", ""):
+                console.print(f"[dim]{provider.search_note}[/dim]")
+            console.print("[dim]Press Esc to cancel and go back.[/dim]")
 
-        # Run the search on a worker thread so Esc can abort the wait instead of
-        # forcing the user to sit through the engine timeouts (or hit Ctrl+C).
-        search_result: dict = {}
+            # Run the search on a worker thread so Esc can abort the wait instead
+            # of forcing the user to sit through the engine timeouts (or Ctrl+C).
+            search_result: dict = {}
 
-        def _run_search() -> None:
+            def _run_search() -> None:
+                try:
+                    search_result["results"] = provider.search(query, cli_filters=cli_filters)
+                except Exception:
+                    search_result["results"] = []
+                finally:
+                    search_result["done"] = True
+
+            cancel_event = threading.Event()
+            worker = threading.Thread(target=_run_search, daemon=True)
+            worker.start()
+            stop_listener = start_esc_listener(cancel_event)
             try:
-                search_result["results"] = provider.search(query, cli_filters=cli_filters)
-            except Exception:
-                search_result["results"] = []
+                with console.status(f"[bold cyan]Searching {provider.name}...[/bold cyan]", spinner="dots"):
+                    while not search_result.get("done") and not cancel_event.is_set():
+                        time.sleep(0.05)
             finally:
-                search_result["done"] = True
+                stop_listener.set()
 
-        cancel_event = threading.Event()
-        worker = threading.Thread(target=_run_search, daemon=True)
-        worker.start()
-        stop_listener = _start_cancel_listener(cancel_event)
-        try:
-            with console.status(f"[bold cyan]Searching {provider.name}...[/bold cyan]", spinner="dots"):
-                while not search_result.get("done") and not cancel_event.is_set():
-                    time.sleep(0.05)
-        finally:
-            stop_listener.set()
+            if cancel_event.is_set():
+                notice_msg = "[warning] Search cancelled — returning to the prompt.[/warning]\n"
+                clear_screen()
+                query = None
+                continue
 
-        if cancel_event.is_set():
-            notice_msg = "[warning] Search cancelled — returning to the prompt.[/warning]\n"
-            clear_screen()
-            query = None
-            continue
+            results = search_result.get("results") or []
 
-        results = search_result.get("results") or []
+            if not results:
+                notice_msg = "[warning] No results found.[/warning]\n"
+                clear_screen()
+                query = None
+                continue
 
-        if not results:
-            notice_msg = "[warning] No results found.[/warning]\n"
-            clear_screen()
-            query = None
-            continue
-
-        # Record successful search in history + stats
-        from state import add_history_entry
-        active_preset_names = [pr.name for pr in getattr(provider, "active_presets", [])]
-        add_history_entry(query, provider.slug, active_preset_names)
-        record_search(provider.slug, query, active_preset_names)
+            # Record successful search in history + stats
+            from state import add_history_entry
+            active_preset_names = [pr.name for pr in getattr(provider, "active_presets", [])]
+            add_history_entry(query, provider.slug, active_preset_names)
+            record_search(provider.slug, query, active_preset_names)
 
         # Torrent selection + download loop (allows going back to results)
         while True:
@@ -465,7 +450,7 @@ def _main_loop() -> None:
                     console.print("[dim]Needs peers — if the torrent has no seeders, this won't work.[/dim]")
                     console.print("[dim]Press Esc to cancel and go back.[/dim]\n")
                     cancel_event = threading.Event()
-                    stop_listener = _start_cancel_listener(cancel_event)
+                    stop_listener = start_esc_listener(cancel_event)
                     try:
                         with console.status("[bold cyan]Fetching file list...[/bold cyan]", spinner="dots"):
                             metadata = session.fetch_files_meta(cancel_event=cancel_event)

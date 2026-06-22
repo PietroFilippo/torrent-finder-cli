@@ -1,8 +1,55 @@
 """Utility functions for formatting, styling, and magnet link building."""
 
 import re
+import threading
+import time
 
 from constants import TRACKERS
+
+
+def start_esc_listener(cancel_event: "threading.Event") -> "threading.Event":
+    """Watch for Esc on a daemon thread and set ``cancel_event`` when pressed.
+
+    Lets a blocking, non-interactive wait (search fan-out, DHT metadata fetch,
+    creator lookups) be aborted with Esc instead of Ctrl+C — which would kill
+    the whole program. Returns a ``stop`` event the caller sets to tear the
+    listener down once the wait completes.
+    """
+    import platform
+
+    stop = threading.Event()
+
+    def listen() -> None:
+        if platform.system() == "Windows":
+            import msvcrt
+            while not stop.is_set():
+                if msvcrt.kbhit():
+                    if msvcrt.getch() == b"\x1b":  # Esc
+                        cancel_event.set()
+                        return
+                time.sleep(0.1)
+        else:
+            import select
+            import sys
+            import termios
+            import tty
+            fd = sys.stdin.fileno()
+            try:
+                old = termios.tcgetattr(fd)
+            except Exception:
+                return  # not a real tty — no key cancel available
+            try:
+                tty.setcbreak(fd)
+                while not stop.is_set():
+                    if select.select([sys.stdin], [], [], 0.1)[0]:
+                        if sys.stdin.read(1) == "\x1b":  # Esc
+                            cancel_event.set()
+                            return
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+    threading.Thread(target=listen, daemon=True).start()
+    return stop
 
 
 def format_size(size_bytes: int) -> str:

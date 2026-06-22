@@ -116,35 +116,38 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "") -> "str | tuple 
             repaint(prev_col, prev_len)
 
 
-def quick_actions_menu() -> "str | None":
+def quick_actions_menu(show_creator: bool = False) -> "str | None":
     """Search-prompt quick actions, opened with Tab.
 
-    Returns "filter", "history", "stats", "tips", or None if cancelled. The
-    familiar F/H/S/T letters jump straight to each action; arrows + Enter also
-    work. Lives behind Tab so it never clashes with typing a query.
+    Returns "filter", "history", "creator", "stats", "tips", or None if
+    cancelled. The familiar F/H/S/T letters (plus C for creator, when shown)
+    jump straight to each action; arrows + Enter also work. Lives behind Tab so
+    it never clashes with typing a query. ``show_creator`` adds the by-creator
+    action for providers that declare ``creator_facets``.
     """
-    items = [
-        SelectItem(label="🔍 Filters & engines", value="filter", is_action=True, hint="F"),
-        SelectItem(label="🕑 Search history", value="history", is_action=True, hint="H"),
-        SelectItem(label="📊 Usage stats", value="stats", is_action=True, hint="S"),
-        SelectItem(label="💡 Tips & shortcuts", value="tips", is_action=True, hint="T"),
-        SelectItem(label="↩  Back", value=None, is_action=True),
-    ]
+    items: list[SelectItem] = []
+    key_actions: dict = {}
 
-    def _pick(index: int):
-        return lambda cursor, items_list: index
+    def _add(label: str, value: str, keys: tuple, hint: str) -> None:
+        items.append(SelectItem(label=label, value=value, is_action=True, hint=hint))
+        i = len(items) - 1
+        for k in keys:
+            key_actions[k] = (lambda idx: (lambda cursor, items_list: idx))(i)
 
-    key_actions = {
-        "F": _pick(0), "f": _pick(0),
-        "H": _pick(1), "h": _pick(1),
-        "S": _pick(2), "s": _pick(2),
-        "T": _pick(3), "t": _pick(3),
-    }
+    _add("🔍 Filters & engines", "filter", ("F", "f"), "F")
+    _add("🕑 Search history", "history", ("H", "h"), "H")
+    if show_creator:
+        _add("🎬 Search by creator", "creator", ("C", "c"), "C")
+    _add("📊 Usage stats", "stats", ("S", "s"), "S")
+    _add("💡 Tips & shortcuts", "tips", ("T", "t"), "T")
+    items.append(SelectItem(label="↩  Back", value=None, is_action=True))
+
+    jumps = "F / H / " + ("C / " if show_creator else "") + "S / T"
     idx = arrow_select(
         items,
         title="Quick actions",
         banner=_make_banner_panel(),
-        footer="↑/↓ select  •  F / H / S / T jump  •  Esc back",
+        footer=f"↑/↓ select  •  {jumps} jump  •  Esc back",
         key_actions=key_actions,
     )
     if idx is None:
