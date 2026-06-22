@@ -4,7 +4,7 @@ import requests
 
 from filters import FilterConfig, FilterPreset
 from providers.base import BaseProvider, SearchEngine
-from resolvers import CreatorFacet, tmdb
+from resolvers import CreatorFacet, movies
 
 
 class MovieProvider(BaseProvider):
@@ -32,23 +32,23 @@ class MovieProvider(BaseProvider):
         ])),
     ]
 
-    # Search by creator via TMDB (needs a free TMDB_API_KEY; the facets are
-    # hidden until one is configured). Director = combined movie + TV credits;
-    # Studio = a production company's films (popularity-ordered, paged).
+    # Search by creator. Always available: uses the keyless Wikidata fallback by
+    # default, and richer TMDB data when a TMDB_API_KEY is configured (see
+    # resolvers/movies.py). Director = films + TV; Studio = a company's films.
     creator_facets = [
         CreatorFacet(
             key="director", label="Director", icon="🎬",
-            search_entities=tmdb.person_search,
-            list_works=tmdb.director_works,
-            note="Find a director's films & shows via TMDB, then search each title.",
-            requires_cred="TMDB_API_KEY",
+            search_entities=movies.director_search,
+            list_works=movies.director_works,
+            note="Find a director's films & shows, then search each title. "
+                 "Add a TMDB key (Credentials) for richer results.",
         ),
         CreatorFacet(
             key="studio", label="Studio", icon="🏢",
-            search_entities=tmdb.company_search,
-            list_works=tmdb.company_works,
-            note="Find a studio/company's films via TMDB, then search each title.",
-            requires_cred="TMDB_API_KEY",
+            search_entities=movies.studio_search,
+            list_works=movies.studio_works,
+            note="Find a studio/company's films, then search each title. "
+                 "Add a TMDB key (Credentials) for richer results.",
         ),
     ]
 
