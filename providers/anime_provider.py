@@ -2,6 +2,7 @@
 
 from filters import FilterConfig, FilterPreset
 from providers.base import BaseProvider, SearchEngine
+from resolvers import CreatorFacet, anilist
 
 
 class AnimeProvider(BaseProvider):
@@ -26,6 +27,23 @@ class AnimeProvider(BaseProvider):
             "subsplease", "erai-raws", "erai", "horriblesubs",
             "judas", "toonshub", "commie", "mtbb",
         ])),
+    ]
+
+    # Search by creator (Tab → Search by creator). AniList resolves the person/
+    # studio to a filmography; each picked title is then searched on Nyaa.
+    creator_facets = [
+        CreatorFacet(
+            key="director", label="Director",
+            search_entities=anilist.staff_search,
+            list_works=anilist.director_works,
+            note="Find a director's anime via AniList, then search each title.",
+        ),
+        CreatorFacet(
+            key="studio", label="Studio",
+            search_entities=anilist.studio_search,
+            list_works=anilist.studio_works,
+            note="Find a studio's anime via AniList, then search each title.",
+        ),
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
