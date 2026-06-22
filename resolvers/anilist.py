@@ -1,12 +1,13 @@
-"""AniList GraphQL resolver — anime director + studio lookups.
+"""AniList GraphQL resolver — anime director/studio + manga writer lookups.
 
 Keyless public API (https://anilist.co/graphiql). Each function fails soft to an
 empty list on any network/parse error, matching the provider search backends.
 
 Roles come back as free-text strings on the staff↔media edge ("Director",
-"Chief Director", "Animation Director", …). We keep only the *show* director
-roles and drop the many "<thing> Director" roles that aren't (animation, sound,
-art, episode, …).
+"Chief Director", "Animation Director", "Story", "Story & Art", …). For anime we
+keep only the *show* director roles (dropping animation/sound/art/episode/…); for
+manga we keep the writer/author roles (Story, Story & Art, Original Creator) and
+drop the pure "Art" credit.
 """
 
 import requests
@@ -20,6 +21,10 @@ _DIRECTOR_ROLE_EXCLUDE = (
     "animation", "sound", "art", "episode", "assistant",
     "photography", "technical", "recording",
 )
+
+# Manga writer/author roles. Substring match keeps "Story", "Story & Art" and
+# "Original Creator"/"Original Story"; the pure "Art" credit (artist) is dropped.
+_WRITER_ROLE_INCLUDE = ("story", "original creator", "original story")
 
 
 def _post(query: str, variables: dict) -> dict | None:
@@ -39,7 +44,7 @@ def _post(query: str, variables: dict) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def _paginate_edges(query: str, base_vars: dict, extract, max_pages: int = 8) -> list:
+def _paginate_edges(query: str, base_vars: dict, extract, max_pages: int = 12) -> list:
     """Page through an AniList connection and return all its edges.
 
     ``extract(data)`` returns the connection dict (``{pageInfo, edges}``) for one
@@ -69,6 +74,11 @@ def _is_director_role(role: str) -> bool:
     if "director" not in r:
         return False
     return not any(bad in r for bad in _DIRECTOR_ROLE_EXCLUDE)
+
+
+def _is_writer_role(role: str) -> bool:
+    r = (role or "").lower()
+    return any(good in r for good in _WRITER_ROLE_INCLUDE)
 
 
 def _node_to_work(node: dict, role: str = "") -> Work:
@@ -116,9 +126,9 @@ query ($search: String) {
 """
 
 _STAFF_MEDIA_Q = """
-query ($id: Int, $page: Int) {
+query ($id: Int, $page: Int, $type: MediaType) {
   Staff(id: $id) {
-    staffMedia(type: ANIME, page: $page, perPage: 50, sort: START_DATE_DESC) {
+    staffMedia(type: $type, page: $page, perPage: 50, sort: START_DATE_DESC) {
       pageInfo { hasNextPage }
       edges {
         staffRole
@@ -130,11 +140,15 @@ query ($id: Int, $page: Int) {
 """
 
 
-def staff_search(name: str) -> list[Entity]:
-    """Resolve a person name to candidate staff entities (for disambiguation)."""
+def staff_search(name: str) -> "list[Entity] | None":
+    """Resolve a person name to candidate staff entities (for disambiguation).
+
+    Returns None when AniList can't be reached (caller shows "service
+    unavailable"); [] when there's genuinely no matching staff.
+    """
     data = _post(_STAFF_SEARCH_Q, {"search": name})
-    if not data:
-        return []
+    if data is None:
+        return None
     out: list[Entity] = []
     for staff in (data.get("Page") or {}).get("staff") or []:
         nm = staff.get("name") or {}
@@ -159,24 +173,45 @@ def staff_search(name: str) -> list[Entity]:
     return out
 
 
-def director_works(entity: Entity) -> list[Work]:
-    """List a person's anime where they hold a show-director role."""
+def _staff_works(entity: Entity, media_type: str, role_ok) -> list[Work]:
+    """List a person's media of ``media_type`` (ANIME/MANGA) whose role passes
+    ``role_ok``. Paginated and deduped by media id."""
     edges = _paginate_edges(
-        _STAFF_MEDIA_Q, {"id": int(entity.id)},
+        _STAFF_MEDIA_Q, {"id": int(entity.id), "type": media_type},
         lambda d: (d.get("Staff") or {}).get("staffMedia"),
     )
     seen: set = set()
     works: list[Work] = []
     for edge in edges:
-        if not _is_director_role(edge.get("staffRole")):
+        role = edge.get("staffRole") or ""
+        if not role_ok(role):
             continue
         node = edge.get("node") or {}
         nid = node.get("id")
         if nid in seen:
             continue
         seen.add(nid)
-        works.append(_node_to_work(node, edge.get("staffRole") or ""))
+        works.append(_node_to_work(node, role))
     return works
+
+
+def director_works(entity: Entity, page: int = 1) -> "tuple[list[Work], bool]":
+    """List a person's anime where they hold a show-director role.
+
+    AniList facets fetch the whole (internally capped) filmography eagerly, so
+    there's never a second page — returns ``(works, has_more=False)``.
+    """
+    if page != 1:
+        return [], False
+    return _staff_works(entity, "ANIME", _is_director_role), False
+
+
+def manga_writer_works(entity: Entity, page: int = 1) -> "tuple[list[Work], bool]":
+    """List a person's manga where they're the writer/author (Story / Story & Art
+    / Original Creator). Eager, single page — returns ``(works, False)``."""
+    if page != 1:
+        return [], False
+    return _staff_works(entity, "MANGA", _is_writer_role), False
 
 
 # --- Studio -----------------------------------------------------------------
@@ -211,11 +246,14 @@ query ($id: Int, $page: Int) {
 """
 
 
-def studio_search(name: str) -> list[Entity]:
-    """Resolve a studio name to candidate studio entities (for disambiguation)."""
+def studio_search(name: str) -> "list[Entity] | None":
+    """Resolve a studio name to candidate studio entities (for disambiguation).
+
+    Returns None when AniList can't be reached; [] when no studio matches.
+    """
     data = _post(_STUDIO_SEARCH_Q, {"search": name})
-    if not data:
-        return []
+    if data is None:
+        return None
     out: list[Entity] = []
     for st in (data.get("Page") or {}).get("studios") or []:
         kind = "Animation studio" if st.get("isAnimationStudio") else "Studio"
@@ -232,8 +270,11 @@ def studio_search(name: str) -> list[Entity]:
     return out
 
 
-def studio_works(entity: Entity) -> list[Work]:
-    """List a studio's anime (main-studio credits preferred)."""
+def studio_works(entity: Entity, page: int = 1) -> "tuple[list[Work], bool]":
+    """List a studio's anime (main-studio credits preferred). Eager, single page
+    — returns ``(works, has_more=False)``."""
+    if page != 1:
+        return [], False
     edges = _paginate_edges(
         _STUDIO_MEDIA_Q, {"id": int(entity.id)},
         lambda d: (d.get("Studio") or {}).get("media"),
@@ -251,4 +292,4 @@ def studio_works(entity: Entity) -> list[Work]:
             continue
         seen.add(nid)
         works.append(_node_to_work(node))
-    return works
+    return works, False

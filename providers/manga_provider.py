@@ -2,6 +2,7 @@
 
 from filters import FilterConfig, FilterPreset
 from providers.base import BaseProvider, SearchEngine
+from resolvers import CreatorFacet, anilist, jikan
 
 
 class MangaProvider(BaseProvider):
@@ -24,6 +25,24 @@ class MangaProvider(BaseProvider):
             "viz", "kodansha", "yen press", "seven seas", "square enix", "j-novel",
         ])),
         FilterPreset("Exclude Light Novels", FilterConfig(exclude_keywords=["light novel"])),
+    ]
+
+    # Search by creator. AniList resolves the writer/author to their manga; Jikan
+    # resolves a Japanese serialization magazine to the manga it ran. Each picked
+    # title is then searched on the torrent backends. Both keyless.
+    creator_facets = [
+        CreatorFacet(
+            key="writer", label="Writer", icon="📝",
+            search_entities=anilist.staff_search,
+            list_works=anilist.manga_writer_works,
+            note="Find a writer's manga via AniList, then search each title.",
+        ),
+        CreatorFacet(
+            key="magazine", label="Magazine", icon="📰",
+            search_entities=jikan.magazine_search,
+            list_works=jikan.magazine_works,
+            note="Find a magazine's serialized manga via MyAnimeList, then search each title.",
+        ),
     ]
 
     def _init_engines(self) -> list[SearchEngine]:

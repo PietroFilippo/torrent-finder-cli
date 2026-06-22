@@ -42,7 +42,7 @@ class CreatorFacet:
     """A way to search a provider by a creator role (director, studio, …)."""
     key: str                                   # stable id, e.g. "director"
     label: str                                 # display label, e.g. "Director"
-    search_entities: Callable[[str], list]     # name -> list[Entity]
-    list_works: Callable[[object], list]       # Entity -> list[Work]
+    search_entities: Callable[[str], list]     # name -> list[Entity] | None (None = service down)
+    list_works: Callable[..., tuple]           # (Entity, page=1) -> (list[Work], has_more)
     note: str = ""                             # optional one-line UI hint
     icon: str = ""                             # optional emoji for the source menu
