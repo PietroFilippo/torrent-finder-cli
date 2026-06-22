@@ -1134,7 +1134,7 @@ _CRED_PROVIDERS = [
             ("TMDB_API_KEY", "API key (v3)", True),
         ],
         "required": ["TMDB_API_KEY"],
-        "limit": "Free TMDB v3 API key — unlocks Movies & Series 'by director / studio'. Without it those facets are hidden.",
+        "limit": "Optional — Movies & Series 'by director / studio' works keyless via Wikidata; a free TMDB v3 API key upgrades it to richer results.",
     },
 ]
 
