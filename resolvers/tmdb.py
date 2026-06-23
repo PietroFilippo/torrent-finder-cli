@@ -9,6 +9,8 @@ Director = eager (TMDB returns a person's whole filmography in one call).
 Studio  = network-paged (TMDB discover is 20/page with a total_pages count).
 """
 
+import concurrent.futures
+
 import requests
 
 import credentials
@@ -116,21 +118,34 @@ def director_works(entity: Entity, page: int = 1) -> "tuple[list[Work], bool]":
 # --- Studio (company) -------------------------------------------------------
 
 def company_search(name: str) -> "list[Entity] | None":
-    """Resolve a studio/company name to candidates. None when TMDB unreachable."""
+    """Resolve a studio/company name to candidates, ranked by film count.
+
+    TMDB often has duplicate company entries with identical names — one populated,
+    one a near-empty stub — which are indistinguishable by name alone. So enrich
+    each with its film count (one discover call apiece, concurrent), drop the
+    empty ones, rank by count, and label it. None when TMDB is unreachable.
+    """
     data = _get("/search/company", {"query": name})
     if data is None:
         return None
-    out: list[Entity] = []
-    for co in (data.get("results") or [])[:10]:
-        cid = co.get("id")
-        if cid is None:
-            continue
-        country = co.get("origin_country") or ""
-        out.append(Entity(
-            id=str(cid), name=co.get("name") or "Unknown",
-            detail=f"Company ({country})" if country else "Company",
-        ))
-    return out
+    candidates = [c for c in (data.get("results") or []) if c.get("id") is not None][:10]
+    if not candidates:
+        return []
+
+    def _film_count(cid: int) -> int:
+        d = _get("/discover/movie", {"with_companies": cid, "page": 1})
+        return (d or {}).get("total_results", 0)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(candidates))) as ex:
+        counts = list(ex.map(lambda c: _film_count(c["id"]), candidates))
+
+    ranked = sorted(((c, n) for c, n in zip(candidates, counts) if n > 0),
+                    key=lambda t: t[1], reverse=True)
+    return [
+        Entity(id=str(co["id"]), name=co.get("name") or "Unknown",
+               detail=f"{n} film{'s' if n != 1 else ''}")
+        for co, n in ranked
+    ]
 
 
 def company_works(entity: Entity, page: int = 1) -> "tuple[list[Work], bool]":
