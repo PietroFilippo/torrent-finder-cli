@@ -1,7 +1,8 @@
 """Game torrent provider — searches PC game and console categories."""
 
 from filters import FilterConfig, FilterPreset
-from providers.base import BaseProvider
+from providers.base import BaseProvider, SearchEngine
+from resolvers import CreatorFacet, games
 
 
 class GameProvider(BaseProvider):
@@ -27,3 +28,40 @@ class GameProvider(BaseProvider):
             "plaza", "codex", "rune", "tenoke", "skidrow",
         ])),
     ]
+
+    # Search by creator. Always available: keyless Wikidata fallback by default,
+    # richer IGDB data when Twitch creds are configured (see resolvers/games.py).
+    # Developer and publisher are separate facets (a company can be both).
+    creator_facets = [
+        CreatorFacet(
+            key="developer", label="Developer", icon="🎮",
+            search_entities=games.developer_search,
+            list_works=games.developer_works,
+            note="Find a developer's games, then search each title. "
+                 "Add IGDB creds (Credentials) for richer results.",
+        ),
+        CreatorFacet(
+            key="publisher", label="Publisher", icon="🏢",
+            search_entities=games.publisher_search,
+            list_works=games.publisher_works,
+            note="Find a publisher's games, then search each title. "
+                 "Add IGDB creds (Credentials) for richer results.",
+        ),
+    ]
+
+    def _init_engines(self) -> list[SearchEngine]:
+        """Public trackers + Online-Fix. Online-Fix is folded in as a toggleable
+        engine (anonymous search) so it's included in both keyword and
+        by-developer/publisher searches; the standalone Online-Fix provider stays
+        for focused searches. A picked Online-Fix result is routed to its
+        .torrent handler by the results loop (source == "Online-Fix")."""
+        return [
+            SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
+            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=True),
+            SearchEngine("Online-Fix", "🔧", self._search_online_fix, enabled=True),
+        ]
+
+    def _search_online_fix(self, query: str) -> list[dict]:
+        """Anonymous online-fix.me search (same backend as the standalone provider)."""
+        import online_fix
+        return online_fix.search(query)

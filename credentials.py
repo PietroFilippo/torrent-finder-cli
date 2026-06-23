@@ -29,6 +29,8 @@ _FILE_KEYS = {
     "ONLINE_FIX_USERNAME": "online_fix_username",
     "ONLINE_FIX_PASSWORD": "online_fix_password",
     "TMDB_API_KEY": "tmdb_api_key",
+    "IGDB_CLIENT_ID": "igdb_client_id",
+    "IGDB_CLIENT_SECRET": "igdb_client_secret",
 }
 
 _file_cache: dict | None = None
