@@ -131,3 +131,25 @@ def company_works(entity: Entity, page: int = 1) -> "tuple[list[Work], bool]":
     if page != 1:
         return [], False
     return _works(entity, "P272")
+
+
+# --- Games (P178 developer, P123 publisher) — same generic helpers ----------
+
+def developer_search(name: str) -> "list[Entity] | None":
+    return _search(name, "P178")
+
+
+def developer_works(entity: Entity, page: int = 1) -> "tuple[list[Work], bool]":
+    if page != 1:
+        return [], False
+    return _works(entity, "P178")
+
+
+def publisher_search(name: str) -> "list[Entity] | None":
+    return _search(name, "P123")
+
+
+def publisher_works(entity: Entity, page: int = 1) -> "tuple[list[Work], bool]":
+    if page != 1:
+        return [], False
+    return _works(entity, "P123")
