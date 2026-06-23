@@ -117,3 +117,15 @@ def icon_for(slug: str) -> str:
     """Return the icon for a provider slug, or a generic fallback."""
     p = get_provider_by_slug(slug)
     return p.icon if p else "🔍"
+
+
+def group_for(provider) -> "ProviderGroup | None":
+    """Return the display ProviderGroup that contains this provider, or None.
+
+    Lets back-navigation from a group child (Online-Fix, Desktop, Mobile,
+    RuTracker) return to the group's source submenu instead of the top list.
+    """
+    for item in PROVIDER_MENU:
+        if isinstance(item, ProviderGroup) and provider in item.children:
+            return item
+    return None

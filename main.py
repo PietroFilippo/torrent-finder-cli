@@ -19,7 +19,7 @@ from constants import console
 import readchar
 from downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, open_torrent_file, stream_with_peerflix, stream_with_webtorrent
 from filters import FilterConfig
-from providers import PROVIDERS, get_provider
+from providers import PROVIDERS, get_provider, group_for
 from security import show_security_warning
 from state import load_state
 from stats import (
@@ -488,9 +488,14 @@ def _main_loop() -> None:
     # into Filters/Stats/Tips and back doesn't lose what was typed.
     pending_query = ""
 
+    # When set, the next provider selection re-opens this group's submenu (so
+    # backing out of a group child returns to its source list, not the top list).
+    pending_open_group = None
+
     while True:
         if not current_provider:
-            result = provider_select_prompt(notice=update_msg)
+            result = provider_select_prompt(notice=update_msg, open_group=pending_open_group)
+            pending_open_group = None
             if result is None:
                 _goodbye()
                 break
@@ -505,6 +510,9 @@ def _main_loop() -> None:
                 # plain providers return "keyword" immediately.
                 nxt = _provider_entry(current_provider, cli_filters)
                 if nxt == "provider":
+                    # Back out → the provider's group submenu if it came from one,
+                    # otherwise the top provider list.
+                    pending_open_group = group_for(current_provider)
                     current_provider = None
                     continue
                 if nxt == "next":
@@ -541,6 +549,9 @@ def _main_loop() -> None:
                 break
 
             if query == "GO_BACK":
+                # Back out → the provider's group submenu if it came from one,
+                # otherwise the top provider list.
+                pending_open_group = group_for(provider)
                 current_provider = None
                 query = None
                 continue
