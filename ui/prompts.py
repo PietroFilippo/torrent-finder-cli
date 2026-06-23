@@ -1136,6 +1136,17 @@ _CRED_PROVIDERS = [
         "required": ["TMDB_API_KEY"],
         "limit": "Optional — Movies & Series 'by director / studio' works keyless via Wikidata; a free TMDB v3 API key upgrades it to richer results.",
     },
+    {
+        "id": "igdb",
+        "icon": "🎮",
+        "name": "IGDB (Games — search by developer / publisher)",
+        "fields": [
+            ("IGDB_CLIENT_ID", "Twitch Client ID", False),
+            ("IGDB_CLIENT_SECRET", "Twitch Client Secret", True),
+        ],
+        "required": ["IGDB_CLIENT_ID", "IGDB_CLIENT_SECRET"],
+        "limit": "Optional — Games 'by developer / publisher' works keyless via Wikidata; free Twitch/IGDB creds (dev.twitch.tv → register an app) upgrade it to richer results.",
+    },
 ]
 
 
@@ -1283,6 +1294,9 @@ def _test_provider_credentials(provider_id: str, effective: dict) -> tuple[bool,
         if provider_id == "tmdb":
             from resolvers import tmdb
             return tmdb.test_api_key(effective["TMDB_API_KEY"])
+        if provider_id == "igdb":
+            from resolvers import igdb
+            return igdb.test_credentials(effective["IGDB_CLIENT_ID"], effective["IGDB_CLIENT_SECRET"])
     return False, "unknown provider"
 
 
@@ -1582,7 +1596,7 @@ def _provider_source_menu(provider, facets=None) -> "str | object | None":
     return None  # __back__
 
 
-def provider_select_prompt(notice: str = "") -> object | None:
+def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
     """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled.
 
     Press F on a highlighted provider to configure its filters without leaving the menu.
@@ -1593,11 +1607,21 @@ def provider_select_prompt(notice: str = "") -> object | None:
     ``notice`` is an optional Rich-markup line (e.g. an "update available"
     banner) prepended to the footer; pass "" to show nothing.
 
+    ``open_group`` (a ProviderGroup) jumps straight into that group's submenu —
+    used by back-navigation from a group child so Esc returns to the source
+    submenu (Esc in the submenu then falls through to the full provider list).
+
     Returns:
         - A provider object for normal selection.
         - A ``("history", query, provider_obj)`` tuple when the user picks a history entry.
         - ``None`` if cancelled.
     """
+    if open_group is not None:
+        chosen = _provider_group_menu(open_group)
+        if chosen is not None:
+            return chosen
+        # backed out of the submenu → fall through to the full provider list
+
     provider_items = [
         SelectItem(label=p.label, value=p, description=getattr(p, "search_note", ""))
         for p in PROVIDER_MENU
