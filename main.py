@@ -439,6 +439,9 @@ def _main_loop() -> None:
     parser.add_argument("-f", "--filter", action="append", help="Include keyword in results")
     parser.add_argument("-x", "--exclude", action="append", help="Exclude keyword from results")
     parser.add_argument("-y", "--skip-warning", action="store_true", help="Skip network exposure warning")
+    parser.add_argument("--by", choices=["director", "studio", "writer", "magazine", "developer", "publisher"],
+                        help="Search by creator role (use with --name and -t), e.g. --by director")
+    parser.add_argument("--name", type=str, help='Creator name for --by, e.g. --name "Hayao Miyazaki"')
     args = parser.parse_args()
 
     if not args.skip_warning:
@@ -454,19 +457,37 @@ def _main_loop() -> None:
         if not initial_provider:
             console.print(f"[warning] Unknown provider type '{args.type}'. Falling back to Movies.[/warning]")
             initial_provider = PROVIDERS[0]
-    elif query:
-        # Backward compatibility: if -q is passed but no -t, default to Movies
+    elif query or args.by:
+        # If -q or --by is passed without -t, default to Movies.
         initial_provider = PROVIDERS[0]
 
     session_provider = initial_provider
     current_provider = session_provider
-    
+
     cli_filters = None
     if args.filter or args.exclude:
         cli_filters = FilterConfig(
             include_keywords=args.filter or [],
             exclude_keywords=args.exclude or [],
         )
+
+    # CLI creator search: -t <provider> --by <facet> --name "<name>" jumps
+    # straight into the by-creator flow (then the normal loop takes over).
+    cli_facet = None
+    pending_creator_name = None
+    if args.by:
+        cli_facet = next(
+            (f for f in getattr(current_provider, "creator_facets", []) if f.key == args.by),
+            None,
+        )
+        if cli_facet is None:
+            avail = ", ".join(f.key for f in getattr(current_provider, "creator_facets", [])) or "none"
+            console.print(f"[warning] {current_provider.name} has no '--by {args.by}' option (available: {avail}).[/warning]")
+        elif not args.name:
+            console.print('[warning] --by requires --name "<creator>".[/warning]')
+            cli_facet = None
+        else:
+            pending_creator_name = args.name
 
     # Clean the terminal for initial run if an interactive search is expected
     if not (args.type and args.query):
@@ -493,6 +514,23 @@ def _main_loop() -> None:
     pending_open_group = None
 
     while True:
+        # One-shot CLI creator search (--by/--name): jump into the by-creator
+        # flow, then fall into the normal what's-next / keyword loop.
+        if cli_facet is not None and pending_creator_name is not None:
+            from ui.creator import creator_search_flow
+            facet, nm = cli_facet, pending_creator_name
+            cli_facet = pending_creator_name = None
+            if creator_search_flow(current_provider, cli_filters, facet, browse_results, initial_name=nm) == "next":
+                res = _handle_whats_next(current_provider)
+                if res == "EXIT":
+                    _goodbye()
+                    break
+                query, current_provider = res
+            else:
+                query = None  # backed out → normal keyword prompt for this provider
+            clear_screen()
+            continue
+
         if not current_provider:
             result = provider_select_prompt(notice=update_msg, open_group=pending_open_group)
             pending_open_group = None
