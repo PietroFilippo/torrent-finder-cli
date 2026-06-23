@@ -343,14 +343,16 @@ def _name_input(provider, facet):
     return name.strip()
 
 
-def creator_search_flow(provider, cli_filters, facet, browse_fn):
+def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=None):
     """Drive the full by-creator journey with step-back navigation.
 
     Stages: name → (disambiguation) → works → torrent results → download. Esc at
     any stage steps back one screen; backing out past the name prompt returns to
     the source screen. ``browse_fn(provider, results)`` runs the shared
     results + download UI and returns "back" (Esc'd the results) or "next" (a
-    download completed).
+    download completed). ``initial_name`` (from the ``--by``/``--name`` CLI flags)
+    pre-seeds the first lookup, skipping the name prompt once; backing out of it
+    re-prompts interactively.
 
     Returns "back" (user left the journey → source screen) or "next" (a download
     completed → caller shows "what's next?").
@@ -362,10 +364,15 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn):
     works_by_entity: dict = {}
     picked = None
     stage = "name"
+    seeded = bool(initial_name and initial_name.strip())
 
     while True:
         if stage == "name":
-            new_name = _name_input(provider, facet)
+            if seeded:
+                new_name = initial_name.strip()
+                seeded = False  # only pre-seed the first pass
+            else:
+                new_name = _name_input(provider, facet)
             if new_name is None:
                 return "back"
             if new_name != name:

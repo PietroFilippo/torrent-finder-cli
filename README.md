@@ -8,6 +8,7 @@ On Windows, the included `torrent.bat` launcher can be added to your `PATH` so y
 
 - **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs via The Pirate Bay's Applications categories plus SolidTorrents), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and stays dormant until one is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`. **Games** is likewise a group: pick it and choose **General** (PC, consoles, ROMs & repacks from public trackers — The Pirate Bay's game categories plus SolidTorrents) or **Online-Fix** (scrapes [online-fix.me](https://online-fix.me) for co-op/online game cracks). On the CLI they're `-t game` and `-t online-fix`. Online-Fix needs **no account** — both search and download are anonymous (the file host is referer-gated, not login-gated); picking a result downloads the `.torrent` into your download folder and opens it in your system torrent client, showing the archive password (`online-fix.me`) to unpack the game with.
 - **Multi-Engine Fan-Out:** Each provider queries several sources in parallel (e.g. Apibay + SolidTorrents + YTS + Nyaa live-action for Movies & Series, Nyaa for Anime, Nyaa Literature + Apibay Comics for Manga) and merges results, deduplicating by info hash and sorting by seeders.
+- **Search by Creator:** Search by the people and companies behind the content instead of by title. After choosing a provider, a "choose how to search" screen offers normal keyword search **plus** by-creator options — **Anime** and **Movies & Series** by **director** or **studio**, **Manga** by **writer** or serialization **magazine**, **Games** by **developer** or **publisher** (kept separate — a company can be both). You type a name, disambiguate between matches, then multi-select which of that creator's titles to include (a paged checklist, 100 per page with `n`/`p`); the app runs a normal torrent search for each picked title and merges the results — so picking still uses all the usual download/stream/episode options. It works **keyless out of the box** (AniList for anime/manga staff, Jikan for manga magazines, Wikidata for movies/games), and an optional **TMDB** key (Movies & Series) or **Twitch/IGDB** credentials (Games) added under **🔑 Credentials** transparently upgrade those two to richer, better-ranked data. Online-Fix is included in the Games developer/publisher results. From the CLI: `--by <role> --name "<creator>"` alongside `-t`, e.g. `torrent -t anime --by director --name "Hayao Miyazaki"`.
 - **Arrow-Key Driven UI:** Fully interactive, flicker-free terminal interface.
   - Utilizes an alternate screen buffer so your scrollback history remains flawlessly clean.
   - **Dynamic Viewport Windowing:** Capable of rendering massive 500+ item checklists (like huge anime seasons) by automatically windowing the active selection while pinning crucial action buttons tightly to the top and bottom of your screen to prevent terminal overflow.
@@ -114,6 +115,13 @@ matching environment variables to remove a credential that's set there.
   `.torrent` download work anonymously ([online-fix.me](https://online-fix.me)'s
   file host is referer-gated, not login-gated). A login is supported (the site's
   DataLife Engine `authtoken` flow) for completeness but isn't required.
+- **TMDB** (Movies & Series "by director / studio"): **optional.** That search
+  already works keyless via Wikidata; a free [TMDB](https://www.themoviedb.org)
+  v3 API key (account → Settings → API) upgrades it to richer, better-ranked
+  results.
+- **IGDB** (Games "by developer / publisher"): **optional.** That search already
+  works keyless via Wikidata; free Twitch/IGDB credentials (register an app at
+  [dev.twitch.tv](https://dev.twitch.tv) → Client ID + Client Secret) upgrade it.
 
 subliminal queries a curated set of providers — `opensubtitlescom`, `addic7ed`,
 `podnapisi`, `tvsubtitles` — chosen for broad coverage and reliability. The rest
@@ -133,6 +141,9 @@ Set them as environment variables:
 [Environment]::SetEnvironmentVariable("RUTRACKER_PASSWORD", "your_pass", "User")
 [Environment]::SetEnvironmentVariable("ONLINE_FIX_USERNAME", "your_user", "User")
 [Environment]::SetEnvironmentVariable("ONLINE_FIX_PASSWORD", "your_pass", "User")
+[Environment]::SetEnvironmentVariable("TMDB_API_KEY", "your_key", "User")
+[Environment]::SetEnvironmentVariable("IGDB_CLIENT_ID", "your_id", "User")
+[Environment]::SetEnvironmentVariable("IGDB_CLIENT_SECRET", "your_secret", "User")
 ```
 
 ```bash
@@ -146,6 +157,9 @@ export RUTRACKER_USERNAME="your_user"
 export RUTRACKER_PASSWORD="your_pass"
 export ONLINE_FIX_USERNAME="your_user"
 export ONLINE_FIX_PASSWORD="your_pass"
+export TMDB_API_KEY="your_key"
+export IGDB_CLIENT_ID="your_id"
+export IGDB_CLIENT_SECRET="your_secret"
 ```
 
 Or create `subtitle_credentials.json` (already gitignored) in the repo folder:
@@ -160,7 +174,10 @@ Or create `subtitle_credentials.json` (already gitignored) in the repo folder:
   "rutracker_username": "your_user",
   "rutracker_password": "your_pass",
   "online_fix_username": "your_user",
-  "online_fix_password": "your_pass"
+  "online_fix_password": "your_pass",
+  "tmdb_api_key": "your_key",
+  "igdb_client_id": "your_id",
+  "igdb_client_secret": "your_secret"
 }
 ```
 
@@ -232,6 +249,14 @@ torrent -q "Berserk" -t manga
 # Apply custom filters (include "1080p", exclude "cam")
 torrent -q "Dune" -t movie -f "1080p" -x "cam"
 
+# Search by creator: --by <role> --name "<creator>" with -t. Roles per provider:
+#   anime/movie -> director, studio   manga -> writer, magazine   game -> developer, publisher
+torrent -t anime --by director --name "Hayao Miyazaki"
+torrent -t movie --by studio   --name "A24"
+torrent -t game  --by developer --name "FromSoftware"
+# Drops you into the disambiguation + title picker; keyless by default,
+# richer with a TMDB key (movies) or IGDB creds (games).
+
 # Skip the network exposure warning at startup
 torrent -y
 ```
@@ -280,9 +305,12 @@ The application is structured into a modular, provider-based architecture:
 
 - `main.py`: The main entry point and CLI argument parser.
 - `torrent.bat`: Windows launcher. It calls `main.py` relative to the batch file location, so adding the repo folder to `PATH` makes `torrent` usable from any directory.
-- `providers/`: Different search categories (Movies & Series, General games, Online-Fix, Desktop, Mobile, RuTracker, Anime, Manga). The display menu nests some of these under groups — **Games** (General + Online-Fix) and **Software** (Desktop + Mobile + RuTracker) — via `ProviderGroup`, a display-only wrapper that changes menu shape without touching slugs. Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga).
-- `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt`), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), `tips.py` (categorized tip catalog), and `tips_page.py` (searchable tips browser).
+- `providers/`: Different search categories (Movies & Series, General games, Online-Fix, Desktop, Mobile, RuTracker, Anime, Manga). The display menu nests some of these under groups — **Games** (General + Online-Fix) and **Software** (Desktop + Mobile + RuTracker) — via `ProviderGroup`, a display-only wrapper that changes menu shape without touching slugs. Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga). Providers may also declare a `creator_facets` list to enable search-by-creator (director/studio/writer/magazine/developer/publisher).
+- `resolvers/`: The "search by creator" metadata layer that turns a person/company name into a list of works. `types.py` (`CreatorFacet` / `Entity` / `Work`), `anilist.py` (anime director & studio + manga writer, keyless GraphQL), `jikan.py` (manga serialization magazines, keyless), `wikidata.py` (keyless SPARQL fallback for movie/series director & studio and game developer & publisher), `tmdb.py` (Movies & Series, needs `TMDB_API_KEY`), `igdb.py` (Games, needs Twitch creds), and `movies.py` / `games.py` which dispatch to TMDB/IGDB when a key is configured and Wikidata otherwise. Each facet exposes `search_entities(name)` → candidates and `list_works(entity, page)` → `(works, has_more)`; `creator_search.fan_out()` then runs the normal provider search over each picked title and merges. `main._available_facets` can gate facets behind a credential when there's no keyless fallback.
+- `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt` + the per-provider "choose how to search" source screen), `creator.py` (the search-by-creator flow: name → disambiguation → paged title picker with `n`/`p` + background prefetch → fan-out), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), `tips.py` (categorized tip catalog), and `tips_page.py` (searchable tips browser).
 - `filters.py`: Logic processing for including or excluding keywords.
+- `creator_search.py`: `fan_out()` for search-by-creator — runs the provider's normal `search()` over each picked title concurrently and merges (dedupe by info hash, sort by seeders), tagging each result with the title it came from.
+- `credentials.py`: Reads optional API credentials from environment variables (preferred) or the gitignored `subtitle_credentials.json`; powers the **🔑 Credentials** menu (subtitle logins, RuTracker/Online-Fix, and the TMDB/IGDB creator-search upgrades).
 - `torrent_session.py`: Post-torrent-pick state owner. Holds the picked magnet + user file selection + sub choice, and lazily resolves `files_meta` / `targets` / `stream_indexes` / `download_indexes` / `sub_paths`. Stream adapters consume the session directly; download adapters take `(magnet, indexes)` projections and stay session-unaware.
 - `downloader.py`: Subprocess orchestration — `aria2c` / `webtorrent-cli` / `peerflix` execution, VLC launch + sub injection, quiet-mode plumbing, in-torrent sub batch fetch, and `v` / `n` / `b` hotkey handling. Stream adapters take a `TorrentSession`; download adapters keep an explicit `(magnet, indexes)` signature for reuse outside the menu loop.
 - `subtitles.py`: Logic for searching and downloading subtitles using `subliminal`. Saves into the effective download folder via `constants.get_download_dir()`.
