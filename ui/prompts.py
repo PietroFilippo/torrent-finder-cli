@@ -19,13 +19,16 @@ from providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
 from ui.selector import SelectItem, arrow_select
 
 
-def get_query_with_shortcut(prompt_str: str, initial: str = "") -> "str | tuple | None":
+def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None) -> "str | tuple | None":
     """Read a search query with inline editing.
 
     Returns the typed text, "GO_BACK" on Esc, or ``("ACTIONS", typed)`` when Tab
     is pressed — the caller opens the quick-actions menu and re-prompts with
     ``initial=typed`` so the in-progress query is preserved. No single-letter
     shortcuts here: a search box must be able to start with any letter.
+
+    ``history`` (this provider's past queries, newest first) enables shell-style
+    recall: Up walks to older searches, Down back toward the in-progress line.
     """
     console.print(prompt_str, end="")
     buffer: list[str] = list(initial)
@@ -50,6 +53,18 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "") -> "str | tuple 
         out.append('\b' * (len(buffer) - pos))  # back to the cursor
         sys.stdout.write(''.join(out))
         sys.stdout.flush()
+
+    hist = history or []
+    hpos = -1   # -1 = editing the live line; 0.. = stepped into history (newest first)
+    stash = ""  # the live line, stashed when first stepping into history
+
+    def _recall(text: str) -> None:
+        """Replace the whole buffer with `text`, cursor at end."""
+        nonlocal pos
+        prev_col, prev_len = pos, len(buffer)
+        buffer[:] = list(text)
+        pos = len(buffer)
+        repaint(prev_col, prev_len)
 
     while True:
         key = readchar.readkey()
@@ -77,6 +92,20 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "") -> "str | tuple 
                 sys.stdout.write(buffer[pos])  # reprint char to advance cursor
                 pos += 1
                 sys.stdout.flush()
+
+        elif key == readchar.key.UP:
+            # Walk to older searches (newest first). Stash the live line first.
+            if hist and hpos < len(hist) - 1:
+                if hpos == -1:
+                    stash = "".join(buffer)
+                hpos += 1
+                _recall(hist[hpos])
+
+        elif key == readchar.key.DOWN:
+            # Walk back toward the live line; past the newest restores it.
+            if hpos >= 0:
+                hpos -= 1
+                _recall(hist[hpos] if hpos >= 0 else stash)
 
         elif key == readchar.key.HOME or key == readchar.key.CTRL_A:
             if pos > 0:

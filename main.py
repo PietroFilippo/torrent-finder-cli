@@ -21,7 +21,7 @@ from downloader import download_with_aria2, download_with_webtorrent, download_w
 from filters import FilterConfig
 from providers import PROVIDERS, get_provider, group_for
 from security import show_security_warning
-from state import load_state
+from state import history_queries, load_state
 from stats import (
     add_runtime_seconds,
     record_magnet_dispatch,
@@ -572,16 +572,18 @@ def _main_loop() -> None:
             active_names = [p.name for p in provider.active_presets]
             active_name = ", ".join(active_names) if active_names else "None"
             console.print(f"[dim]Engines:[/dim] [cyan]{engine_str}[/cyan]   [dim]Filters:[/dim] [cyan]{active_name}[/cyan]")
+            prov_history = history_queries(provider.slug)
+            nav = "  •  [/dim][bold]↑/↓[/bold] [dim]past searches" if prov_history else ""
             console.print(
                 "[dim]Type to search  •  [/dim][bold]Tab[/bold] [dim]actions "
-                "(filters, history, stats, tips)  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
+                f"(filters, history, stats, tips){nav}  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
             )
             if notice_msg:
                 console.print(notice_msg)
                 notice_msg = None
             initial, pending_query = pending_query, ""
             try:
-                query = get_query_with_shortcut(f"[title] Search {provider.name}:[/title] ", initial=initial)
+                query = get_query_with_shortcut(f"[title] Search {provider.name}:[/title] ", initial=initial, history=prov_history)
             except (EOFError, KeyboardInterrupt):
                 _goodbye()
                 break

@@ -214,7 +214,52 @@ def add_history_entry(
     save_history(history)
 
 
+def history_queries(provider_slug: str) -> list[str]:
+    """Past search query strings for one provider, newest first.
+
+    Powers the ↑/↓ history recall in the search prompt. History is already
+    deduped per query+provider, so these are unique.
+    """
+    return [
+        e.get("query", "")
+        for e in load_history()
+        if e.get("provider") == provider_slug and e.get("query")
+    ]
+
+
+_CREATOR_HISTORY_MAX = 30
+
+
+def creator_history(provider_slug: str, facet_key: str) -> list[str]:
+    """Past creator names searched for one provider+facet, newest first.
+
+    Kept separate from the keyword `history` — these are people/company names
+    (not replayable plain-text queries), keyed by ``"<slug>:<facet>"`` so each
+    facet (director / studio / writer / magazine / developer / publisher) has
+    its own ↑/↓ recall list.
+    """
+    sub = _read_state().get("creator_history", {})
+    return list(sub.get(f"{provider_slug}:{facet_key}", []))
+
+
+def add_creator_history(provider_slug: str, facet_key: str, name: str) -> None:
+    """Record a searched creator name (deduped case-insensitively, newest first)."""
+    name = (name or "").strip()
+    if not name:
+        return
+    data = _read_state()
+    sub = data.setdefault("creator_history", {})
+    key = f"{provider_slug}:{facet_key}"
+    kept = [n for n in sub.get(key, []) if n.lower() != name.lower()]
+    kept.insert(0, name)
+    sub[key] = kept[:_CREATOR_HISTORY_MAX]
+    _write_state(data)
+
+
 def clear_history() -> None:
-    """Wipe all history entries. Flushes immediately — explicit destructive action."""
+    """Wipe all history entries (keyword + creator). Flushes immediately."""
+    data = _read_state()
+    data["creator_history"] = {}
+    _write_state(data)
     save_history([])
     _flush()
