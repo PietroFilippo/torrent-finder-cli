@@ -127,6 +127,11 @@ def _build_items(stats: dict) -> list[SelectItem]:
     items.extend(_kv_items("Searches by Provider", _by_display_name(stats.get("searches_by_provider", {}))))
     items.extend(_kv_items("Torrents Picked by Provider", _by_display_name(stats.get("torrents_picked_by_provider", {}))))
     items.extend(_kv_items("Top 10 Queries", stats.get("top_queries", {}), top_n=10))
+    items.extend(_kv_items(
+        "Creator Searches by Facet",
+        {k.capitalize(): v for k, v in stats.get("creator_searches_by_facet", {}).items()},
+    ))
+    items.extend(_kv_items("Top 10 Creators Searched", stats.get("top_creators", {}), top_n=10))
     items.extend(_kv_items("Filter Preset Usage", stats.get("preset_usage", {})))
 
     # Blank spacer between last section and trailing action buttons

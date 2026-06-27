@@ -1663,7 +1663,8 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
 
     Returns:
         - A provider object for normal selection.
-        - A ``("history", query, provider_obj)`` tuple when the user picks a history entry.
+        - A ``("history", entry)`` tuple when the user picks a history entry
+          (the raw entry dict; main routes keyword vs creator).
         - ``None`` if cancelled.
     """
     if open_group is not None:
@@ -1763,11 +1764,7 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
                 from ui.history import history_select_prompt
                 pick = history_select_prompt()
                 if pick:
-                    query, prov_name = pick
-                    from providers import get_provider
-                    prov = get_provider(prov_name)
-                    if prov:
-                        return ("history", query, prov)
+                    return ("history", pick)  # entry dict — main routes keyword vs creator
                 start = cursor
                 continue
             if action == "stats":
@@ -1816,7 +1813,7 @@ def search_again_prompt() -> str | tuple | None:
     Returns:
         - ``'search'`` to search again with the same provider.
         - ``'provider'`` to change provider.
-        - ``("history", query, provider_obj)`` when the user picks a history entry.
+        - ``("history", entry)`` when the user picks a history entry (raw entry dict).
         - ``None`` (exit).
     """
     items = [
@@ -1855,11 +1852,7 @@ def search_again_prompt() -> str | tuple | None:
             from ui.history import history_select_prompt
             pick = history_select_prompt()
             if pick:
-                query, prov_name = pick
-                from providers import get_provider
-                prov = get_provider(prov_name)
-                if prov:
-                    return ("history", query, prov)
+                return ("history", pick)  # entry dict — main routes keyword vs creator
             start = idx
             continue
 

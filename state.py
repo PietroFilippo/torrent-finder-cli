@@ -186,23 +186,37 @@ def add_history_entry(
     query: str,
     provider_name: str,
     presets: list[str] | None = None,
+    kind: str = "keyword",
+    facet: str | None = None,
+    name: str | None = None,
 ) -> None:
-    """Record a search.  Deduplicates: if the same query+provider already
-    exists, the old entry is removed so the new one lands on top.
+    """Record a search, newest on top, deduplicated.
 
-    *presets* is the list of active preset names at search time, shown in
-    the history menu so users can see which filters a past search used.
+    Keyword searches dedup on query+provider and replay as a normal search.
+    ``kind="creator"`` records a by-creator search (``facet`` key + creator
+    ``name``, with ``query`` as the display label); those dedup on
+    provider+facet+name and replay through the by-creator flow. *presets* are the
+    active preset names at search time, shown in the history menu.
     """
     from datetime import datetime, timezone
 
     history = load_history()
 
-    # Remove any previous duplicate (same query text + same provider)
-    history = [
-        e for e in history
-        if not (e.get("query", "").lower() == query.lower()
-                and e.get("provider") == provider_name)
-    ]
+    if kind == "creator":
+        history = [
+            e for e in history
+            if not (e.get("kind") == "creator"
+                    and e.get("provider") == provider_name
+                    and e.get("facet") == facet
+                    and (e.get("name", "") or "").lower() == (name or "").lower())
+        ]
+    else:
+        history = [
+            e for e in history
+            if not (e.get("kind", "keyword") == "keyword"
+                    and e.get("query", "").lower() == query.lower()
+                    and e.get("provider") == provider_name)
+        ]
 
     entry = {
         "query": query,
@@ -210,6 +224,10 @@ def add_history_entry(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "presets": list(presets) if presets else [],
     }
+    if kind == "creator":
+        entry["kind"] = "creator"
+        entry["facet"] = facet
+        entry["name"] = name
     history.insert(0, entry)
     save_history(history)
 
@@ -227,39 +245,22 @@ def history_queries(provider_slug: str) -> list[str]:
     ]
 
 
-_CREATOR_HISTORY_MAX = 30
-
-
 def creator_history(provider_slug: str, facet_key: str) -> list[str]:
-    """Past creator names searched for one provider+facet, newest first.
-
-    Kept separate from the keyword `history` — these are people/company names
-    (not replayable plain-text queries), keyed by ``"<slug>:<facet>"`` so each
-    facet (director / studio / writer / magazine / developer / publisher) has
-    its own ↑/↓ recall list.
+    """Past creator names searched for one provider+facet, newest first — derived
+    from the main history's creator entries (powers ↑/↓ recall in the name
+    prompt). Already deduped per provider+facet+name at record time.
     """
-    sub = _read_state().get("creator_history", {})
-    return list(sub.get(f"{provider_slug}:{facet_key}", []))
-
-
-def add_creator_history(provider_slug: str, facet_key: str, name: str) -> None:
-    """Record a searched creator name (deduped case-insensitively, newest first)."""
-    name = (name or "").strip()
-    if not name:
-        return
-    data = _read_state()
-    sub = data.setdefault("creator_history", {})
-    key = f"{provider_slug}:{facet_key}"
-    kept = [n for n in sub.get(key, []) if n.lower() != name.lower()]
-    kept.insert(0, name)
-    sub[key] = kept[:_CREATOR_HISTORY_MAX]
-    _write_state(data)
+    return [
+        e.get("name", "")
+        for e in load_history()
+        if e.get("kind") == "creator"
+        and e.get("provider") == provider_slug
+        and e.get("facet") == facet_key
+        and e.get("name")
+    ]
 
 
 def clear_history() -> None:
     """Wipe all history entries (keyword + creator). Flushes immediately."""
-    data = _read_state()
-    data["creator_history"] = {}
-    _write_state(data)
     save_history([])
     _flush()

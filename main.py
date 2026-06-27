@@ -414,21 +414,44 @@ def _provider_entry(provider, cli_filters) -> str:
         # "back" → re-show the source screen
 
 
+def _history_pick(entry):
+    """Resolve a history entry → (provider, facet_or_None, value).
+
+    Creator entry → (provider, facet, name); keyword → (provider, None, query).
+    ``provider`` is None when it no longer exists; ``facet`` is None when the
+    stored facet is gone (caller then treats ``value`` as a keyword fallback).
+    """
+    prov = get_provider(entry.get("provider", "") or "")
+    if entry.get("kind") == "creator":
+        facet = None
+        if prov:
+            facet = next((f for f in getattr(prov, "creator_facets", []) if f.key == entry.get("facet")), None)
+        return prov, facet, entry.get("name", "")
+    return prov, None, entry.get("query", "")
+
+
 def _handle_whats_next(current_provider):
     """Show the post-action "What's next?" menu.
 
-    Returns ``(query, provider)`` to keep looping, or the string ``"EXIT"`` to
-    quit the program.
+    Returns ``(query, provider, facet, name)`` to keep looping, or ``"EXIT"`` to
+    quit. ``facet`` is set only when a creator history entry was picked (caller
+    seeds the by-creator one-shot); otherwise it's None and ``query`` drives a
+    normal search.
     """
     choice = search_again_prompt()
     if isinstance(choice, tuple) and choice[0] == "history":
         clear_screen()
-        return (choice[1], choice[2])
+        prov, facet, val = _history_pick(choice[1])
+        if prov is None:
+            return (None, current_provider, None, None)  # provider gone → just re-prompt
+        if facet:
+            return (None, prov, facet, val)              # creator replay
+        return (val, prov, None, None)                   # keyword replay
     if choice == "search":
         clear_screen()
-        return (None, current_provider)
+        return (None, current_provider, None, None)
     if choice == "provider":
-        return (None, None)
+        return (None, None, None, None)
     return "EXIT"
 
 
@@ -525,7 +548,9 @@ def _main_loop() -> None:
                 if res == "EXIT":
                     _goodbye()
                     break
-                query, current_provider = res
+                query, current_provider, _hf, _hn = res
+                if _hf:
+                    cli_facet, pending_creator_name = _hf, _hn
             else:
                 query = None  # backed out → normal keyword prompt for this provider
             clear_screen()
@@ -537,10 +562,17 @@ def _main_loop() -> None:
             if result is None:
                 _goodbye()
                 break
-            # History selection returns ("history", query, provider) → keyword search.
+            # History selection returns ("history", entry) — keyword or creator.
             if isinstance(result, tuple) and result[0] == "history":
-                _, query, current_provider = result
+                prov, facet, val = _history_pick(result[1])
                 clear_screen()
+                if prov is None:
+                    continue
+                current_provider = prov
+                if facet:  # creator entry → run the by-creator one-shot at loop top
+                    cli_facet, pending_creator_name = facet, val
+                    continue
+                query = val  # keyword entry → normal search
             else:
                 current_provider = result
                 clear_screen()
@@ -558,7 +590,9 @@ def _main_loop() -> None:
                     if res == "EXIT":
                         _goodbye()
                         break
-                    query, current_provider = res
+                    query, current_provider, _hf, _hn = res
+                    if _hf:
+                        cli_facet, pending_creator_name = _hf, _hn
                     continue
                 # nxt == "keyword" → fall through to the keyword prompt
 
@@ -611,12 +645,14 @@ def _main_loop() -> None:
                         from ui.history import history_select_prompt
                         pick = history_select_prompt()
                         if pick:
-                            query, prov_name = pick
-                            from providers import get_provider
-                            hist_prov = get_provider(prov_name)
-                            if hist_prov:
-                                current_provider = hist_prov
-                            break  # past search chosen → leave the menu and run it
+                            prov, facet, val = _history_pick(pick)
+                            if prov is not None:
+                                current_provider = prov
+                                if facet:  # creator entry → by-creator one-shot
+                                    cli_facet, pending_creator_name = facet, val
+                                else:
+                                    query = val
+                                break  # leave the menu and run it
                     elif action == "stats":
                         from ui.stats import stats_page
                         stats_page()
@@ -696,7 +732,9 @@ def _main_loop() -> None:
         if res == "EXIT":
             _goodbye()
             break
-        query, current_provider = res
+        query, current_provider, _hf, _hn = res
+        if _hf:
+            cli_facet, pending_creator_name = _hf, _hn
         continue
 
 def main() -> None:
