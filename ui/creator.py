@@ -18,7 +18,7 @@ from constants import console
 from creator_search import fan_out
 from state import add_history_entry, creator_history
 from stats import record_creator_search
-from ui.prompts import _make_banner_panel, clear_screen, get_query_with_shortcut
+from ui.prompts import _make_banner_panel, clear_screen, filter_menu, get_query_with_shortcut
 from ui.selector import SelectItem, arrow_select
 from utils import start_esc_listener
 
@@ -105,6 +105,8 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
     on the visible page; ``n``/``p`` move between pages. Returns:
       - ``("confirm", {checked titles on this page})``,
       - ``("next", {checked …})`` / ``("prev", {checked …})`` for page moves,
+      - ``("filters", {checked …})`` to open the filter menu (caller re-shows
+        this page; checks are preserved),
       - ``None`` if cancelled (Esc / Back — leaves the works picker).
     """
     preselected = preselected or set()
@@ -144,6 +146,11 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
             description="Load the next page of titles (ordered by popularity).",
         ))
         next_idx = len(items) - 1
+    items.append(SelectItem(
+        label="⚙  Filters  [f]", value="filters", is_action=True,
+        description="Set quality/preset filters — applied when the torrents are fetched.",
+    ))
+    filters_idx = len(items) - 1
     items.append(SelectItem(label="✅ Confirm  [w]", value="confirm", is_action=True))
     confirm_idx = len(items) - 1
     items.append(SelectItem(label="↩ Back", value="cancel", is_action=True))
@@ -176,6 +183,9 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
 
     def _go_next(cursor, items_list):
         return next_idx if next_idx is not None else True
+
+    def _go_filters(cursor, items_list):
+        return filters_idx
 
     def _set_anchor(cursor, items_list):
         if cursor not in _work_set():
@@ -221,6 +231,7 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
         "w": _confirm_now, "W": _confirm_now,
         "p": _go_prev, "P": _go_prev,
         "n": _go_next, "N": _go_next,
+        "f": _go_filters, "F": _go_filters, readchar.key.CTRL_F: _go_filters,
         "v": _set_anchor, "V": _range_toggle,
         " ": _toggle_current,
     }
@@ -234,7 +245,7 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
     footer = (
         "↑/↓ nav  •  Space/Enter toggle  •  "
         "[bold yellow]a[/bold yellow]ll/[bold yellow]i[/bold yellow]nvert/[bold yellow]c[/bold yellow]lear  •  "
-        "[bold green]w[/bold green] confirm" + nav + "  •  Esc back\n"
+        "[bold green]w[/bold green] confirm" + nav + "  •  [bold yellow]f[/bold yellow] filters  •  Esc back\n"
         "Pick titles to search (none selected by default; a/i/c act on this page)."
     )
     if any_partial:
@@ -255,7 +266,7 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
         return None
     val = items[result].value
     checked = {items[i].value[1].title for i in work_item_indexes if items[i].toggled}
-    if val in ("next", "prev", "confirm"):
+    if val in ("next", "prev", "confirm", "filters"):
         return (val, checked)
     return None
 
@@ -327,23 +338,38 @@ def _name_input(provider, facet):
     """Prompt for a creator name. Returns the name, or None to go back (Esc).
 
     Always starts with an empty box (matching the keyword prompt): going back or
-    retrying after "not found" doesn't keep the previously typed text.
+    retrying after "not found" doesn't keep the previously typed text. Ctrl+F
+    opens the filter menu (filters apply to the eventual torrent results) and
+    re-prompts with the in-progress text preserved.
     """
-    clear_screen()
-    console.print(f"[title]Search {provider.name} by {facet.label}[/title]")
-    if facet.note:
-        console.print(f"[dim]{facet.note}[/dim]")
-    hist = creator_history(provider.slug, facet.key)
-    nav = "  •  ↑/↓ past searches" if hist else ""
-    console.print(f"[dim]Type a name and press Enter  •  Esc to go back{nav}[/dim]")
-    try:
-        name = get_query_with_shortcut(f"[info]{facet.label} name:[/info] ", history=hist)
-    except (EOFError, KeyboardInterrupt):
-        return None
-    # Esc -> "GO_BACK", Tab -> ("ACTIONS", ...); both go back here, as does empty.
-    if not isinstance(name, str) or name in ("GO_BACK", "") or not name.strip():
-        return None
-    return name.strip()
+    typed = ""
+    while True:
+        clear_screen()
+        console.print(f"[title]Search {provider.name} by {facet.label}[/title]")
+        if facet.note:
+            console.print(f"[dim]{facet.note}[/dim]")
+        hist = creator_history(provider.slug, facet.key)
+        nav = "  •  [/dim][bold]↑/↓[/bold] [dim]past searches" if hist else ""
+        console.print(
+            "[dim]Type a name and press Enter  •  [/dim][bold]Ctrl+F[/bold] [dim]filters"
+            f"{nav}  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
+        )
+        try:
+            name = get_query_with_shortcut(
+                f"[info]{facet.label} name:[/info] ",
+                initial=typed, history=hist, filters_shortcut=True,
+            )
+        except (EOFError, KeyboardInterrupt):
+            return None
+        # Ctrl+F → filters, then re-prompt keeping what was typed.
+        if isinstance(name, tuple) and name and name[0] == "FILTERS":
+            typed = name[1]
+            filter_menu(provider)
+            continue
+        # Esc -> "GO_BACK", Tab -> ("ACTIONS", ...); both go back here, as does empty.
+        if not isinstance(name, str) or name in ("GO_BACK", "") or not name.strip():
+            return None
+        return name.strip()
 
 
 def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=None):
@@ -493,6 +519,10 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
             # first so un-checks are honoured), then act on the chosen button.
             page_titles = {w.title for w in window}
             cache["toggled"] = (cache["toggled"] - page_titles) | checked
+            if action == "filters":
+                # Presets apply at fan-out; works list is unaffected → re-show page.
+                filter_menu(provider)
+                continue
             if action == "next":
                 cache["page_idx"] += 1
                 continue
