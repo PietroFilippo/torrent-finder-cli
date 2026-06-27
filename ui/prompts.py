@@ -814,8 +814,10 @@ def download_method_prompt(
     """
     Prompt the user to choose a download method.
     Returns 't', 'd', 'p', 'aria', 'stream_w', 'stream_p', 's', 'pick_episodes',
-    'torrent_info', 'set_subs', 'back', or None. 'l' (copy magnet) and
-    'open_page' (browser) are handled internally.
+    'torrent_info', 'set_subs', 'back', 'cancel', or None (Esc). 'back' and Esc
+    step back to the results table; 'cancel' (✕ Cancel) means "done with this
+    torrent" → caller goes to what's next. 'l' (copy magnet) and 'open_page'
+    (browser) are handled internally.
     """
     wt_available = has_webtorrent()
     pf_available = has_peerflix()
@@ -1046,7 +1048,7 @@ def download_method_prompt(
         is_action=True,
         description="Return to the search results list",
     ))
-    items.append(SelectItem(label="✕  Cancel", value=None, is_action=True))
+    items.append(SelectItem(label="✕  Cancel", value="cancel", is_action=True))
 
     def handle_download_action(idx, items):
         if items[idx].value == "l" and magnet:

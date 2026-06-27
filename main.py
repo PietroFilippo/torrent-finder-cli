@@ -148,9 +148,10 @@ def browse_results(provider, results) -> str:
 
     Returns ``"back"`` if the user Esc'd the results table (caller steps back a
     screen), or ``"next"`` if a download action completed (caller shows "what's
-    next?"). Esc / ✕ Cancel / "go back to results" on the download menu all step
-    back to the results table; only a completed action (magnet sent, download
-    finished, Online-Fix handoff) returns ``"next"``.
+    next?"). On the download menu, Esc / "↩ Go back to results" step back to the
+    results table; "✕ Cancel" means "done with this torrent" → returns ``"next"``
+    (what's next), as do completed actions (magnet sent, download finished,
+    Online-Fix handoff).
     """
     while True:
         clear_screen()
@@ -362,7 +363,10 @@ def browse_results(provider, results) -> str:
                 console.print("\n[dim]Press any key to continue...[/dim]")
                 readchar.readkey()
                 continue
-            else:  # "back", ✕ Cancel, or Esc → step back to the results table
+            elif method == "cancel":  # ✕ Cancel → done with this torrent → what's next
+                clear_screen()
+                return "next"
+            else:  # "back" (Go back to results) or Esc → step back to the results table
                 go_back_to_results = True
                 break
 
