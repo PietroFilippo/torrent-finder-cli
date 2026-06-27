@@ -540,6 +540,11 @@ def _main_loop() -> None:
     # backing out of a group child returns to its source list, not the top list).
     pending_open_group = None
 
+    # When set, (re)show the provider's "choose how to search" source screen — on
+    # fresh selection, and when stepping back from a creator-capable provider's
+    # keyword prompt (so Esc there lands on the source screen, not the prov list).
+    show_source = False
+
     while True:
         # One-shot CLI creator search (--by/--name): jump into the by-creator
         # flow, then fall into the normal what's-next / keyword loop.
@@ -580,25 +585,30 @@ def _main_loop() -> None:
             else:
                 current_provider = result
                 clear_screen()
-                # Source screen + creator journey for creator-capable providers;
-                # plain providers return "keyword" immediately.
-                nxt = _provider_entry(current_provider, cli_filters)
-                if nxt == "provider":
-                    # Back out → the provider's group submenu if it came from one,
-                    # otherwise the top provider list.
-                    pending_open_group = group_for(current_provider)
-                    current_provider = None
-                    continue
-                if nxt == "next":
-                    res = _handle_whats_next(current_provider)
-                    if res == "EXIT":
-                        _goodbye()
-                        break
-                    query, current_provider, _hf, _hn = res
-                    if _hf:
-                        cli_facet, pending_creator_name = _hf, _hn
-                    continue
-                # nxt == "keyword" → fall through to the keyword prompt
+                show_source = True  # show its "choose how to search" screen below
+
+        # Source screen ("choose how to search") for creator-capable providers — on
+        # fresh selection and when stepping back from the keyword prompt. Plain
+        # providers' _provider_entry returns "keyword" with no screen shown.
+        if show_source:
+            show_source = False
+            nxt = _provider_entry(current_provider, cli_filters)
+            if nxt == "provider":
+                # Back out → the provider's group submenu if it came from one,
+                # otherwise the top provider list.
+                pending_open_group = group_for(current_provider)
+                current_provider = None
+                continue
+            if nxt == "next":
+                res = _handle_whats_next(current_provider)
+                if res == "EXIT":
+                    _goodbye()
+                    break
+                query, current_provider, _hf, _hn = res
+                if _hf:
+                    cli_facet, pending_creator_name = _hf, _hn
+                continue
+            # nxt == "keyword" → fall through to the keyword prompt
 
         provider = current_provider
 
@@ -631,8 +641,13 @@ def _main_loop() -> None:
                 break
 
             if query == "GO_BACK":
-                # Back out → the provider's group submenu if it came from one,
-                # otherwise the top provider list.
+                if _available_facets(provider):
+                    # Creator-capable → step back to its "choose how to search"
+                    # screen, not all the way to the provider list.
+                    show_source = True
+                    query = None
+                    continue
+                # Plain provider → its group submenu if any, else the top list.
                 pending_open_group = group_for(provider)
                 current_provider = None
                 query = None

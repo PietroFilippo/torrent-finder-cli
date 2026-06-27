@@ -72,12 +72,23 @@ _DATE_OPTIONS = ["All time", "Today", "This week", "This month"]
 # Sort order
 _SORT_OPTIONS = ["Newest first", "Oldest first"]
 
+# Type filter — keyword searches vs by-creator entries
+_TYPE_OPTIONS = ["All", "Keyword", "By-creator"]
+
 
 def _filter_by_provider(entries: list[dict], provider: str) -> list[dict]:
     if provider == "All":
         return entries
     slug = _NAME_TO_SLUG.get(provider, provider)
     return [e for e in entries if e.get("provider") == slug]
+
+
+def _filter_by_type(entries: list[dict], type_filter: str) -> list[dict]:
+    if type_filter == "All":
+        return entries
+    if type_filter == "Keyword":
+        return [e for e in entries if e.get("kind", "keyword") == "keyword"]
+    return [e for e in entries if e.get("kind") == "creator"]
 
 
 def _filter_by_date(entries: list[dict], date_range: str) -> list[dict]:
@@ -124,6 +135,7 @@ def history_select_prompt() -> dict | None:
         "prov_idx": 0,   # index into _PROVIDER_OPTIONS
         "date_idx": 0,   # index into _DATE_OPTIONS
         "sort_idx": 0,   # index into _SORT_OPTIONS
+        "type_idx": 0,   # index into _TYPE_OPTIONS
     }
 
     history = load_history()
@@ -135,13 +147,15 @@ def history_select_prompt() -> dict | None:
             _PROVIDER_OPTIONS[fstate["prov_idx"]],
             _DATE_OPTIONS[fstate["date_idx"]],
             _SORT_OPTIONS[fstate["sort_idx"]],
+            _TYPE_OPTIONS[fstate["type_idx"]],
         )
 
     def _rebuild(items: list[SelectItem]) -> None:
         """Clear *items* and repopulate from current history + active filters."""
-        prov_filter, date_filter, sort_order = _current_filters()
+        prov_filter, date_filter, sort_order, type_filter = _current_filters()
 
         filtered = _filter_by_provider(history, prov_filter)
+        filtered = _filter_by_type(filtered, type_filter)
         filtered = _filter_by_date(filtered, date_filter)
         filtered = _sort_entries(filtered, sort_order)
 
@@ -183,10 +197,12 @@ def history_select_prompt() -> dict | None:
     # --- dynamic title / footer (callables resolved each render) ---
 
     def _title():
-        prov_filter, date_filter, sort_order = _current_filters()
+        prov_filter, date_filter, sort_order, type_filter = _current_filters()
         tags = []
         if prov_filter != "All":
             tags.append(f"{_provider_icon(prov_filter)} {prov_filter}")
+        if type_filter != "All":
+            tags.append(type_filter)
         if date_filter != "All time":
             tags.append(date_filter)
         if sort_order != "Newest first":
@@ -197,10 +213,11 @@ def history_select_prompt() -> dict | None:
         return t
 
     def _footer():
-        prov_filter, date_filter, sort_order = _current_filters()
+        prov_filter, date_filter, sort_order, type_filter = _current_filters()
         return (
             "↑/↓ navigate  •  Enter re-run  •  Esc back\n"
-            f" [bold yellow]P[/bold yellow] provider: [cyan]{prov_filter}[/cyan]  •  "
+            f"[bold]Filters:[/bold]  [bold yellow]P[/bold yellow] provider: [cyan]{prov_filter}[/cyan]  •  "
+            f"[bold yellow]T[/bold yellow] type: [cyan]{type_filter}[/cyan]  •  "
             f"[bold yellow]D[/bold yellow] date: [cyan]{date_filter}[/cyan]  •  "
             f"[bold yellow]S[/bold yellow] sort: [cyan]{sort_order}[/cyan]"
         )
@@ -253,6 +270,8 @@ def history_select_prompt() -> dict | None:
             "d": _cycle("date_idx", len(_DATE_OPTIONS)),
             "S": _cycle("sort_idx", len(_SORT_OPTIONS)),
             "s": _cycle("sort_idx", len(_SORT_OPTIONS)),
+            "T": _cycle("type_idx", len(_TYPE_OPTIONS)),
+            "t": _cycle("type_idx", len(_TYPE_OPTIONS)),
         },
     )
 
