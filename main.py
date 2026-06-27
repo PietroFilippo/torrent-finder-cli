@@ -614,14 +614,18 @@ def _main_loop() -> None:
             nav = "  •  [/dim][bold]↑/↓[/bold] [dim]past searches" if prov_history else ""
             console.print(
                 "[dim]Type to search  •  [/dim][bold]Tab[/bold] [dim]actions "
-                f"(filters, history, stats, tips){nav}  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
+                "(filters, history, stats, tips)  •  [/dim][bold]Ctrl+F[/bold] [dim]filters"
+                f"{nav}  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
             )
             if notice_msg:
                 console.print(notice_msg)
                 notice_msg = None
             initial, pending_query = pending_query, ""
             try:
-                query = get_query_with_shortcut(f"[title] Search {provider.name}:[/title] ", initial=initial, history=prov_history)
+                query = get_query_with_shortcut(
+                    f"[title] Search {provider.name}:[/title] ",
+                    initial=initial, history=prov_history, filters_shortcut=True,
+                )
             except (EOFError, KeyboardInterrupt):
                 _goodbye()
                 break
@@ -632,6 +636,14 @@ def _main_loop() -> None:
                 pending_open_group = group_for(provider)
                 current_provider = None
                 query = None
+                continue
+
+            # Ctrl+F → jump straight to the filter menu, keeping the typed query.
+            if isinstance(query, tuple) and query and query[0] == "FILTERS":
+                pending_query = query[1]
+                filter_menu(provider)
+                query = None
+                clear_screen()
                 continue
 
             # Tab opened the quick-actions menu. Loop it so finishing or
