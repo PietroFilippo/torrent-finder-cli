@@ -59,6 +59,22 @@ def record_search(provider: str, query: str, active_presets: list[str]) -> None:
     _save_stats(stats)
 
 
+def record_creator_search(provider: str, facet: str, name: str, active_presets: list[str]) -> None:
+    """Once per by-creator search that returned results. Counts in the search
+    totals + per-provider like any search, but tracked separately from keyword
+    queries — its own by-facet + top-creators counters; never in top_queries."""
+    stats = _get_stats()
+    _bump(stats, "searches_by_provider", provider)
+    stats["searches_total"] = stats.get("searches_total", 0) + 1
+    _bump(stats, "creator_searches_by_facet", facet)
+    nm = (name or "").strip()
+    if nm:
+        _bump(stats, "top_creators", nm)
+    for preset_name in active_presets:
+        _bump(stats, "preset_usage", preset_name)
+    _save_stats(stats)
+
+
 def record_torrent_picked(provider: str, seeders: int) -> None:
     stats = _get_stats()
     _bump(stats, "torrents_picked_by_provider", provider)

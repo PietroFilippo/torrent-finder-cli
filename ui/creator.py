@@ -16,8 +16,8 @@ import readchar
 
 from constants import console
 from creator_search import fan_out
-from state import add_creator_history, creator_history
-from stats import record_search
+from state import add_history_entry, creator_history
+from stats import record_creator_search
 from ui.prompts import _make_banner_panel, clear_screen, get_query_with_shortcut
 from ui.selector import SelectItem, arrow_select
 from utils import start_esc_listener
@@ -522,8 +522,11 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
                 stage = "works"
                 continue
             label = f"{facet.label}: {entity.name}"
-            record_search(provider.slug, label, [p.name for p in getattr(provider, "active_presets", [])])
-            add_creator_history(provider.slug, facet.key, entity.name)  # ↑/↓ recall, per facet
+            presets = [p.name for p in getattr(provider, "active_presets", [])]
+            record_creator_search(provider.slug, facet.key, entity.name, presets)
+            # Main history (re-runnable + ↑/↓ recall both derive from this entry).
+            add_history_entry(label, provider.slug, presets, kind="creator",
+                              facet=facet.key, name=entity.name)
             if browse_fn(provider, results) == "back":
                 stage = "works"
                 continue

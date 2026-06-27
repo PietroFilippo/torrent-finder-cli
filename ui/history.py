@@ -111,12 +111,13 @@ def _sort_entries(entries: list[dict], order: str) -> list[dict]:
 
 # Public prompt
 
-def history_select_prompt() -> tuple[str, str] | None:
+def history_select_prompt() -> dict | None:
     """Display the search history menu with filtering hotkeys.
 
-    Returns ``(query, provider_slug)`` when the user picks an entry,
-    or ``None`` on cancel / empty history / go-back. Callers resolve the
-    slug back to a provider via ``get_provider(slug)``.
+    Returns the selected history **entry dict** (keyword or creator), or ``None``
+    on cancel / empty history / go-back. The caller routes it: keyword entries
+    re-run a normal search, creator entries (``kind == "creator"``) replay the
+    by-creator flow via ``facet`` + ``name``.
     """
     # Mutable filter state — shared by key_action callbacks and callable title/footer
     fstate = {
@@ -260,7 +261,7 @@ def history_select_prompt() -> tuple[str, str] | None:
 
     selected = items[result].value
     if isinstance(selected, dict):
-        return (selected["query"], selected["provider"])
+        return selected
 
     return None
 
