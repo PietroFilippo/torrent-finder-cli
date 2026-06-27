@@ -1068,11 +1068,13 @@ def download_method_prompt(
     return items[idx].value
 
 
-# Subtitle-provider metadata for the in-program credentials manager.
-# Each field is (env_var_name, prompt_label, is_secret).
+# Credential metadata for the in-program manager. Each field is
+# (env_var_name, prompt_label, is_secret); `category` groups them on the menu
+# (entries are kept ordered by category so section headers fall in one place).
 _CRED_PROVIDERS = [
     {
         "id": "opensubtitles",
+        "category": "Subtitles",
         "icon": "🎬",
         "name": "OpenSubtitles.com",
         "fields": [
@@ -1085,6 +1087,7 @@ _CRED_PROVIDERS = [
     },
     {
         "id": "addic7ed",
+        "category": "Subtitles",
         "icon": "📺",
         "name": "Addic7ed (TV series)",
         "fields": [
@@ -1096,6 +1099,7 @@ _CRED_PROVIDERS = [
     },
     {
         "id": "jimaku",
+        "category": "Subtitles",
         "icon": "🍙",
         "name": "Jimaku (anime)",
         "fields": [
@@ -1106,6 +1110,7 @@ _CRED_PROVIDERS = [
     },
     {
         "id": "rutracker",
+        "category": "Search provider logins",
         "icon": "🧲",
         "name": "RuTracker",
         "fields": [
@@ -1113,10 +1118,11 @@ _CRED_PROVIDERS = [
             ("RUTRACKER_PASSWORD", "Password", True),
         ],
         "required": ["RUTRACKER_USERNAME", "RUTRACKER_PASSWORD"],
-        "limit": "Powers the RuTracker provider (login + scrape; may break if the site changes).",
+        "limit": "Required — the RuTracker provider logs in to search and returns nothing without an account.",
     },
     {
         "id": "online_fix",
+        "category": "Search provider logins",
         "icon": "🔧",
         "name": "Online-Fix",
         "fields": [
@@ -1128,8 +1134,9 @@ _CRED_PROVIDERS = [
     },
     {
         "id": "tmdb",
+        "category": "Creator-search upgrades (optional)",
         "icon": "🎬",
-        "name": "TMDB (Movies & Series — search by director / studio)",
+        "name": "TMDB (Movies & Series — by director / studio)",
         "fields": [
             ("TMDB_API_KEY", "API key (v3)", True),
         ],
@@ -1138,8 +1145,9 @@ _CRED_PROVIDERS = [
     },
     {
         "id": "igdb",
+        "category": "Creator-search upgrades (optional)",
         "icon": "🎮",
-        "name": "IGDB (Games — search by developer / publisher)",
+        "name": "IGDB (Games — by developer / publisher)",
         "fields": [
             ("IGDB_CLIENT_ID", "Twitch Client ID", False),
             ("IGDB_CLIENT_SECRET", "Twitch Client Secret", True),
@@ -1456,12 +1464,24 @@ def _manage_provider_credentials(meta: dict) -> None:
 
 
 def credentials_menu() -> None:
-    """Manage subtitle-provider credentials (stored in the gitignored JSON)."""
+    """Manage credentials, grouped by kind: subtitle providers, search-provider
+    logins, and the optional TMDB/IGDB creator-search upgrades. Stored in the
+    gitignored JSON."""
     import credentials as C
 
     while True:
         items = []
+        last_cat = None
         for meta in _CRED_PROVIDERS:
+            cat = meta.get("category", "Other")
+            if cat != last_cat:
+                items.append(SelectItem(
+                    label=f"─── {cat} ───",
+                    value="section_header",
+                    enabled=False,
+                    is_action=True,
+                ))
+                last_cat = cat
             configured = all(C.get_credential(k) for k in meta["required"])
             sources = {C.credential_source(k) for k in meta["required"]}
             if not configured:
@@ -1485,7 +1505,8 @@ def credentials_menu() -> None:
             items,
             title="Credentials",
             banner=_make_banner_panel(),
-            footer="Saved to subtitle_credentials.json (gitignored, plaintext). Env vars override the file.",
+            footer="Stored in subtitle_credentials.json (gitignored, plaintext) — holds all of these. Env vars override the file.",
+            start_index=1,  # land on the first entry, skipping the section header
         )
         if idx is None:
             return
@@ -1643,10 +1664,10 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
         is_action=True,
     )
     creds_item = SelectItem(
-        label="🔑 Credentials — subtitle providers & RuTracker / Online-Fix logins",
+        label="🔑 Credentials — subtitles, provider logins, creator-search keys",
         value="__credentials__",
         is_action=True,
-        description="Manage OpenSubtitles / Addic7ed / Jimaku subtitle logins and the RuTracker / Online-Fix accounts.",
+        description="Manage subtitle logins (OpenSubtitles / Addic7ed / Jimaku), search-provider logins (RuTracker / Online-Fix), and the optional TMDB / IGDB creator-search upgrades.",
     )
     items = provider_items + [separator, tips_item, info_item, creds_item]
     start = 0
