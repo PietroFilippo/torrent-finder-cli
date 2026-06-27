@@ -16,6 +16,7 @@ import readchar
 
 from constants import console
 from creator_search import fan_out
+from state import add_creator_history, creator_history
 from stats import record_search
 from ui.prompts import _make_banner_panel, clear_screen, get_query_with_shortcut
 from ui.selector import SelectItem, arrow_select
@@ -332,9 +333,11 @@ def _name_input(provider, facet):
     console.print(f"[title]Search {provider.name} by {facet.label}[/title]")
     if facet.note:
         console.print(f"[dim]{facet.note}[/dim]")
-    console.print("[dim]Type a name and press Enter  •  Esc to go back[/dim]")
+    hist = creator_history(provider.slug, facet.key)
+    nav = "  •  ↑/↓ past searches" if hist else ""
+    console.print(f"[dim]Type a name and press Enter  •  Esc to go back{nav}[/dim]")
     try:
-        name = get_query_with_shortcut(f"[info]{facet.label} name:[/info] ")
+        name = get_query_with_shortcut(f"[info]{facet.label} name:[/info] ", history=hist)
     except (EOFError, KeyboardInterrupt):
         return None
     # Esc -> "GO_BACK", Tab -> ("ACTIONS", ...); both go back here, as does empty.
@@ -520,6 +523,7 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
                 continue
             label = f"{facet.label}: {entity.name}"
             record_search(provider.slug, label, [p.name for p in getattr(provider, "active_presets", [])])
+            add_creator_history(provider.slug, facet.key, entity.name)  # ↑/↓ recall, per facet
             if browse_fn(provider, results) == "back":
                 stage = "works"
                 continue
