@@ -19,13 +19,16 @@ from providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
 from ui.selector import SelectItem, arrow_select
 
 
-def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None) -> "str | tuple | None":
+def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
+                            filters_shortcut: bool = False) -> "str | tuple | None":
     """Read a search query with inline editing.
 
     Returns the typed text, "GO_BACK" on Esc, or ``("ACTIONS", typed)`` when Tab
     is pressed — the caller opens the quick-actions menu and re-prompts with
-    ``initial=typed`` so the in-progress query is preserved. No single-letter
-    shortcuts here: a search box must be able to start with any letter.
+    ``initial=typed`` so the in-progress query is preserved. With
+    ``filters_shortcut=True``, Ctrl+F returns ``("FILTERS", typed)`` to jump
+    straight to the filter menu. No single-letter shortcuts here: a search box
+    must be able to start with any letter (Ctrl combos are safe — non-printable).
 
     ``history`` (this provider's past queries, newest first) enables shell-style
     recall: Up walks to older searches, Down back toward the in-progress line.
@@ -80,6 +83,13 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None) ->
         elif key in (readchar.key.TAB, '\t'):
             print()
             return ("ACTIONS", "".join(buffer))
+
+        elif key == readchar.key.CTRL_F:
+            # Quick filters jump. Always swallowed so the control char (\x06) is
+            # never inserted into the query; only acts where it's enabled.
+            if filters_shortcut:
+                print()
+                return ("FILTERS", "".join(buffer))
 
         elif key == readchar.key.LEFT:
             if pos > 0:
