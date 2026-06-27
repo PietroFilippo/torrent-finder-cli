@@ -1183,6 +1183,12 @@ _CRED_PROVIDERS = [
         ],
         "required": ["TMDB_API_KEY"],
         "limit": "Optional — Movies & Series 'by director / studio' works keyless via Wikidata; a free TMDB v3 API key upgrades it to richer results.",
+        "howto": [
+            "Create a free account at themoviedb.org",
+            "Settings → API → Request an API key (choose Developer, accept the terms)",
+            "Copy the “API Key (v3 auth)” and paste it below",
+        ],
+        "tip": "The form's Application URL can be anything valid — e.g. http://localhost",
     },
     {
         "id": "igdb",
@@ -1195,6 +1201,12 @@ _CRED_PROVIDERS = [
         ],
         "required": ["IGDB_CLIENT_ID", "IGDB_CLIENT_SECRET"],
         "limit": "Optional — Games 'by developer / publisher' works keyless via Wikidata; free Twitch/IGDB creds (dev.twitch.tv → register an app) upgrade it to richer results.",
+        "howto": [
+            "dev.twitch.tv/console → Applications → Register Your Application",
+            "OAuth Redirect URL: http://localhost  •  Category: Application Integration",
+            "Copy the Client ID, click New Secret, copy the Client Secret → paste below",
+        ],
+        "tip": "The Client Secret is shown only once — copy it before leaving the page",
     },
 ]
 
@@ -1241,6 +1253,15 @@ def _credentials_form(meta: dict, buffers: dict) -> dict | None:
 
     def _panel():
         body = Text()
+        howto = meta.get("howto")
+        if howto:
+            body.append("  How to get this:\n", style="bold")
+            for step_no, step in enumerate(howto, 1):
+                body.append(f"   {step_no}. {step}\n", style="dim")
+            tip = meta.get("tip")
+            if tip:
+                body.append(f"   💡 {tip}\n", style="yellow")
+            body.append("  ─────────────────────────\n", style="dim")
         for i, (env_key, label, secret) in enumerate(fields):
             foc = focus == i
             sty = "bold cyan" if foc else "white"
