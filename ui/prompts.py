@@ -1109,6 +1109,66 @@ def download_method_prompt(
     return items[idx].value
 
 
+def batch_download_menu(count: int, copyable: int) -> "str | None":
+    """Reduced download menu for a multi-torrent selection.
+
+    Only the actions that generalise across many *different* torrents: hand them
+    all to the system client (it queues and downloads in parallel), or copy
+    their magnets. Per-torrent actions (browse files, info, subtitles, stream)
+    don't apply to a batch and are omitted — pick a single torrent for those.
+
+    ``copyable`` is how many of the selected items actually have a magnet
+    (Online-Fix has none); Copy is disabled when it's zero. Returns "open",
+    "copy", "back", "cancel", or None (Esc — caller treats it as back).
+    """
+    from downloader import detect_torrent_client
+
+    client = detect_torrent_client()
+    copy_label = "📋 Copy all magnet links"
+    if copyable != count:
+        copy_label += f" ({copyable})"
+    items = [
+        SelectItem(
+            label=f"🧲 Open all {count} in {client}",
+            value="open",
+            is_action=True,
+            description=(
+                "Hand every selected torrent to your desktop client at once — it "
+                "queues and downloads them in parallel. Press Esc mid-run to stop."
+            ),
+        ),
+        SelectItem(
+            label=copy_label,
+            value="copy",
+            is_action=True,
+            enabled=copyable > 0,
+            hint=("" if copyable > 0 else "no magnet links in this selection"),
+            description=(
+                "Copy the magnets to your clipboard. Online-Fix entries have no "
+                "magnet and are skipped; RuTracker links are resolved on demand."
+            ),
+        ),
+        SelectItem(
+            label="↩  Back to results",
+            value="back",
+            is_action=True,
+            description="Return to the results list to change your selection.",
+        ),
+        SelectItem(label="✕  Cancel", value="cancel", is_action=True),
+    ]
+
+    idx = arrow_select(
+        items,
+        title=f"Batch download — {count} torrents",
+        banner=_make_banner_panel(),
+        start_index=0,
+        footer="↑/↓ navigate  •  Enter select  •  Esc back to results",
+    )
+    if idx is None:
+        return None
+    return items[idx].value
+
+
 # Credential metadata for the in-program manager. Each field is
 # (env_var_name, prompt_label, is_secret); `category` groups them on the menu
 # (entries are kept ordered by category so section headers fall in one place).
