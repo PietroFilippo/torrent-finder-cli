@@ -20,8 +20,14 @@ from ui.selector import SelectItem, arrow_select
 
 
 def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
-                            filters_shortcut: bool = False) -> "str | tuple | None":
+                            filters_shortcut: bool = False,
+                            multi: bool = False) -> "str | tuple | list | None":
     """Read a search query with inline editing.
+
+    With ``multi=True``, Ctrl+J commits the current line and starts another;
+    Enter then returns the full ``list[str]`` of titles. Ctrl+F / Tab are
+    suppressed once a title has been committed so the in-progress list isn't
+    lost. Without ``multi`` the return is a single string, exactly as before.
 
     Returns the typed text, "GO_BACK" on Esc, or ``("ACTIONS", typed)`` when Tab
     is pressed — the caller opens the quick-actions menu and re-prompts with
@@ -57,6 +63,8 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
         sys.stdout.write(''.join(out))
         sys.stdout.flush()
 
+    committed: list[str] = []  # multi mode: titles locked in with Ctrl+J
+
     hist = history or []
     hpos = -1   # -1 = editing the live line; 0.. = stepped into history (newest first)
     stash = ""  # the live line, stashed when first stepping into history
@@ -72,8 +80,28 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
     while True:
         key = readchar.readkey()
 
+        if multi and key in (readchar.key.LF, readchar.key.CTRL_J):
+            # Ctrl+J: lock the current title in and start a fresh line below.
+            # (Enter is CR '\r' here, Ctrl+J is LF '\n', so the two are distinct.)
+            text = "".join(buffer).strip()
+            if text:
+                committed.append(text)
+                print()
+                console.print(prompt_str, end="")
+                sys.stdout.flush()
+                buffer[:] = []
+                pos = 0
+                hpos = -1
+                stash = ""
+            continue
+
         if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
             print()
+            if multi:
+                text = "".join(buffer).strip()
+                if text:
+                    committed.append(text)
+                return list(committed)
             return "".join(buffer)
 
         elif key == readchar.key.ESC:
@@ -81,6 +109,8 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
             return "GO_BACK"
 
         elif key in (readchar.key.TAB, '\t'):
+            if multi and committed:
+                continue  # mid-multi-entry: don't lose the locked-in titles
             print()
             return ("ACTIONS", "".join(buffer))
 
@@ -88,6 +118,8 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
             # Quick filters jump. Always swallowed so the control char (\x06) is
             # never inserted into the query; only acts where it's enabled.
             if filters_shortcut:
+                if multi and committed:
+                    continue  # mid-multi-entry: keep the locked-in titles
                 print()
                 return ("FILTERS", "".join(buffer))
 

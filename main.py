@@ -822,7 +822,8 @@ def _main_loop() -> None:
             prov_history = history_queries(provider.slug)
             nav = "  •  [/dim][bold]↑/↓[/bold] [dim]past searches" if prov_history else ""
             console.print(
-                "[dim]Type to search  •  [/dim][bold]Tab[/bold] [dim]actions "
+                "[dim]Type to search  •  [/dim][bold]Ctrl+J[/bold] [dim]add another title  •  [/dim]"
+                "[bold]Tab[/bold] [dim]actions "
                 "(filters, history, stats, tips)  •  [/dim][bold]Ctrl+F[/bold] [dim]filters"
                 f"{nav}  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
             )
@@ -834,6 +835,7 @@ def _main_loop() -> None:
                 query = get_query_with_shortcut(
                     f"[title] Search {provider.name}:[/title] ",
                     initial=initial, history=prov_history, filters_shortcut=True,
+                    multi=True,
                 )
             except (EOFError, KeyboardInterrupt):
                 _goodbye()
@@ -896,14 +898,24 @@ def _main_loop() -> None:
                 clear_screen()
                 continue
 
-        if not query:
+        # Normalize the prompt result to a list of query strings. Multi mode
+        # (Ctrl+J = add another title) returns a list; single mode a string.
+        if isinstance(query, list):
+            queries = [q.strip() for q in query if q and q.strip()]
+        else:
+            queries = [query.strip()] if isinstance(query, str) and query.strip() else []
+
+        if not queries:
             notice_msg = "[warning] Please enter a search term.[/warning]"
             clear_screen()
             query = None
             continue
 
-        # Search the provider for the typed query.
-        console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{query}[/highlight]...")
+        # Search the provider. Multiple titles fan out across the same engines
+        # and merge (dedupe by hash, sort by seeders), reusing the by-creator
+        # search path.
+        shown = ", ".join(queries)
+        console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{shown}[/highlight]...")
         if getattr(provider, "search_note", ""):
             console.print(f"[dim]{provider.search_note}[/dim]")
         console.print("[dim]Press Esc to cancel and go back.[/dim]")
@@ -911,16 +923,24 @@ def _main_loop() -> None:
         # Run the search on a worker thread so Esc can abort the wait instead of
         # forcing the user to sit through the engine timeouts (or Ctrl+C).
         search_result: dict = {}
+        cancel_event = threading.Event()
 
         def _run_search() -> None:
             try:
-                search_result["results"] = provider.search(query, cli_filters=cli_filters)
+                if len(queries) == 1:
+                    search_result["results"] = provider.search(queries[0], cli_filters=cli_filters)
+                else:
+                    from resolvers.types import Work
+                    from creator_search import fan_out
+                    search_result["results"] = fan_out(
+                        provider, [Work(title=q) for q in queries], cli_filters,
+                        cancel_event=cancel_event,
+                    )
             except Exception:
                 search_result["results"] = []
             finally:
                 search_result["done"] = True
 
-        cancel_event = threading.Event()
         worker = threading.Thread(target=_run_search, daemon=True)
         worker.start()
         stop_listener = start_esc_listener(cancel_event)
@@ -944,11 +964,13 @@ def _main_loop() -> None:
             query = None
             continue
 
-        # Record the successful search in history + stats.
+        # Record the successful search in history + stats — each title
+        # individually so ↑/↓ recall offers them separately.
         from state import add_history_entry
         active_preset_names = [pr.name for pr in getattr(provider, "active_presets", [])]
-        add_history_entry(query, provider.slug, active_preset_names)
-        record_search(provider.slug, query, active_preset_names)
+        for q in queries:
+            add_history_entry(q, provider.slug, active_preset_names)
+            record_search(provider.slug, q, active_preset_names)
 
         # Results + download (shared with the by-creator flow). Esc on the
         # results table steps back to the keyword prompt; a completed download
