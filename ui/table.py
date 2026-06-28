@@ -129,12 +129,13 @@ def _pick_result(picked: set[int]) -> tuple:
     return ("one", idxs[0]) if len(idxs) == 1 else ("many", idxs)
 
 
-def interactive_select(results: list[dict]) -> "tuple | None":
+def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
     """Interactive torrent results table with multi-select.
 
     Navigate with arrows; Left/Right switch pages; type a number to jump.
     Space toggles a row's checkbox; ``a`` selects every result, ``c`` clears.
-    Returns:
+    ``note`` is an optional line shown above the table (e.g. which multi-search
+    titles returned nothing). Returns:
       - ``("one", global_idx)`` — Enter with nothing checked (open that row), or
         Enter/``d`` with exactly one checked;
       - ``("many", [global_idx, ...])`` — Enter/``d`` with two or more checked
@@ -166,7 +167,7 @@ def interactive_select(results: list[dict]) -> "tuple | None":
     # (title, borders, header, caption ≈ 7) and a 1-line margin so the caption is
     # never on the last row.
     term_height = console.size.height
-    overhead = 14
+    overhead = 14 + (1 if note else 0)  # the note line (if any) takes one row
     visible_count = max(3, term_height - overhead)
     visible_count = min(visible_count, total)  # Don't exceed result count
 
@@ -185,6 +186,9 @@ def interactive_select(results: list[dict]) -> "tuple | None":
     banner = _make_banner_panel()
 
     def framed(tbl):
+        if note:
+            note_line = Text(note, style="yellow", no_wrap=True, overflow="ellipsis")
+            return Group(banner, Text(""), note_line, tbl)
         return Group(banner, Text(""), tbl)
 
     # screen=True renders into the terminal's alternate-screen buffer — a fixed

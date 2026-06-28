@@ -32,7 +32,7 @@ from stats import (
     record_torrent_picked,
 )
 from torrent_session import TorrentSession
-from ui.prompts import clear_screen, download_method_prompt, episode_select_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
+from ui.prompts import MULTI_ADD_KEY_LABEL, clear_screen, download_method_prompt, episode_select_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
 from ui.table import interactive_select
 from updates import update_notice
 from utils import build_magnet, start_esc_listener
@@ -332,7 +332,7 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
         return "back"
 
 
-def browse_results(provider, results) -> str:
+def browse_results(provider, results, note: str = "") -> str:
     """Show the torrent results table + download-method UI for ``results``.
 
     Returns ``"back"`` if the user Esc'd the results table (caller steps back a
@@ -344,7 +344,7 @@ def browse_results(provider, results) -> str:
     """
     while True:
         clear_screen()
-        choice = interactive_select(results)
+        choice = interactive_select(results, note=note)
         if choice is None:
             return "back"
 
@@ -822,7 +822,7 @@ def _main_loop() -> None:
             prov_history = history_queries(provider.slug)
             nav = "  •  [/dim][bold]↑/↓[/bold] [dim]past searches" if prov_history else ""
             console.print(
-                "[dim]Type to search  •  [/dim][bold]Ctrl+J[/bold] [dim]add another title  •  [/dim]"
+                f"[dim]Type to search  •  [/dim][bold]{MULTI_ADD_KEY_LABEL}[/bold] [dim]add another title  •  [/dim]"
                 "[bold]Tab[/bold] [dim]actions "
                 "(filters, history, stats, tips)  •  [/dim][bold]Ctrl+F[/bold] [dim]filters"
                 f"{nav}  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
@@ -972,10 +972,23 @@ def _main_loop() -> None:
             add_history_entry(q, provider.slug, active_preset_names)
             record_search(provider.slug, q, active_preset_names)
 
+        # Note any searched titles that returned nothing (multi-title only). It
+        # rides above the results table (a pre-table print would be wiped by the
+        # table's own screen clear).
+        note = ""
+        if len(queries) > 1:
+            found = {r.get("from_work") for r in results}
+            missing = [q for q in queries if q not in found]
+            if missing:
+                cap = 4
+                more = f" +{len(missing) - cap} more" if len(missing) > cap else ""
+                note = (f"⚠  No torrents for {len(missing)} of {len(queries)} titles: "
+                        + ", ".join(missing[:cap]) + more)
+
         # Results + download (shared with the by-creator flow). Esc on the
         # results table steps back to the keyword prompt; a completed download
         # proceeds to "what's next?".
-        if browse_results(provider, results) == "back":
+        if browse_results(provider, results, note=note) == "back":
             query = None
             clear_screen()
             continue

@@ -19,6 +19,14 @@ from providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
 from ui.selector import SelectItem, arrow_select
 
 
+# "Add another title" trigger for multi-line search entry. Ctrl+N on every
+# platform: it's distinct from Enter everywhere, whereas Ctrl+J is LF ('\n') and
+# would collide with Enter on POSIX — readchar leaves ICRNL set, so the Enter key
+# arrives as '\n' there (see readchar's _posix_key.py: ENTER = LF).
+_ADD_LINE_KEYS = {readchar.key.CTRL_N}
+MULTI_ADD_KEY_LABEL = "Ctrl+N"
+
+
 def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
                             filters_shortcut: bool = False,
                             multi: bool = False) -> "str | tuple | list | None":
@@ -80,9 +88,9 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
     while True:
         key = readchar.readkey()
 
-        if multi and key in (readchar.key.LF, readchar.key.CTRL_J):
-            # Ctrl+J: lock the current title in and start a fresh line below.
-            # (Enter is CR '\r' here, Ctrl+J is LF '\n', so the two are distinct.)
+        if multi and key in _ADD_LINE_KEYS:
+            # Add-another-title key (Ctrl+J on Windows / Ctrl+N anywhere): lock the
+            # current title in and start a fresh line below.
             text = "".join(buffer).strip()
             if text:
                 committed.append(text)
@@ -180,7 +188,7 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
         elif key in (readchar.key.CTRL_D, '\x04'):
             raise EOFError
 
-        elif len(key) == 1 and not key.startswith('\x1b') and not key.startswith('\x00') and not key.startswith('\xe0'):
+        elif len(key) == 1 and key >= ' ' and not key.startswith('\x1b') and not key.startswith('\x00') and not key.startswith('\xe0'):
             prev_col, prev_len = pos, len(buffer)
             buffer.insert(pos, key)
             pos += 1
