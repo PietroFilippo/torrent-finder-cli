@@ -143,71 +143,101 @@ def _online_fix_pick(selected: dict) -> None:
     readchar.readkey()
 
 
+def _magnet_for(result: dict) -> str | None:
+    """Magnet URI for a result, or None when it has none.
+
+    Online-Fix games ship as .torrent files (no magnet); RuTracker keeps the
+    real hash on the topic page, so it's resolved on demand here (a network
+    call). Used by both batch hand-off and copy-magnets.
+    """
+    source = result.get("source")
+    name = result.get("name", "Unknown")
+    if source == "Online-Fix":
+        return None
+    if source == "RuTracker":
+        import rutracker
+        real_hash = rutracker.resolve_info_hash(result.get("rt_topic_id") or result.get("info_hash"))
+        return build_magnet(real_hash, name) if real_hash else None
+    info_hash = result.get("info_hash") or ""
+    return build_magnet(info_hash, name) if info_hash else None
+
+
+def _copy_to_clipboard(text: str) -> bool:
+    """Copy text to the OS clipboard. Returns False if no clipboard tool exists."""
+    import subprocess
+    import platform
+    try:
+        system = platform.system()
+        if system == "Windows":
+            subprocess.run("clip", input=text.encode(), check=True)
+        elif system == "Darwin":
+            subprocess.run("pbcopy", input=text.encode(), check=True)
+        else:
+            subprocess.run(["xclip", "-selection", "clipboard"], input=text.encode(), check=True)
+        return True
+    except Exception:
+        return False
+
+
 def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
     """Hand every checkbox-selected torrent to the system client at once.
 
-    The v1 batch action (the only one that generalises across many torrents —
-    see the multi-select plan). Branches per item by source because a Games
-    results list can mix magnet torrents with Online-Fix entries that have no
-    magnet: magnet → open_magnet; Online-Fix → fetch the .torrent and open it;
-    RuTracker → resolve the magnet on demand. One summary at the end. The full
-    batch menu (copy magnets, save-to, quiet, cancel) is step 2.
+    Branches per item by source because a Games results list can mix magnet
+    torrents with Online-Fix entries that have no magnet: magnet → open_magnet;
+    Online-Fix → fetch the .torrent and open it; RuTracker → resolve on demand.
+    Esc stops the run between items; one summary at the end.
     """
     from rich.panel import Panel
     from constants import get_download_dir
-    from ui.prompts import confirm_prompt
 
     n = len(idxs)
-    if n > 8 and not confirm_prompt(
-        f"Open {n} torrents in your client at once?", title="Batch download"
-    ):
-        clear_screen()
-        return
-
     sent = 0
     failed: list[str] = []
     ofix_urls: list[str] = []
     ofix_pw = None
 
-    with console.status(f"[bold cyan]Opening {n} torrent(s) in your client…[/bold cyan]", spinner="dots"):
-        for gi in idxs:
-            if not (0 <= gi < len(results)):
-                continue
-            r = results[gi]
-            name = r.get("name", "Unknown")
-            source = r.get("source")
-            ok = False
-            try:
-                if source == "Online-Fix":
-                    page_url = r.get("page_url") or r.get("of_post_url") or ""
-                    import online_fix
-                    path = online_fix.fetch_torrent_for(page_url, get_download_dir())
-                    if path and open_torrent_file(path):
-                        ok = True
-                        ofix_pw = online_fix.ARCHIVE_PASSWORD
-                    elif page_url:
-                        ofix_urls.append(page_url)
-                elif source == "RuTracker":
-                    import rutracker
-                    real_hash = rutracker.resolve_info_hash(r.get("rt_topic_id") or r.get("info_hash"))
-                    if real_hash:
-                        open_magnet(build_magnet(real_hash, name))
-                        ok = True
-                else:
-                    info_hash = r.get("info_hash") or ""
-                    if info_hash:
-                        open_magnet(build_magnet(info_hash, name))
-                        ok = True
-            except Exception:
+    cancel_event = threading.Event()
+    stop_listener = start_esc_listener(cancel_event)
+    try:
+        with console.status("[bold cyan]Opening torrents in your client…  (Esc to stop)[/bold cyan]", spinner="dots"):
+            for gi in idxs:
+                if cancel_event.is_set():
+                    break
+                if not (0 <= gi < len(results)):
+                    continue
+                r = results[gi]
+                name = r.get("name", "Unknown")
                 ok = False
-            if ok:
-                sent += 1
-                record_torrent_picked(provider.slug, int(r.get("seeders", 0) or 0))
-                record_magnet_dispatch()
-            else:
-                failed.append(name)
+                try:
+                    if r.get("source") == "Online-Fix":
+                        page_url = r.get("page_url") or r.get("of_post_url") or ""
+                        import online_fix
+                        path = online_fix.fetch_torrent_for(page_url, get_download_dir())
+                        if path and open_torrent_file(path):
+                            ok = True
+                            ofix_pw = online_fix.ARCHIVE_PASSWORD
+                        elif page_url:
+                            ofix_urls.append(page_url)
+                    else:
+                        magnet = _magnet_for(r)
+                        if magnet:
+                            open_magnet(magnet)
+                            ok = True
+                except Exception:
+                    ok = False
+                if ok:
+                    sent += 1
+                    record_torrent_picked(provider.slug, int(r.get("seeders", 0) or 0))
+                    record_magnet_dispatch()
+                else:
+                    failed.append(name)
+    finally:
+        stop_listener.set()
 
-    lines = [f"[success]✓ {sent} of {n} sent to your torrent client.[/success]"]
+    if cancel_event.is_set():
+        lines = [f"[warning] Stopped after {sent} of {n}.[/warning]"]
+    else:
+        lines = [f"[success]✓ {sent} of {n} sent to your torrent client.[/success]"]
     if ofix_pw:
         lines.append(f"[cyan]Online-Fix archive password:[/cyan] {ofix_pw}")
     if failed:
@@ -222,6 +252,84 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
     console.print("[dim]Press any key to continue...[/dim]")
     readchar.readkey()
     clear_screen()
+
+
+def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
+    """Copy the selection's magnet links to the clipboard.
+
+    Online-Fix entries have no magnet and are skipped; RuTracker magnets are
+    resolved on demand (so this can take a moment for RuTracker selections).
+    """
+    magnets: list[str] = []
+    skipped = 0
+    with console.status("[bold cyan]Collecting magnet links…[/bold cyan]", spinner="dots"):
+        for gi in idxs:
+            if not (0 <= gi < len(results)):
+                continue
+            magnet = _magnet_for(results[gi])
+            if magnet:
+                magnets.append(magnet)
+            else:
+                skipped += 1
+
+    if not magnets:
+        console.print("[warning] No magnet links in this selection (e.g. all Online-Fix).[/warning]")
+        console.print("[dim]Press any key to continue...[/dim]")
+        readchar.readkey()
+        clear_screen()
+        return
+
+    if _copy_to_clipboard("\n".join(magnets)):
+        console.print(f"[success]✓ Copied {len(magnets)} magnet link(s) to the clipboard.[/success]")
+    else:
+        console.print(
+            f"[warning] Couldn't access the clipboard — {len(magnets)} link(s) below:[/warning]\n"
+            + "\n".join(magnets)
+        )
+    if skipped:
+        console.print(f"[dim]{skipped} skipped (no magnet link).[/dim]")
+    console.print("[dim]Press any key to continue...[/dim]")
+    readchar.readkey()
+    clear_screen()
+
+
+def _batch_flow(provider, results: list, idxs: list[int]) -> str:
+    """Drive the reduced batch-download menu for a multi-torrent selection.
+
+    Loops the menu so Copy stays put; returns "next" when the user opened or
+    cancelled (caller shows what's next), or "back" to re-show the results table
+    (Back / Esc).
+    """
+    from ui.prompts import batch_download_menu
+
+    copyable = sum(
+        1 for gi in idxs
+        if 0 <= gi < len(results) and results[gi].get("source") != "Online-Fix"
+    )
+    while True:
+        action = batch_download_menu(len(idxs), copyable)
+        if action == "open":
+            # Guard against an accidental flood (e.g. 'a' select-all then Enter):
+            # a decline returns to the menu rather than dropping to what's next.
+            if len(idxs) > 8:
+                from ui.prompts import confirm_prompt
+                if not confirm_prompt(
+                    f"Open {len(idxs)} torrents in your client at once?",
+                    title="Batch download",
+                ):
+                    clear_screen()
+                    continue
+            _batch_handoff(provider, results, idxs)
+            return "next"
+        if action == "copy":
+            _batch_copy_magnets(provider, results, idxs)
+            continue
+        if action == "cancel":
+            clear_screen()
+            return "next"
+        # "back" or None (Esc) → step back to the results table
+        clear_screen()
+        return "back"
 
 
 def browse_results(provider, results) -> str:
@@ -240,11 +348,13 @@ def browse_results(provider, results) -> str:
         if choice is None:
             return "back"
 
-        # Multi-select: two or more torrents checked → batch hand-off, then
-        # straight to "what's next?". A single pick falls through to the full
-        # per-torrent download menu below (unchanged).
+        # Multi-select: two or more torrents checked → reduced batch menu. "back"
+        # re-shows the results table (re-select); otherwise we go to "what's
+        # next?". A single pick falls through to the full per-torrent download
+        # menu below (unchanged).
         if choice[0] == "many":
-            _batch_handoff(provider, results, choice[1])
+            if _batch_flow(provider, results, choice[1]) == "back":
+                continue
             return "next"
 
         idx = choice[1]
