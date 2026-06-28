@@ -143,6 +143,87 @@ def _online_fix_pick(selected: dict) -> None:
     readchar.readkey()
 
 
+def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
+    """Hand every checkbox-selected torrent to the system client at once.
+
+    The v1 batch action (the only one that generalises across many torrents —
+    see the multi-select plan). Branches per item by source because a Games
+    results list can mix magnet torrents with Online-Fix entries that have no
+    magnet: magnet → open_magnet; Online-Fix → fetch the .torrent and open it;
+    RuTracker → resolve the magnet on demand. One summary at the end. The full
+    batch menu (copy magnets, save-to, quiet, cancel) is step 2.
+    """
+    from rich.panel import Panel
+    from constants import get_download_dir
+    from ui.prompts import confirm_prompt
+
+    n = len(idxs)
+    if n > 8 and not confirm_prompt(
+        f"Open {n} torrents in your client at once?", title="Batch download"
+    ):
+        clear_screen()
+        return
+
+    sent = 0
+    failed: list[str] = []
+    ofix_urls: list[str] = []
+    ofix_pw = None
+
+    with console.status(f"[bold cyan]Opening {n} torrent(s) in your client…[/bold cyan]", spinner="dots"):
+        for gi in idxs:
+            if not (0 <= gi < len(results)):
+                continue
+            r = results[gi]
+            name = r.get("name", "Unknown")
+            source = r.get("source")
+            ok = False
+            try:
+                if source == "Online-Fix":
+                    page_url = r.get("page_url") or r.get("of_post_url") or ""
+                    import online_fix
+                    path = online_fix.fetch_torrent_for(page_url, get_download_dir())
+                    if path and open_torrent_file(path):
+                        ok = True
+                        ofix_pw = online_fix.ARCHIVE_PASSWORD
+                    elif page_url:
+                        ofix_urls.append(page_url)
+                elif source == "RuTracker":
+                    import rutracker
+                    real_hash = rutracker.resolve_info_hash(r.get("rt_topic_id") or r.get("info_hash"))
+                    if real_hash:
+                        open_magnet(build_magnet(real_hash, name))
+                        ok = True
+                else:
+                    info_hash = r.get("info_hash") or ""
+                    if info_hash:
+                        open_magnet(build_magnet(info_hash, name))
+                        ok = True
+            except Exception:
+                ok = False
+            if ok:
+                sent += 1
+                record_torrent_picked(provider.slug, int(r.get("seeders", 0) or 0))
+                record_magnet_dispatch()
+            else:
+                failed.append(name)
+
+    lines = [f"[success]✓ {sent} of {n} sent to your torrent client.[/success]"]
+    if ofix_pw:
+        lines.append(f"[cyan]Online-Fix archive password:[/cyan] {ofix_pw}")
+    if failed:
+        shown = ", ".join(failed[:6]) + (" …" if len(failed) > 6 else "")
+        lines.append(f"[warning] Couldn't open {len(failed)}:[/warning] {shown}")
+        for u in ofix_urls[:6]:
+            lines.append(f"[dim]Grab manually: {u}[/dim]")
+    console.print(Panel(
+        "\n".join(lines),
+        title="🧲 Batch download", border_style="bright_blue", padding=(1, 2),
+    ))
+    console.print("[dim]Press any key to continue...[/dim]")
+    readchar.readkey()
+    clear_screen()
+
+
 def browse_results(provider, results) -> str:
     """Show the torrent results table + download-method UI for ``results``.
 
@@ -155,10 +236,18 @@ def browse_results(provider, results) -> str:
     """
     while True:
         clear_screen()
-        idx = interactive_select(results)
-        if idx is None:
+        choice = interactive_select(results)
+        if choice is None:
             return "back"
 
+        # Multi-select: two or more torrents checked → batch hand-off, then
+        # straight to "what's next?". A single pick falls through to the full
+        # per-torrent download menu below (unchanged).
+        if choice[0] == "many":
+            _batch_handoff(provider, results, choice[1])
+            return "next"
+
+        idx = choice[1]
         selected = results[idx]
         name = selected.get("name", "Unknown")
         info_hash = selected.get("info_hash", "")
