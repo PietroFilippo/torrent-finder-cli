@@ -31,8 +31,13 @@ def build_table(
     total_pages: int = 1,
     global_offset: int = 0,
     tick: int = 0,
+    picked: "frozenset[int]" = frozenset(),
 ) -> Table:
-    """Build a rich table showing only the visible window of rows."""
+    """Build a rich table showing only the visible window of rows.
+
+    ``picked`` is the set of *global* indexes the user has checkbox-selected
+    (multi-select); their rows show a ✓ and the count surfaces in the title.
+    """
     # Scroll indicator in the title
     end_idx = min(scroll_offset + visible_count, total)
     scroll_info = f"[dim]({scroll_offset + 1}-{end_idx} of {total})[/dim]"
@@ -42,21 +47,25 @@ def build_table(
     if total_pages > 1:
         page_info = f"  [bold cyan]Page {current_page + 1}/{total_pages}[/bold cyan]"
 
+    sel_info = f"  [bold green]✓ {len(picked)} selected[/bold green]" if picked else ""
+
     table = Table(
-        title=f"Torrent Results {scroll_info}{page_info}",
+        title=f"Torrent Results {scroll_info}{page_info}{sel_info}",
         title_style="bold magenta",
         border_style="bright_blue",
         header_style="bold cyan",
         show_lines=False,
         padding=(0, 1),
         caption=(
-            "[dim] Up/Down: navigate | Enter: select | Esc: cancel | Type number to jump"
-            + (" | Left/Right: change page" if total_pages > 1 else "")
-            + "[/dim]"
+            "[dim] ↑/↓ navigate  |  Space select  |  a all  |  c clear"
+            + ("  |  ←/→ page" if total_pages > 1 else "")
+            + (f"  |  Enter download {len(picked)} selected" if picked else "  |  Enter open")
+            + "  |  Esc back[/dim]"
         ),
         caption_style="dim",
     )
 
+    table.add_column("Sel", justify="center", width=5)
     table.add_column("#", style="bold white", justify="right", width=7)
     table.add_column("Source", style="magenta", width=9)
     table.add_column("Name", style="white", max_width=_NAME_COL_WIDTH, no_wrap=True)
@@ -94,8 +103,10 @@ def build_table(
             leech_text = f"[{leech_style(leeches)}]{leeches}[/{leech_style(leeches)}]"
 
         source_val = item.get("source", "Apibay")
+        check_text = "[green][✓][/green]" if global_i in picked else "[dim][ ][/dim]"
 
         table.add_row(
+            check_text,
             num_text,
             source_val,
             display_name,
@@ -108,12 +119,27 @@ def build_table(
     return table
 
 
-def interactive_select(results: list[dict]) -> int | None:
+def _pick_result(picked: set[int]) -> tuple:
+    """Map the checkbox set to the selector's return shape.
+
+    Exactly one checked collapses to the single-torrent path (so a lone pick
+    keeps the full per-torrent download menu); two or more is a batch.
     """
-    Display an interactive table where the user navigates with arrow keys.
-    Results are split into pages of RESULTS_PER_PAGE. Left/Right arrows
-    switch pages. Returns the global index of the selected result, or
-    None if cancelled.
+    idxs = sorted(picked)
+    return ("one", idxs[0]) if len(idxs) == 1 else ("many", idxs)
+
+
+def interactive_select(results: list[dict]) -> "tuple | None":
+    """Interactive torrent results table with multi-select.
+
+    Navigate with arrows; Left/Right switch pages; type a number to jump.
+    Space toggles a row's checkbox; ``a`` selects every result, ``c`` clears.
+    Returns:
+      - ``("one", global_idx)`` — Enter with nothing checked (open that row), or
+        Enter/``d`` with exactly one checked;
+      - ``("many", [global_idx, ...])`` — Enter/``d`` with two or more checked
+        (batch hand-off);
+      - ``None`` if cancelled (Esc).
     """
     all_results = results
     total_all = len(all_results)
@@ -128,6 +154,9 @@ def interactive_select(results: list[dict]) -> int | None:
     # Current selection index (local to the page)
     current = 0
     num_buffer = ""
+    # Checkbox multi-select: global indexes the user has ticked. Persists across
+    # page flips (it stores global indexes, not page-local ones).
+    picked: set[int] = set()
     page_items = page_results()
     total = len(page_items)
     global_offset = current_page * RESULTS_PER_PAGE
@@ -167,6 +196,7 @@ def interactive_select(results: list[dict]) -> int | None:
         framed(build_table(
             page_items, current, scroll_offset, visible_count, total,
             current_page, total_pages, global_offset, tick=0,
+            picked=frozenset(picked),
         )),
         console=console,
         refresh_per_second=15,
@@ -198,6 +228,7 @@ def interactive_select(results: list[dict]) -> int | None:
                     framed(build_table(
                         page_items, cur, scroll_offset, visible_count, total,
                         current_page, total_pages, global_offset, tick=new_tick,
+                        picked=frozenset(picked),
                     ))
                 )
 
@@ -236,8 +267,27 @@ def interactive_select(results: list[dict]) -> int | None:
                         scroll_offset = 0
                         visible_count = min(max(3, term_height - overhead), total)
                     num_buffer = ""
+                elif key == " ":
+                    gi = global_offset + current
+                    if gi in picked:
+                        picked.discard(gi)
+                    else:
+                        picked.add(gi)
+                    num_buffer = ""
+                elif key in ("a", "A"):
+                    picked.update(range(total_all))
+                    num_buffer = ""
+                elif key in ("c", "C"):
+                    picked.clear()
+                    num_buffer = ""
                 elif key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
-                    return global_offset + current
+                    if picked:
+                        return _pick_result(picked)
+                    return ("one", global_offset + current)
+                elif key in ("d", "D"):
+                    if picked:
+                        return _pick_result(picked)
+                    num_buffer = ""
                 elif key == readchar.key.ESC:
                     return None
                 elif key in (readchar.key.CTRL_C,):
@@ -274,6 +324,7 @@ def interactive_select(results: list[dict]) -> int | None:
                         page_items, current, scroll_offset, visible_count, total,
                         current_page, total_pages, global_offset,
                         tick=marquee_state["tick"],
+                        picked=frozenset(picked),
                     ))
                 )
         finally:
