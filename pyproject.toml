@@ -34,31 +34,8 @@ Homepage = "https://github.com/PietroFilippo/torrent-finder-cli"
 Repository = "https://github.com/PietroFilippo/torrent-finder-cli"
 
 [project.scripts]
-torrent-finder = "main:main"
+torrent-finder = "torrent_finder.main:main"
 
-# Explicit layout: this is a flat project (loose top-level modules + three
-# subpackages), so list them rather than relying on auto-discovery (which errors
-# on a flat layout with multiple top-level packages). When step 1b moves these
-# under a `torrent_finder/` package, this whole section collapses to one line.
-[tool.setuptools]
-py-modules = [
-    "main",
-    "constants",
-    "creator_search",
-    "credentials",
-    "downloader",
-    "filters",
-    "jimaku",
-    "online_fix",
-    "rutracker",
-    "security",
-    "state",
-    "stats",
-    "subtitles",
-    "torrent_info",
-    "torrent_meta",
-    "torrent_session",
-    "updates",
-    "utils",
-]
-packages = ["providers", "resolvers", "ui"]
+# One top-level package now — discover it and its subpackages.
+[tool.setuptools.packages.find]
+include = ["torrent_finder*"]
