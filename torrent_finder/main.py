@@ -15,6 +15,7 @@ import warnings
 warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
+from torrent_finder import __version__
 from torrent_finder.constants import console
 import readchar
 from torrent_finder.downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, open_torrent_file, stream_with_peerflix, stream_with_webtorrent
@@ -708,6 +709,7 @@ def _handle_whats_next(current_provider):
 
 def _main_loop() -> None:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
     parser.add_argument("-t", "--type", type=str, choices=["movie", "game", "online-fix", "software", "mobile", "rutracker", "anime", "manga"], help="Search type (default: movie if used with -q)")
     parser.add_argument("-f", "--filter", action="append", help="Include keyword in results")
