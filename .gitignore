@@ -10,4 +10,9 @@ downloads/
 filter_state.json
 
 # Subtitle provider credentials (OpenSubtitles / Jimaku) — never commit
-subtitle_credentials.json
+subtitle_credentials.json
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
