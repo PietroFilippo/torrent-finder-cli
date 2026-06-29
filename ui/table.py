@@ -32,11 +32,14 @@ def build_table(
     global_offset: int = 0,
     tick: int = 0,
     picked: "frozenset[int]" = frozenset(),
+    show_from: bool = False,
 ) -> Table:
     """Build a rich table showing only the visible window of rows.
 
     ``picked`` is the set of *global* indexes the user has checkbox-selected
     (multi-select); their rows show a ✓ and the count surfaces in the title.
+    ``show_from`` adds a "From" column with each row's ``from_work`` provenance
+    (which searched title found it) — used for multi-title searches.
     """
     # Scroll indicator in the title
     end_idx = min(scroll_offset + visible_count, total)
@@ -68,6 +71,8 @@ def build_table(
     table.add_column("Sel", justify="center", width=5)
     table.add_column("#", style="bold white", justify="right", width=7)
     table.add_column("Source", style="magenta", width=9)
+    if show_from:
+        table.add_column("From", style="green", width=12, no_wrap=True, overflow="ellipsis")
     table.add_column("Name", style="white", max_width=_NAME_COL_WIDTH, no_wrap=True)
     table.add_column("Size", style="cyan", justify="right", width=10)
     table.add_column("Seeds", justify="right", width=7)
@@ -105,16 +110,11 @@ def build_table(
         source_val = item.get("source", "Apibay")
         check_text = "[green][✓][/green]" if global_i in picked else "[dim][ ][/dim]"
 
-        table.add_row(
-            check_text,
-            num_text,
-            source_val,
-            display_name,
-            format_size(size),
-            seed_text,
-            leech_text,
-            style=row_style,
-        )
+        row_cells = [check_text, num_text, source_val]
+        if show_from:
+            row_cells.append(item.get("from_work", "") or "")
+        row_cells += [display_name, format_size(size), seed_text, leech_text]
+        table.add_row(*row_cells, style=row_style)
 
     return table
 
@@ -144,6 +144,9 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
     """
     all_results = results
     total_all = len(all_results)
+    # Provenance "From" column: only when results came from more than one searched
+    # title (multi-title search); redundant for a single query.
+    show_from = len({r.get("from_work") for r in all_results if r.get("from_work")}) > 1
     total_pages = math.ceil(total_all / RESULTS_PER_PAGE)
     current_page = 0
 
@@ -200,7 +203,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
         framed(build_table(
             page_items, current, scroll_offset, visible_count, total,
             current_page, total_pages, global_offset, tick=0,
-            picked=frozenset(picked),
+            picked=frozenset(picked), show_from=show_from,
         )),
         console=console,
         refresh_per_second=15,
@@ -232,7 +235,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                     framed(build_table(
                         page_items, cur, scroll_offset, visible_count, total,
                         current_page, total_pages, global_offset, tick=new_tick,
-                        picked=frozenset(picked),
+                        picked=frozenset(picked), show_from=show_from,
                     ))
                 )
 
@@ -328,7 +331,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                         page_items, current, scroll_offset, visible_count, total,
                         current_page, total_pages, global_offset,
                         tick=marquee_state["tick"],
-                        picked=frozenset(picked),
+                        picked=frozenset(picked), show_from=show_from,
                     ))
                 )
         finally:
