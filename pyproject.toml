@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torrent-finder-cli"
+version = "0.1.0"
+description = "Search torrents across multiple sources from your terminal and hand them to your client — subtitles, episode picking, batch download, and search-by-creator."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Pietro Filippo" }]
+keywords = ["torrent", "cli", "tui", "magnet", "search", "subtitles"]
+classifiers = [
+    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Utilities",
+]
+# NOTE: deps mirror requirements.txt. subliminal/babelfish are only imported
+# lazily (subtitle search), but are required for that feature to work.
+dependencies = [
+    "requests",
+    "rich",
+    "readchar",
+    "subliminal",
+    "babelfish",
+]
+
+# TODO before PyPI: add a `license = { file = "LICENSE" }` (and a LICENSE file).
+# An unlicensed public package is "all rights reserved", which discourages use.
+
+[project.urls]
+Homepage = "https://github.com/PietroFilippo/torrent-finder-cli"
+Repository = "https://github.com/PietroFilippo/torrent-finder-cli"
+
+[project.scripts]
+torrent-finder = "main:main"
+
+# Explicit layout: this is a flat project (loose top-level modules + three
+# subpackages), so list them rather than relying on auto-discovery (which errors
+# on a flat layout with multiple top-level packages). When step 1b moves these
+# under a `torrent_finder/` package, this whole section collapses to one line.
+[tool.setuptools]
+py-modules = [
+    "main",
+    "constants",
+    "creator_search",
+    "credentials",
+    "downloader",
+    "filters",
+    "jimaku",
+    "online_fix",
+    "rutracker",
+    "security",
+    "state",
+    "stats",
+    "subtitles",
+    "torrent_info",
+    "torrent_meta",
+    "torrent_session",
+    "updates",
+    "utils",
+]
+packages = ["providers", "resolvers", "ui"]
