@@ -426,6 +426,60 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
         return False
 
 
+def download_many_with_aria2(magnets: list[str]) -> bool:
+    """Download several torrents with a single aria2c process (parallel).
+
+    The client-free batch path: aria2c accepts every magnet at once and pulls
+    them concurrently. Batch download grabs whole torrents (no per-file
+    selection). Returns True on a clean exit, False on cancel/failure.
+    """
+    aria_path = shutil.which("aria2c")
+    if not aria_path:
+        console.print("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n")
+        return False
+    if not magnets:
+        return False
+
+    dl_dir = get_download_dir()
+    os.makedirs(dl_dir, exist_ok=True)
+    console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
+    console.print(f"[info]Torrents:[/info] [highlight]{len(magnets)}[/highlight] (downloaded in parallel)")
+    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
+
+    cmd = [
+        aria_path,
+        "-d", dl_dir,
+        "--seed-time=0",
+        "--console-log-level=warn",
+    ] + list(magnets)
+
+    quiet = is_quiet_mode()
+    try:
+        if quiet:
+            with console.status(
+                f"[bold cyan]Downloading {len(magnets)} torrent(s)…[/bold cyan]  Ctrl+C cancel",
+                spinner="dots",
+            ):
+                result = subprocess.run(
+                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
+                )
+        else:
+            result = subprocess.run(cmd, stdin=subprocess.DEVNULL)
+        console.print()
+        if result.returncode == 0:
+            console.print("[success] Downloads complete![/success]")
+            console.print(f"[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n")
+            return True
+        console.print(f"[error] Some downloads failed (exit code {result.returncode}).[/error]\n")
+        return False
+    except KeyboardInterrupt:
+        console.print("\n[warning] Downloads cancelled.[/warning]\n")
+        return False
+    except FileNotFoundError:
+        console.print("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n")
+        return False
+
+
 def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None = None) -> bool:
     """Download torrent content directly using webtorrent-cli.
 

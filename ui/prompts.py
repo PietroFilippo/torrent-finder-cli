@@ -1167,6 +1167,10 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
     copy_label = "📋 Copy all magnet links"
     if copyable != count:
         copy_label += f" ({copyable})"
+    aria_ok = has_aria2()
+    aria_label = "⬇  Download all with aria2c"
+    if copyable != count:
+        aria_label += f" ({copyable})"
     items = [
         SelectItem(
             label=f"🧲 Open all {count} in {client}",
@@ -1175,6 +1179,21 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
             description=(
                 "Hand every selected torrent to your desktop client at once — it "
                 "queues and downloads them in parallel. Press Esc mid-run to stop."
+            ),
+        ),
+        SelectItem(
+            label=aria_label,
+            value="aria",
+            is_action=True,
+            enabled=(aria_ok and copyable > 0),
+            hint=(
+                "" if (aria_ok and copyable > 0)
+                else "aria2c not installed — https://aria2.github.io/" if not aria_ok
+                else "no magnet links in this selection"
+            ),
+            description=(
+                "Download every selected torrent with one aria2c process — parallel and "
+                "no torrent client needed. Online-Fix entries have no magnet and are skipped."
             ),
         ),
         SelectItem(
