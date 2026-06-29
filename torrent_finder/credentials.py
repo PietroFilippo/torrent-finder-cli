@@ -14,7 +14,9 @@ import json
 import os
 from pathlib import Path
 
-_CRED_FILE = Path(__file__).resolve().parent / "subtitle_credentials.json"
+from torrent_finder.constants import data_path
+
+_CRED_FILE = Path(data_path("subtitle_credentials.json"))
 
 # Maps the public env-var name -> the key used inside the JSON fallback file.
 _FILE_KEYS = {

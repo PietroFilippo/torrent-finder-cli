@@ -1,6 +1,8 @@
 """Shared constants, theme, and console instance."""
 
 import os
+import shutil
+import sys
 
 from rich.console import Console
 from rich.theme import Theme
@@ -19,10 +21,51 @@ custom_theme = Theme(
 
 console = Console(theme=custom_theme)
 
+# --- User data directory ------------------------------------------------------
+# State, credentials, and (by default) downloads live in a per-user directory,
+# not next to the code — so the app works when installed via pip/pipx or as a
+# frozen binary, where the package directory is shared/read-only.
+APP_DIRNAME = "torrent-finder-cli"
+_PKG_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def user_data_dir() -> str:
+    """Per-user data directory for this app (not created here — see ``data_path``)."""
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or os.path.expanduser("~")
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    return os.path.join(base, APP_DIRNAME)
+
+
+def data_path(name: str) -> str:
+    """Absolute path to a persisted file in the user data dir (dir created).
+
+    On first use, migrates a legacy copy that lived next to the code so existing
+    users keep their settings/credentials. The old repo-root location (richest,
+    pre-packaging) wins over a transient copy inside the package dir. The copy is
+    non-destructive (the original stays).
+    """
+    d = user_data_dir()
+    os.makedirs(d, exist_ok=True)
+    target = os.path.join(d, name)
+    if not os.path.exists(target):
+        for legacy in (os.path.join(_PKG_DIR, os.pardir, name), os.path.join(_PKG_DIR, name)):
+            if os.path.isfile(legacy):
+                try:
+                    shutil.copy2(legacy, target)
+                except OSError:
+                    pass
+                break
+    return target
+
+
 # API
 API_URL = "https://apibay.org/q.php"
 RESULTS_PER_PAGE = 20
-DOWNLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
+DOWNLOADS_DIR = os.path.join(user_data_dir(), "downloads")
 
 
 def get_download_dir() -> str:

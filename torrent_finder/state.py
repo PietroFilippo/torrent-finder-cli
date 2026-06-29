@@ -10,7 +10,9 @@ import atexit
 import json
 import os
 
-STATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "filter_state.json")
+from torrent_finder.constants import data_path
+
+STATE_PATH = data_path("filter_state.json")
 
 _CACHE: dict | None = None
 _DIRTY: bool = False
