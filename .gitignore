@@ -15,4 +15,7 @@ subtitle_credentials.json
 # Packaging / build artifacts
 build/
 dist/
-*.egg-info/
+*.egg-info/
+
+# setuptools-scm writes this at build time
+torrent_finder/_version.py

@@ -1,14 +1,16 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "torrent-finder-cli"
-version = "0.1.0"
+dynamic = ["version"]                     # version comes from git tags via setuptools-scm
 description = "Search torrents across multiple sources from your terminal and hand them to your client — subtitles, episode picking, batch download, and search-by-creator."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Pietro Filippo" }]
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = ["torrent", "cli", "tui", "magnet", "search", "subtitles"]
 classifiers = [
     "Environment :: Console",
@@ -26,9 +28,6 @@ dependencies = [
     "babelfish",
 ]
 
-# TODO before PyPI: add a `license = { file = "LICENSE" }` (and a LICENSE file).
-# An unlicensed public package is "all rights reserved", which discourages use.
-
 [project.urls]
 Homepage = "https://github.com/PietroFilippo/torrent-finder-cli"
 Repository = "https://github.com/PietroFilippo/torrent-finder-cli"
@@ -39,3 +38,13 @@ torrent-finder = "torrent_finder.main:main"
 # One top-level package now — discover it and its subpackages.
 [tool.setuptools.packages.find]
 include = ["torrent_finder*"]
+
+# Version is derived from git tags (e.g. tag v0.1.3 -> version 0.1.3). A file is
+# written into the package at build time so installed/frozen copies know their
+# version; fallback keeps non-git builds (rare) from failing.
+[tool.setuptools_scm]
+version_file = "torrent_finder/_version.py"
+fallback_version = "0.0.0"
+# PyPI rejects local version segments (the "+g<hash>" part), so untagged dev
+# builds (e.g. the manual TestPyPI run) upload as 0.1.1.devN instead.
+local_scheme = "no-local-version"
