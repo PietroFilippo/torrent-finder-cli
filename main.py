@@ -293,6 +293,51 @@ def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
     clear_screen()
 
 
+def _batch_aria2(provider, results: list, idxs: list[int]) -> None:
+    """Download every selected torrent that has a magnet with one aria2c process.
+
+    The client-free batch path (parallel, single process). Online-Fix entries
+    have no magnet and are skipped; RuTracker magnets are resolved on demand.
+    """
+    from downloader import download_many_with_aria2
+
+    magnets: list[str] = []
+    picked: list[dict] = []
+    skipped = 0
+    with console.status("[bold cyan]Collecting magnet links…[/bold cyan]", spinner="dots"):
+        for gi in idxs:
+            if not (0 <= gi < len(results)):
+                continue
+            magnet = _magnet_for(results[gi])
+            if magnet:
+                magnets.append(magnet)
+                picked.append(results[gi])
+            else:
+                skipped += 1
+
+    if not magnets:
+        console.print("[warning] Nothing to download via aria2c — no magnet links (e.g. all Online-Fix).[/warning]")
+        console.print("[dim]Press any key to continue...[/dim]")
+        readchar.readkey()
+        clear_screen()
+        return
+
+    if skipped:
+        console.print(
+            f"[dim]{skipped} item(s) skipped — no magnet (e.g. Online-Fix). "
+            "Use “Open all in client” for those.[/dim]"
+        )
+
+    ok = download_many_with_aria2(magnets)
+    if ok:
+        record_method_complete("aria")
+        for r in picked:
+            record_torrent_picked(provider.slug, int(r.get("seeders", 0) or 0))
+    console.print("[dim]Press any key to continue...[/dim]")
+    readchar.readkey()
+    clear_screen()
+
+
 def _batch_flow(provider, results: list, idxs: list[int]) -> str:
     """Drive the reduced batch-download menu for a multi-torrent selection.
 
@@ -320,6 +365,9 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
                     clear_screen()
                     continue
             _batch_handoff(provider, results, idxs)
+            return "next"
+        if action == "aria":
+            _batch_aria2(provider, results, idxs)
             return "next"
         if action == "copy":
             _batch_copy_magnets(provider, results, idxs)
