@@ -35,7 +35,7 @@ from torrent_finder.stats import (
 from torrent_finder.torrent_session import TorrentSession
 from torrent_finder.ui.prompts import MULTI_ADD_KEY_LABEL, clear_screen, download_method_prompt, episode_select_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
 from torrent_finder.ui.table import interactive_select
-from torrent_finder.updates import update_notice
+from torrent_finder.updates import check_for_update, notice_line, run_update
 from torrent_finder.utils import build_magnet, start_esc_listener
 
 load_state(PROVIDERS)
@@ -707,6 +707,18 @@ def _handle_whats_next(current_provider):
     return "EXIT"
 
 
+def _run_update_flow(info: dict) -> None:
+    """Run the install-appropriate update (git pull / pipx / open Releases)."""
+    clear_screen()
+    console.print("[info]Updating…[/info]\n")
+    ok, msg = run_update(info)
+    style = "success" if ok else "warning"
+    console.print(f"\n[{style}]{msg}[/{style}]")
+    console.print("\n[dim]Press any key to continue...[/dim]")
+    readchar.readkey()
+    clear_screen()
+
+
 def _main_loop() -> None:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -769,10 +781,12 @@ def _main_loop() -> None:
     if not (args.type and args.query):
         console.clear()
 
-    # One-shot update check (git-clone installs). Empty string when up to date
-    # or not checkable. Shown in the provider menu footer (interactive) and
+    # One-shot, install-aware update check (git / pip-pipx / binary). Rate-limited
+    # to once a day inside check_for_update. ``update_info`` also drives the
+    # "Install update" entry in the Tab menu; ``update_msg`` is the footer line,
     # printed once here for direct -q/-t runs that skip the menu.
-    update_msg = update_notice()
+    update_info = check_for_update()
+    update_msg = notice_line(update_info)
     if current_provider and update_msg:
         console.print(update_msg + "\n")
 
@@ -920,8 +934,12 @@ def _main_loop() -> None:
                 from torrent_finder.ui.prompts import quick_actions_menu
                 query = None
                 while True:
-                    action = quick_actions_menu()
-                    if action == "filter":
+                    action = quick_actions_menu(update_available=bool(update_info))
+                    if action == "update":
+                        _run_update_flow(update_info)
+                        update_info = None   # consumed → drop the notice + entry
+                        update_msg = ""
+                    elif action == "filter":
                         filter_menu(provider)
                     elif action == "history":
                         from torrent_finder.ui.history import history_select_prompt

@@ -195,35 +195,46 @@ def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
             repaint(prev_col, prev_len)
 
 
-def quick_actions_menu() -> "str | None":
+def quick_actions_menu(update_available: bool = False) -> "str | None":
     """Search-prompt quick actions, opened with Tab.
 
-    Returns "filter", "history", "stats", "tips", or None if cancelled. The
-    familiar F/H/S/T letters jump straight to each action; arrows + Enter also
-    work. Lives behind Tab so it never clashes with typing a query.
+    Returns "update" (only when ``update_available``), "filter", "history",
+    "stats", "tips", or None if cancelled. The familiar U/F/H/S/T letters jump
+    straight to each action; arrows + Enter also work. Lives behind Tab so it
+    never clashes with typing a query.
     """
-    items = [
-        SelectItem(label="🔍 Filters & engines", value="filter", is_action=True, hint="F"),
-        SelectItem(label="🕑 Search history", value="history", is_action=True, hint="H"),
-        SelectItem(label="📊 Usage stats", value="stats", is_action=True, hint="S"),
-        SelectItem(label="💡 Tips & shortcuts", value="tips", is_action=True, hint="T"),
-        SelectItem(label="↩  Back", value=None, is_action=True),
+    items: list[SelectItem] = []
+    if update_available:
+        items.append(SelectItem(label="⬆ Install update", value="update", is_action=True, hint="U"))
+    base = [
+        ("🔍 Filters & engines", "filter", "F"),
+        ("🕑 Search history", "history", "H"),
+        ("📊 Usage stats", "stats", "S"),
+        ("💡 Tips & shortcuts", "tips", "T"),
     ]
+    for label, value, key in base:
+        items.append(SelectItem(label=label, value=value, is_action=True, hint=key))
+    items.append(SelectItem(label="↩  Back", value=None, is_action=True))
 
     def _pick(index: int):
         return lambda cursor, items_list: index
 
-    key_actions = {
-        "F": _pick(0), "f": _pick(0),
-        "H": _pick(1), "h": _pick(1),
-        "S": _pick(2), "s": _pick(2),
-        "T": _pick(3), "t": _pick(3),
-    }
+    key_actions: dict = {}
+    offset = 0
+    if update_available:
+        key_actions["U"] = _pick(0)
+        key_actions["u"] = _pick(0)
+        offset = 1
+    for i, (_label, _value, key) in enumerate(base):
+        key_actions[key] = _pick(i + offset)
+        key_actions[key.lower()] = _pick(i + offset)
+
+    jump = "U / F / H / S / T" if update_available else "F / H / S / T"
     idx = arrow_select(
         items,
         title="Quick actions",
         banner=_make_banner_panel(),
-        footer="↑/↓ select  •  F / H / S / T jump  •  Esc back",
+        footer=f"↑/↓ select  •  {jump} jump  •  Esc back",
         key_actions=key_actions,
     )
     if idx is None:
