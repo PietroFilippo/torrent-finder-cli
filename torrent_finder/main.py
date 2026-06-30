@@ -1075,6 +1075,11 @@ def main() -> None:
     t0 = time.monotonic()
     try:
         _main_loop()
+    except (KeyboardInterrupt, EOFError):
+        # Ctrl+C / Ctrl+D from any menu (readchar raises these from readkey).
+        # Caught here so every entry point — the console script, python -m,
+        # and the frozen binary — exits cleanly instead of dumping a traceback.
+        _goodbye()
     finally:
         add_runtime_seconds(time.monotonic() - t0)
 
