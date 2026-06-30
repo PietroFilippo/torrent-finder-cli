@@ -56,3 +56,54 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  binaries:
+    # Tag pushes only — build a standalone executable per OS (no Python needed)
+    # and attach it to the GitHub Release. The collect-all / copy-metadata flags
+    # are what make subliminal's entry-point subtitle providers work when frozen.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    permissions:
+      contents: write          # upload assets to the Release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: torrent-finder-linux
+          - os: windows-latest
+            asset: torrent-finder-windows.exe
+          - os: macos-latest
+            asset: torrent-finder-macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0        # setuptools-scm needs full history + tags
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+      - name: Install package + PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . pyinstaller
+      - name: Build standalone binary
+        run: >
+          pyinstaller --onefile --name torrent-finder
+          --collect-all subliminal --collect-all babelfish
+          --collect-all guessit --collect-all dogpile.cache
+          --copy-metadata torrent-finder-cli --copy-metadata readchar
+          --copy-metadata rich --copy-metadata requests --copy-metadata subliminal
+          torrent_finder/__main__.py
+      - name: Name the asset per OS
+        shell: bash
+        run: |
+          mkdir -p out
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            mv dist/torrent-finder.exe "out/${{ matrix.asset }}"
+          else
+            mv dist/torrent-finder "out/${{ matrix.asset }}"
+          fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/${{ matrix.asset }}
