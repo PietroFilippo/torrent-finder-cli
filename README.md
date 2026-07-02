@@ -2,13 +2,15 @@
 
 An interactive command-line application for searching and downloading torrents directly from your terminal. Built with Python and `rich`.
 
-On Windows, the included `torrent.bat` launcher can be added to your `PATH` so you can run `torrent` from any terminal directory.
+Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, no-Python binary from [Releases](https://github.com/PietroFilippo/torrent-finder-cli/releases) — see [Installation](#installation).
 
 ## Features
 
 - **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs via The Pirate Bay's Applications categories plus SolidTorrents), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and stays dormant until one is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`. **Games** is likewise a group: pick it and choose **General** (PC, consoles, ROMs & repacks from public trackers — The Pirate Bay's game categories plus SolidTorrents) or **Online-Fix** (scrapes [online-fix.me](https://online-fix.me) for co-op/online game cracks). On the CLI they're `-t game` and `-t online-fix`. Online-Fix needs **no account** — both search and download are anonymous (the file host is referer-gated, not login-gated); picking a result downloads the `.torrent` into your download folder and opens it in your system torrent client, showing the archive password (`online-fix.me`) to unpack the game with.
 - **Multi-Engine Fan-Out:** Each provider queries several sources in parallel (e.g. Apibay + SolidTorrents + YTS + Nyaa live-action for Movies & Series, Nyaa for Anime, Nyaa Literature + Apibay Comics for Manga) and merges results, deduplicating by info hash and sorting by seeders.
 - **Search by Creator:** Search by the people and companies behind the content instead of by title. After choosing a provider, a "choose how to search" screen offers normal keyword search **plus** by-creator options — **Anime** and **Movies & Series** by **director** or **studio**, **Manga** by **writer** or serialization **magazine**, **Games** by **developer** or **publisher** (kept separate — a company can be both). You type a name, disambiguate between matches, then multi-select which of that creator's titles to include (a paged checklist, 100 per page with `n`/`p`); the app runs a normal torrent search for each picked title and merges the results — so picking still uses all the usual download/stream/episode options. It works **keyless out of the box** (AniList for anime/manga staff, Jikan for manga magazines, Wikidata for movies/games), and an optional **TMDB** key (Movies & Series) or **Twitch/IGDB** credentials (Games) added under **🔑 Credentials** transparently upgrade those two to richer, better-ranked data. Online-Fix is included in the Games developer/publisher results. From the CLI: `--by <role> --name "<creator>"` alongside `-t`, e.g. `torrent -t anime --by director --name "Hayao Miyazaki"`.
+- **Search Several at Once (multi-title):** At the keyword prompt, press **Ctrl+N** to add another title, then `Enter` to search them all together — results fan out across the provider's engines and merge into one list. A **From** column shows which searched title each result came from, so interleaved results are easy to tell apart.
+- **Multi-Select & Batch Download:** In the results table, press **Space** to tick more than one torrent (`a` select all, `c` clear), then `Enter`. A batch menu lets you **open all in your torrent client**, **download all with `aria2c`** (one parallel process — no client needed), or **copy all magnet links** at once. Works for any results — several releases of one title, or picks spanning a multi-title / by-creator search. A single pick still opens the full per-torrent download menu.
 - **Arrow-Key Driven UI:** Fully interactive, flicker-free terminal interface.
   - Utilizes an alternate screen buffer so your scrollback history remains flawlessly clean.
   - **Dynamic Viewport Windowing:** Capable of rendering massive 500+ item checklists (like huge anime seasons) by automatically windowing the active selection while pinning crucial action buttons tightly to the top and bottom of your screen to prevent terminal overflow.
@@ -19,7 +21,7 @@ On Windows, the included `torrent.bat` launcher can be added to your `PATH` so y
   - Toggle individual search engines on and off per provider from the same menu.
   - Add custom include/exclude keywords to quickly find the exact release you want.
   - **Shared keybinds with the episode picker:** `a` select all • `i` invert • `c` clear presets • `w` save • `v` / `Shift+V` visual anchor + range toggle • `Space` toggle current.
-  - **Persistent across runs:** engine toggles, active filter presets, search history, usage stats, the quiet-mode flag, the chosen download folder, and the dismissed-warning state all live in `filter_state.json` next to the script, so configuration sticks after you close the program. Mutations are held in an in-memory cache and flushed on exit or after destructive actions (clear history, reset stats, filter-menu Confirm) — no per-event disk hit.
+  - **Persistent across runs:** engine toggles, active filter presets, search history, usage stats, the quiet-mode flag, the chosen download folder, and the dismissed-warning state all live in `filter_state.json` in your user data folder (see [Where your data lives](#where-your-data-lives)), so configuration sticks after you close the program. Mutations are held in an in-memory cache and flushed on exit or after destructive actions (clear history, reset stats, filter-menu Confirm) — no per-event disk hit.
 - **Search History:** Press `H` on the provider screen (or `Tab` then `H` at the search prompt) to browse past searches. Filter by provider (`P`), date range (`D`, today/week/month), and sort order (`S`). Each entry shows the provider, relative timestamp, and the filter presets that were active at search time. Pick an entry to re-run the query; clear history with a confirmation modal.
 - **Usage Stats:** Press `S` on the provider screen (or `Tab` then `S` at the search prompt) to open a scrollable stats page showing session count, total runtime, searches, top queries, torrents picked, method picks vs. completions (with success rate), avg seeders of picks, and preset usage counters. Reset all stats from the same screen, guarded by a confirmation modal.
 - **Confirmation Modals:** Destructive actions (clear history, reset stats) share a unified red Y/N panel so you can't nuke state with a stray keypress.
@@ -42,25 +44,55 @@ On Windows, the included `torrent.bat` launcher can be added to your `PATH` so y
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
   - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
 - **Network Exposure Warning:** At startup a red panel queries `ip-api.com` and shows your public IP, ISP, ASN, location, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
-- **Update Notice for Git Clones:** When the project is installed from a git clone, the provider screen can show a lightweight update notice when the local branch is behind `origin`.
+- **Install-Aware Update Check:** On startup the app checks for a newer version (at most once a day, fail-silent) and shows a notice tailored to how you installed it — a pip/pipx install compares against PyPI, a git clone against `origin`, a standalone binary against the latest Release. Press **Tab → ⬆ Install update** to update in place (`pipx upgrade`/`pip -U`, `git pull`, or open the Releases page).
 - **Pagination & Navigation:** Navigate through large sets of search results cleanly, with the ability to safely go back to your previous search results after viewing download options.
 
 ## Prerequisites
 
-- **Python 3.10+**
+- **Python 3.10+** — for the PyPI/pip install or running from source. *Not needed for the standalone binary.*
 - (Optional but recommended) **Node.js** & **npm** for installing `webtorrent-cli` or `peerflix`.
 - (Optional) **VLC Media Player** — required for streaming.
 - (Optional) **aria2** — required for the file browser / episode picker, the in-torrent subtitle auto-detect path, auto episode navigation on the peerflix backend, and single-process multi-file downloads. Install with `winget install aria2.aria2` (Windows), `brew install aria2` (macOS), or `apt install aria2` / `dnf install aria2` (Linux).
 
 ## Installation
 
-### Clone and install Python dependencies
+### With Python (3.10+) — from PyPI
+
+Install from PyPI; **pipx** keeps it isolated in its own environment:
 
 ```bash
-git clone https://github.com/PietroFilippo/movie-finder-cli.git
-cd movie-finder-cli
-python -m pip install -r requirements.txt
+pipx install torrent-finder-cli      # recommended
+# or
+pip install torrent-finder-cli
 ```
+
+Then run it from anywhere:
+
+```bash
+torrent-finder
+```
+
+### Without Python — standalone binary
+
+Download a ready-to-run build for your OS from the
+[Releases page](https://github.com/PietroFilippo/torrent-finder-cli/releases):
+`torrent-finder-windows.exe`, `torrent-finder-macos`, or `torrent-finder-linux`.
+On Windows, double-click it (if SmartScreen warns, **More info → Run anyway** —
+it's just unsigned). On macOS/Linux, make it executable (`chmod +x <file>`) and
+run it from a terminal; on macOS the first run may need **System Settings →
+Privacy & Security → Open anyway**.
+
+### From source (for development)
+
+```bash
+git clone https://github.com/PietroFilippo/torrent-finder-cli.git
+cd torrent-finder-cli
+pip install -e .
+```
+
+Run it with `torrent-finder`, `python -m torrent_finder`, or `torrent.bat`
+(Windows). An editable install keeps pointing at your clone, so `git pull`
+updates it.
 
 ### Optional direct download / streaming tools
 
@@ -87,8 +119,8 @@ sudo apt install aria2
 
 Several features improve with — or, for RuTracker, require — an account.
 Credentials are read at runtime from environment variables (preferred) or a
-gitignored `subtitle_credentials.json` next to the code — **never commit real
-values**.
+`subtitle_credentials.json` in your user data folder (see [Where your data
+lives](#where-your-data-lives)) — **never commit real values**.
 
 The easiest way to set them is in-program: on the **Select Provider** screen,
 choose **🔑 Credentials**. For each provider you can view, enter/update,
@@ -162,7 +194,7 @@ export IGDB_CLIENT_ID="your_id"
 export IGDB_CLIENT_SECRET="your_secret"
 ```
 
-Or create `subtitle_credentials.json` (already gitignored) in the repo folder:
+Or create `subtitle_credentials.json` in your user data folder (see [Where your data lives](#where-your-data-lives)):
 
 ```json
 {
@@ -184,28 +216,31 @@ Or create `subtitle_credentials.json` (already gitignored) in the repo folder:
 Environment variables take precedence over the file. All keys are optional —
 anything unset just falls back to the anonymous provider set.
 
-### Run `torrent` from anywhere on Windows
+### Where your data lives
 
-The repository includes `torrent.bat`, which launches `main.py` relative to the repo folder. Add the repo folder to your user `PATH`, then open a new terminal:
+Your settings, credentials, search history, usage stats, and the default
+downloads folder are stored in a per-user data directory — not next to the code,
+so it survives upgrades and works the same for pip, pipx, and binary installs:
 
-```powershell
-# Run from the repository root in PowerShell
-$repo = (Get-Location).Path
-$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if (($userPath -split ';') -notcontains $repo) {
-    $newPath = @($userPath, $repo) -join ';'
-    [Environment]::SetEnvironmentVariable("Path", $newPath.Trim(';'), "User")
-}
-```
+- **Windows:** `%LOCALAPPDATA%\torrent-finder-cli\`
+- **macOS:** `~/Library/Application Support/torrent-finder-cli/`
+- **Linux:** `$XDG_DATA_HOME/torrent-finder-cli/` (or `~/.local/share/torrent-finder-cli/`)
 
-After opening a new terminal, this works from any directory:
+It holds `filter_state.json` (settings, history, stats), `subtitle_credentials.json`,
+and `downloads/`. If you used an older version that kept these next to the code,
+they are migrated here automatically on first run (the originals are left untouched).
 
-```bash
-torrent
-torrent -q "The Matrix" -t movie -y
-```
+### Updating
 
-If you do not add the repo folder to `PATH`, run `torrent.bat` or `python main.py` from the repository folder.
+The app checks for a newer version on startup (at most once a day, fail-silent)
+and shows a notice when one is available. Update from inside the program with
+**Tab → ⬆ Install update**, which does the right thing for your install type:
+
+- **pip / pipx** — runs `pipx upgrade torrent-finder-cli` (or `pip install -U`); restart the app afterward.
+- **standalone binary** — opens the Releases page so you can download the new file.
+- **source clone** — runs `git pull`.
+
+Or update manually any time with `pipx upgrade torrent-finder-cli`.
 
 ## Usage
 
@@ -214,13 +249,15 @@ If you do not add the repo folder to `PATH`, run `torrent.bat` or `python main.p
 The easiest way to use the CLI is to run it interactively. The arrow-key driven UI will guide you through selecting a category, searching, filtering, and downloading.
 
 ```bash
-# If the repo folder is on your PATH (Windows)
-torrent
+# After a pip/pipx install — the command is on your PATH
+torrent-finder
 
-# From the repository folder
-torrent.bat
-python main.py
+# From a source clone
+python -m torrent_finder
+torrent.bat            # Windows
 ```
+
+> The command is **`torrent-finder`**. The examples below shorten it to `torrent` for brevity — substitute `torrent-finder` (or, from a source clone, `torrent.bat`).
 
 ### Command Line Arguments
 
@@ -259,11 +296,14 @@ torrent -t game  --by developer --name "FromSoftware"
 
 # Skip the network exposure warning at startup
 torrent -y
+
+# Print the version and exit
+torrent --version
 ```
 
 You can also suppress the warning with the environment variable `TORRENT_SKIP_WARNING=1`, or permanently dismiss it from inside the panel itself (see below).
 
-If you did not add the repo folder to `PATH`, replace `torrent` with `python main.py` in the examples above.
+From a source clone with no pip install, replace `torrent` with `python -m torrent_finder` in the examples above.
 
 ### Network Exposure Warning
 
@@ -288,6 +328,8 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 - **Lists & Menus**: Use `Up` and `Down` arrows to navigate.
 - **Select**: Press `Enter` to confirm a choice or open a torrent.
 - **Toggle**: In multi-select menus (like Filters), press `Enter` or `Space` on an item to toggle its checkbox.
+- **Search prompt (multi-title)**: `Ctrl+N` commits the current title and starts another line; `Enter` searches them all at once. `Tab` opens quick actions, `Ctrl+F` jumps to filters, and `Up`/`Down` recall past searches.
+- **Results table (multi-select / batch)**: `Space` ticks a torrent, `a` selects all results, `c` clears. With one or more ticked, `Enter` opens the batch menu (open all in client • download all with `aria2c` • copy all magnets); with nothing ticked, `Enter` opens that single torrent's download menu.
 - **Range Selection (Episode Picker)**: 
   - `v`: Drop a visual anchor on the current item.
   - `Shift + V`: Instantly mass-toggle all items between the anchor and your cursor.
@@ -301,10 +343,13 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 
 ## Project Architecture
 
-The application is structured into a modular, provider-based architecture:
+All code lives under the `torrent_finder/` package, installed as a console script
+(`torrent-finder = torrent_finder.main:main`). The structure is modular and
+provider-based — the module paths below are relative to `torrent_finder/`:
 
 - `main.py`: The main entry point and CLI argument parser.
-- `torrent.bat`: Windows launcher. It calls `main.py` relative to the batch file location, so adding the repo folder to `PATH` makes `torrent` usable from any directory.
+- `__main__.py`: Enables `python -m torrent_finder` and serves as the PyInstaller binary entry point.
+- `torrent.bat` *(repo root)*: Windows launcher that runs `python -m torrent_finder`.
 - `providers/`: Different search categories (Movies & Series, General games, Online-Fix, Desktop, Mobile, RuTracker, Anime, Manga). The display menu nests some of these under groups — **Games** (General + Online-Fix) and **Software** (Desktop + Mobile + RuTracker) — via `ProviderGroup`, a display-only wrapper that changes menu shape without touching slugs. Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga). Providers may also declare a `creator_facets` list to enable search-by-creator (director/studio/writer/magazine/developer/publisher).
 - `resolvers/`: The "search by creator" metadata layer that turns a person/company name into a list of works. `types.py` (`CreatorFacet` / `Entity` / `Work`), `anilist.py` (anime director & studio + manga writer, keyless GraphQL), `jikan.py` (manga serialization magazines, keyless), `wikidata.py` (keyless SPARQL fallback for movie/series director & studio and game developer & publisher), `tmdb.py` (Movies & Series, needs `TMDB_API_KEY`), `igdb.py` (Games, needs Twitch creds), and `movies.py` / `games.py` which dispatch to TMDB/IGDB when a key is configured and Wikidata otherwise. Each facet exposes `search_entities(name)` → candidates and `list_works(entity, page)` → `(works, has_more)`; `creator_search.fan_out()` then runs the normal provider search over each picked title and merges. `main._available_facets` can gate facets behind a credential when there's no keyless fallback.
 - `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt` + the per-provider "choose how to search" source screen), `creator.py` (the search-by-creator flow: name → disambiguation → paged title picker with `n`/`p` + background prefetch → fan-out), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), `tips.py` (categorized tip catalog), and `tips_page.py` (searchable tips browser).
@@ -318,8 +363,8 @@ The application is structured into a modular, provider-based architecture:
 - `state.py`: Persists engine toggles, active presets, misc settings (dismissed-warning flag, quiet-mode flag, `download_dir`), and search history to `filter_state.json`. Backed by an in-memory cache: mutations mark dirty, disk write happens at `atexit` and at three destructive sites (`save_state`, `clear_history`, `reset_stats`). Includes a one-shot migration that rewrites legacy display-name keys (e.g. `"Movies & Series"`) to provider slugs.
 - `stats.py`: Usage counter recorders and read helpers; stores under the `stats` subtree, keyed by provider slug. Same in-memory cache flow as `state.py`.
 - `torrent_meta.py`: Fetches a torrent's file list from a magnet via `aria2c`. Helpers for episode-number extraction, video/subtitle classification, multi-episode detection (any torrent with ≥ 2 video files), sub-to-video matching (`match_subtitles_for`), and `--select-file` range formatting.
-- `updates.py`: Lightweight git-clone update notice. It rate-limits remote checks in `filter_state.json` and reports when the local branch is behind `origin`.
-- `constants.py`: Configuration constants, trackers, UI themes, and `get_download_dir()` (returns the user's chosen `download_dir` setting or falls back to `DOWNLOADS_DIR`).
+- `updates.py`: Install-aware update check (git clone / pip-pipx / binary). Rate-limited; compares against `origin` (git) or PyPI (`__version__`), and powers the in-app **Install update** action via `check_for_update()` / `run_update()`.
+- `constants.py`: Configuration constants, trackers, UI themes, the per-user data directory resolver (`user_data_dir()` / `data_path()`, with first-run migration of legacy files), and `get_download_dir()` (returns the user's chosen `download_dir` setting or falls back to `DOWNLOADS_DIR`).
 
 ## Security Notes
 
@@ -331,3 +376,7 @@ This tool does **not** make torrenting safe. Some things it cannot guarantee:
 - The startup `ip-api.com` call travels over plain HTTP (free tier limitation). If that matters to you, use `-y` or `TORRENT_SKIP_WARNING=1`.
 
 Use a VPN, verify content before running installers, and treat everything in a public swarm as untrusted.
+
+## License
+
+Released under the [MIT License](LICENSE).
