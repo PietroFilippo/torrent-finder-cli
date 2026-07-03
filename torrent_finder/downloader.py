@@ -4,6 +4,7 @@ import os
 import platform
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -363,6 +364,55 @@ def has_aria2() -> bool:
     return shutil.which("aria2c") is not None
 
 
+def _spawn_detached(cmd: list[str], quiet: bool) -> subprocess.Popen:
+    """Spawn a download child outside the console's Ctrl+C delivery.
+
+    Ctrl+C must interrupt only *this* process. When the console delivered it to
+    the whole group, a fast-dying child (webtorrent) could let the wait return
+    before Python raised its own KeyboardInterrupt — the interrupt then fired
+    *after* the caller's try/except and unwound the whole program. With the
+    child in its own process group (Windows) / session (POSIX), the
+    KeyboardInterrupt always lands in our ``proc.wait()`` and the child is
+    stopped explicitly (see ``_cancel_download_proc``).
+    """
+    stdout_arg, stderr_arg = _quiet_streams(quiet)
+    kwargs: dict = {"stdout": stdout_arg, "stderr": stderr_arg, "stdin": subprocess.DEVNULL}
+    if platform.system() == "Windows":
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+    return subprocess.Popen(cmd, **kwargs)
+
+
+def _cancel_download_proc(proc: subprocess.Popen) -> None:
+    """Stop a detached download child after the user's Ctrl+C: ask nicely first
+    (CTRL_BREAK on Windows — aria2c treats it like Ctrl+C and saves its control
+    file so the download stays resumable), then hard-kill the tree."""
+    if platform.system() == "Windows":
+        try:
+            proc.send_signal(signal.CTRL_BREAK_EVENT)
+            proc.wait(timeout=5)
+            return
+        except Exception:
+            pass
+    _kill_process_tree(proc)
+
+
+def _run_download(cmd: list[str], quiet: bool, status_msg: str) -> int | None:
+    """Run one download subprocess to completion. Returns its exit code, or
+    None when the user cancelled with Ctrl+C. In quiet mode the child's native
+    UI is suppressed and a spinner renders instead."""
+    proc = _spawn_detached(cmd, quiet)
+    try:
+        if quiet:
+            with console.status(status_msg, spinner="dots"):
+                return proc.wait()
+        return proc.wait()
+    except KeyboardInterrupt:
+        _cancel_download_proc(proc)
+        return None
+
+
 def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = None) -> bool:
     """Download torrent content using aria2c.
 
@@ -401,22 +451,16 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
     quiet = is_quiet_mode()
 
     try:
-        if quiet:
-            with console.status(
-                "[bold cyan]Downloading…[/bold cyan]  Ctrl+C cancel",
-                spinner="dots",
-            ):
-                result = subprocess.run(
-                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
-                )
-        else:
-            result = subprocess.run(cmd, stdin=subprocess.DEVNULL)
+        rc = _run_download(cmd, quiet, "[bold cyan]Downloading…[/bold cyan]  Ctrl+C cancel")
+        if rc is None:
+            console.print("\n[warning] Download cancelled.[/warning]\n")
+            return False
         console.print()
-        if result.returncode == 0:
+        if rc == 0:
             console.print("[success] Download complete![/success]")
             console.print(f"[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n")
             return True
-        console.print(f"[error] Download failed (exit code {result.returncode}).[/error]\n")
+        console.print(f"[error] Download failed (exit code {rc}).[/error]\n")
         return False
     except KeyboardInterrupt:
         console.print("\n[warning] Download cancelled.[/warning]\n")
@@ -455,22 +499,19 @@ def download_many_with_aria2(magnets: list[str]) -> bool:
 
     quiet = is_quiet_mode()
     try:
-        if quiet:
-            with console.status(
-                f"[bold cyan]Downloading {len(magnets)} torrent(s)…[/bold cyan]  Ctrl+C cancel",
-                spinner="dots",
-            ):
-                result = subprocess.run(
-                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
-                )
-        else:
-            result = subprocess.run(cmd, stdin=subprocess.DEVNULL)
+        rc = _run_download(
+            cmd, quiet,
+            f"[bold cyan]Downloading {len(magnets)} torrent(s)…[/bold cyan]  Ctrl+C cancel",
+        )
+        if rc is None:
+            console.print("\n[warning] Downloads cancelled.[/warning]\n")
+            return False
         console.print()
-        if result.returncode == 0:
+        if rc == 0:
             console.print("[success] Downloads complete![/success]")
             console.print(f"[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n")
             return True
-        console.print(f"[error] Some downloads failed (exit code {result.returncode}).[/error]\n")
+        console.print(f"[error] Some downloads failed (exit code {rc}).[/error]\n")
         return False
     except KeyboardInterrupt:
         console.print("\n[warning] Downloads cancelled.[/warning]\n")
@@ -520,20 +561,17 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
             cmd = [wt_path, "download", magnet_link, "--out", dl_dir]
             if idx is not None:
                 cmd.extend(["--select", str(idx - 1)])  # webtorrent is 0-based
-            if quiet:
-                with console.status(
-                    f"[bold cyan]Downloading…[/bold cyan]  "
-                    f"{'session ' + str(n) + '/' + str(len(targets)) + '  •  ' if len(targets) > 1 else ''}"
-                    "Ctrl+C cancel",
-                    spinner="dots",
-                ):
-                    result = subprocess.run(
-                        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
-                    )
-            else:
-                result = subprocess.run(cmd, stdin=subprocess.DEVNULL)
-            if result.returncode != 0:
-                console.print(f"\n[error] Session {n} failed (exit code {result.returncode}).[/error]\n")
+            rc = _run_download(
+                cmd, quiet,
+                f"[bold cyan]Downloading…[/bold cyan]  "
+                f"{'session ' + str(n) + '/' + str(len(targets)) + '  •  ' if len(targets) > 1 else ''}"
+                "Ctrl+C cancel",
+            )
+            if rc is None:
+                console.print("\n[warning] Download cancelled.[/warning]\n")
+                return False
+            if rc != 0:
+                console.print(f"\n[error] Session {n} failed (exit code {rc}).[/error]\n")
                 return False
 
         console.print()
@@ -588,20 +626,17 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
             cmd = [pf_path, magnet_link, "--path", dl_dir]
             if idx is not None:
                 cmd.extend(["-i", str(idx - 1)])  # peerflix is 0-based
-            if quiet:
-                with console.status(
-                    f"[bold cyan]Downloading…[/bold cyan]  "
-                    f"{'session ' + str(n) + '/' + str(len(targets)) + '  •  ' if len(targets) > 1 else ''}"
-                    "Ctrl+C cancel",
-                    spinner="dots",
-                ):
-                    result = subprocess.run(
-                        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
-                    )
-            else:
-                result = subprocess.run(cmd, stdin=subprocess.DEVNULL)
-            if result.returncode != 0:
-                console.print(f"\n[error] Session {n} failed (exit code {result.returncode}).[/error]\n")
+            rc = _run_download(
+                cmd, quiet,
+                f"[bold cyan]Downloading…[/bold cyan]  "
+                f"{'session ' + str(n) + '/' + str(len(targets)) + '  •  ' if len(targets) > 1 else ''}"
+                "Ctrl+C cancel",
+            )
+            if rc is None:
+                console.print("\n[warning] Download cancelled.[/warning]\n")
+                return False
+            if rc != 0:
+                console.print(f"\n[error] Session {n} failed (exit code {rc}).[/error]\n")
                 return False
 
         console.print()
@@ -680,13 +715,23 @@ def _run_stream(
     # keybinds stop working, but those aren't surfaced in our header anyway.
     # cwd=system tempdir keeps webtorrent's transient files out of the user's
     # working directory.
+    # New process group / session for the same reason as _spawn_detached: the
+    # console must deliver Ctrl+C to us alone, so the KeyboardInterrupt always
+    # lands inside this function's try (which kills the child tree) instead of
+    # racing the child's own death and escaping the caller's except scope.
     import tempfile as _tempfile
+    detach: dict = (
+        {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        if platform.system() == "Windows"
+        else {"start_new_session": True}
+    )
     proc = subprocess.Popen(
         cmd,
         stdout=stdout_arg,
         stderr=stderr_arg,
         stdin=subprocess.DEVNULL,
         cwd=_tempfile.gettempdir(),
+        **detach,
     )
     nav_action = "none"
 
