@@ -31,16 +31,20 @@ def apply_filters(results: list[dict], config: FilterConfig) -> list[dict]:
 
     for r in results:
         name = r.get("name", "").lower()
+        # Keyword include/exclude also match the source, so e.g. the Games
+        # "Repacks Only" preset ("fitgirl") keeps FitGirl-source rows whose
+        # names are plain game titles (same for "Online Fix" vs Online-Fix).
+        haystack = f"{name} {r.get('source', '').lower()}"
         seeds = int(r.get("seeders", 0))
 
         if config.min_seeds > 0 and seeds < config.min_seeds:
             continue
-            
-        if excludes and any(ext in name for ext in excludes):
+
+        if excludes and any(ext in haystack for ext in excludes):
             continue
-            
+
         # If includes is set, the name MUST contain at least one of the include keywords
-        if includes and not any(inc in name for inc in includes):
+        if includes and not any(inc in haystack for inc in includes):
             continue
             
         # If quality is set, the name MUST contain at least one of the quality keywords
