@@ -6,9 +6,12 @@ from torrent_finder.resolvers import CreatorFacet, anilist, jikan
 
 
 class MangaProvider(BaseProvider):
-    name = "Manga"
+    # Shown as "General" under the Manga group; slug stays "manga" so the -t
+    # flag and existing history/stats keys keep working.
+    name = "General"
     slug = "manga"
     icon = "📚"
+    search_note = "Manga from public trackers (Nyaa Literature + Apibay Comics)."
     categories = [602]  # Apibay/TPB Comics
     nyaa_category = "3_1"  # Literature - English-translated (default Nyaa engine)
 
