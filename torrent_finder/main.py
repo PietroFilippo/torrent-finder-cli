@@ -359,17 +359,25 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
     manual_urls: list[str] = []
     ofix_pw = None
 
+    from rich.markup import escape
+
     cancel_event = threading.Event()
     stop_listener = start_esc_listener(cancel_event)
+    # The status line names the item being handled ("(3/8) Title…") — and for a
+    # Madokami file, a live MB counter — so a multi-minute batch isn't a blind
+    # spinner. Titles are markup-escaped (manga names carry brackets).
+    status = console.status("[bold cyan]Opening torrents…  (Esc to stop)[/bold cyan]", spinner="dots")
     try:
-        with console.status("[bold cyan]Opening torrents in your client…  (Esc to stop)[/bold cyan]", spinner="dots"):
-            for gi in idxs:
+        with status:
+            for k, gi in enumerate(idxs, 1):
                 if cancel_event.is_set():
                     break
                 if not (0 <= gi < len(results)):
                     continue
                 r = results[gi]
                 name = r.get("name", "Unknown")
+                shown = escape(name[:40] + ("…" if len(name) > 40 else ""))
+                status.update(f"[bold cyan]({k}/{n}) {shown}  (Esc to stop)[/bold cyan]")
                 ok = False
                 try:
                     if r.get("source") == "Online-Fix":
@@ -390,9 +398,18 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
                         if madokami.is_file_path(mpath):
                             # cancel_event makes Esc abort mid-archive, not
                             # just between items — these can run to hundreds
-                            # of MB.
+                            # of MB. The callback keeps a MB counter on the
+                            # status line while the archive streams.
+                            def _on_progress(done, total, _k=k, _shown=shown):
+                                size = (f"{done / 1048576:.1f}/{total / 1048576:.1f} MB"
+                                        if total else f"{done / 1048576:.1f} MB")
+                                status.update(
+                                    f"[bold cyan]({_k}/{n}) {_shown} — {size}  (Esc to stop)[/bold cyan]"
+                                )
+
                             if madokami.download_file(
-                                mpath, get_download_dir(), cancel_event=cancel_event
+                                mpath, get_download_dir(),
+                                cancel_event=cancel_event, progress_cb=_on_progress,
                             ):
                                 ok = True
                                 saved_direct += 1
