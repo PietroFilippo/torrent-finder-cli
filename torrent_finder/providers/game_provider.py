@@ -50,18 +50,25 @@ class GameProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Public trackers + Online-Fix. Online-Fix is folded in as a toggleable
-        engine (anonymous search) so it's included in both keyword and
-        by-developer/publisher searches; the standalone Online-Fix provider stays
-        for focused searches. A picked Online-Fix result is routed to its
-        .torrent handler by the results loop (source == "Online-Fix")."""
+        """Public trackers + Online-Fix + FitGirl. The site engines are folded in
+        as toggleable engines (both search anonymously) so they're included in
+        both keyword and by-developer/publisher searches; the standalone
+        providers stay for focused searches. Picked results are routed by the
+        results loop on their ``source`` (Online-Fix → .torrent handoff,
+        FitGirl → lazy magnet resolve)."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
             SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=True),
             SearchEngine("Online-Fix", "🔧", self._search_online_fix, enabled=True),
+            SearchEngine("FitGirl", "🧚", self._search_fitgirl, enabled=True),
         ]
 
     def _search_online_fix(self, query: str) -> list[dict]:
         """Anonymous online-fix.me search (same backend as the standalone provider)."""
         from torrent_finder import online_fix
         return online_fix.search(query)
+
+    def _search_fitgirl(self, query: str) -> list[dict]:
+        """Anonymous fitgirl-repacks.site search (same backend as the standalone provider)."""
+        from torrent_finder import fitgirl
+        return fitgirl.search(query)

@@ -3,7 +3,9 @@
 from dataclasses import dataclass, field
 
 from torrent_finder.providers.anime_provider import AnimeProvider
+from torrent_finder.providers.fitgirl_provider import FitGirlProvider
 from torrent_finder.providers.game_provider import GameProvider
+from torrent_finder.providers.madokami_provider import MadokamiProvider
 from torrent_finder.providers.manga_provider import MangaProvider
 from torrent_finder.providers.mobile_provider import MobileProvider
 from torrent_finder.providers.movie_provider import MovieProvider
@@ -16,11 +18,13 @@ from torrent_finder.providers.software_provider import SoftwareProvider
 _movie = MovieProvider()
 _game = GameProvider()
 _online_fix = OnlineFixProvider()
+_fitgirl = FitGirlProvider()
 _desktop = SoftwareProvider()
 _mobile = MobileProvider()
 _rutracker = RuTrackerProvider()
 _anime = AnimeProvider()
 _manga = MangaProvider()
+_madokami = MadokamiProvider()
 
 # Flat registry of every provider. This is the source of truth for identity:
 # slugs (-t flag, history, stats, settings) all resolve against this list, so a
@@ -29,11 +33,13 @@ PROVIDERS: list = [
     _movie,
     _game,
     _online_fix,
+    _fitgirl,
     _desktop,
     _mobile,
     _rutracker,
     _anime,
     _manga,
+    _madokami,
 ]
 
 
@@ -56,12 +62,12 @@ class ProviderGroup:
 
 
 # The "Games" umbrella collects the game sources. Picking it drills into General
-# (public-tracker search) / Online-Fix (co-op cracks from online-fix.me).
+# (public-tracker search) / Online-Fix (co-op cracks) / FitGirl (official repacks).
 GAMES_GROUP = ProviderGroup(
     name="Games",
     icon="🎮",
-    search_note="Games — General (public trackers) or Online-Fix (co-op / online cracks).",
-    children=[_game, _online_fix],
+    search_note="Games — General (public trackers), Online-Fix (co-op / online cracks), or FitGirl (official repacks).",
+    children=[_game, _online_fix, _fitgirl],
 )
 
 # The "Software" umbrella collects the three app sources so they don't crowd the
@@ -73,6 +79,15 @@ SOFTWARE_GROUP = ProviderGroup(
     children=[_desktop, _mobile, _rutracker],
 )
 
+# The "Manga" umbrella collects the manga sources. Picking it drills into
+# General (public trackers) / Madokami (private library, direct downloads).
+MANGA_GROUP = ProviderGroup(
+    name="Manga",
+    icon="📚",
+    search_note="Manga — General (public trackers) or Madokami (private library, login needed).",
+    children=[_manga, _madokami],
+)
+
 # Display order for the Select Provider screen (mixes standalone providers and
 # groups). Distinct from PROVIDERS, which stays flat for identity lookups.
 PROVIDER_MENU: list = [
@@ -80,7 +95,7 @@ PROVIDER_MENU: list = [
     GAMES_GROUP,
     SOFTWARE_GROUP,
     _anime,
-    _manga,
+    MANGA_GROUP,
 ]
 
 
@@ -122,8 +137,9 @@ def icon_for(slug: str) -> str:
 def group_for(provider) -> "ProviderGroup | None":
     """Return the display ProviderGroup that contains this provider, or None.
 
-    Lets back-navigation from a group child (Online-Fix, Desktop, Mobile,
-    RuTracker) return to the group's source submenu instead of the top list.
+    Lets back-navigation from a group child (Online-Fix, FitGirl, Desktop,
+    Mobile, RuTracker) return to the group's source submenu instead of the top
+    list.
     """
     for item in PROVIDER_MENU:
         if isinstance(item, ProviderGroup) and provider in item.children:
