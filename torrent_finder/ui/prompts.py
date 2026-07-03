@@ -696,7 +696,9 @@ def subtitle_source_prompt(current: dict | None = None) -> dict:
 def download_dir_prompt() -> None:
     """Pick the default download directory. Persists via ``save_setting`` and
     returns to the caller — no return value. Applies to aria2, webtorrent /
-    peerflix downloads, and subtitle saves (not streams or magnet handoff)."""
+    peerflix downloads, subtitle saves, and Online-Fix / Madokami file saves
+    (not streams or magnet handoff). Reachable from the download-method menu
+    and the provider screen."""
     import os
     from torrent_finder.constants import DOWNLOADS_DIR
     from torrent_finder.state import load_setting, save_setting
@@ -1880,7 +1882,6 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
         is_action=True,
         description="Manage subtitle logins (OpenSubtitles / Addic7ed / Jimaku), search-provider logins (RuTracker / Online-Fix / Madokami), and the optional TMDB / IGDB creator-search upgrades.",
     )
-    items = provider_items + [separator, tips_item, info_item, creds_item]
     start = 0
 
     # Closure flag: set by key_action when F is pressed on a provider
@@ -1899,6 +1900,21 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
 
     while True:
         _filter_request["target"] = None
+
+        # Rebuilt every pass (unlike the static rows above) so the description
+        # shows the folder picked in download_dir_prompt without leaving the
+        # screen.
+        from torrent_finder.constants import get_download_dir
+        dir_item = SelectItem(
+            label="📁 Download folder",
+            value="__download_dir__",
+            is_action=True,
+            description=(
+                "Set the default folder for aria2c / webtorrent / peerflix downloads, "
+                f"subtitle saves, and Online-Fix / Madokami files.\nCurrent: {get_download_dir()}"
+            ),
+        )
+        items = provider_items + [separator, tips_item, info_item, creds_item, dir_item]
 
         # Fresh tip each time we enter the selector — but NOT on every render
         # (that would re-roll on every keypress and make the footer jitter).
@@ -1973,6 +1989,11 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
 
         if items[result].value == "__credentials__":
             credentials_menu()
+            start = result
+            continue
+
+        if items[result].value == "__download_dir__":
+            download_dir_prompt()
             start = result
             continue
 
