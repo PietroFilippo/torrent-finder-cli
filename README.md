@@ -6,7 +6,7 @@ Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, n
 
 ## Features
 
-- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs via The Pirate Bay's Applications categories plus SolidTorrents), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and stays dormant until one is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`. **Games** is likewise a group: pick it and choose **General** (PC, consoles, ROMs & repacks from public trackers — The Pirate Bay's game categories plus SolidTorrents) or **Online-Fix** (scrapes [online-fix.me](https://online-fix.me) for co-op/online game cracks). On the CLI they're `-t game` and `-t online-fix`. Online-Fix needs **no account** — both search and download are anonymous (the file host is referer-gated, not login-gated); picking a result downloads the `.torrent` into your download folder and opens it in your system torrent client, showing the archive password (`online-fix.me`) to unpack the game with.
+- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs via The Pirate Bay's Applications categories plus SolidTorrents), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and stays dormant until one is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`. **Games** is likewise a group: pick it and choose **General** (PC, consoles, ROMs & repacks from public trackers — The Pirate Bay's game categories plus SolidTorrents), **Online-Fix** (scrapes [online-fix.me](https://online-fix.me) for co-op/online game cracks), or **FitGirl** (searches the official [fitgirl-repacks.site](https://fitgirl-repacks.site) — the one trustworthy source for FitGirl repacks, since fake "FitGirl" uploads on public trackers are a known malware vector; no account needed, the magnet resolves from the post when you pick a result). On the CLI they're `-t game`, `-t online-fix`, and `-t fitgirl`. Online-Fix needs **no account** — both search and download are anonymous (the file host is referer-gated, not login-gated); picking a result downloads the `.torrent` into your download folder and opens it in your system torrent client, showing the archive password (`online-fix.me`) to unpack the game with. **Manga** is also a group: **General** (Nyaa Literature + Apibay Comics) or **Madokami** (the private [manga.madokami.al](https://manga.madokami.al) library — needs an account under the credentials menu; hits are **direct downloads**, no torrent client involved: picking a series folder opens a volume picker and the chosen archives are saved straight to your download folder). On the CLI: `-t manga` and `-t madokami`.
 - **Multi-Engine Fan-Out:** Each provider queries several sources in parallel (e.g. Apibay + SolidTorrents + YTS + Nyaa live-action for Movies & Series, Nyaa for Anime, Nyaa Literature + Apibay Comics for Manga) and merges results, deduplicating by info hash and sorting by seeders.
 - **Search by Creator:** Search by the people and companies behind the content instead of by title. After choosing a provider, a "choose how to search" screen offers normal keyword search **plus** by-creator options — **Anime** and **Movies & Series** by **director** or **studio**, **Manga** by **writer** or serialization **magazine**, **Games** by **developer** or **publisher** (kept separate — a company can be both). You type a name, disambiguate between matches, then multi-select which of that creator's titles to include (a paged checklist, 100 per page with `n`/`p`); the app runs a normal torrent search for each picked title and merges the results — so picking still uses all the usual download/stream/episode options. It works **keyless out of the box** (AniList for anime/manga staff, Jikan for manga magazines, Wikidata for movies/games), and an optional **TMDB** key (Movies & Series) or **Twitch/IGDB** credentials (Games) added under **🔑 Credentials** transparently upgrade those two to richer, better-ranked data. Online-Fix is included in the Games developer/publisher results. From the CLI: `--by <role> --name "<creator>"` alongside `-t`, e.g. `torrent -t anime --by director --name "Hayao Miyazaki"`.
 - **Search Several at Once (multi-title):** At the keyword prompt, press **Ctrl+N** to add another title, then `Enter` to search them all together — results fan out across the provider's engines and merge into one list. A **From** column shows which searched title each result came from, so interleaved results are easy to tell apart.
@@ -40,7 +40,7 @@ Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, n
     - After downloading subs via **📝 Search & download subtitles** (the existing subliminal flow), the saved file is auto-promoted to external mode so your next stream just picks it up.
   - **Auto Episode Navigation:** When streaming a torrent with ≥ 2 video files **without** pre-selecting anything, the CLI fetches metadata via `aria2c`, queues every video file in episode order (using filename patterns like `S01E01`, ` - 01`, `[01]`, `Episode 01`, or ` E01` when present; alphabetical fallback otherwise), and enables `n` (next) / `b` (previous) hotkeys so you can jump between episodes mid-session. Single-file movies still stream as-is — no forced picker, no extra wait.
   - **Subtitle Download:** Search and download the best matching subtitles directly from the terminal using `subliminal`. Enter one or more languages separated by commas (e.g. `eng, por` or `pt-BR`) — accepts ISO codes (`eng`/`en`) and regional variants (`pt-BR`, `pt-PT`). Every available language is downloaded, the first in your order becomes the primary VLC track (the rest attach as switchable tracks), and any language it couldn't find is reported. If a matching video has already been downloaded, it hash-matches the real file for frame-accurate sync; otherwise it matches on the release name. Configuring OpenSubtitles.com credentials greatly improves results (see *Subtitle providers* below). For Anime searches, a dedicated **Jimaku** lookup (jimaku.cc) runs first when a `JIMAKU_API_KEY` is set, since the western-TV providers behind subliminal don't index anime fansubs well.
-  - **Configurable Download Folder:** A **📁 Save to:** row in the Download Method menu lets you set a persistent default download directory used by `aria2c`, `webtorrent`, `peerflix` downloads and the subtitle downloader. Picker offers `Default (downloads/)`, `~/Downloads`, or a custom path (created on-the-fly if missing). Streams and magnet-to-client handoff are unaffected — they use their own paths.
+  - **Configurable Download Folder:** A **📁 Save to:** row in the Download Method menu — or the **📁 Download folder** row on the Select Provider screen, which shows the current path — sets a persistent default download directory used by `aria2c`, `webtorrent`, `peerflix` downloads, the subtitle downloader, and Online-Fix / Madokami file saves. Picker offers `Default (downloads/)`, `~/Downloads`, or a custom path (created on-the-fly if missing). Streams and magnet-to-client handoff are unaffected — they use their own paths.
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
   - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
 - **Network Exposure Warning:** At startup a red panel queries `ip-api.com` and shows your public IP, ISP, ASN, location, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
@@ -117,7 +117,7 @@ sudo apt install aria2
 
 ### Credentials (optional)
 
-Several features improve with — or, for RuTracker, require — an account.
+Several features improve with — or, for RuTracker and Madokami, require — an account.
 Credentials are read at runtime from environment variables (preferred) or a
 `subtitle_credentials.json` in your user data folder (see [Where your data
 lives](#where-your-data-lives)) — **never commit real values**.
@@ -141,8 +141,11 @@ matching environment variables to remove a credential that's set there.
   searches. Without the key, Anime falls back to subliminal automatically.
 - **RuTracker** (the RuTracker provider): a free [rutracker.org](https://rutracker.org)
   account is **required** — the provider logs in to search and returns nothing
-  without one. This is the only credential that gates a whole provider rather
-  than just enhancing subtitle results.
+  without one.
+- **Madokami** (the Madokami provider, under Manga): an account on
+  [manga.madokami.al](https://manga.madokami.al) is **required** — the whole
+  site sits behind HTTP Basic auth, so the provider returns nothing without
+  one. Like RuTracker, this credential gates the whole provider.
 - **Online-Fix** (the Online-Fix provider): **optional.** Both search and
   `.torrent` download work anonymously ([online-fix.me](https://online-fix.me)'s
   file host is referer-gated, not login-gated). A login is supported (the site's
@@ -173,6 +176,8 @@ Set them as environment variables:
 [Environment]::SetEnvironmentVariable("RUTRACKER_PASSWORD", "your_pass", "User")
 [Environment]::SetEnvironmentVariable("ONLINE_FIX_USERNAME", "your_user", "User")
 [Environment]::SetEnvironmentVariable("ONLINE_FIX_PASSWORD", "your_pass", "User")
+[Environment]::SetEnvironmentVariable("MADOKAMI_USERNAME", "your_user", "User")
+[Environment]::SetEnvironmentVariable("MADOKAMI_PASSWORD", "your_pass", "User")
 [Environment]::SetEnvironmentVariable("TMDB_API_KEY", "your_key", "User")
 [Environment]::SetEnvironmentVariable("IGDB_CLIENT_ID", "your_id", "User")
 [Environment]::SetEnvironmentVariable("IGDB_CLIENT_SECRET", "your_secret", "User")
@@ -189,6 +194,8 @@ export RUTRACKER_USERNAME="your_user"
 export RUTRACKER_PASSWORD="your_pass"
 export ONLINE_FIX_USERNAME="your_user"
 export ONLINE_FIX_PASSWORD="your_pass"
+export MADOKAMI_USERNAME="your_user"
+export MADOKAMI_PASSWORD="your_pass"
 export TMDB_API_KEY="your_key"
 export IGDB_CLIENT_ID="your_id"
 export IGDB_CLIENT_SECRET="your_secret"
@@ -207,6 +214,8 @@ Or create `subtitle_credentials.json` in your user data folder (see [Where your 
   "rutracker_password": "your_pass",
   "online_fix_username": "your_user",
   "online_fix_password": "your_pass",
+  "madokami_username": "your_user",
+  "madokami_password": "your_pass",
   "tmdb_api_key": "your_key",
   "igdb_client_id": "your_id",
   "igdb_client_secret": "your_secret"
@@ -265,11 +274,14 @@ torrent.bat            # Windows
 # Direct search (defaults to Movies)
 torrent -q "The Matrix"
 
-# Specify the search type (movie, game, online-fix, software, mobile, rutracker, anime, manga). `movie` covers both films and series.
+# Specify the search type (movie, game, online-fix, fitgirl, software, mobile, rutracker, anime, manga, madokami). `movie` covers both films and series.
 torrent -q "Elden Ring" -t game
 
 # Search Online-Fix (co-op / online game cracks from online-fix.me; no account needed)
 torrent -q "Elden Ring" -t online-fix
+
+# Search FitGirl repacks on the official fitgirl-repacks.site (no account needed)
+torrent -q "Cyberpunk" -t fitgirl
 
 # Search desktop software (The Pirate Bay Applications + SolidTorrents)
 torrent -q "Photoshop" -t software
@@ -282,6 +294,9 @@ torrent -q "Photoshop" -t rutracker
 
 # Search manga (Nyaa Literature English + Apibay Comics; Raw Nyaa available as a toggle)
 torrent -q "Berserk" -t manga
+
+# Search Madokami's manga library (requires a manga.madokami.al login; direct downloads)
+torrent -q "Berserk" -t madokami
 
 # Apply custom filters (include "1080p", exclude "cam")
 torrent -q "Dune" -t movie -f "1080p" -x "cam"
@@ -350,12 +365,12 @@ provider-based — the module paths below are relative to `torrent_finder/`:
 - `main.py`: The main entry point and CLI argument parser.
 - `__main__.py`: Enables `python -m torrent_finder` and serves as the PyInstaller binary entry point.
 - `torrent.bat` *(repo root)*: Windows launcher that runs `python -m torrent_finder`.
-- `providers/`: Different search categories (Movies & Series, General games, Online-Fix, Desktop, Mobile, RuTracker, Anime, Manga). The display menu nests some of these under groups — **Games** (General + Online-Fix) and **Software** (Desktop + Mobile + RuTracker) — via `ProviderGroup`, a display-only wrapper that changes menu shape without touching slugs. Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga). Providers may also declare a `creator_facets` list to enable search-by-creator (director/studio/writer/magazine/developer/publisher).
+- `providers/`: Different search categories (Movies & Series, General games, Online-Fix, FitGirl, Desktop, Mobile, RuTracker, Anime, General manga, Madokami). The display menu nests some of these under groups — **Games** (General + Online-Fix + FitGirl), **Software** (Desktop + Mobile + RuTracker), and **Manga** (General + Madokami) — via `ProviderGroup`, a display-only wrapper that changes menu shape without touching slugs. Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga). Providers may also declare a `creator_facets` list to enable search-by-creator (director/studio/writer/magazine/developer/publisher).
 - `resolvers/`: The "search by creator" metadata layer that turns a person/company name into a list of works. `types.py` (`CreatorFacet` / `Entity` / `Work`), `anilist.py` (anime director & studio + manga writer, keyless GraphQL), `jikan.py` (manga serialization magazines, keyless), `wikidata.py` (keyless SPARQL fallback for movie/series director & studio and game developer & publisher), `tmdb.py` (Movies & Series, needs `TMDB_API_KEY`), `igdb.py` (Games, needs Twitch creds), and `movies.py` / `games.py` which dispatch to TMDB/IGDB when a key is configured and Wikidata otherwise. Each facet exposes `search_entities(name)` → candidates and `list_works(entity, page)` → `(works, has_more)`; `creator_search.fan_out()` then runs the normal provider search over each picked title and merges. `main._available_facets` can gate facets behind a credential when there's no keyless fallback.
 - `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt` + the per-provider "choose how to search" source screen), `creator.py` (the search-by-creator flow: name → disambiguation → paged title picker with `n`/`p` + background prefetch → fan-out), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), `tips.py` (categorized tip catalog), and `tips_page.py` (searchable tips browser).
 - `filters.py`: Logic processing for including or excluding keywords.
 - `creator_search.py`: `fan_out()` for search-by-creator — runs the provider's normal `search()` over each picked title concurrently and merges (dedupe by info hash, sort by seeders), tagging each result with the title it came from.
-- `credentials.py`: Reads optional API credentials from environment variables (preferred) or the gitignored `subtitle_credentials.json`; powers the **🔑 Credentials** menu (subtitle logins, RuTracker/Online-Fix, and the TMDB/IGDB creator-search upgrades).
+- `credentials.py`: Reads optional API credentials from environment variables (preferred) or the gitignored `subtitle_credentials.json`; powers the **🔑 Credentials** menu (subtitle logins, RuTracker/Online-Fix/Madokami, and the TMDB/IGDB creator-search upgrades).
 - `torrent_session.py`: Post-torrent-pick state owner. Holds the picked magnet + user file selection + sub choice, and lazily resolves `files_meta` / `targets` / `stream_indexes` / `download_indexes` / `sub_paths`. Stream adapters consume the session directly; download adapters take `(magnet, indexes)` projections and stay session-unaware.
 - `downloader.py`: Subprocess orchestration — `aria2c` / `webtorrent-cli` / `peerflix` execution, VLC launch + sub injection, quiet-mode plumbing, in-torrent sub batch fetch, and `v` / `n` / `b` hotkey handling. Stream adapters take a `TorrentSession`; download adapters keep an explicit `(magnet, indexes)` signature for reuse outside the menu loop.
 - `subtitles.py`: Logic for searching and downloading subtitles using `subliminal`. Saves into the effective download folder via `constants.get_download_dir()`.
