@@ -97,7 +97,7 @@ def _locate_downloaded_video(torrent_name: str) -> str | None:
     return best if best_score >= 2 else None
 
 
-def _online_fix_pick(selected: dict) -> None:
+def _online_fix_pick(selected: dict) -> str:
     """Handle a picked Online-Fix result: fetch its ``.torrent`` and hand it to
     the system torrent client.
 
@@ -106,6 +106,10 @@ def _online_fix_pick(selected: dict) -> None:
     host is referer-gated (no login), so we download the .torrent into the user's
     download folder and open it in their client. On failure we show the page URL
     so they can grab it manually.
+
+    Returns ``"next"`` after a successful handoff (caller shows "what's next?"),
+    or ``"back"`` when nothing happened (fetch failed) so the caller re-shows
+    the results table instead of skipping past it.
     """
     from torrent_finder import online_fix
     from torrent_finder.constants import get_download_dir
@@ -126,7 +130,7 @@ def _online_fix_pick(selected: dict) -> None:
         ))
         console.print("[dim]Press any key to continue...[/dim]")
         readchar.readkey()
-        return
+        return "back"
 
     opened = open_torrent_file(path)
     handoff = ("[success]✓ opened in your torrent client[/success]" if opened
@@ -142,16 +146,22 @@ def _online_fix_pick(selected: dict) -> None:
     ))
     console.print("[dim]Press any key to continue...[/dim]")
     readchar.readkey()
+    return "next"
 
 
-def _madokami_pick(selected: dict) -> None:
+def _madokami_pick(selected: dict) -> str:
     """Handle a picked Madokami result: download the archive(s) directly.
 
     Madokami is a direct-download library — no magnet, no .torrent — so a pick
     bypasses the magnet menu entirely. A file hit is streamed to the download
     folder; a directory hit (a series) lists its contents in the file picker
-    first, then each checked file is downloaded in turn (Esc stops between
-    files). On failure the page URL is shown so the user can grab it manually.
+    first, then each checked file is downloaded in turn (Esc aborts mid-file).
+    On failure the page URL is shown so the user can grab it manually.
+
+    Returns ``"next"`` when at least one file was saved (caller shows "what's
+    next?"), or ``"back"`` when nothing was downloaded — Esc in the volume
+    picker, missing credentials, listing failure, or a failed/aborted transfer
+    — so the caller re-shows the results table instead of skipping past it.
     """
     import os
     from torrent_finder import madokami
@@ -173,7 +183,7 @@ def _madokami_pick(selected: dict) -> None:
         ))
         console.print("[dim]Press any key to continue...[/dim]")
         readchar.readkey()
-        return
+        return "back"
 
     if madokami.is_file_path(path):
         dl_paths = [path]
@@ -191,7 +201,7 @@ def _madokami_pick(selected: dict) -> None:
             ))
             console.print("[dim]Press any key to continue...[/dim]")
             readchar.readkey()
-            return
+            return "back"
         files = [c for c in children if not c["is_dir"]]
         subdirs = [c for c in children if c["is_dir"]]
         if not files:
@@ -204,33 +214,65 @@ def _madokami_pick(selected: dict) -> None:
             ))
             console.print("[dim]Press any key to continue...[/dim]")
             readchar.readkey()
-            return
+            return "back"
         picker_files = [
             TorrentFile(index=i + 1, name=f["name"], size_bytes=0)
             for i, f in enumerate(files)
         ]
         picked = episode_select_prompt(picker_files)
-        if not picked:  # Esc / cancelled / confirmed empty → nothing to download
-            return
+        if not picked:  # Esc / cancelled / confirmed empty → back to results
+            return "back"
         dl_paths = [files[i - 1]["path"] for i in picked if 1 <= i <= len(files)]
+
+    from urllib.parse import unquote
+    from rich.progress import (
+        BarColumn, DownloadColumn, Progress, TextColumn, TimeRemainingColumn,
+        TransferSpeedColumn,
+    )
 
     saved: list[str] = []
     failed: list[str] = []
     cancel_event = threading.Event()
     stop_listener = start_esc_listener(cancel_event)
+    # A volume archive can run to hundreds of MB, so show a real transfer bar
+    # (size / speed / ETA from Content-Length) instead of a blind spinner, and
+    # let Esc abort mid-file (checked per chunk inside download_file).
+    # markup=False: manga filenames routinely contain brackets ("[Group] …"),
+    # which rich would otherwise try to parse as style tags.
+    progress = Progress(
+        TextColumn("{task.description}", style="cyan", markup=False),
+        BarColumn(),
+        DownloadColumn(),
+        TransferSpeedColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    )
+    console.print(
+        f"[info]Downloading {len(dl_paths)} file(s) from Madokami — press Esc to stop.[/info]"
+    )
     try:
-        with console.status(
-            f"[bold cyan]Downloading {len(dl_paths)} file(s) from Madokami…  (Esc to stop)[/bold cyan]",
-            spinner="dots",
-        ):
-            for p in dl_paths:
+        with progress:
+            for i, p in enumerate(dl_paths, 1):
                 if cancel_event.is_set():
                     break
-                dest = madokami.download_file(p, get_download_dir())
+                label = unquote(p.rsplit("/", 1)[-1])
+                if len(label) > 46:
+                    label = label[:45] + "…"
+                if len(dl_paths) > 1:
+                    label = f"({i}/{len(dl_paths)}) {label}"
+                task = progress.add_task(label, total=None)
+
+                def _on_progress(done: int, total: int | None, _task=task) -> None:
+                    progress.update(_task, completed=done, total=total)
+
+                dest = madokami.download_file(
+                    p, get_download_dir(),
+                    cancel_event=cancel_event, progress_cb=_on_progress,
+                )
                 if dest:
                     saved.append(dest)
-                else:
-                    failed.append(p.rsplit("/", 1)[-1])
+                elif not cancel_event.is_set():
+                    failed.append(label)
     finally:
         stop_listener.set()
 
@@ -254,6 +296,7 @@ def _madokami_pick(selected: dict) -> None:
     ))
     console.print("[dim]Press any key to continue...[/dim]")
     readchar.readkey()
+    return "next" if saved else "back"
 
 
 def _magnet_for(result: dict) -> str | None:
@@ -345,7 +388,12 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
                         from torrent_finder import madokami
                         mpath = r.get("mdk_path") or ""
                         if madokami.is_file_path(mpath):
-                            if madokami.download_file(mpath, get_download_dir()):
+                            # cancel_event makes Esc abort mid-archive, not
+                            # just between items — these can run to hundreds
+                            # of MB.
+                            if madokami.download_file(
+                                mpath, get_download_dir(), cancel_event=cancel_event
+                            ):
                                 ok = True
                                 saved_direct += 1
                         elif r.get("page_url"):
@@ -362,6 +410,8 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
                     record_torrent_picked(provider.slug, int(r.get("seeders", 0) or 0))
                     if r.get("source") != "Madokami":  # a saved file isn't a magnet dispatch
                         record_magnet_dispatch()
+                elif cancel_event.is_set():
+                    break  # aborted mid-transfer — cancelled, not failed
                 else:
                     failed.append(name)
     finally:
@@ -551,17 +601,24 @@ def browse_results(provider, results, note: str = "") -> str:
         info_hash = selected.get("info_hash", "")
         record_torrent_picked(provider.slug, int(selected.get("seeders", 0) or 0))
 
-        # Online-Fix has no public magnet — fetch the .torrent and hand it to the
-        # system client, then proceed to "what's next?".
+        # Online-Fix has no public magnet — fetch the .torrent and hand it to
+        # the system client. Success proceeds to "what's next?"; a failed fetch
+        # steps back to the results table (nothing happened).
         if selected.get("source") == "Online-Fix":
-            _online_fix_pick(selected)
+            if _online_fix_pick(selected) == "back":
+                clear_screen()
+                continue
             clear_screen()
             return "next"
 
         # Madokami is a direct-download library (no torrent at all) — download
-        # the archive(s) straight to disk, then proceed to "what's next?".
+        # the archive(s) straight to disk. A saved file proceeds to "what's
+        # next?"; Esc in the volume picker or any dead end (no credentials,
+        # listing failure, aborted transfer) steps back to the results table.
         if selected.get("source") == "Madokami":
-            _madokami_pick(selected)
+            if _madokami_pick(selected) == "back":
+                clear_screen()
+                continue
             clear_screen()
             return "next"
 

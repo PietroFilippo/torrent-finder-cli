@@ -1169,8 +1169,9 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
     don't apply to a batch and are omitted — pick a single torrent for those.
 
     ``copyable`` is how many of the selected items actually have a magnet
-    (Online-Fix has none); Copy is disabled when it's zero. Returns "open",
-    "copy", "back", "cancel", or None (Esc — caller treats it as back).
+    (Online-Fix and Madokami have none); Copy is disabled when it's zero.
+    Returns "open", "copy", "back", "cancel", or None (Esc — caller treats it
+    as back).
     """
     from torrent_finder.downloader import detect_torrent_client
 
@@ -1204,7 +1205,7 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
             ),
             description=(
                 "Download every selected torrent with one aria2c process — parallel and "
-                "no torrent client needed. Online-Fix entries have no magnet and are skipped."
+                "no torrent client needed. Online-Fix / Madokami entries have no magnet and are skipped."
             ),
         ),
         SelectItem(
@@ -1214,8 +1215,8 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
             enabled=copyable > 0,
             hint=("" if copyable > 0 else "no magnet links in this selection"),
             description=(
-                "Copy the magnets to your clipboard. Online-Fix entries have no "
-                "magnet and are skipped; RuTracker links are resolved on demand."
+                "Copy the magnets to your clipboard. Online-Fix / Madokami entries have "
+                "no magnet and are skipped; RuTracker / FitGirl links are resolved on demand."
             ),
         ),
         SelectItem(
@@ -1302,6 +1303,18 @@ _CRED_PROVIDERS = [
         ],
         "required": ["ONLINE_FIX_USERNAME", "ONLINE_FIX_PASSWORD"],
         "limit": "Optional — Online-Fix search and download work without it; login is supported for completeness.",
+    },
+    {
+        "id": "madokami",
+        "category": "Search provider logins",
+        "icon": "📕",
+        "name": "Madokami (manga)",
+        "fields": [
+            ("MADOKAMI_USERNAME", "Username", False),
+            ("MADOKAMI_PASSWORD", "Password", True),
+        ],
+        "required": ["MADOKAMI_USERNAME", "MADOKAMI_PASSWORD"],
+        "limit": "Required — the Madokami provider authenticates every request and returns nothing without an account.",
     },
     {
         "id": "tmdb",
@@ -1490,6 +1503,11 @@ def _test_provider_credentials(provider_id: str, effective: dict) -> tuple[bool,
             from torrent_finder import online_fix
             return online_fix.test_credentials(
                 effective["ONLINE_FIX_USERNAME"], effective["ONLINE_FIX_PASSWORD"]
+            )
+        if provider_id == "madokami":
+            from torrent_finder import madokami
+            return madokami.test_credentials(
+                effective["MADOKAMI_USERNAME"], effective["MADOKAMI_PASSWORD"]
             )
         if provider_id == "tmdb":
             from torrent_finder.resolvers import tmdb
@@ -1860,7 +1878,7 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
         label="🔑 Credentials — subtitles, provider logins, creator-search keys",
         value="__credentials__",
         is_action=True,
-        description="Manage subtitle logins (OpenSubtitles / Addic7ed / Jimaku), search-provider logins (RuTracker / Online-Fix), and the optional TMDB / IGDB creator-search upgrades.",
+        description="Manage subtitle logins (OpenSubtitles / Addic7ed / Jimaku), search-provider logins (RuTracker / Online-Fix / Madokami), and the optional TMDB / IGDB creator-search upgrades.",
     )
     items = provider_items + [separator, tips_item, info_item, creds_item]
     start = 0

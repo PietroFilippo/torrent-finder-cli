@@ -30,6 +30,8 @@ _FILE_KEYS = {
     "RUTRACKER_PASSWORD": "rutracker_password",
     "ONLINE_FIX_USERNAME": "online_fix_username",
     "ONLINE_FIX_PASSWORD": "online_fix_password",
+    "MADOKAMI_USERNAME": "madokami_username",
+    "MADOKAMI_PASSWORD": "madokami_password",
     "TMDB_API_KEY": "tmdb_api_key",
     "IGDB_CLIENT_ID": "igdb_client_id",
     "IGDB_CLIENT_SECRET": "igdb_client_secret",
@@ -193,6 +195,15 @@ def online_fix_config() -> dict | None:
     """Username/password for the Online-Fix provider, or None when unset."""
     username = get_credential("ONLINE_FIX_USERNAME")
     password = get_credential("ONLINE_FIX_PASSWORD")
+    if not username or not password:
+        return None
+    return {"username": username, "password": password}
+
+
+def madokami_config() -> dict | None:
+    """Username/password for the Madokami provider, or None when unset."""
+    username = get_credential("MADOKAMI_USERNAME")
+    password = get_credential("MADOKAMI_PASSWORD")
     if not username or not password:
         return None
     return {"username": username, "password": password}
