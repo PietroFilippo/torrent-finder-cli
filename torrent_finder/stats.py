@@ -1,25 +1,26 @@
 """Usage statistics — recorders + storage under the `stats` subtree of filter_state.json.
 
-Every `record_*` reads the full state, mutates the stats subtree, writes back.
+Persistence goes through ``store.py`` (the filter_state.json owner). Every
+`record_*` reads the full state, mutates the stats subtree, writes back.
 Cheap given the tiny JSON and infrequent events.
 """
 
 from datetime import datetime, timezone
 
-from torrent_finder.state import _flush, _read_state, _write_state
+from torrent_finder import store
 
 
 _STATS_KEY = "stats"
 
 
 def _get_stats() -> dict:
-    return _read_state().get(_STATS_KEY, {})
+    return store.read().get(_STATS_KEY, {})
 
 
 def _save_stats(stats: dict) -> None:
-    data = _read_state()
+    data = store.read()
     data[_STATS_KEY] = stats
-    _write_state(data)
+    store.write(data)
 
 
 def _bump(stats: dict, *path: str, by: int = 1) -> None:
@@ -117,11 +118,11 @@ def add_runtime_seconds(seconds: float) -> None:
 
 def reset_stats() -> None:
     """Wipe the stats subtree (keeps other state keys intact). Flushes immediately."""
-    data = _read_state()
+    data = store.read()
     if _STATS_KEY in data:
         del data[_STATS_KEY]
-    _write_state(data)
-    _flush()
+    store.write(data)
+    store.flush()
 
 
 # ---------------------------------------------------------------------------

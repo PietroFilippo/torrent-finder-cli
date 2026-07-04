@@ -1,63 +1,12 @@
-"""Persist engine toggles, active filter presets, history, stats, and misc settings.
+"""Persist engine toggles, active filter presets, history, and misc settings.
 
-Mutations are held in an in-memory cache and flushed to disk at process exit
-(atexit) or on explicit ``_flush()`` calls from destructive UI sites
-(``save_state``, ``clear_history``, ``reset_stats``). Public ``save_*`` /
-``record_*`` helpers no longer hit the disk on every call.
+Persistence itself (cache / dirty / flush of filter_state.json) is owned by
+``store.py``; this module reads and mutates the dict through that interface.
+Destructive UI sites (``save_state``, ``clear_history``) flush explicitly so
+the action survives a hard kill.
 """
 
-import atexit
-import json
-import os
-
-from torrent_finder.constants import data_path
-
-STATE_PATH = data_path("filter_state.json")
-
-_CACHE: dict | None = None
-_DIRTY: bool = False
-_ATEXIT_REGISTERED: bool = False
-
-
-def _load_from_disk() -> dict:
-    if not os.path.exists(STATE_PATH):
-        return {}
-    try:
-        with open(STATE_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
-def _read_state() -> dict:
-    """Return the in-memory state dict, loading from disk on first call."""
-    global _CACHE, _ATEXIT_REGISTERED
-    if _CACHE is None:
-        _CACHE = _load_from_disk()
-        if not _ATEXIT_REGISTERED:
-            atexit.register(_flush)
-            _ATEXIT_REGISTERED = True
-    return _CACHE
-
-
-def _write_state(data: dict) -> None:
-    """Update the cache and mark it dirty. No disk hit — see ``_flush()``."""
-    global _CACHE, _DIRTY
-    _CACHE = data
-    _DIRTY = True
-
-
-def _flush() -> None:
-    """Persist the cache to disk if dirty. Called from atexit + destructive sites."""
-    global _DIRTY
-    if not _DIRTY or _CACHE is None:
-        return
-    try:
-        with open(STATE_PATH, "w", encoding="utf-8") as f:
-            json.dump(_CACHE, f, indent=2)
-        _DIRTY = False
-    except OSError:
-        pass
+from torrent_finder import store
 
 
 # One-shot rename: legacy persistence keyed on display ``name``; new schema
@@ -112,9 +61,9 @@ def _migrate_legacy_names(data: dict) -> bool:
 
 def load_state(providers) -> None:
     """Apply saved engine/preset selections onto the given provider instances in place."""
-    data = _read_state()
+    data = store.read()
     if _migrate_legacy_names(data):
-        _write_state(data)
+        store.write(data)
     provider_states = data.get("providers", {})
     for provider in providers:
         pstate = provider_states.get(provider.slug)
@@ -138,7 +87,7 @@ def save_state(providers) -> None:
     Flushes immediately — filter-menu Confirm is an explicit user action and
     should survive a hard kill.
     """
-    data = _read_state()
+    data = store.read()
     data["providers"] = {
         p.slug: {
             "engines": {e.name: e.enabled for e in p.engines},
@@ -146,20 +95,20 @@ def save_state(providers) -> None:
         }
         for p in providers
     }
-    _write_state(data)
-    _flush()
+    store.write(data)
+    store.flush()
 
 
 def load_setting(key: str, default=None):
     """Read a value from the `settings` subtree of the state file."""
-    return _read_state().get("settings", {}).get(key, default)
+    return store.read().get("settings", {}).get(key, default)
 
 
 def save_setting(key: str, value) -> None:
     """Write a value into the `settings` subtree of the state file, preserving other keys."""
-    data = _read_state()
+    data = store.read()
     data.setdefault("settings", {})[key] = value
-    _write_state(data)
+    store.write(data)
 
 
 # ---------------------------------------------------------------------------
@@ -174,14 +123,14 @@ def load_history() -> list[dict]:
 
     Each entry is ``{"query": str, "provider": str, "timestamp": str}``.
     """
-    return _read_state().get("history", [])
+    return store.read().get("history", [])
 
 
 def save_history(entries: list[dict]) -> None:
     """Persist a history list, capping at *_HISTORY_MAX* entries."""
-    data = _read_state()
+    data = store.read()
     data["history"] = entries[:_HISTORY_MAX]
-    _write_state(data)
+    store.write(data)
 
 
 def add_history_entry(
@@ -265,4 +214,4 @@ def creator_history(provider_slug: str, facet_key: str) -> list[str]:
 def clear_history() -> None:
     """Wipe all history entries (keyword + creator). Flushes immediately."""
     save_history([])
-    _flush()
+    store.flush()
