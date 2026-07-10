@@ -15,10 +15,10 @@ import warnings
 warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
-from torrent_finder import __version__
+from torrent_finder import __version__, acquisition
 from torrent_finder.constants import console
 import readchar
-from torrent_finder.downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, open_torrent_file, stream_with_peerflix, stream_with_webtorrent
+from torrent_finder.downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, stream_with_peerflix, stream_with_webtorrent
 from torrent_finder.filters import FilterConfig
 from torrent_finder.providers import PROVIDERS, get_provider, group_for
 from torrent_finder.security import show_security_warning
@@ -36,7 +36,7 @@ from torrent_finder.torrent_session import TorrentSession
 from torrent_finder.ui.prompts import MULTI_ADD_KEY_LABEL, clear_screen, download_method_prompt, episode_select_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
 from torrent_finder.ui.table import interactive_select
 from torrent_finder.updates import check_for_update, notice_line, run_update
-from torrent_finder.utils import build_magnet, start_esc_listener
+from torrent_finder.utils import start_esc_listener
 
 load_state(PROVIDERS)
 
@@ -97,230 +97,13 @@ def _locate_downloaded_video(torrent_name: str) -> str | None:
     return best if best_score >= 2 else None
 
 
-def _online_fix_pick(selected: dict) -> str:
-    """Handle a picked Online-Fix result: fetch its ``.torrent`` and hand it to
-    the system torrent client.
+def _magnet_for(result) -> str | None:
+    """Magnet URI for a result, or None when its acquisition style has none.
 
-    Online-Fix has no public magnet (games are distributed as .torrent files), so
-    it can't use the magnet download menu. The post page is public and the file
-    host is referer-gated (no login), so we download the .torrent into the user's
-    download folder and open it in their client. On failure we show the page URL
-    so they can grab it manually.
-
-    Returns ``"next"`` after a successful handoff (caller shows "what's next?"),
-    or ``"back"`` when nothing happened (fetch failed) so the caller re-shows
-    the results table instead of skipping past it.
+    Thin delegate kept for the characterization tests; the per-source logic
+    lives behind the acquisition seam (``acquisition.magnet_for``).
     """
-    from torrent_finder import online_fix
-    from torrent_finder.constants import get_download_dir
-    from rich.panel import Panel
-
-    name = selected.get("name", "Unknown")
-    page_url = selected.get("page_url") or selected.get("of_post_url") or ""
-    with console.status("[bold cyan]Fetching .torrent from online-fix.me…[/bold cyan]", spinner="dots"):
-        path = online_fix.fetch_torrent_for(page_url, get_download_dir())
-
-    if not path:
-        console.print(Panel(
-            f"[bold]{name}[/bold]\n\n"
-            "[warning]Couldn't fetch the .torrent automatically[/warning] "
-            "(post layout changed or host blocked).\n"
-            f"[cyan]Open the page and grab it manually:[/cyan]\n{page_url}",
-            title="🔧 Online-Fix", border_style="yellow", padding=(1, 2),
-        ))
-        console.print("[dim]Press any key to continue...[/dim]")
-        readchar.readkey()
-        return "back"
-
-    opened = open_torrent_file(path)
-    handoff = ("[success]✓ opened in your torrent client[/success]" if opened
-               else "[warning]saved, but couldn't auto-open — add it to your client manually[/warning]")
-    console.print(Panel(
-        f"[bold]{name}[/bold]\n\n"
-        f"[cyan].torrent saved:[/cyan]   {path}\n"
-        f"[cyan]Handed to client:[/cyan] {handoff}\n"
-        f"[cyan]Archive password:[/cyan] {online_fix.ARCHIVE_PASSWORD}\n\n"
-        "[dim]Your client downloads the game from online-fix's tracker; unpack the "
-        "archives with the password above.[/dim]",
-        title="🔧 Online-Fix", border_style="bright_blue", padding=(1, 2),
-    ))
-    console.print("[dim]Press any key to continue...[/dim]")
-    readchar.readkey()
-    return "next"
-
-
-def _madokami_pick(selected: dict) -> str:
-    """Handle a picked Madokami result: download the archive(s) directly.
-
-    Madokami is a direct-download library — no magnet, no .torrent — so a pick
-    bypasses the magnet menu entirely. A file hit is streamed to the download
-    folder; a directory hit (a series) lists its contents in the file picker
-    first, then each checked file is downloaded in turn (Esc aborts mid-file).
-    On failure the page URL is shown so the user can grab it manually.
-
-    Returns ``"next"`` when at least one file was saved (caller shows "what's
-    next?"), or ``"back"`` when nothing was downloaded — Esc in the volume
-    picker, missing credentials, listing failure, or a failed/aborted transfer
-    — so the caller re-shows the results table instead of skipping past it.
-    """
-    import os
-    from torrent_finder import madokami
-    from torrent_finder.constants import get_download_dir
-    from torrent_finder.credentials import madokami_config
-    from torrent_finder.torrent_meta import TorrentFile
-    from rich.panel import Panel
-
-    name = selected.get("name", "Unknown")
-    path = selected.get("mdk_path") or ""
-    page_url = selected.get("page_url", "")
-
-    if madokami_config() is None:
-        console.print(Panel(
-            "[warning]Madokami needs a login[/warning] — add your account under "
-            "Credentials on the provider screen (or set MADOKAMI_USERNAME / "
-            "MADOKAMI_PASSWORD).",
-            title="📕 Madokami", border_style="yellow", padding=(1, 2),
-        ))
-        console.print("[dim]Press any key to continue...[/dim]")
-        readchar.readkey()
-        return "back"
-
-    if madokami.is_file_path(path):
-        dl_paths = [path]
-    else:
-        # A directory hit — usually a series folder of volume archives. List it
-        # and let the user pick which files to pull.
-        with console.status("[bold cyan]Listing the Madokami folder…[/bold cyan]", spinner="dots"):
-            children = madokami.list_directory(path)
-        if children is None:
-            console.print(Panel(
-                f"[bold]{name}[/bold]\n\n"
-                "[warning]Couldn't list the folder[/warning] (login rejected or site layout changed).\n"
-                f"[cyan]Open it in your browser instead:[/cyan]\n{page_url}",
-                title="📕 Madokami", border_style="yellow", padding=(1, 2),
-            ))
-            console.print("[dim]Press any key to continue...[/dim]")
-            readchar.readkey()
-            return "back"
-        files = [c for c in children if not c["is_dir"]]
-        subdirs = [c for c in children if c["is_dir"]]
-        if not files:
-            hint = (f"It holds {len(subdirs)} subfolder(s) — " if subdirs else "")
-            console.print(Panel(
-                f"[bold]{name}[/bold]\n\n"
-                f"[warning]No files at this level.[/warning] {hint}"
-                f"[cyan]browse it directly:[/cyan]\n{page_url}",
-                title="📕 Madokami", border_style="yellow", padding=(1, 2),
-            ))
-            console.print("[dim]Press any key to continue...[/dim]")
-            readchar.readkey()
-            return "back"
-        picker_files = [
-            TorrentFile(index=i + 1, name=f["name"], size_bytes=0)
-            for i, f in enumerate(files)
-        ]
-        picked = episode_select_prompt(picker_files)
-        if not picked:  # Esc / cancelled / confirmed empty → back to results
-            return "back"
-        dl_paths = [files[i - 1]["path"] for i in picked if 1 <= i <= len(files)]
-
-    from urllib.parse import unquote
-    from rich.progress import (
-        BarColumn, DownloadColumn, Progress, TextColumn, TimeRemainingColumn,
-        TransferSpeedColumn,
-    )
-
-    saved: list[str] = []
-    failed: list[str] = []
-    cancel_event = threading.Event()
-    stop_listener = start_esc_listener(cancel_event)
-    # A volume archive can run to hundreds of MB, so show a real transfer bar
-    # (size / speed / ETA from Content-Length) instead of a blind spinner, and
-    # let Esc abort mid-file (checked per chunk inside download_file).
-    # markup=False: manga filenames routinely contain brackets ("[Group] …"),
-    # which rich would otherwise try to parse as style tags.
-    progress = Progress(
-        TextColumn("{task.description}", style="cyan", markup=False),
-        BarColumn(),
-        DownloadColumn(),
-        TransferSpeedColumn(),
-        TimeRemainingColumn(),
-        console=console,
-    )
-    console.print(
-        f"[info]Downloading {len(dl_paths)} file(s) from Madokami — press Esc to stop.[/info]"
-    )
-    try:
-        with progress:
-            for i, p in enumerate(dl_paths, 1):
-                if cancel_event.is_set():
-                    break
-                label = unquote(p.rsplit("/", 1)[-1])
-                if len(label) > 46:
-                    label = label[:45] + "…"
-                if len(dl_paths) > 1:
-                    label = f"({i}/{len(dl_paths)}) {label}"
-                task = progress.add_task(label, total=None)
-
-                def _on_progress(done: int, total: int | None, _task=task) -> None:
-                    progress.update(_task, completed=done, total=total)
-
-                dest = madokami.download_file(
-                    p, get_download_dir(),
-                    cancel_event=cancel_event, progress_cb=_on_progress,
-                )
-                if dest:
-                    saved.append(dest)
-                elif not cancel_event.is_set():
-                    failed.append(label)
-    finally:
-        stop_listener.set()
-
-    lines = []
-    if cancel_event.is_set():
-        lines.append(f"[warning] Stopped after {len(saved)} of {len(dl_paths)}.[/warning]")
-    elif saved:
-        lines.append(f"[success]✓ {len(saved)} file(s) saved to {get_download_dir()}[/success]")
-    for s in saved[:6]:
-        lines.append(f"[dim]{os.path.basename(s)}[/dim]")
-    if len(saved) > 6:
-        lines.append(f"[dim]… +{len(saved) - 6} more[/dim]")
-    if failed:
-        lines.append(f"[warning] Couldn't download {len(failed)}:[/warning] " + ", ".join(failed[:4]))
-        lines.append(f"[dim]Grab manually: {page_url}[/dim]")
-    if not lines:
-        lines.append("[warning] Nothing downloaded.[/warning]")
-    console.print(Panel(
-        f"[bold]{name}[/bold]\n\n" + "\n".join(lines),
-        title="📕 Madokami", border_style="bright_blue", padding=(1, 2),
-    ))
-    console.print("[dim]Press any key to continue...[/dim]")
-    readchar.readkey()
-    return "next" if saved else "back"
-
-
-def _magnet_for(result: dict) -> str | None:
-    """Magnet URI for a result, or None when it has none.
-
-    Online-Fix games ship as .torrent files and Madokami is a direct-download
-    library (no magnet either way); RuTracker and FitGirl keep the real hash on
-    the topic/post page, so those are resolved on demand here (a network call).
-    Used by both batch hand-off and copy-magnets.
-    """
-    source = result.get("source")
-    name = result.get("name", "Unknown")
-    if source in ("Online-Fix", "Madokami"):
-        return None
-    if source == "RuTracker":
-        from torrent_finder import rutracker
-        real_hash = rutracker.resolve_info_hash(result.get("rt_topic_id") or result.get("info_hash"))
-        return build_magnet(real_hash, name) if real_hash else None
-    if source == "FitGirl":
-        from torrent_finder import fitgirl
-        real_hash = fitgirl.resolve_info_hash(result.get("fg_post_url") or result.get("page_url") or "")
-        return build_magnet(real_hash, name) if real_hash else None
-    info_hash = result.get("info_hash") or ""
-    return build_magnet(info_hash, name) if info_hash else None
+    return acquisition.magnet_for(result)
 
 
 def _copy_to_clipboard(text: str) -> bool:
@@ -343,11 +126,10 @@ def _copy_to_clipboard(text: str) -> bool:
 def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
     """Hand every checkbox-selected torrent to the system client at once.
 
-    Branches per item by source because a results list can mix magnet torrents
-    with entries that have no magnet: magnet → open_magnet; Online-Fix → fetch
-    the .torrent and open it; RuTracker / FitGirl → resolve on demand; Madokami
-    → download the file directly (a folder hit can't be batched — its URL lands
-    in the manual list). Esc stops the run between items; one summary at the end.
+    A results list can mix acquisition styles (magnet, torrent-file handoff,
+    direct download), so each item drives its own adapter's ``batch_item``;
+    the outcomes aggregate into one summary. Esc stops the run between items
+    (and mid-transfer for direct downloads).
     """
     from rich.panel import Panel
     from torrent_finder.constants import get_download_dir
@@ -378,58 +160,33 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
                 name = r.get("name", "Unknown")
                 shown = escape(name[:40] + ("…" if len(name) > 40 else ""))
                 status.update(f"[bold cyan]({k}/{n}) {shown}  (Esc to stop)[/bold cyan]")
-                ok = False
-                try:
-                    if r.get("source") == "Online-Fix":
-                        page_url = r.get("page_url") or r.get("of_post_url") or ""
-                        from torrent_finder import online_fix
-                        path = online_fix.fetch_torrent_for(page_url, get_download_dir())
-                        if path and open_torrent_file(path):
-                            ok = True
-                            ofix_pw = online_fix.ARCHIVE_PASSWORD
-                        elif page_url:
-                            manual_urls.append(page_url)
-                    elif r.get("source") == "Madokami":
-                        # Direct download, not a client handoff. Only file hits
-                        # can be batched — a folder needs its volume picker, so
-                        # it goes to the manual list instead.
-                        from torrent_finder import madokami
-                        mpath = r.get("mdk_path") or ""
-                        if madokami.is_file_path(mpath):
-                            # cancel_event makes Esc abort mid-archive, not
-                            # just between items — these can run to hundreds
-                            # of MB. The callback keeps a MB counter on the
-                            # status line while the archive streams.
-                            def _on_progress(done, total, _k=k, _shown=shown):
-                                size = (f"{done / 1048576:.1f}/{total / 1048576:.1f} MB"
-                                        if total else f"{done / 1048576:.1f} MB")
-                                status.update(
-                                    f"[bold cyan]({_k}/{n}) {_shown} — {size}  (Esc to stop)[/bold cyan]"
-                                )
+                def _set_status(suffix, _k=k, _shown=shown):
+                    status.update(
+                        f"[bold cyan]({_k}/{n}) {_shown} — {suffix}  (Esc to stop)[/bold cyan]"
+                    )
 
-                            if madokami.download_file(
-                                mpath, get_download_dir(),
-                                cancel_event=cancel_event, progress_cb=_on_progress,
-                            ):
-                                ok = True
-                                saved_direct += 1
-                        elif r.get("page_url"):
-                            manual_urls.append(r["page_url"])
-                    else:
-                        magnet = _magnet_for(r)
-                        if magnet:
-                            open_magnet(magnet)
-                            ok = True
+                outcome = None
+                try:
+                    outcome = acquisition.for_result(r).batch_item(
+                        r, download_dir=get_download_dir(),
+                        cancel_event=cancel_event, set_status=_set_status,
+                    )
                 except Exception:
-                    ok = False
-                if ok:
+                    outcome = None
+                if outcome is not None and outcome.ok:
                     sent += 1
+                    if outcome.saved_direct:
+                        saved_direct += 1
+                    if outcome.password:
+                        ofix_pw = outcome.password
                     record_torrent_picked(provider.slug, int(r.get("seeders", 0) or 0))
-                    if r.get("source") != "Madokami":  # a saved file isn't a magnet dispatch
+                    if not outcome.saved_direct:  # a saved file isn't a magnet dispatch
                         record_magnet_dispatch()
                 elif cancel_event.is_set():
                     break  # aborted mid-transfer — cancelled, not failed
                 else:
+                    if outcome is not None and outcome.manual_url:
+                        manual_urls.append(outcome.manual_url)
                     failed.append(name)
     finally:
         stop_listener.set()
@@ -556,7 +313,7 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
     copyable = sum(
         1 for gi in idxs
         if 0 <= gi < len(results)
-        and results[gi].get("source") not in ("Online-Fix", "Madokami")
+        and acquisition.for_result(results[gi]).has_magnet
     )
     while True:
         action = batch_download_menu(len(idxs), copyable)
@@ -614,63 +371,21 @@ def browse_results(provider, results, note: str = "") -> str:
 
         idx = choice[1]
         selected = results[idx]
-        name = selected.get("name", "Unknown")
-        info_hash = selected.get("info_hash", "")
         record_torrent_picked(provider.slug, int(selected.get("seeders", 0) or 0))
 
-        # Online-Fix has no public magnet — fetch the .torrent and hand it to
-        # the system client. Success proceeds to "what's next?"; a failed fetch
-        # steps back to the results table (nothing happened).
-        if selected.get("source") == "Online-Fix":
-            if _online_fix_pick(selected) == "back":
-                clear_screen()
-                continue
+        # Acquisition seam: magnet styles hand back a magnet and fall through
+        # to the download-method menu; handoff / direct-download styles finish
+        # (or abort) the whole acquisition inside ``pick``. "back" means
+        # nothing happened — re-show the results table.
+        outcome = acquisition.for_result(selected).pick(selected)
+        if outcome.action == "back":
+            clear_screen()
+            continue
+        if outcome.action == "next":
             clear_screen()
             return "next"
 
-        # Madokami is a direct-download library (no torrent at all) — download
-        # the archive(s) straight to disk. A saved file proceeds to "what's
-        # next?"; Esc in the volume picker or any dead end (no credentials,
-        # listing failure, aborted transfer) steps back to the results table.
-        if selected.get("source") == "Madokami":
-            if _madokami_pick(selected) == "back":
-                clear_screen()
-                continue
-            clear_screen()
-            return "next"
-
-        # RuTracker results carry the topic id as a placeholder hash — the real
-        # magnet lives on the topic page, so resolve it on demand here.
-        if selected.get("source") == "RuTracker":
-            from torrent_finder import rutracker
-            with console.status("[bold cyan]Fetching magnet from RuTracker…[/bold cyan]", spinner="dots"):
-                real_hash = rutracker.resolve_info_hash(selected.get("rt_topic_id") or info_hash)
-            if not real_hash:
-                console.print("[error] Couldn't get the magnet from RuTracker (login expired or topic unavailable).[/error]")
-                console.print("[dim]Press any key to continue...[/dim]")
-                readchar.readkey()
-                clear_screen()
-                continue
-            info_hash = real_hash
-            selected["info_hash"] = real_hash
-
-        # FitGirl results also carry a placeholder — the magnet lives in the
-        # post body, so resolve it on demand here (no login needed).
-        if selected.get("source") == "FitGirl":
-            from torrent_finder import fitgirl
-            with console.status("[bold cyan]Fetching magnet from FitGirl…[/bold cyan]", spinner="dots"):
-                real_hash = fitgirl.resolve_info_hash(selected.get("fg_post_url") or selected.get("page_url") or "")
-            if not real_hash:
-                console.print("[error] Couldn't get the magnet from FitGirl (post layout changed or site unreachable).[/error]")
-                console.print("[dim]Press any key to continue...[/dim]")
-                readchar.readkey()
-                clear_screen()
-                continue
-            info_hash = real_hash
-            selected["info_hash"] = real_hash
-
-        magnet = build_magnet(info_hash, name)
-        session = TorrentSession(selected, magnet)
+        session = TorrentSession(selected, outcome.magnet)
 
         go_back_to_results = False
         while True:

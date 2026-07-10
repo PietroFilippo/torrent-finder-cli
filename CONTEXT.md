@@ -49,10 +49,12 @@ mapping, so legacy reads such as `result.get("rt_topic_id")` continue to work.
 
 ## Acquisition
 
-How a picked result becomes files on disk. Four styles exist:
+How a picked result becomes files on disk. Four styles exist, each an adapter
+in `acquisition.py` behind one interface
+(see [ADR-0003](docs/adr/0003-acquisition-seam.md)):
 
 1. **magnet-direct** — result carries a real `info_hash`; build a magnet
-   (Apibay, SolidTorrents, Nyaa).
+   (Apibay, SolidTorrents, Nyaa, YTS — and any unregistered source).
 2. **magnet-lazy-resolve** — hash lives on the topic/post page, fetched on
    demand (`rutracker.resolve_info_hash`, `fitgirl.resolve_info_hash`).
 3. **torrent-file-handoff** — no public magnet; fetch the `.torrent` and open
@@ -60,9 +62,12 @@ How a picked result becomes files on disk. Four styles exist:
 4. **direct-download** — no torrent at all; stream files straight to the
    download folder (Madokami, login required).
 
-> Known debt: the style is chosen by re-testing `result["source"]` at ~11
-> sites in `main.py` (`_magnet_for`, `_batch_handoff`, the `_*_pick`
-> handlers). Planned fix: acquisition becomes part of the provider interface.
+The adapter is chosen by `result.source` via `acquisition.for_result()` —
+keyed per source, not per provider, because one provider merges engines with
+different styles (Games mixes Apibay, Online-Fix, and FitGirl rows). Every
+consumer path drives the same interface: `magnet()` (silent; copy-magnets and
+batch-aria2), `pick()` (interactive single pick), `batch_item()` (batch
+handoff). A new non-standard source is one adapter plus one registry line.
 
 ## Session
 
