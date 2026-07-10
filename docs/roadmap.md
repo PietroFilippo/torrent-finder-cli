@@ -1,0 +1,21 @@
+# Architecture Roadmap
+
+This is the agreed sequence for the result/acquisition cleanup.
+
+## Current Sequence
+
+1. Done: `CONTEXT.md` and ADR trail.
+2. Done: single `store.py` owner for `filter_state.json`.
+3. Done: focused characterization tests while introducing `SearchResult`.
+4. Done: implement a typed `SearchResult` contract.
+5. Move acquisition behind provider/adapters.
+6. Derive CLI/provider choices from the provider registry.
+7. Extract a credentials registry.
+
+## Notes
+
+- `SearchResult` should make producer/parser behavior assertable without relying
+  on drift-prone dict defaults.
+- The acquisition interface should cover the existing four styles:
+  magnet-direct, magnet-lazy-resolve, torrent-file-handoff, and direct-download.
+- Tests should stay mostly headless and avoid network by mocking site clients.
