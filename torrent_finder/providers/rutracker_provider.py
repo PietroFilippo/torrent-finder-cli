@@ -9,6 +9,7 @@ result is selected (see rutracker.resolve_info_hash).
 
 from torrent_finder import rutracker
 from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.search_result import SearchResult
 
 
 class RuTrackerProvider(BaseProvider):
@@ -25,5 +26,5 @@ class RuTrackerProvider(BaseProvider):
     def _init_engines(self) -> list[SearchEngine]:
         return [SearchEngine("RuTracker", "🧲", self._search_rutracker, enabled=True)]
 
-    def _search_rutracker(self, query: str) -> list[dict]:
+    def _search_rutracker(self, query: str) -> list[SearchResult]:
         return rutracker.search(query)

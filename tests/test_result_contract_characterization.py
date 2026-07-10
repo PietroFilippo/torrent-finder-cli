@@ -4,6 +4,7 @@ from torrent_finder.creator_search import fan_out
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.resolvers.types import Work
+from torrent_finder.search_result import SearchResult
 
 
 class FakeProvider(BaseProvider):
@@ -22,6 +23,27 @@ class FakeProvider(BaseProvider):
             for name, fn, enabled in self._test_engines
         ]
 
+
+class SearchResultContractTests(unittest.TestCase):
+    def test_from_mapping_coerces_numbers_and_preserves_legacy_handle_keys(self):
+        result = SearchResult.from_mapping({
+            "name": "Ru row",
+            "info_hash": "123",
+            "seeders": "9",
+            "leechers": "4",
+            "size": "2048",
+            "source": "RuTracker",
+            "page_url": "https://example.test/topic",
+            "rt_topic_id": "987",
+            "unexpected": "kept",
+        })
+
+        self.assertEqual(result.seeders, 9)
+        self.assertEqual(result.leechers, 4)
+        self.assertEqual(result.size, 2048)
+        self.assertEqual(result.handle, {"rt_topic_id": "987"})
+        self.assertEqual(result.get("rt_topic_id"), "987")
+        self.assertEqual(result.get("unexpected"), "kept")
 
 class BaseProviderSearchContractTests(unittest.TestCase):
     def test_search_merges_enabled_engines_dedupes_hashes_and_sorts_by_seeders(self):
@@ -76,8 +98,9 @@ class BaseProviderSearchContractTests(unittest.TestCase):
 
         results = provider.search("query")
 
-        self.assertEqual([r["info_hash"].lower() for r in results], ["top", "mid", "abc"])
-        self.assertEqual([int(r["seeders"]) for r in results], [20, 9, 2])
+        self.assertTrue(all(isinstance(r, SearchResult) for r in results))
+        self.assertEqual([r.info_hash.lower() for r in results], ["top", "mid", "abc"])
+        self.assertEqual([r.seeders for r in results], [20, 9, 2])
 
     def test_search_applies_default_presets_and_cli_filters_to_dict_results(self):
         def engine(query):
@@ -127,7 +150,8 @@ class BaseProviderSearchContractTests(unittest.TestCase):
             cli_filters=FilterConfig(exclude_keywords=["cam"]),
         )
 
-        self.assertEqual([r["info_hash"] for r in results], ["good"])
+        self.assertTrue(all(isinstance(r, SearchResult) for r in results))
+        self.assertEqual([r.info_hash for r in results], ["good"])
 
 
 class CreatorFanOutContractTests(unittest.TestCase):
@@ -183,8 +207,9 @@ class CreatorFanOutContractTests(unittest.TestCase):
 
         self.assertEqual({q for q, _ in provider.calls}, {"Primary", "Alt", "Other"})
         self.assertTrue(all(filters is cli_filters for _, filters in provider.calls))
-        self.assertEqual([r["info_hash"] for r in results], ["h3", "h2", "h1"])
-        self.assertEqual([r["from_work"] for r in results], ["Other", "Primary", "Primary"])
+        self.assertTrue(all(isinstance(r, SearchResult) for r in results))
+        self.assertEqual([r.info_hash for r in results], ["h3", "h2", "h1"])
+        self.assertEqual([r.from_work for r in results], ["Other", "Primary", "Primary"])
 
 
 if __name__ == "__main__":

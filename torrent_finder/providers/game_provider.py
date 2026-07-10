@@ -2,6 +2,7 @@
 
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.search_result import SearchResult
 from torrent_finder.resolvers import CreatorFacet, games
 
 
@@ -63,12 +64,12 @@ class GameProvider(BaseProvider):
             SearchEngine("FitGirl", "🧚", self._search_fitgirl, enabled=True),
         ]
 
-    def _search_online_fix(self, query: str) -> list[dict]:
+    def _search_online_fix(self, query: str) -> list[SearchResult]:
         """Anonymous online-fix.me search (same backend as the standalone provider)."""
         from torrent_finder import online_fix
         return online_fix.search(query)
 
-    def _search_fitgirl(self, query: str) -> list[dict]:
+    def _search_fitgirl(self, query: str) -> list[SearchResult]:
         """Anonymous fitgirl-repacks.site search (same backend as the standalone provider)."""
         from torrent_finder import fitgirl
         return fitgirl.search(query)

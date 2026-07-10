@@ -2,6 +2,7 @@
 
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.search_result import SearchResult
 from torrent_finder.resolvers import CreatorFacet, anilist, jikan
 
 
@@ -56,6 +57,6 @@ class MangaProvider(BaseProvider):
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
         ]
 
-    def _search_nyaa_raw(self, query: str) -> list[dict]:
+    def _search_nyaa_raw(self, query: str) -> list[SearchResult]:
         """Nyaa Literature - Raw (Japanese), c=3_2. Off by default."""
         return self._search_nyaa_in(query, "3_2")

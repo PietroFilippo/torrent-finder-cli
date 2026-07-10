@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from torrent_finder.search_result import SearchResult
+
 
 class MagnetForContractTests(unittest.TestCase):
     @classmethod
@@ -45,12 +47,12 @@ class MagnetForContractTests(unittest.TestCase):
         resolved = "b" * 40
         with patch("torrent_finder.rutracker.resolve_info_hash", return_value=resolved) as resolve:
             magnet = self.main._magnet_for(
-                {
-                    "name": "Ru Result",
-                    "info_hash": "123",
-                    "source": "RuTracker",
-                    "rt_topic_id": "987",
-                }
+                SearchResult(
+                    name="Ru Result",
+                    info_hash="123",
+                    source="RuTracker",
+                    handle={"rt_topic_id": "987"},
+                )
             )
 
         resolve.assert_called_once_with("987")

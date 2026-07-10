@@ -17,7 +17,7 @@ class FilterPreset:
     config: FilterConfig
 
 
-def apply_filters(results: list[dict], config: FilterConfig) -> list[dict]:
+def apply_filters(results: list, config: FilterConfig) -> list:
     """Filter a list of torrent results based on the given FilterConfig."""
     if not config:
         return results

@@ -28,6 +28,8 @@ from html import unescape
 
 import requests
 
+from torrent_finder.search_result import SearchResult
+
 _BASE = "https://fitgirl-repacks.site"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
@@ -78,7 +80,7 @@ def _parse_size(article: str) -> str:
     return str(int(num * _UNIT_BYTES.get(m.group(2).upper(), 1)))
 
 
-def _parse_page(html: str, results: list[dict], seen: set[str]) -> None:
+def _parse_page(html: str, results: list[SearchResult], seen: set[str]) -> None:
     """Append one search page's repack posts to ``results`` (dedup on post id).
 
     Only ``category-lossless-repack`` articles are repacks — the search also
@@ -97,23 +99,23 @@ def _parse_page(html: str, results: list[dict], seen: set[str]) -> None:
             continue
         seen.add(post_id)
         url = title_m.group(1)
-        results.append({
-            "name": _strip_tags(title_m.group(2)) or "Unknown",
+        results.append(SearchResult(
+            name=_strip_tags(title_m.group(2)) or "Unknown",
             # "fitgirl-" prefix keeps the placeholder from colliding with other
             # engines' numeric placeholders (Online-Fix post ids) in the merged
             # Games results, where dedupe is by info_hash.
-            "info_hash": f"fitgirl-{post_id}",
-            "seeders": "0",          # the listing carries no swarm stats
-            "leechers": "0",
-            "size": _parse_size(article),
-            "source": "FitGirl",
-            "page_url": url,
-            "fg_post_url": url,      # explicit handle for the magnet resolver
-        })
+            info_hash=f"fitgirl-{post_id}",
+            seeders=0,          # the listing carries no swarm stats
+            leechers=0,
+            size=_parse_size(article),
+            source="FitGirl",
+            page_url=url,
+            handle={"fg_post_url": url},      # explicit handle for the magnet resolver
+        ))
 
 
-def search(query: str) -> list[dict]:
-    """Search fitgirl-repacks.site. Returns result dicts with a placeholder
+def search(query: str) -> list[SearchResult]:
+    """Search fitgirl-repacks.site. Returns SearchResult rows with a placeholder
     ``info_hash`` (resolve the real one with ``resolve_info_hash`` on select).
     No login needed. Empty list on any error.
 
@@ -121,7 +123,7 @@ def search(query: str) -> list[dict]:
     next page, page 2 is fetched too (capped there — 20 results is plenty).
     """
     session = _http()
-    results: list[dict] = []
+    results: list[SearchResult] = []
     seen: set[str] = set()
     try:
         r = session.get(f"{_BASE}/", params={"s": query}, timeout=30)

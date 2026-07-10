@@ -34,6 +34,8 @@ from urllib.parse import unquote, urlsplit
 
 import requests
 
+from torrent_finder.search_result import SearchResult
+
 from torrent_finder.credentials import madokami_config
 
 _BASE = "https://manga.madokami.al"
@@ -108,8 +110,8 @@ def _content_paths(html: str) -> list[tuple[str, str]]:
     return out
 
 
-def search(query: str) -> list[dict]:
-    """Search Madokami. Returns result dicts whose placeholder ``info_hash`` is
+def search(query: str) -> list[SearchResult]:
+    """Search Madokami. Returns SearchResult rows whose placeholder ``info_hash`` is
     the library path (prefixed, so it can't collide with real hashes). Empty
     list when no credentials are configured or on any error.
 
@@ -128,18 +130,18 @@ def search(query: str) -> list[dict]:
     except requests.RequestException:
         return []
 
-    results: list[dict] = []
+    results: list[SearchResult] = []
     for path, label in _content_paths(html):
-        results.append({
-            "name": label,
-            "info_hash": f"madokami:{path}",  # placeholder; no torrent exists
-            "seeders": "0",                   # no swarm — direct downloads
-            "leechers": "0",
-            "size": "0",                      # listing carries no reliable size
-            "source": "Madokami",
-            "page_url": _BASE + path,
-            "mdk_path": path,                 # handle for listing/downloading
-        })
+        results.append(SearchResult(
+            name=label,
+            info_hash=f"madokami:{path}",  # placeholder; no torrent exists
+            seeders=0,                   # no swarm - direct downloads
+            leechers=0,
+            size=0,                      # listing carries no reliable size
+            source="Madokami",
+            page_url=_BASE + path,
+            handle={"mdk_path": path},                 # handle for listing/downloading
+        ))
     return results
 
 

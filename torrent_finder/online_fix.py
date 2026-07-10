@@ -33,6 +33,8 @@ from urllib.parse import urljoin, unquote
 
 import requests
 
+from torrent_finder.search_result import SearchResult
+
 _BASE = "https://online-fix.me"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 # The uploads host gates files by HTTP referer (hotlink protection), not login —
@@ -137,8 +139,8 @@ def _anon_http() -> requests.Session:
         return _anon_session
 
 
-def search(query: str) -> list[dict]:
-    """Search online-fix.me. Returns result dicts with the post id as a
+def search(query: str) -> list[SearchResult]:
+    """Search online-fix.me. Returns SearchResult rows with the post id as a
     placeholder ``info_hash`` (the real ``.torrent`` is resolved on select via
     ``resolve_torrent``). Search is public — no login needed; credentials only
     gate the download bridge. Empty list on any error.
@@ -159,7 +161,7 @@ def search(query: str) -> list[dict]:
     except requests.RequestException:
         return []
 
-    results: list[dict] = []
+    results: list[SearchResult] = []
     seen: set[str] = set()
     for m in _GAME_HREF_RE.finditer(html):
         path, post_id = m.group(1), m.group(2)
@@ -173,16 +175,16 @@ def search(query: str) -> list[dict]:
         window = html[m.start():m.start() + 600]
         title_m = _ALT_ATTR_RE.search(window) or _TITLE_ATTR_RE.search(window)
         name = _strip_tags(title_m.group(1)) if title_m else ""
-        results.append({
-            "name": name or _deslug(path),
-            "info_hash": post_id,    # placeholder; no public hash exists
-            "seeders": "0",          # online-fix listing carries no swarm stats
-            "leechers": "0",
-            "size": "0",             # unknown until the .torrent is parsed
-            "source": "Online-Fix",
-            "page_url": url,
-            "of_post_url": url,      # explicit handle for the download resolver
-        })
+        results.append(SearchResult(
+            name=name or _deslug(path),
+            info_hash=post_id,    # placeholder; no public hash exists
+            seeders=0,          # online-fix listing carries no swarm stats
+            leechers=0,
+            size=0,             # unknown until the .torrent is parsed
+            source="Online-Fix",
+            page_url=url,
+            handle={"of_post_url": url},      # explicit handle for the download resolver
+        ))
     return results
 
 

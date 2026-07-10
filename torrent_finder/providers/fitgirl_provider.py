@@ -10,6 +10,7 @@ RuTracker lazy resolve.
 
 from torrent_finder import fitgirl
 from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.search_result import SearchResult
 
 
 class FitGirlProvider(BaseProvider):
@@ -27,5 +28,5 @@ class FitGirlProvider(BaseProvider):
     def _init_engines(self) -> list[SearchEngine]:
         return [SearchEngine("FitGirl", "🧚", self._search_fitgirl, enabled=True)]
 
-    def _search_fitgirl(self, query: str) -> list[dict]:
+    def _search_fitgirl(self, query: str) -> list[SearchResult]:
         return fitgirl.search(query)

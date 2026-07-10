@@ -36,17 +36,16 @@ provider; the toggle persists under the provider's slug.
 
 ## Result
 
-What a search returns: today a plain `dict` per row. Common keys: `name`,
-`info_hash`, `seeders`, `leechers`, `size` (bytes, **stored as strings** and
-re-`int()`ed by consumers), `source` (the engine/site that produced it),
-`page_url`. Site clients add private handle keys only their own acquisition
-path understands: `rt_topic_id` (RuTracker), `fg_post_url` (FitGirl),
-`of_post_url` (Online-Fix), `mdk_path` (Madokami).
+What a search returns: a `SearchResult` (`search_result.py`) per row. Common
+fields are explicit: `name`, `info_hash`, `seeders`, `leechers`, `size`
+(bytes), `source`, `page_url`, and optional `from_work` provenance for
+multi-title / creator searches. `seeders`, `leechers`, and `size` are normalized
+to integers at construction.
 
-> Known debt: this contract is undocumented and stringly-typed — 85 `.get()`
-> sites, defaults scattered (table.py falls back to `"Apibay"`). Planned fix:
-> one typed `SearchResult`. Until that lands, treat this section as the
-> contract.
+Source-specific acquisition identifiers live in `SearchResult.handle`:
+`rt_topic_id` (RuTracker), `fg_post_url` (FitGirl), `of_post_url` (Online-Fix),
+`mdk_path` (Madokami). During migration, `SearchResult` still behaves like a
+mapping, so legacy reads such as `result.get("rt_topic_id")` continue to work.
 
 ## Acquisition
 

@@ -22,6 +22,8 @@ from html import unescape
 
 import requests
 
+from torrent_finder.search_result import SearchResult
+
 from torrent_finder.credentials import rutracker_config
 
 _BASE = "https://rutracker.org/forum"
@@ -69,8 +71,8 @@ def _get_session() -> requests.Session | None:
         return _session
 
 
-def search(query: str) -> list[dict]:
-    """Search RuTracker. Returns result dicts with the topic id as a placeholder
+def search(query: str) -> list[SearchResult]:
+    """Search RuTracker. Returns SearchResult rows with the topic id as a placeholder
     ``info_hash`` (resolve the real one with ``resolve_info_hash`` on select)."""
     session = _get_session()
     if session is None:
@@ -82,7 +84,7 @@ def search(query: str) -> list[dict]:
     except requests.RequestException:
         return []
 
-    results: list[dict] = []
+    results: list[SearchResult] = []
     for row in _ROW_RE.findall(html):
         tid = re.search(r'data-topic_id="(\d+)"', row)
         title = re.search(r'class="[^"]*tt-text[^"]*"[^>]*>(.*?)</a>', row, re.S)
@@ -91,16 +93,16 @@ def search(query: str) -> list[dict]:
             continue
         seeders = re.search(r'class="seedmed"[^>]*>(\d+)', row)
         leechers = re.search(r'leechmed[^>]*>(\d+)<', row)
-        results.append({
-            "name": _strip_tags(title.group(1)),
-            "info_hash": tid.group(1),  # placeholder; real hash resolved on select
-            "seeders": seeders.group(1) if seeders else "0",
-            "leechers": leechers.group(1) if leechers else "0",
-            "size": size.group(1),      # bytes
-            "source": "RuTracker",
-            "page_url": f"{_BASE}/viewtopic.php?t={tid.group(1)}",
-            "rt_topic_id": tid.group(1),
-        })
+        results.append(SearchResult(
+            name=_strip_tags(title.group(1)),
+            info_hash=tid.group(1),  # placeholder; real hash resolved on select
+            seeders=seeders.group(1) if seeders else 0,
+            leechers=leechers.group(1) if leechers else 0,
+            size=size.group(1),      # bytes
+            source="RuTracker",
+            page_url=f"{_BASE}/viewtopic.php?t={tid.group(1)}",
+            handle={"rt_topic_id": tid.group(1)},
+        ))
     return results
 
 

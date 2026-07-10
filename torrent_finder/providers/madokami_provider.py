@@ -10,6 +10,7 @@ entering the magnet pipeline (see main.py's Madokami branch).
 
 from torrent_finder import madokami
 from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.search_result import SearchResult
 
 
 class MadokamiProvider(BaseProvider):
@@ -28,5 +29,5 @@ class MadokamiProvider(BaseProvider):
     def _init_engines(self) -> list[SearchEngine]:
         return [SearchEngine("Madokami", "📕", self._search_madokami, enabled=True)]
 
-    def _search_madokami(self, query: str) -> list[dict]:
+    def _search_madokami(self, query: str) -> list[SearchResult]:
         return madokami.search(query)

@@ -11,6 +11,7 @@ import requests
 
 from torrent_finder.constants import API_URL, console
 from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
+from torrent_finder.search_result import SearchResult, normalize_result
 
 
 @dataclass
@@ -18,7 +19,7 @@ class SearchEngine:
     """A toggleable search engine backend."""
     name: str
     icon: str
-    search_fn: Callable[[object, str], list[dict]]  # bound method reference
+    search_fn: Callable[[object, str], list[dict | SearchResult]]  # bound method reference
     enabled: bool = True
 
 
@@ -73,7 +74,7 @@ class BaseProvider(ABC):
     def label(self) -> str:
         return f"{self.icon} {self.name}"
 
-    def _search_apibay(self, query: str) -> list[dict]:
+    def _search_apibay(self, query: str) -> list[SearchResult]:
         """Search Apibay (The Pirate Bay) for the query.
 
         apibay.org is reachable but slow (~20s behind Cloudflare), so instead of
@@ -104,20 +105,25 @@ class BaseProvider(ABC):
             return []
 
         wanted = {str(c) for c in self.categories}
-        results = []
+        results: list[SearchResult] = []
         for item in data:
             if str(item.get("category", "")) not in wanted:
                 continue
-            item["source"] = "Apibay"
             tid = item.get("id")
-            if tid:
-                item["page_url"] = f"https://thepiratebay.org/description.php?id={tid}"
-            results.append(item)
+            results.append(SearchResult(
+                name=item.get("name", "Unknown"),
+                info_hash=item.get("info_hash", ""),
+                seeders=item.get("seeders", 0),
+                leechers=item.get("leechers", 0),
+                size=item.get("size", 0),
+                source="Apibay",
+                page_url=f"https://thepiratebay.org/description.php?id={tid}" if tid else "",
+            ))
         return results
 
-    def _search_solidtorrents(self, query: str) -> list[dict]:
+    def _search_solidtorrents(self, query: str) -> list[SearchResult]:
         """Search SolidTorrents API for the query."""
-        results = []
+        results: list[SearchResult] = []
         try:
             response = requests.get(
                 "https://solidtorrents.to/api/v1/search",
@@ -129,15 +135,15 @@ class BaseProvider(ABC):
             for r in data.get("results", []):
                 # The slug segment is ignored by the site; only the id matters.
                 rid = r.get("_id") or r.get("id")
-                results.append({
-                    "name": r.get("title", "Unknown"),
-                    "info_hash": r.get("infohash", "").lower(),
-                    "seeders": str(r.get("swarm", {}).get("seeders", 0)),
-                    "leechers": str(r.get("swarm", {}).get("leechers", 0)),
-                    "size": str(r.get("size", 0)),
-                    "source": "SolidTorrents",
-                    "page_url": f"https://solidtorrents.to/torrents/t/{rid}" if rid else "",
-                })
+                results.append(SearchResult(
+                    name=r.get("title", "Unknown"),
+                    info_hash=r.get("infohash", "").lower(),
+                    seeders=r.get("swarm", {}).get("seeders", 0),
+                    leechers=r.get("swarm", {}).get("leechers", 0),
+                    size=r.get("size", 0),
+                    source="SolidTorrents",
+                    page_url=f"https://solidtorrents.to/torrents/t/{rid}" if rid else "",
+                ))
         except Exception:
             pass
         return results
@@ -156,18 +162,18 @@ class BaseProvider(ABC):
         except Exception:
             return 0
 
-    def _search_nyaa(self, query: str) -> list[dict]:
+    def _search_nyaa(self, query: str) -> list[SearchResult]:
         """Search Nyaa scoped to ``self.nyaa_category`` (the provider default)."""
         return self._search_nyaa_in(query, self.nyaa_category)
 
-    def _search_nyaa_in(self, query: str, category: str) -> list[dict]:
+    def _search_nyaa_in(self, query: str, category: str) -> list[SearchResult]:
         """Search the Nyaa.si RSS feed scoped to a specific ``c`` category.
 
         Split out from ``_search_nyaa`` so one provider can register multiple
         Nyaa engines on different categories (e.g. Manga's English-translated
         ``3_1`` + Raw ``3_2``).
         """
-        results = []
+        results: list[SearchResult] = []
         try:
             response = requests.get(
                 "https://nyaa.si/",
@@ -192,23 +198,23 @@ class BaseProvider(ABC):
                     if size is not None and size.text:
                         size_bytes = self._parse_nyaa_size(size.text)
 
-                    results.append({
-                        "name": title.text,
-                        "info_hash": info_hash.text.lower(),
-                        "seeders": seeders.text if seeders is not None else "0",
-                        "leechers": leechers.text if leechers is not None else "0",
-                        "size": str(size_bytes),
-                        "source": "Nyaa",
-                        "page_url": guid.text if guid is not None and guid.text else "",
-                    })
+                    results.append(SearchResult(
+                        name=title.text,
+                        info_hash=info_hash.text.lower(),
+                        seeders=seeders.text if seeders is not None else 0,
+                        leechers=leechers.text if leechers is not None else 0,
+                        size=size_bytes,
+                        source="Nyaa",
+                        page_url=guid.text if guid is not None and guid.text else "",
+                    ))
         except Exception:
             pass
         return results
 
-    def search(self, query: str, cli_filters: FilterConfig | None = None) -> list[dict]:
+    def search(self, query: str, cli_filters: FilterConfig | None = None) -> list[SearchResult]:
         """Search all enabled engines concurrently, merge, dedupe, and sort by seeds."""
         seen_hashes: set[str] = set()
-        merged: list[dict] = []
+        merged: list[SearchResult] = []
 
         active_engines = [e for e in self.engines if e.enabled]
         if not active_engines:
@@ -221,8 +227,9 @@ class BaseProvider(ABC):
             for future in concurrent.futures.as_completed(future_to_engine):
                 try:
                     data = future.result()
-                    for item in data:
-                        h = item.get("info_hash", "").lower()
+                    for raw_item in data:
+                        item = normalize_result(raw_item)
+                        h = item.info_hash.lower()
                         if h and h not in seen_hashes:
                             seen_hashes.add(h)
                             merged.append(item)
@@ -243,5 +250,5 @@ class BaseProvider(ABC):
             merged = apply_filters(merged, cli_filters)
 
         # Sort by seeders descending
-        merged.sort(key=lambda x: int(x.get("seeders", 0)), reverse=True)
+        merged.sort(key=lambda x: x.seeders, reverse=True)
         return merged
