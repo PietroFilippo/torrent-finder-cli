@@ -12,6 +12,7 @@ page) and hands it to the system torrent client rather than building a magnet
 
 from torrent_finder import online_fix
 from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.search_result import SearchResult
 
 
 class OnlineFixProvider(BaseProvider):
@@ -30,5 +31,5 @@ class OnlineFixProvider(BaseProvider):
     def _init_engines(self) -> list[SearchEngine]:
         return [SearchEngine("Online-Fix", "🔧", self._search_online_fix, enabled=True)]
 
-    def _search_online_fix(self, query: str) -> list[dict]:
+    def _search_online_fix(self, query: str) -> list[SearchResult]:
         return online_fix.search(query)

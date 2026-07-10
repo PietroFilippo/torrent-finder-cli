@@ -10,8 +10,10 @@ search.
 
 import concurrent.futures
 
+from torrent_finder.search_result import SearchResult, normalize_result
 
-def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6):
+
+def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6) -> list[SearchResult]:
     """Search every Work's title(s) and return one merged, sorted result list.
 
     Each result is tagged with ``from_work`` (the originating title) for any
@@ -30,7 +32,7 @@ def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6)
         return []
 
     seen_hashes: set = set()
-    merged: list[dict] = []
+    merged: list[SearchResult] = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_work = {
@@ -44,8 +46,9 @@ def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6)
                 rows = future.result() or []
             except Exception:
                 rows = []
-            for r in rows:
-                h = (r.get("info_hash") or "").lower()
+            for raw_row in rows:
+                r = normalize_result(raw_row)
+                h = r.info_hash.lower()
                 if h and h in seen_hashes:
                     continue
                 if h:
@@ -53,5 +56,5 @@ def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6)
                 r.setdefault("from_work", work.title)
                 merged.append(r)
 
-    merged.sort(key=lambda x: int(x.get("seeders", 0) or 0), reverse=True)
+    merged.sort(key=lambda x: x.seeders, reverse=True)
     return merged

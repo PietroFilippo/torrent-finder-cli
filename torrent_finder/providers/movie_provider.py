@@ -4,6 +4,7 @@ import requests
 
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.search_result import SearchResult
 from torrent_finder.resolvers import CreatorFacet, movies
 
 
@@ -61,7 +62,7 @@ class MovieProvider(BaseProvider):
             SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),
         ]
 
-    def _search_yts(self, query: str) -> list[dict]:
+    def _search_yts(self, query: str) -> list[SearchResult]:
         """Search YTS API for the query."""
         results = []
         try:
@@ -79,15 +80,15 @@ class MovieProvider(BaseProvider):
                     quality = t.get("quality", "")
                     _type = t.get("type", "")
                     name = f"{title} [{quality} {_type}]"
-                    results.append({
-                        "name": name,
-                        "info_hash": t.get("hash", "").lower(),
-                        "seeders": str(t.get("seeds", 0)),
-                        "leechers": str(t.get("peers", 0)),
-                        "size": str(t.get("size_bytes", 0)),
-                        "source": "YTS",
-                        "page_url": movie.get("url", ""),
-                    })
+                    results.append(SearchResult(
+                        name=name,
+                        info_hash=t.get("hash", "").lower(),
+                        seeders=t.get("seeds", 0),
+                        leechers=t.get("peers", 0),
+                        size=t.get("size_bytes", 0),
+                        source="YTS",
+                        page_url=movie.get("url", ""),
+                    ))
         except Exception:
             pass
         return results
