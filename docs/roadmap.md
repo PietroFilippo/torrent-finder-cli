@@ -8,7 +8,7 @@ This is the agreed sequence for the result/acquisition cleanup.
 2. Done: single `store.py` owner for `filter_state.json`.
 3. Done: focused characterization tests while introducing `SearchResult`.
 4. Done: implement a typed `SearchResult` contract.
-5. Move acquisition behind provider/adapters.
+5. Done: acquisition seam — per-source adapters in `acquisition.py` (ADR-0003).
 6. Derive CLI/provider choices from the provider registry.
 7. Extract a credentials registry.
 
