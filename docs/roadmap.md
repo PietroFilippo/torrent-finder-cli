@@ -10,7 +10,7 @@ This is the agreed sequence for the result/acquisition cleanup.
 4. Done: implement a typed `SearchResult` contract.
 5. Done: acquisition seam — per-source adapters in `acquisition.py` (ADR-0003).
 6. Done: derive CLI/provider choices from the provider registry (ADR-0004).
-7. Extract a credentials registry.
+7. Done: extract a typed credentials registry (ADR-0005).
 
 ## Notes
 
