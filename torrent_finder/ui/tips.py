@@ -187,7 +187,7 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
             Tip("The app checks for a newer version on startup — at most once a day, and silently if you are offline — and shows a notice when one is available.", ("updates", "version")),
             Tip("Update from inside the app: press Tab, then Install update. It runs pipx upgrade / pip -U, git pull, or opens the Releases page depending on how you installed.", ("updates", "hotkey")),
             Tip("Check which version you are running anytime with torrent-finder --version.", ("version", "cli")),
-            Tip("Your settings, credentials, and downloads live in a per-user data folder (e.g. %LOCALAPPDATA%\\torrent-finder-cli on Windows), not next to the program — so updates never wipe them.", ("state", "data", "settings")),
+            Tip("History, stats, and settings use machine-stable storage, so changing networks or launch methods does not reset them.", ("state", "data", "settings")),
         ),
     ),
 )

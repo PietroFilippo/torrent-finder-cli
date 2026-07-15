@@ -227,17 +227,22 @@ anything unset just falls back to the anonymous provider set.
 
 ### Where your data lives
 
-Your settings, credentials, search history, usage stats, and the default
-downloads folder are stored in a per-user data directory — not next to the code,
-so it survives upgrades and works the same for pip, pipx, and binary installs:
+Settings, search history, usage stats, and provider choices live in a per-user,
+machine-stable `filter_state.json`:
 
-- **Windows:** `%LOCALAPPDATA%\torrent-finder-cli\`
-- **macOS:** `~/Library/Application Support/torrent-finder-cli/`
-- **Linux:** `$XDG_DATA_HOME/torrent-finder-cli/` (or `~/.local/share/torrent-finder-cli/`)
+- **Windows:** `%USERPROFILE%\.torrent-finder-cli\filter_state.json`
+- **macOS:** `~/Library/Application Support/torrent-finder-cli/filter_state.json`
+- **Linux:** `$XDG_DATA_HOME/torrent-finder-cli/filter_state.json` (or `~/.local/share/torrent-finder-cli/filter_state.json`)
 
-It holds `filter_state.json` (settings, history, stats), `subtitle_credentials.json`,
-and `downloads/`. If you used an older version that kept these next to the code,
-they are migrated here automatically on first run (the originals are left untouched).
+Credentials and the default downloads folder stay in the platform user-data
+directory. On Windows that is `%LOCALAPPDATA%\torrent-finder-cli\`; on macOS
+and Linux it is the same app directory shown above. Keeping Windows state under
+the user profile prevents Microsoft Store Python from splitting history and
+stats across interpreter-specific LocalCache directories.
+
+On first run after upgrading, prior state copies from the old platform-data,
+repository, package, and Store Python locations are consolidated into the
+machine-stable file. The originals are left untouched.
 
 ### Updating
 
@@ -379,7 +384,7 @@ provider-based — the module paths below are relative to `torrent_finder/`:
 - `stats.py`: Usage counter recorders and read helpers; stores under the `stats` subtree, keyed by provider slug. Same in-memory cache flow as `state.py`.
 - `torrent_meta.py`: Fetches a torrent's file list from a magnet via `aria2c`. Helpers for episode-number extraction, video/subtitle classification, multi-episode detection (any torrent with ≥ 2 video files), sub-to-video matching (`match_subtitles_for`), and `--select-file` range formatting.
 - `updates.py`: Install-aware update check (git clone / pip-pipx / binary). Rate-limited; compares against `origin` (git) or PyPI (`__version__`), and powers the in-app **Install update** action via `check_for_update()` / `run_update()`.
-- `constants.py`: Configuration constants, trackers, UI themes, the per-user data directory resolver (`user_data_dir()` / `data_path()`, with first-run migration of legacy files), and `get_download_dir()` (returns the user's chosen `download_dir` setting or falls back to `DOWNLOADS_DIR`).
+- `constants.py`: Configuration constants, trackers, UI themes, the platform user-data resolver (`user_data_dir()` / `data_path()`), the machine-stable state resolver (`machine_state_dir()` / `machine_state_path()`), legacy-location discovery, and `get_download_dir()` (returns the user's chosen `download_dir` setting or falls back to `DOWNLOADS_DIR`).
 
 ## Security Notes
 

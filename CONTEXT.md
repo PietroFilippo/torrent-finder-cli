@@ -99,11 +99,13 @@ name persist in history as `kind="creator"` entries.
 
 ## Store
 
-`store.py` is the single owner of `filter_state.json`: in-memory cache, dirty
-flag, flush at exit + at destructive sites. Everything above it (`state.py`
-toggles/settings/history, `stats.py` counters) goes through
-`store.read()` / `store.write()` / `store.flush()` and never touches the file.
-See [ADR-0002](docs/adr/0002-single-store-for-persistence.md).
+`store.py` is the single owner of `filter_state.json`: machine-stable location,
+legacy-copy consolidation, in-memory cache, dirty flag, and flush at exit + at
+destructive sites. Everything above it (`state.py` toggles/settings/history,
+`stats.py` counters) goes through `store.read()` / `store.write()` /
+`store.flush()` and never touches the file. See
+[ADR-0002](docs/adr/0002-single-store-for-persistence.md) and
+[ADR-0006](docs/adr/0006-machine-stable-state-path.md).
 
 ## Credentials
 
