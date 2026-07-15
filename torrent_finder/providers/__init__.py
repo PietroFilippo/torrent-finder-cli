@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from torrent_finder.providers.base import BaseProvider
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.fitgirl_provider import FitGirlProvider
 from torrent_finder.providers.game_provider import GameProvider
@@ -29,7 +30,7 @@ _madokami = MadokamiProvider()
 # Flat registry of every provider. This is the source of truth for identity:
 # slugs (-t flag, history, stats, settings) all resolve against this list, so a
 # provider stays reachable here even when the UI tucks it inside a group.
-PROVIDERS: list = [
+PROVIDERS: list[BaseProvider] = [
     _movie,
     _game,
     _online_fix,
@@ -41,6 +42,47 @@ PROVIDERS: list = [
     _manga,
     _madokami,
 ]
+
+
+def _provider_names(provider: BaseProvider) -> tuple[str, ...]:
+    """Accepted CLI identities for a provider, in help-display order."""
+    return (*provider.cli_aliases, provider.slug)
+
+
+def _build_provider_name_index() -> dict[str, BaseProvider]:
+    index: dict[str, BaseProvider] = {}
+    for provider in PROVIDERS:
+        for raw_name in _provider_names(provider):
+            name = raw_name.casefold()
+            if name in index:
+                other = index[name]
+                raise ValueError(
+                    f"Duplicate provider CLI name {raw_name!r}: "
+                    f"{other.slug!r} and {provider.slug!r}"
+                )
+            index[name] = provider
+    return index
+
+
+_PROVIDERS_BY_CLI_NAME = _build_provider_name_index()
+
+
+def provider_cli_choices() -> tuple[str, ...]:
+    """Return every accepted -t value, derived from the registry."""
+    return tuple(
+        name
+        for provider in PROVIDERS
+        for name in _provider_names(provider)
+    )
+
+
+def creator_facet_choices() -> tuple[str, ...]:
+    """Return unique --by facet keys in provider registry order."""
+    return tuple(dict.fromkeys(
+        facet.key
+        for provider in PROVIDERS
+        for facet in provider.creator_facets
+    ))
 
 
 @dataclass
@@ -99,25 +141,29 @@ PROVIDER_MENU: list = [
 ]
 
 
-def get_provider(slug_or_prefix: str):
-    """Look up a provider by slug (case-insensitive, allows prefix like 'movie' for 'movies').
+def get_provider(slug_alias_or_prefix: str):
+    """Look up a provider by slug, declared CLI alias, or unique prefix.
 
-    Used by the ``-t`` CLI flag and by the history menu to re-resolve a saved
-    search. Match is on ``slug`` only — display ``name`` is no longer an
-    identity key (see CONTEXT.md → "Provider").
+    Used by the -t CLI flag and by the history menu to re-resolve a saved
+    search. Display name is never an identity key (see CONTEXT.md, Provider).
     """
-    needle = slug_or_prefix.lower()
-    for p in PROVIDERS:
-        if p.slug.lower().startswith(needle):
-            return p
-    return None
+    needle = slug_alias_or_prefix.casefold()
+    exact = _PROVIDERS_BY_CLI_NAME.get(needle)
+    if exact:
+        return exact
+
+    matches = []
+    for name, provider in _PROVIDERS_BY_CLI_NAME.items():
+        if name.startswith(needle) and provider not in matches:
+            matches.append(provider)
+    return matches[0] if len(matches) == 1 else None
 
 
 def get_provider_by_slug(slug: str):
     """Strict slug lookup. Returns None if no exact match."""
-    for p in PROVIDERS:
-        if p.slug == slug:
-            return p
+    provider = _PROVIDERS_BY_CLI_NAME.get(slug.casefold())
+    if provider and provider.slug.casefold() == slug.casefold():
+        return provider
     return None
 
 

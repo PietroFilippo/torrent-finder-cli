@@ -28,12 +28,15 @@ class BaseProvider(ABC):
 
     Each provider defines:
       - name: display label (e.g. "Movies")
+      - slug: canonical identity used by persistence and the CLI
+      - cli_aliases: optional backwards-compatible CLI spellings
       - icon: emoji (e.g. "🎬")
       - categories: list of apibay numeric category IDs to search
     """
 
     name: str  # display label, free to change
     slug: str  # immutable identity used for persistence keys (history, stats, settings)
+    cli_aliases: tuple[str, ...] = ()  # backwards-compatible -t names; slug is always accepted
     icon: str
     categories: list[int]
     solidtorrents_category: str = "all"

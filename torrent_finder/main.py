@@ -20,7 +20,13 @@ from torrent_finder.constants import console
 import readchar
 from torrent_finder.downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, stream_with_peerflix, stream_with_webtorrent
 from torrent_finder.filters import FilterConfig
-from torrent_finder.providers import PROVIDERS, get_provider, group_for
+from torrent_finder.providers import (
+    PROVIDERS,
+    creator_facet_choices,
+    get_provider,
+    group_for,
+    provider_cli_choices,
+)
 from torrent_finder.security import show_security_warning
 from torrent_finder.state import history_queries, load_state
 from torrent_finder.stats import (
@@ -669,19 +675,28 @@ def _run_update_flow(info: dict) -> None:
     clear_screen()
 
 
-def _main_loop() -> None:
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
-    parser.add_argument("-t", "--type", type=str, choices=["movie", "game", "online-fix", "fitgirl", "software", "mobile", "rutracker", "anime", "manga", "madokami"], help="Search type (default: movie if used with -q)")
+    parser.add_argument(
+        "-t", "--type", type=str, choices=provider_cli_choices(),
+        help="Search provider (default: movie if used with -q)",
+    )
     parser.add_argument("-f", "--filter", action="append", help="Include keyword in results")
     parser.add_argument("-x", "--exclude", action="append", help="Exclude keyword from results")
     parser.add_argument("-y", "--skip-warning", action="store_true", help="Skip network exposure warning")
-    parser.add_argument("--by", choices=["director", "studio", "writer", "magazine", "developer", "publisher"],
-                        help="Search by creator role (use with --name and -t), e.g. --by director")
+    parser.add_argument(
+        "--by", choices=creator_facet_choices(),
+        help="Search by creator role (use with --name and -t), e.g. --by director",
+    )
     parser.add_argument("--name", type=str, help='Creator name for --by, e.g. --name "Hayao Miyazaki"')
-    args = parser.parse_args()
+    return parser
 
+
+def _main_loop() -> None:
+    parser = _build_parser()
+    args = parser.parse_args()
     if not args.skip_warning:
         if not show_security_warning():
             console.print("[info]Aborted.[/info]")

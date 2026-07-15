@@ -11,6 +11,7 @@ from torrent_finder.resolvers import CreatorFacet, movies
 class MovieProvider(BaseProvider):
     name = "Movies & Series"
     slug = "movies"
+    cli_aliases = ("movie",)
     icon = "🎬"
     categories = [201, 207]  # Movies, HD Movies
     solidtorrents_category = "Movie"

@@ -11,6 +11,7 @@ class GameProvider(BaseProvider):
     # and existing history/stats keys keep working.
     name = "General"
     slug = "games"
+    cli_aliases = ("game",)
     icon = "🎮"
     search_note = "PC, consoles, ROMs & repacks from public trackers (Apibay + SolidTorrents)."
     categories = [400, 401, 403, 404, 405, 406]  # All, PC, PSX, Xbox, Wii, Handheld
