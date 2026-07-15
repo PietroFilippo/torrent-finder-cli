@@ -11,6 +11,11 @@ from dataclasses import dataclass
 
 from rich.markup import escape
 
+from torrent_finder.providers import provider_cli_choices
+
+
+_PROVIDER_CLI_NAMES = ", ".join(provider_cli_choices())
+
 
 @dataclass(frozen=True)
 class Tip:
@@ -52,7 +57,7 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
             Tip("History entries remember the filter presets you had active at search time.", ("history", "filters", "presets")),
             Tip("History can be filtered by provider, date range, and sort order with P, D, and S.", ("history", "filters", "hotkey")),
             Tip("Use -f and -x on the CLI to add ad-hoc include or exclude keywords.", ("cli", "filters")),
-            Tip("Use -t movie, game, online-fix, fitgirl, software, mobile, rutracker, anime, manga, or madokami to choose a provider for direct CLI searches.", ("cli", "provider")),
+            Tip(f"Use -t with a provider name for direct CLI searches. Accepted names: {_PROVIDER_CLI_NAMES}.", ("cli", "provider")),
             Tip("Software is a group: pick it to choose Desktop, Mobile, or RuTracker as the source.", ("software", "apps", "provider")),
             Tip("Need a desktop program? Software → Desktop searches The Pirate Bay Applications plus SolidTorrents; or -t software on the CLI.", ("software", "apps", "cli")),
             Tip("Looking for an Android app? Software → Mobile searches The Pirate Bay's Android category (APK/MOD/OBB); it's Android-only. Try -t mobile.", ("mobile", "android", "cli")),

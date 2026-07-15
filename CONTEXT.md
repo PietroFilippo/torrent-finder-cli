@@ -18,6 +18,11 @@ for, not where it comes from. One instance of a `BaseProvider` subclass
 - **`name` is a display label** — free to change (`"Movies & Series"`,
   `"General"`), never used for identity. Duplicate names across providers are
   fine (both game and manga "General").
+- **CLI choices come from the registry** — every Provider's canonical `slug`
+  is accepted by `-t`; optional `cli_aliases` preserve older spellings
+  (`movie`, `game`). The `--by` choices are the unique union of registered
+  Providers' `creator_facets`. See
+  [ADR-0004](docs/adr/0004-provider-registry-drives-cli-choices.md).
 - A provider declares capabilities as class attributes (`supports_subtitles`,
   `supports_episode_picker`, `supports_streaming`), default filters, presets,
   and optional creator-search facets.
