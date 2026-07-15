@@ -18,6 +18,10 @@ from torrent_finder.downloader import (
 from torrent_finder.providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
 from torrent_finder.ui.selector import SelectItem, arrow_select
 
+_ARIA2_INSTALL_URL = "https://aria2.github.io/"
+_WEBTORRENT_INSTALL_URL = "https://www.npmjs.com/package/webtorrent-cli"
+_PEERFLIX_INSTALL_URL = "https://www.npmjs.com/package/peerflix"
+
 
 # "Add another title" trigger for multi-line search entry. Ctrl+N on every
 # platform: it's distinct from Enter everywhere, whereas Ctrl+J is LF ('\n') and
@@ -913,8 +917,11 @@ def download_method_prompt(
                 label=ep_label,
                 value="pick_episodes",
                 is_action=True,
-                hint=("requires aria2c to fetch file list" if not aria_available else ""),
-                enabled=aria_available,
+                hint=(
+                    f"requires aria2c — {_ARIA2_INSTALL_URL}"
+                    if not aria_available else ""
+                ),
+                passive=not aria_available,
                 description=(
                     "Browse every file in the torrent and pick any subset. "
                     "Downloads grab exactly what you pick; streams auto-skip non-video files."
@@ -973,9 +980,9 @@ def download_method_prompt(
         items.append(SelectItem(
             label="▶  webtorrent",
             value="stream_w",
-            enabled=wt_available,
+            passive=not wt_available,
             hint=(
-                "(not installed)" if not wt_available
+                f"(not installed — {_WEBTORRENT_INSTALL_URL})" if not wt_available
                 else f"plays {n_sel} episode(s) sequentially" if has_selection
                 else "requires VLC installed"
             ),
@@ -984,9 +991,9 @@ def download_method_prompt(
         items.append(SelectItem(
             label="▶  peerflix",
             value="stream_p",
-            enabled=pf_available,
+            passive=not pf_available,
             hint=(
-                "(not installed)" if not pf_available
+                f"(not installed — {_PEERFLIX_INSTALL_URL})" if not pf_available
                 else f"plays {n_sel} episode(s) sequentially" if has_selection
                 else "requires VLC installed"
             ),
@@ -1009,9 +1016,9 @@ def download_method_prompt(
     items.append(SelectItem(
         label="⬇  aria2c",
         value="aria",
-        enabled=aria_available,
+        passive=not aria_available,
         hint=(
-            "(not installed — https://aria2.github.io/)" if not aria_available
+            f"(not installed — {_ARIA2_INSTALL_URL})" if not aria_available
             else "fastest, multi-file in one process, won't seed - downloads only selected files"
         ),
         description="Best downloader — native multi-file, resumes, fastest for batches",
@@ -1019,9 +1026,9 @@ def download_method_prompt(
     items.append(SelectItem(
         label="⬇  webtorrent",
         value="d",
-        enabled=wt_available,
+        passive=not wt_available,
         hint=(
-            "(not installed)" if not wt_available
+            f"(not installed — {_WEBTORRENT_INSTALL_URL})" if not wt_available
             else f"⚠  may ignore selection ({n_sel} picked) — can pull full torrent" if has_selection
             else "slower, won't seed"
         ),
@@ -1034,9 +1041,9 @@ def download_method_prompt(
     items.append(SelectItem(
         label="⬇  peerflix",
         value="p",
-        enabled=pf_available,
+        passive=not pf_available,
         hint=(
-            "(not installed)" if not pf_available
+            f"(not installed — {_PEERFLIX_INSTALL_URL})" if not pf_available
             else f"⚠  ignores file selection ({n_sel} picked) — downloads full torrent" if has_selection
             else "slower, won't seed"
         ),
@@ -1202,7 +1209,7 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
             enabled=(aria_ok and copyable > 0),
             hint=(
                 "" if (aria_ok and copyable > 0)
-                else "aria2c not installed — https://aria2.github.io/" if not aria_ok
+                else f"aria2c not installed — {_ARIA2_INSTALL_URL}" if not aria_ok
                 else "no magnet links in this selection"
             ),
             description=(

@@ -55,11 +55,11 @@ class MovieProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Movies use Apibay, SolidTorrents, YTS, plus Nyaa (live-action) for Asian TV/film."""
+        """Movies default to Apibay + Nyaa; SolidTorrents and YTS are opt-in."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
-            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=True),
-            SearchEngine("YTS", "🎥", self._search_yts, enabled=True),
+            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=False),
+            SearchEngine("YTS", "🎥", self._search_yts, enabled=False),
             SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),
         ]
 
