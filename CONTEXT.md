@@ -107,10 +107,11 @@ See [ADR-0002](docs/adr/0002-single-store-for-persistence.md).
 
 ## Credentials
 
-Optional per-site logins/API keys (`credentials.py`), read from env vars or
-`subtitle_credentials.json`. Used by subtitle providers and credentialed
-sites (Madokami, RuTracker, Online-Fix optional login).
+Optional per-site logins/API keys, read from environment variables or
+`subtitle_credentials.json` with environment taking precedence.
 
-> Known debt: provider-credential metadata (fields, verifier) is split
-> between `prompts.py:_CRED_PROVIDERS` and `credentials.py`. Planned fix: one
-> credentials registry.
+`credential_registry.py` is the integration seam: each `CredentialSpec` owns
+typed fields, required/optional rules, display metadata, status/save/clear
+semantics, and one lazy verifier adapter. `credentials.py` owns generic
+environment/file storage; `ui/credentials.py` owns rendering and interaction.
+See [ADR-0005](docs/adr/0005-credential-registry-owns-integration-metadata.md).

@@ -14,28 +14,13 @@ import json
 import os
 from pathlib import Path
 
+from torrent_finder.credential_registry import credential_file_keys
 from torrent_finder.constants import data_path
 
 _CRED_FILE = Path(data_path("subtitle_credentials.json"))
 
-# Maps the public env-var name -> the key used inside the JSON fallback file.
-_FILE_KEYS = {
-    "OPENSUBTITLES_USERNAME": "opensubtitles_username",
-    "OPENSUBTITLES_PASSWORD": "opensubtitles_password",
-    "OPENSUBTITLES_APIKEY": "opensubtitles_apikey",
-    "ADDIC7ED_USERNAME": "addic7ed_username",
-    "ADDIC7ED_PASSWORD": "addic7ed_password",
-    "JIMAKU_API_KEY": "jimaku_api_key",
-    "RUTRACKER_USERNAME": "rutracker_username",
-    "RUTRACKER_PASSWORD": "rutracker_password",
-    "ONLINE_FIX_USERNAME": "online_fix_username",
-    "ONLINE_FIX_PASSWORD": "online_fix_password",
-    "MADOKAMI_USERNAME": "madokami_username",
-    "MADOKAMI_PASSWORD": "madokami_password",
-    "TMDB_API_KEY": "tmdb_api_key",
-    "IGDB_CLIENT_ID": "igdb_client_id",
-    "IGDB_CLIENT_SECRET": "igdb_client_secret",
-}
+# Maps public env-var names to JSON keys, derived from the credential registry.
+_FILE_KEYS = credential_file_keys()
 
 _file_cache: dict | None = None
 
