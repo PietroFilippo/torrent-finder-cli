@@ -1,5 +1,6 @@
 """Shared constants, theme, and console instance."""
 
+import glob
 import os
 import shutil
 import sys
@@ -22,9 +23,9 @@ custom_theme = Theme(
 console = Console(theme=custom_theme)
 
 # --- User data directory ------------------------------------------------------
-# State, credentials, and (by default) downloads live in a per-user directory,
-# not next to the code — so the app works when installed via pip/pipx or as a
-# frozen binary, where the package directory is shared/read-only.
+# Credentials and (by default) downloads live in the platform user-data
+# directory. filter_state.json uses machine_state_dir() so Store Python cannot
+# split history/stats across interpreter-specific LocalCache directories.
 APP_DIRNAME = "torrent-finder-cli"
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -38,6 +39,61 @@ def user_data_dir() -> str:
     else:
         base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
     return os.path.join(base, APP_DIRNAME)
+
+
+def machine_state_dir() -> str:
+    """Stable per-user state directory for this machine.
+
+    Microsoft Store Python virtualizes ``LOCALAPPDATA`` per Python package,
+    which can make the same apparent path resolve to different files depending
+    on how the app was launched. A directory directly under the Windows user
+    profile avoids that runtime-specific redirection.
+    """
+    if sys.platform == "win32":
+        return os.path.join(os.path.expanduser("~"), f".{APP_DIRNAME}")
+    return user_data_dir()
+
+
+def machine_state_path(name: str) -> str:
+    """Absolute path to machine-stable state, creating its directory."""
+    directory = machine_state_dir()
+    os.makedirs(directory, exist_ok=True)
+    return os.path.join(directory, name)
+
+
+def legacy_data_paths(name: str) -> list[str]:
+    """Possible pre-machine-state locations for a persisted file.
+
+    Store Python may have produced one copy per interpreter package, so include
+    those package LocalCache paths in addition to the previous app-data and
+    source-tree locations.
+    """
+    candidates = [
+        os.path.join(user_data_dir(), name),
+        os.path.abspath(os.path.join(_PKG_DIR, os.pardir, name)),
+        os.path.join(_PKG_DIR, name),
+    ]
+    if sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidates.extend(glob.glob(os.path.join(
+                local_app_data,
+                "Packages",
+                "PythonSoftwareFoundation.Python.*",
+                "LocalCache",
+                "Local",
+                APP_DIRNAME,
+                name,
+            )))
+
+    unique = []
+    seen = set()
+    for candidate in candidates:
+        key = os.path.normcase(os.path.abspath(candidate))
+        if key not in seen:
+            seen.add(key)
+            unique.append(candidate)
+    return unique
 
 
 def data_path(name: str) -> str:
