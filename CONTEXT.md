@@ -115,6 +115,20 @@ ownership checks, and optional Windows user-PATH update. `ui/launcher.py` owns
 the selector and confirmation flow. See
 [ADR-0007](docs/adr/0007-managed-terminal-command-presets.md).
 
+## Terminal Layout
+
+A viewport is the terminal's current width and height, which may change while
+an interactive screen is open. `ui/layout.py` owns terminal-cell-aware
+cropping and marquee primitives. Selectable rows remain one physical line so
+cursor movement and height windowing are stable; contextual hints,
+descriptions, footers, and result metadata may wrap.
+
+The result table progressively removes columns as the viewport narrows and
+shows hidden fields for the selected result in its caption. Selectors and the
+result table watch live size changes. Streaming headers reserve their measured
+wrapped height before subprocess output begins. See
+[ADR-0008](docs/adr/0008-responsive-terminal-layout.md).
+
 ## Credentials
 
 Optional per-site logins/API keys, read from environment variables or

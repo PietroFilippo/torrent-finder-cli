@@ -825,7 +825,7 @@ def torrent_info_screen(result: dict) -> None:
         readchar.readkey()
         return
 
-    width = max(40, console.size.width - 12)
+    width = max(8, console.size.width - 12)
     rows: list[SelectItem] = []
 
     def add(text: str = "") -> None:

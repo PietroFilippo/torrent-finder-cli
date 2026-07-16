@@ -14,6 +14,7 @@ Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, n
 - **Arrow-Key Driven UI:** Fully interactive, flicker-free terminal interface.
   - Utilizes an alternate screen buffer so your scrollback history remains flawlessly clean.
   - **Dynamic Viewport Windowing:** Capable of rendering massive 500+ item checklists (like huge anime seasons) by automatically windowing the active selection while pinning crucial action buttons tightly to the top and bottom of your screen to prevent terminal overflow.
+  - **Responsive Narrow Layouts:** Selector hints, descriptions, and controls wrap without changing selectable-row height. Search results progressively collapse to the fields that fit, with hidden metadata kept under the selected row; resizing an open screen recalculates the viewport automatically.
   - **Marquee Scrolling:** Automatically scrolls long torrent names and checklist items that exceed the physical terminal width when hovered over.
   - **Contextual Footers:** Displays dynamic helper text explaining the trade-offs, speeds, and seeding behaviors of different download options as you highlight them.
 - **Quick-Launch Commands:** The startup provider screen includes a **Terminal command** row for choosing `torrent-finder`, `tf`, `torrent`, `find-torrent`, or `tfind`. The canonical command remains available and `torrent` is built into pip/pipx installs; the other presets create one app-owned forwarding launcher, preserve every CLI argument, refuse unrelated command collisions, and can be removed safely from the same screen.
