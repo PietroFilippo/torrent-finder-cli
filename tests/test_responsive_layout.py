@@ -9,8 +9,10 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 from rich.cells import cell_len
 from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
-from torrent_finder.ui import selector, streaming, table
+from torrent_finder.ui import prompts, selector, streaming, table
 from torrent_finder.ui.selector import SelectItem
 
 
@@ -33,6 +35,31 @@ def _render(renderable, width, height=40):
 
 
 class ResponsiveSelectorTests(unittest.TestCase):
+    def test_resize_requests_an_immediate_coherent_redraw(self):
+        resize = selector._ResizeRedraw((120, 30))
+
+        self.assertTrue(resize.observe((110, 30)))
+        self.assertFalse(resize.observe((110, 30)))
+        self.assertTrue(resize.observe((100, 30)))
+
+    def test_stale_selector_frame_is_not_written(self):
+        narrow = Console(file=io.StringIO(), width=48, height=20)
+        terminal = io.StringIO()
+
+        with (
+            patch.object(selector, "console", narrow),
+            patch.object(selector.sys, "stdout", terminal),
+        ):
+            written = selector._render(
+                None,
+                Panel("stale frame"),
+                width=60,
+                expected_size=(60, 20),
+            )
+
+        self.assertFalse(written)
+        self.assertEqual(terminal.getvalue(), "")
+
     def test_narrow_selector_wraps_complete_description_footer_and_hint(self):
         narrow = Console(width=48, height=20, color_system=None)
         items = [
@@ -60,6 +87,49 @@ class ResponsiveSelectorTests(unittest.TestCase):
         self.assertIn("DESCRIPTION-END", output)
         self.assertIn("FOOTER-END", output)
         self.assertLessEqual(len(output.splitlines()), 20)
+
+
+class ResponsiveSearchPromptTests(unittest.TestCase):
+    def test_search_frame_adapts_without_overflow_or_duplicate_banner(self):
+        renderer = prompts.make_search_screen_renderer(
+            "Apibay, Nyaa", "None", has_history=True
+        )
+
+        for width, height in ((48, 10), (48, 14), (72, 18), (120, 30)):
+            with self.subTest(width=width, height=height):
+                content, cursor_row, cursor_col = prompts._render_query_frame(
+                    renderer,
+                    "[title] Search Movies & Series:[/title] ",
+                    [],
+                    list("oppenheimer"),
+                    len("oppenheimer"),
+                    width,
+                    height,
+                )
+                plain = Text.from_ansi(content).plain
+
+                self.assertEqual(plain.count("Torrent Search CLI"), 1)
+                self.assertLessEqual(len(plain.splitlines()), height)
+                self.assertTrue(
+                    all(cell_len(line) <= width for line in plain.splitlines())
+                )
+                self.assertLessEqual(cursor_row, height)
+                self.assertLessEqual(cursor_col, width)
+
+    def test_stale_search_frame_is_not_written(self):
+        narrow = Console(file=io.StringIO(), width=48, height=10)
+        terminal = io.StringIO()
+
+        with (
+            patch.object(prompts, "console", narrow),
+            patch.object(prompts.sys, "stdout", terminal),
+        ):
+            written = prompts._write_query_frame(
+                "stale frame", 1, 1, expected_size=(60, 20)
+            )
+
+        self.assertFalse(written)
+        self.assertEqual(terminal.getvalue(), "")
 
 
 class ResponsiveTableTests(unittest.TestCase):

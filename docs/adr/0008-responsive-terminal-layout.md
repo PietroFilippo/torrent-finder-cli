@@ -33,7 +33,11 @@ Result tables use four progressive layouts:
 
 Metadata hidden by a layout is shown in the selected-row caption. The live
 result screen watches terminal size changes and recalculates its layout,
-visible row count, and scroll offset without reopening the screen.
+visible row count, and scroll offset without reopening the screen. Selector and
+search-editor frames are rendered against a size snapshot and written
+atomically; a frame is discarded if the viewport changes before that complete
+write. The search editor uses the alternate screen and collapses its header at
+short terminal heights so resizing cannot reflow an old banner in scrollback.
 
 Torrent information uses the available width instead of a 40-column floor.
 Streaming headers measure their actual rendered height and start any child

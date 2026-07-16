@@ -39,7 +39,17 @@ from torrent_finder.stats import (
     record_torrent_picked,
 )
 from torrent_finder.torrent_session import TorrentSession
-from torrent_finder.ui.prompts import MULTI_ADD_KEY_LABEL, clear_screen, download_method_prompt, episode_select_prompt, filter_menu, get_query_with_shortcut, print_banner, provider_select_prompt, search_again_prompt
+from torrent_finder.ui.prompts import (
+    clear_screen,
+    download_method_prompt,
+    episode_select_prompt,
+    filter_menu,
+    get_query_with_shortcut,
+    make_search_screen_renderer,
+    print_banner,
+    provider_select_prompt,
+    search_again_prompt,
+)
 from torrent_finder.ui.table import interactive_select
 from torrent_finder.updates import check_for_update, notice_line, run_update
 from torrent_finder.utils import start_esc_listener
@@ -847,24 +857,20 @@ def _main_loop() -> None:
             engine_str = ", ".join(engine_names) if engine_names else "None"
             active_names = [p.name for p in provider.active_presets]
             active_name = ", ".join(active_names) if active_names else "None"
-            console.print(f"[dim]Engines:[/dim] [cyan]{engine_str}[/cyan]   [dim]Filters:[/dim] [cyan]{active_name}[/cyan]")
             prov_history = history_queries(provider.slug)
-            nav = "  •  [/dim][bold]↑/↓[/bold] [dim]past searches" if prov_history else ""
-            console.print(
-                f"[dim]Type to search  •  [/dim][bold]{MULTI_ADD_KEY_LABEL}[/bold] [dim]add another title  •  [/dim]"
-                "[bold]Tab[/bold] [dim]actions "
-                "(filters, history, stats, tips)  •  [/dim][bold]Ctrl+F[/bold] [dim]filters"
-                f"{nav}  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
+            screen_renderer = make_search_screen_renderer(
+                engine_str,
+                active_name,
+                has_history=bool(prov_history),
+                notice=notice_msg or "",
             )
-            if notice_msg:
-                console.print(notice_msg)
-                notice_msg = None
+            notice_msg = None
             initial, pending_query = pending_query, ""
             try:
                 query = get_query_with_shortcut(
                     f"[title] Search {provider.name}:[/title] ",
                     initial=initial, history=prov_history, filters_shortcut=True,
-                    multi=True,
+                    multi=True, screen_renderer=screen_renderer,
                 )
             except (EOFError, KeyboardInterrupt):
                 _goodbye()
@@ -932,7 +938,7 @@ def _main_loop() -> None:
                 continue
 
         # Normalize the prompt result to a list of query strings. Multi mode
-        # (Ctrl+J = add another title) returns a list; single mode a string.
+        # (Ctrl+N = add another title) returns a list; single mode a string.
         if isinstance(query, list):
             queries = [q.strip() for q in query if q and q.strip()]
         else:

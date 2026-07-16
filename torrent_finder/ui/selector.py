@@ -18,7 +18,20 @@ from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 # Marquee timing
 _MARQUEE_DWELL_S = 1.0      # delay before scrolling starts
 _MARQUEE_RATE = 6           # chars/sec scroll speed
-_TICK_INTERVAL_S = 0.12     # how often the watcher wakes up
+_TICK_INTERVAL_S = 0.05     # how often the watcher wakes up
+
+
+@dataclass
+class _ResizeRedraw:
+    """Track viewport changes that require an immediate coherent redraw."""
+
+    size: object
+
+    def observe(self, size: object) -> bool:
+        if size == self.size:
+            return False
+        self.size = size
+        return True
 
 
 @dataclass
@@ -241,7 +254,12 @@ def _next_enabled(items: list[SelectItem], current: int, direction: int) -> int:
     return current  # All disabled — stay put
 
 
-def _render(banner: object, panel: Panel) -> None:
+def _render(
+    banner: object,
+    panel: Panel,
+    width: int | None = None,
+    expected_size: object | None = None,
+) -> bool:
     """Redraw inside the alternate screen buffer.
 
     Clears the viewport first (cheap inside an alt-screen) so a previous
@@ -252,7 +270,11 @@ def _render(banner: object, panel: Panel) -> None:
 
     # Pre-render all content into a string
     buf = StringIO()
-    tmp = _Console(file=buf, width=console.size.width, force_terminal=True)
+    tmp = _Console(
+        file=buf,
+        width=width if width is not None else console.size.width,
+        force_terminal=True,
+    )
     if banner:
         tmp.print(banner)
         tmp.print()  # Blank line after banner
@@ -262,8 +284,11 @@ def _render(banner: object, panel: Panel) -> None:
     # Home + clear entire screen + write content. The 2J clear avoids
     # ghost borders when a prior render overflowed and scrolled the
     # viewport (which was leaving leftover top borders visible).
+    if expected_size is not None and console.size != expected_size:
+        return False
     sys.stdout.write("\033[H\033[2J" + content)
     sys.stdout.flush()
+    return True
 
 
 def _resolve(val):
@@ -328,38 +353,61 @@ def arrow_select(
         "cursor_changed_at": time.monotonic(),
     }
     stop_event = threading.Event()
+    render_lock = threading.Lock()
+    resize = _ResizeRedraw(console.size)
+
+    def draw(tick: int) -> bool:
+        """Write a complete frame only when it matches the current viewport."""
+        with render_lock:
+            for _ in range(3):
+                frame_size = console.size
+                panel = _build_panel(
+                    items,
+                    state["cursor"],
+                    _resolve(title),
+                    multi,
+                    _resolve(footer),
+                    tick=tick,
+                )
+                if _render(
+                    banner,
+                    panel,
+                    width=frame_size.width,
+                    expected_size=frame_size,
+                ):
+                    return True
+            return False
 
     def watcher():
-        prev_size = console.size
         last_cursor = state["cursor"]
         last_rendered_tick = -1
         while not stop_event.is_set():
             if stop_event.wait(_TICK_INTERVAL_S):
                 break
 
-            cur_size = console.size
-            size_changed = cur_size != prev_size
-            prev_size = cur_size
+            now = time.monotonic()
+            size_changed = resize.observe(console.size)
 
             # Reset marquee on cursor move
             if state["cursor"] != last_cursor:
                 last_cursor = state["cursor"]
-                state["cursor_changed_at"] = time.monotonic()
+                state["cursor_changed_at"] = now
                 state["tick"] = 0
                 last_rendered_tick = -1
 
-            elapsed = time.monotonic() - state["cursor_changed_at"]
+            elapsed = now - state["cursor_changed_at"]
             overflows = _cursor_overflows(items, state["cursor"], multi)
-
             new_tick = 0
             if overflows and elapsed > _MARQUEE_DWELL_S:
                 new_tick = int((elapsed - _MARQUEE_DWELL_S) * _MARQUEE_RATE)
 
-            need_redraw = size_changed or (overflows and new_tick != last_rendered_tick)
+            need_redraw = size_changed or (
+                overflows and new_tick != last_rendered_tick
+            )
             if need_redraw:
                 state["tick"] = new_tick
                 last_rendered_tick = new_tick
-                _render(banner, _build_panel(items, state["cursor"], _resolve(title), multi, _resolve(footer), tick=new_tick))
+                draw(new_tick)
 
     # Enter alternate screen buffer + hide cursor + clear it
     sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
@@ -370,7 +418,7 @@ def arrow_select(
 
     try:
         # Initial render
-        _render(banner, _build_panel(items, cursor, _resolve(title), multi, _resolve(footer), tick=0))
+        draw(0)
 
         while True:
             key = readchar.readkey()
@@ -425,7 +473,7 @@ def arrow_select(
                 state["cursor_changed_at"] = time.monotonic()
 
             state["cursor"] = cursor
-            _render(banner, _build_panel(items, cursor, _resolve(title), multi, _resolve(footer), tick=state["tick"]))
+            draw(state["tick"])
 
     finally:
         stop_event.set()
