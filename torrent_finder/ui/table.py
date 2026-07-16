@@ -66,7 +66,7 @@ def _selected_metadata(
     item = results[selected_idx]
     parts: list[str] = []
     if not layout.source:
-        parts.append(f"Source: {item.get('source', 'Apibay')}")
+        parts.append(f"Source: {item.get('source') or 'Unknown'}")
     if show_from and not layout.from_work and item.get("from_work"):
         parts.append(f"From: {item.get('from_work')}")
     if not layout.size:
@@ -218,7 +218,7 @@ def build_table(
         check_text = "[green][✓][/green]" if checked else "[dim][ ][/dim]"
         cells: list[object] = [check_text, number]
         if layout.source:
-            cells.append(Text(str(item.get("source", "Apibay"))))
+            cells.append(Text(str(item.get("source") or "Unknown")))
         if layout.from_work:
             cells.append(Text(str(item.get("from_work", "") or "")))
         cells.append(Text(display_name))
