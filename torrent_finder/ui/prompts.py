@@ -1,12 +1,17 @@
 """User-facing prompts: banner, download method selection."""
 
+import io
 import sys
+import threading
+from collections.abc import Callable
 
 import readchar
+from rich.cells import cell_len
+from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-from torrent_finder.constants import console
+from torrent_finder.constants import console, custom_theme
 from torrent_finder.downloader import (
     detect_torrent_client,
     download_with_webtorrent,
@@ -31,172 +36,404 @@ _ADD_LINE_KEYS = {readchar.key.CTRL_N}
 MULTI_ADD_KEY_LABEL = "Ctrl+N"
 
 
-def get_query_with_shortcut(prompt_str: str, initial: str = "", history=None,
-                            filters_shortcut: bool = False,
-                            multi: bool = False) -> "str | tuple | list | None":
+def search_shortcuts_line(has_history: bool) -> str:
+    """Build the search-screen shortcut line in display-priority order."""
+    history = (
+        "  •  [/dim][bold]↑/↓[/bold] [dim]past searches"
+        if has_history
+        else ""
+    )
+    return (
+        "[dim]Type to search  •  [/dim][bold]Ctrl+F[/bold] [dim]filters"
+        f"  •  [/dim][bold]{MULTI_ADD_KEY_LABEL}[/bold] "
+        "[dim]add another title  •  [/dim][bold]Tab[/bold] [dim]actions "
+        f"(filters, history, stats, tips){history}  •  [/dim]"
+        "[bold]Esc[/bold] [dim]back[/dim]"
+    )
+
+
+def make_search_screen_renderer(
+    engine_names: str,
+    active_filters: str,
+    has_history: bool,
+    notice: str = "",
+) -> Callable[[Console], None]:
+    """Return the responsive header renderer used by the search editor."""
+    status = (
+        f"[dim]Engines:[/dim] [cyan]{engine_names}[/cyan]   "
+        f"[dim]Filters:[/dim] [cyan]{active_filters}[/cyan]"
+    )
+    compact_shortcuts = (
+        "[bold]Ctrl+F[/bold] [dim]filters  |  [/dim]"
+        f"[bold]{MULTI_ADD_KEY_LABEL}[/bold] [dim]add title  |  [/dim]"
+        "[bold]Tab[/bold] [dim]actions  |  [/dim]"
+        "[bold]Esc[/bold] [dim]back[/dim]"
+    )
+    full_shortcuts = search_shortcuts_line(has_history)
+    notice_rows = 2 if notice else 0
+
+    def render(target: Console) -> None:
+        height = target.size.height
+        if height >= 11 + notice_rows:
+            target.print(_make_banner_panel())
+            if height >= 20 + notice_rows:
+                target.print()
+        else:
+            target.print("[title]Torrent Search CLI[/title]")
+
+        if height >= 15 + notice_rows:
+            target.print(status)
+        target.print(
+            full_shortcuts
+            if height >= 18 + notice_rows
+            else compact_shortcuts
+        )
+        if notice:
+            target.print(notice)
+
+    return render
+
+
+def _emit_query_frame(
+    target: Console,
+    screen_renderer: Callable[[Console], None],
+    prompt_str: str,
+    committed: list[str],
+    current_text: str,
+) -> None:
+    screen_renderer(target)
+    for title in committed:
+        target.print(prompt_str, end="")
+        target.print(Text(title))
+    target.print(prompt_str, end="")
+    target.print(Text(current_text), end="")
+
+
+def _render_query_frame(
+    screen_renderer: Callable[[Console], None],
+    prompt_str: str,
+    committed: list[str],
+    buffer: list[str],
+    pos: int,
+    width: int,
+    height: int,
+) -> tuple[str, int, int]:
+    """Pre-render one complete search frame and its absolute cursor position."""
+    content_buffer = io.StringIO()
+    frame_console = Console(
+        file=content_buffer,
+        width=max(1, width),
+        height=max(1, height),
+        theme=custom_theme,
+        force_terminal=True,
+        color_system="standard",
+    )
+    _emit_query_frame(
+        frame_console,
+        screen_renderer,
+        prompt_str,
+        committed,
+        "".join(buffer),
+    )
+
+    cursor_buffer = io.StringIO()
+    cursor_console = Console(
+        file=cursor_buffer,
+        width=max(1, width),
+        height=max(1, height),
+        theme=custom_theme,
+        force_terminal=False,
+        color_system=None,
+    )
+    _emit_query_frame(
+        cursor_console,
+        screen_renderer,
+        prompt_str,
+        committed,
+        "".join(buffer[:pos]),
+    )
+    before_cursor = cursor_buffer.getvalue()
+    lines = before_cursor.split("\n")
+    cursor_row = len(lines)
+    cursor_col = cell_len(lines[-1]) + 1
+    if cursor_col > width:
+        cursor_row += 1
+        cursor_col = 1
+
+    return (
+        content_buffer.getvalue(),
+        max(1, min(height, cursor_row)),
+        max(1, min(width, cursor_col)),
+    )
+
+
+def _write_query_frame(
+    content: str,
+    cursor_row: int,
+    cursor_col: int,
+    expected_size: object,
+) -> bool:
+    """Atomically replace the search screen if its render size is still current."""
+    if console.size != expected_size:
+        return False
+    sys.stdout.write(
+        "\033[H\033[2J"
+        + content
+        + f"\033[{cursor_row};{cursor_col}H"
+    )
+    sys.stdout.flush()
+    return True
+
+
+def get_query_with_shortcut(
+    prompt_str: str,
+    initial: str = "",
+    history=None,
+    filters_shortcut: bool = False,
+    multi: bool = False,
+    screen_renderer: Callable[[Console], None] | None = None,
+) -> "str | tuple | list | None":
     """Read a search query with inline editing.
 
-    With ``multi=True``, Ctrl+J commits the current line and starts another;
+    With ``multi=True``, Ctrl+N commits the current line and starts another;
     Enter then returns the full ``list[str]`` of titles. Ctrl+F / Tab are
     suppressed once a title has been committed so the in-progress list isn't
     lost. Without ``multi`` the return is a single string, exactly as before.
 
     Returns the typed text, "GO_BACK" on Esc, or ``("ACTIONS", typed)`` when Tab
-    is pressed — the caller opens the quick-actions menu and re-prompts with
-    ``initial=typed`` so the in-progress query is preserved. With
-    ``filters_shortcut=True``, Ctrl+F returns ``("FILTERS", typed)`` to jump
-    straight to the filter menu. No single-letter shortcuts here: a search box
-    must be able to start with any letter (Ctrl combos are safe — non-printable).
+    is pressed. With ``filters_shortcut=True``, Ctrl+F returns
+    ``("FILTERS", typed)``. ``history`` enables Up/Down search recall.
 
-    ``history`` (this provider's past queries, newest first) enables shell-style
-    recall: Up walks to older searches, Down back toward the in-progress line.
+    When ``screen_renderer`` is provided, the editor owns an alternate-screen
+    frame and redraws it atomically whenever the terminal size changes.
     """
-    console.print(prompt_str, end="")
     buffer: list[str] = list(initial)
-    pos = len(buffer)  # cursor index within buffer; physical cursor sits `pos` cols past the prompt
-    if buffer:
-        sys.stdout.write(''.join(buffer))
-    sys.stdout.flush()
+    pos = len(buffer)
+    committed: list[str] = []
+
+    hist = history or []
+    hpos = -1
+    stash = ""
+
+    stop_event = threading.Event()
+    render_lock = threading.Lock()
+    watcher_thread: threading.Thread | None = None
+    observed_size = console.size
+
+    def draw() -> bool:
+        with render_lock:
+            for _ in range(3):
+                frame_size = console.size
+                content, cursor_row, cursor_col = _render_query_frame(
+                    screen_renderer,
+                    prompt_str,
+                    committed,
+                    buffer,
+                    pos,
+                    frame_size.width,
+                    frame_size.height,
+                )
+                if _write_query_frame(
+                    content,
+                    cursor_row,
+                    cursor_col,
+                    frame_size,
+                ):
+                    return True
+            return False
+
+    def watcher() -> None:
+        nonlocal observed_size
+        while not stop_event.wait(0.05):
+            current_size = console.size
+            if current_size != observed_size:
+                observed_size = current_size
+                draw()
 
     def repaint(prev_col: int, prev_len: int) -> None:
-        """Redraw the input after an edit, then park the cursor at `pos`.
+        """Redraw an edit and leave the physical cursor at ``pos``."""
+        if screen_renderer is not None:
+            draw()
+            return
 
-        Uses only backspaces and spaces (no ANSI) so it behaves the same on
-        every Windows console. `prev_col` is where the physical cursor was
-        (always the old `pos`); `prev_len` is the old text length, so we know
-        how many stale trailing chars to wipe when the text got shorter.
-        """
         out = ['\b' * prev_col, ''.join(buffer)]
         extra = prev_len - len(buffer)
         if extra > 0:
-            out.append(' ' * extra)      # paint over leftover chars
+            out.append(' ' * extra)
             out.append('\b' * extra)
-        out.append('\b' * (len(buffer) - pos))  # back to the cursor
+        out.append('\b' * (len(buffer) - pos))
         sys.stdout.write(''.join(out))
         sys.stdout.flush()
 
-    committed: list[str] = []  # multi mode: titles locked in with Ctrl+J
-
-    hist = history or []
-    hpos = -1   # -1 = editing the live line; 0.. = stepped into history (newest first)
-    stash = ""  # the live line, stashed when first stepping into history
-
-    def _recall(text: str) -> None:
-        """Replace the whole buffer with `text`, cursor at end."""
+    def recall(text: str) -> None:
         nonlocal pos
         prev_col, prev_len = pos, len(buffer)
         buffer[:] = list(text)
         pos = len(buffer)
         repaint(prev_col, prev_len)
 
-    while True:
-        key = readchar.readkey()
+    if screen_renderer is not None:
+        sys.stdout.write("\033[?1049h\033[?25h\033[2J\033[H")
+        sys.stdout.flush()
+        draw()
+        watcher_thread = threading.Thread(target=watcher, daemon=True)
+        watcher_thread.start()
+    else:
+        console.print(prompt_str, end="")
+        if buffer:
+            sys.stdout.write(''.join(buffer))
+        sys.stdout.flush()
 
-        if multi and key in _ADD_LINE_KEYS:
-            # Add-another-title key (Ctrl+J on Windows / Ctrl+N anywhere): lock the
-            # current title in and start a fresh line below.
-            text = "".join(buffer).strip()
-            if text:
-                committed.append(text)
-                print()
-                console.print(prompt_str, end="")
-                sys.stdout.flush()
-                buffer[:] = []
-                pos = 0
-                hpos = -1
-                stash = ""
-            continue
+    try:
+        while True:
+            key = readchar.readkey()
 
-        if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
-            print()
-            if multi:
+            if multi and key in _ADD_LINE_KEYS:
                 text = "".join(buffer).strip()
                 if text:
                     committed.append(text)
-                return list(committed)
-            return "".join(buffer)
+                    buffer[:] = []
+                    pos = 0
+                    hpos = -1
+                    stash = ""
+                    if screen_renderer is not None:
+                        draw()
+                    else:
+                        print()
+                        console.print(prompt_str, end="")
+                        sys.stdout.flush()
+                continue
 
-        elif key == readchar.key.ESC:
-            print()
-            return "GO_BACK"
+            if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
+                if screen_renderer is None:
+                    print()
+                if multi:
+                    text = "".join(buffer).strip()
+                    if text:
+                        committed.append(text)
+                    return list(committed)
+                return "".join(buffer)
 
-        elif key in (readchar.key.TAB, '\t'):
-            if multi and committed:
-                continue  # mid-multi-entry: don't lose the locked-in titles
-            print()
-            return ("ACTIONS", "".join(buffer))
+            if key == readchar.key.ESC:
+                if screen_renderer is None:
+                    print()
+                return "GO_BACK"
 
-        elif key == readchar.key.CTRL_F:
-            # Quick filters jump. Always swallowed so the control char (\x06) is
-            # never inserted into the query; only acts where it's enabled.
-            if filters_shortcut:
+            if key in (readchar.key.TAB, '\t'):
                 if multi and committed:
-                    continue  # mid-multi-entry: keep the locked-in titles
-                print()
-                return ("FILTERS", "".join(buffer))
+                    continue
+                if screen_renderer is None:
+                    print()
+                return ("ACTIONS", "".join(buffer))
 
-        elif key == readchar.key.LEFT:
-            if pos > 0:
-                pos -= 1
-                sys.stdout.write('\b')
-                sys.stdout.flush()
+            if key == readchar.key.CTRL_F:
+                if filters_shortcut:
+                    if multi and committed:
+                        continue
+                    if screen_renderer is None:
+                        print()
+                    return ("FILTERS", "".join(buffer))
+                continue
 
-        elif key == readchar.key.RIGHT:
-            if pos < len(buffer):
-                sys.stdout.write(buffer[pos])  # reprint char to advance cursor
+            if key == readchar.key.LEFT:
+                if pos > 0:
+                    if screen_renderer is not None:
+                        prev_col = pos
+                        pos -= 1
+                        repaint(prev_col, len(buffer))
+                    else:
+                        pos -= 1
+                        sys.stdout.write('\b')
+                        sys.stdout.flush()
+                continue
+
+            if key == readchar.key.RIGHT:
+                if pos < len(buffer):
+                    if screen_renderer is not None:
+                        prev_col = pos
+                        pos += 1
+                        repaint(prev_col, len(buffer))
+                    else:
+                        sys.stdout.write(buffer[pos])
+                        pos += 1
+                        sys.stdout.flush()
+                continue
+
+            if key == readchar.key.UP:
+                if hist and hpos < len(hist) - 1:
+                    if hpos == -1:
+                        stash = "".join(buffer)
+                    hpos += 1
+                    recall(hist[hpos])
+                continue
+
+            if key == readchar.key.DOWN:
+                if hpos >= 0:
+                    hpos -= 1
+                    recall(hist[hpos] if hpos >= 0 else stash)
+                continue
+
+            if key == readchar.key.HOME or key == readchar.key.CTRL_A:
+                if pos > 0:
+                    if screen_renderer is not None:
+                        prev_col = pos
+                        pos = 0
+                        repaint(prev_col, len(buffer))
+                    else:
+                        sys.stdout.write('\b' * pos)
+                        pos = 0
+                        sys.stdout.flush()
+                continue
+
+            if key == readchar.key.END or key == readchar.key.CTRL_E:
+                if pos < len(buffer):
+                    if screen_renderer is not None:
+                        prev_col = pos
+                        pos = len(buffer)
+                        repaint(prev_col, len(buffer))
+                    else:
+                        sys.stdout.write(''.join(buffer[pos:]))
+                        pos = len(buffer)
+                        sys.stdout.flush()
+                continue
+
+            if key in (readchar.key.BACKSPACE, '\x08', '\x7f'):
+                if pos > 0:
+                    prev_col, prev_len = pos, len(buffer)
+                    del buffer[pos - 1]
+                    pos -= 1
+                    repaint(prev_col, prev_len)
+                continue
+
+            if key in (readchar.key.DELETE, readchar.key.SUPR):
+                if pos < len(buffer):
+                    prev_col, prev_len = pos, len(buffer)
+                    del buffer[pos]
+                    repaint(prev_col, prev_len)
+                continue
+
+            if key in (readchar.key.CTRL_C, '\x03'):
+                raise KeyboardInterrupt
+
+            if key in (readchar.key.CTRL_D, '\x04'):
+                raise EOFError
+
+            if (
+                len(key) == 1
+                and key >= ' '
+                and not key.startswith(('\x1b', '\x00', '\xe0'))
+            ):
+                prev_col, prev_len = pos, len(buffer)
+                buffer.insert(pos, key)
                 pos += 1
-                sys.stdout.flush()
-
-        elif key == readchar.key.UP:
-            # Walk to older searches (newest first). Stash the live line first.
-            if hist and hpos < len(hist) - 1:
-                if hpos == -1:
-                    stash = "".join(buffer)
-                hpos += 1
-                _recall(hist[hpos])
-
-        elif key == readchar.key.DOWN:
-            # Walk back toward the live line; past the newest restores it.
-            if hpos >= 0:
-                hpos -= 1
-                _recall(hist[hpos] if hpos >= 0 else stash)
-
-        elif key == readchar.key.HOME or key == readchar.key.CTRL_A:
-            if pos > 0:
-                sys.stdout.write('\b' * pos)
-                pos = 0
-                sys.stdout.flush()
-
-        elif key == readchar.key.END or key == readchar.key.CTRL_E:
-            if pos < len(buffer):
-                sys.stdout.write(''.join(buffer[pos:]))
-                pos = len(buffer)
-                sys.stdout.flush()
-
-        elif key in (readchar.key.BACKSPACE, '\x08', '\x7f'):
-            if pos > 0:
-                prev_col, prev_len = pos, len(buffer)
-                del buffer[pos - 1]
-                pos -= 1
                 repaint(prev_col, prev_len)
-
-        elif key in (readchar.key.DELETE, readchar.key.SUPR):
-            if pos < len(buffer):
-                prev_col, prev_len = pos, len(buffer)
-                del buffer[pos]
-                repaint(prev_col, prev_len)
-
-        elif key in (readchar.key.CTRL_C, '\x03'):
-            raise KeyboardInterrupt
-
-        elif key in (readchar.key.CTRL_D, '\x04'):
-            raise EOFError
-
-        elif len(key) == 1 and key >= ' ' and not key.startswith('\x1b') and not key.startswith('\x00') and not key.startswith('\xe0'):
-            prev_col, prev_len = pos, len(buffer)
-            buffer.insert(pos, key)
-            pos += 1
-            repaint(prev_col, prev_len)
+    finally:
+        if screen_renderer is not None:
+            stop_event.set()
+            if watcher_thread is not None:
+                watcher_thread.join(timeout=0.25)
+            sys.stdout.write("\033[?25h\033[?1049l")
+            sys.stdout.flush()
 
 
 def quick_actions_menu(update_available: bool = False) -> "str | None":
