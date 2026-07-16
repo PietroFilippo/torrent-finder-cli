@@ -181,6 +181,28 @@ class ResponsiveTableTests(unittest.TestCase):
         self.assertIn("Source: Nyaa", output)
         self.assertIn("From: Example Work", output)
         self.assertIn("Leeches: 7", output)
+
+    def test_missing_source_is_never_mislabeled_as_apibay(self):
+        result = dict(self.RESULTS[0])
+        result.pop("source")
+
+        for width in (100, 72):
+            with self.subTest(width=width):
+                sized_console = Console(width=width, height=30, color_system=None)
+                with patch.object(table, "console", sized_console):
+                    responsive_table = table.build_table(
+                        [result],
+                        selected_idx=0,
+                        scroll_offset=0,
+                        visible_count=1,
+                        total=1,
+                        show_from=True,
+                    )
+
+                output = _render(responsive_table, width)
+                self.assertIn("Unknown", output)
+                self.assertNotIn("Apibay", output)
+
     def test_each_table_layout_stays_inside_its_terminal_width(self):
         for width in (140, 100, 72, 46):
             with self.subTest(width=width):
