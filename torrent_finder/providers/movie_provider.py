@@ -1,5 +1,7 @@
 """Movie torrent provider — searches video/movie categories."""
 
+from typing import Iterator
+
 import requests
 
 from torrent_finder.filters import FilterConfig, FilterPreset
@@ -8,12 +10,46 @@ from torrent_finder.search_result import SearchResult
 from torrent_finder.resolvers import CreatorFacet, movies
 
 
+_YTS_API_URLS = (
+    "https://movies-api.accel.li/api/v2/list_movies.json",
+    "https://yts.gg/api/v2/list_movies.json",
+)
+
+
+def _fetch_yts_movies(query: str) -> list[dict]:
+    for api_url in _YTS_API_URLS:
+        try:
+            response = requests.get(
+                api_url,
+                params={"query_term": query, "limit": 50},
+                timeout=10,
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            response.raise_for_status()
+            payload = response.json()
+            data = payload.get("data") if isinstance(payload, dict) else None
+            movies = data.get("movies") if isinstance(data, dict) else None
+            if (
+                isinstance(payload, dict)
+                and payload.get("status") == "ok"
+                and isinstance(movies, list)
+            ):
+                return movies
+        except (requests.RequestException, ValueError):
+            continue
+    return []
+
+
 class MovieProvider(BaseProvider):
     name = "Movies & Series"
     slug = "movies"
     cli_aliases = ("movie",)
     icon = "🎬"
-    categories = [201, 207]  # Movies, HD Movies
+    # Movies, DVD movies, TV, HD movies/TV, and 3D movies.
+    categories = [201, 202, 205, 207, 208, 209]
+    # Apibay's cat=0 search can falsely return no results for movie titles.
+    # Restore the category requests used before commit 5d895da9 as fallback.
+    apibay_fallback_categories = (201, 207)
     solidtorrents_category = "Movie"
     nyaa_category = "4_1"  # Live Action - English-translated (J-dramas, Asian films/TV)
 
@@ -64,32 +100,33 @@ class MovieProvider(BaseProvider):
         ]
 
     def _search_yts(self, query: str) -> list[SearchResult]:
-        """Search YTS API for the query."""
-        results = []
-        try:
-            response = requests.get(
-                "https://yts.mx/api/v2/list_movies.json",
-                params={"query_term": query, "limit": 50},
-                timeout=10
-            )
-            response.raise_for_status()
-            data = response.json()
-            movies = data.get("data", {}).get("movies", [])
-            for movie in movies:
-                title = movie.get("title_long", "Unknown")
-                for t in movie.get("torrents", []):
-                    quality = t.get("quality", "")
-                    _type = t.get("type", "")
-                    name = f"{title} [{quality} {_type}]"
-                    results.append(SearchResult(
-                        name=name,
-                        info_hash=t.get("hash", "").lower(),
-                        seeders=t.get("seeds", 0),
-                        leechers=t.get("peers", 0),
-                        size=t.get("size_bytes", 0),
-                        source="YTS",
-                        page_url=movie.get("url", ""),
-                    ))
-        except Exception:
-            pass
+        """Search the current YTS API, falling back to its prior API host."""
+        results: list[SearchResult] = []
+        for movie in _fetch_yts_movies(query):
+            title = movie.get("title_long", "Unknown")
+            for torrent in movie.get("torrents") or []:
+                quality = torrent.get("quality", "")
+                torrent_type = torrent.get("type", "")
+                results.append(SearchResult(
+                    name=f"{title} [{quality} {torrent_type}]",
+                    info_hash=torrent.get("hash", "").lower(),
+                    seeders=torrent.get("seeds", 0),
+                    leechers=torrent.get("peers", 0),
+                    size=torrent.get("size_bytes", 0),
+                    source="YTS",
+                    page_url=movie.get("url", ""),
+                ))
         return results
+
+    def _apibay_retry_queries(self, query: str) -> Iterator[str]:
+        yield from super()._apibay_retry_queries(query)
+
+        query_key = " ".join(query.casefold().split())
+        for movie in _fetch_yts_movies(query):
+            title = str(movie.get("title", "")).strip()
+            if " ".join(title.casefold().split()) != query_key:
+                continue
+            year = movie.get("year")
+            if year:
+                yield f"{query.strip()} {year}"
+            return

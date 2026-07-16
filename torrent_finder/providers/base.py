@@ -3,15 +3,70 @@
 from abc import ABC, abstractmethod
 
 import concurrent.futures
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Iterator
 
 import requests
 
 from torrent_finder.constants import API_URL, console
 from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
 from torrent_finder.search_result import SearchResult, normalize_result
+
+
+_APIBAY_NUMBER_WORDS = {
+    "zero": "0",
+    "one": "1",
+    "two": "2",
+    "three": "3",
+    "four": "4",
+    "five": "5",
+    "six": "6",
+    "seven": "7",
+    "eight": "8",
+    "nine": "9",
+    "ten": "10",
+}
+_APIBAY_FALLBACK_IGNORED = {
+    "a",
+    "an",
+    "and",
+    "at",
+    "film",
+    "for",
+    "in",
+    "movie",
+    "of",
+    "on",
+    "or",
+    "part",
+    "the",
+    "to",
+}
+
+
+def _apibay_fallback_query(query: str) -> str | None:
+    """Return one conservative retry for Apibay's brittle phrase search."""
+    tokens = re.findall(r"[a-z0-9]+", query.casefold())
+    if len(tokens) < 2:
+        return None
+
+    normalized = [_APIBAY_NUMBER_WORDS.get(token, token) for token in tokens]
+    normalized_query = " ".join(normalized)
+    canonical_query = " ".join(tokens)
+    if (
+        normalized_query != canonical_query
+        or canonical_query != query.casefold().strip()
+    ):
+        return normalized_query
+
+    meaningful = [
+        token
+        for token in normalized
+        if token not in _APIBAY_FALLBACK_IGNORED and not token.isdigit()
+    ]
+    return max(meaningful, key=len) if meaningful else None
 
 
 @dataclass
@@ -39,6 +94,7 @@ class BaseProvider(ABC):
     cli_aliases: tuple[str, ...] = ()  # backwards-compatible -t names; slug is always accepted
     icon: str
     categories: list[int]
+    apibay_fallback_categories: tuple[int, ...] = ()
     solidtorrents_category: str = "all"
     nyaa_category: str = "1_2"  # Nyaa "c" filter; e.g. "1_2" anime EngSub, "4_1" live-action EngSub
 
@@ -77,51 +133,98 @@ class BaseProvider(ABC):
     def label(self) -> str:
         return f"{self.icon} {self.name}"
 
+    def _apibay_retry_queries(self, query: str) -> Iterator[str]:
+        fallback = _apibay_fallback_query(query)
+        if fallback:
+            yield fallback
+
     def _search_apibay(self, query: str) -> list[SearchResult]:
-        """Search Apibay (The Pirate Bay) for the query.
+        """Search Apibay with conservative provider-specific query retries.
 
-        apibay.org is reachable but slow (~20s behind Cloudflare), so instead of
-        one slow request per category we make a single ``cat=0`` (all) request
-        and filter client-side to this provider's categories. Otherwise a
-        multi-category provider would multiply that 20s by every category
-        (e.g. Games has 6 → ~2 minutes).
+        Apibay's phrase matching can return either a no-results sentinel or
+        unrelated categories for valid titles. Retry normalized queries only
+        after filtering leaves no provider results. Network failures stop the
+        retry chain.
         """
-        try:
-            response = requests.get(
-                API_URL,
-                params={"q": query, "cat": 0},
-                # apibay.org sits behind Cloudflare and routinely takes ~20s to
-                # answer, so 25s left almost no margin — a single slow response
-                # tipped it over and the engine returned nothing. Providers with
-                # only Apibay + SolidTorrents (e.g. Games) then showed "no
-                # results", while multi-engine providers (Movies) masked it.
-                timeout=45,
-                headers={"User-Agent": "Mozilla/5.0"},
-            )
-            response.raise_for_status()
-            data = response.json()
-        except (requests.RequestException, ValueError):
-            # Silently fail on network/DNS/Cloudflare blocks or malformed JSON.
+        def fetch(search_query: str, category: int = 0) -> list[dict] | None:
+            try:
+                response = requests.get(
+                    API_URL,
+                    params={"q": search_query, "cat": category},
+                    timeout=45,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                )
+                response.raise_for_status()
+                data = response.json()
+            except (requests.RequestException, ValueError):
+                return None
+
+            if not isinstance(data, list):
+                return []
+            if not data or (len(data) == 1 and data[0].get("id") == "0"):
+                return []
+            return data
+
+        wanted = {str(category) for category in self.categories}
+
+        def matching_results(data: list[dict]) -> list[SearchResult]:
+            results: list[SearchResult] = []
+            for item in data:
+                if str(item.get("category", "")) not in wanted:
+                    continue
+                tid = item.get("id")
+                results.append(SearchResult(
+                    name=item.get("name", "Unknown"),
+                    info_hash=item.get("info_hash", ""),
+                    seeders=item.get("seeders", 0),
+                    leechers=item.get("leechers", 0),
+                    size=item.get("size", 0),
+                    source="Apibay",
+                    page_url=(
+                        f"https://thepiratebay.org/description.php?id={tid}"
+                        if tid
+                        else ""
+                    ),
+                ))
+            return results
+
+        data = fetch(query)
+        if data is None:
             return []
 
-        if not data or (len(data) == 1 and data[0].get("id") == "0"):
-            return []
+        results = matching_results(data)
+        if results:
+            return results
 
-        wanted = {str(c) for c in self.categories}
-        results: list[SearchResult] = []
-        for item in data:
-            if str(item.get("category", "")) not in wanted:
+        if self.apibay_fallback_categories:
+            seen: set[str] = set()
+            for category in self.apibay_fallback_categories:
+                category_data = fetch(query, category)
+                if category_data is None:
+                    continue
+                for item in matching_results(category_data):
+                    key = (
+                        item.info_hash.casefold()
+                        or f"name:{item.name.casefold()}"
+                    )
+                    if key not in seen:
+                        seen.add(key)
+                        results.append(item)
+            if results:
+                return results
+
+        tried = {query.casefold()}
+        for fallback in self._apibay_retry_queries(query):
+            fallback_key = fallback.casefold()
+            if fallback_key in tried:
                 continue
-            tid = item.get("id")
-            results.append(SearchResult(
-                name=item.get("name", "Unknown"),
-                info_hash=item.get("info_hash", ""),
-                seeders=item.get("seeders", 0),
-                leechers=item.get("leechers", 0),
-                size=item.get("size", 0),
-                source="Apibay",
-                page_url=f"https://thepiratebay.org/description.php?id={tid}" if tid else "",
-            ))
+            tried.add(fallback_key)
+            fallback_data = fetch(fallback)
+            if fallback_data is None:
+                break
+            results = matching_results(fallback_data)
+            if results:
+                break
         return results
 
     def _search_solidtorrents(self, query: str) -> list[SearchResult]:
