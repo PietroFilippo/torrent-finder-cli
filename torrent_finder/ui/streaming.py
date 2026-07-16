@@ -15,12 +15,13 @@ from rich.panel import Panel
 from rich.text import Text
 
 from torrent_finder.constants import console
+from torrent_finder.ui.layout import ellipsize_cells
 from torrent_finder.torrent_meta import format_size
 
 
-# Fixed header height for multi-episode streaming. We always reserve this
-# many lines so the scroll region boundary never shifts between episodes.
-# Panel renders as: top-border + 5 content lines + bottom-border = 7 lines.
+# Minimum header height keeps the normal-width stream panel stable. Narrow
+# terminals may wrap it taller; the scroll region then starts below the actual
+# rendered panel instead of overlapping child-process output.
 _STREAM_HEADER_LINES = 7
 
 
@@ -36,10 +37,8 @@ def _set_terminal_title(title: str) -> None:
 
 
 def _truncate(text: str, max_len: int) -> str:
-    """Truncate *text* to *max_len* characters, ellipsizing the tail."""
-    if not text or len(text) <= max_len:
-        return text
-    return text[: max(1, max_len - 1)] + "…"
+    """Truncate *text* to *max_len* terminal cells."""
+    return ellipsize_cells(text, max_len)
 
 
 def _print_stream_header(
@@ -57,9 +56,9 @@ def _print_stream_header(
     """Pin a Rich Panel summary at the top of the terminal for this stream session.
 
     Replaces the legacy line-by-line print with a bordered panel showing file
-    name + size + backend + subtitle status + keybinds. Height is fixed at
-    ``_STREAM_HEADER_LINES`` so the scroll-region boundary doesn't shift between
-    episode advances.
+    name + size + backend + subtitle status + keybinds. The normal header
+    keeps a stable minimum height; wrapped narrow headers reserve their actual
+    rendered height before the child-process scroll region begins.
 
     When *use_scroll_region* is True (peerflix), a scroll region is set below
     the panel so child output flows in the lower zone. When False (webtorrent),
@@ -80,7 +79,7 @@ def _print_stream_header(
         _set_terminal_title(f"Streaming file {file_idx} | v: VLC  Ctrl+C: cancel")
 
     # Panel sizing: leave room for borders (2 cols) + padding (2 cols) + icon (3 chars).
-    inner_width = max(20, console.size.width - 8)
+    inner_width = max(8, console.size.width - 8)
 
     # Escape user-supplied strings — torrent filenames often contain bracketed
     # tags like ``[x265]`` that Rich's markup parser would interpret as styles.
@@ -91,7 +90,9 @@ def _print_stream_header(
     idx_str = f"  •  file index {file_idx}" if file_idx is not None else ""
 
     if sub_paths:
-        primary = escape(_truncate(os.path.basename(sub_paths[0]), inner_width - 20))
+        primary = escape(
+            _truncate(os.path.basename(sub_paths[0]), max(4, inner_width - 20))
+        )
         extras = f"  (+{len(sub_paths) - 1} more)" if len(sub_paths) > 1 else ""
         sub_line = f"📝  [success]Subtitles:[/success] [highlight]{primary}[/highlight]{extras}"
     else:
@@ -132,6 +133,13 @@ def _print_stream_header(
         border_style="cyan",
         padding=(0, 1),
     )
+    rendered_lines = len(
+        console.render_lines(
+            panel,
+            console.options.update(width=max(1, console.size.width)),
+            pad=False,
+        )
+    )
     console.print(panel)
     # Reset SGR + flush so any child subprocess starts writing into a clean
     # terminal state. Mitigates a class of "child output appears line-by-line
@@ -141,14 +149,12 @@ def _print_stream_header(
     sys.stdout.flush()
 
     if use_scroll_region:
-        # Panel = top-border + 5 content + bottom-border = 7 lines, matching
-        # _STREAM_HEADER_LINES exactly — no blank padding needed.
-        rendered_lines = 7
-        for _ in range(rendered_lines, _STREAM_HEADER_LINES):
+        header_lines = max(_STREAM_HEADER_LINES, rendered_lines)
+        for _ in range(rendered_lines, header_lines):
             console.print()
-        # Set scroll region: rows _STREAM_HEADER_LINES+1 .. terminal height
+        # Child output begins below the actual wrapped panel height.
         term_h = console.size.height
-        top = _STREAM_HEADER_LINES + 1
+        top = header_lines + 1
         if top < term_h:
             sys.stdout.write(f"\033[{top};{term_h}r")
             sys.stdout.write(f"\033[{top};1H")

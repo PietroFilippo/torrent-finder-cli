@@ -6,11 +6,13 @@ from dataclasses import dataclass
 from typing import Callable
 
 import readchar
+from rich.cells import cell_len
+from rich.console import Group
 from rich.panel import Panel
 from rich.text import Text
 
 from torrent_finder.constants import console
-from torrent_finder.utils import marquee
+from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 
 
 # Marquee timing
@@ -49,26 +51,44 @@ def _compute_window(n: int, cursor: int, max_visible: int) -> tuple[int, int]:
     return start, end
 
 
+def _inner_width() -> int:
+    """Return usable selector content width after panel border and padding."""
+    return max(8, console.size.width - 6)
+
+
+def _inline_hint(item: "SelectItem") -> bool:
+    """Keep short hints inline only when they leave useful label space."""
+    inner = _inner_width()
+    return (
+        bool(item.hint)
+        and console.size.width >= 72
+        and cell_len(item.hint) + 2 <= inner // 2
+    )
+
+
 def _label_avail_width(item: "SelectItem", multi: bool) -> int:
-    """Approximate visible chars available for the label of one item."""
-    # Panel: 1 border + 2 padding on each side = 6 chars chrome.
-    inner = max(20, console.size.width - 6)
+    """Return terminal cells available for an item's one-line label."""
     if multi and not item.is_action:
-        prefix_len = 8   # "  ❯ [✓] "
+        prefix_len = cell_len("  ❯ [✓] ")
     else:
-        prefix_len = 4   # "  ❯ " or "    "
-    hint_len = (2 + len(item.hint)) if item.hint else 0
-    marker_len = (len(item.marker) + 1) if item.marker else 0
-    return max(10, inner - prefix_len - hint_len - marker_len)
+        prefix_len = cell_len("  ❯ ")
+    hint_len = cell_len(f"  {item.hint}") if _inline_hint(item) else 0
+    marker_len = cell_len(f"{item.marker} ") if item.marker else 0
+    return max(4, _inner_width() - prefix_len - hint_len - marker_len)
 
 
 def _cursor_overflows(items: list["SelectItem"], cursor: int, multi: bool) -> bool:
     if not (0 <= cursor < len(items)):
         return False
-    it = items[cursor]
-    if isinstance(it.value, str) and it.value == "section_header":
+    item = items[cursor]
+    if isinstance(item.value, str) and item.value == "section_header":
         return False
-    return len(it.label) > _label_avail_width(it, multi)
+    return cell_len(item.label) > _label_avail_width(item, multi)
+
+
+def _wrapped_line_count(text: Text, width: int) -> int:
+    """Count lines Rich will need for a wrapping text block."""
+    return max(1, len(text.wrap(console, max(1, width), overflow="fold")))
 
 
 def _build_panel(
@@ -79,21 +99,40 @@ def _build_panel(
     footer: str = "",
     tick: int = 0,
 ) -> Panel:
-    """Render the selector as a Rich Panel.
-
-    When the item list is too tall for the terminal, the main (non-action)
-    section is windowed around the cursor. Action buttons (Confirm/Cancel/
-    Select all, etc.) always render so they can't be scrolled out of reach.
-    """
-    # no_wrap keeps every logical row to exactly one terminal line, so the
-    # item-count windowing below can't be undercounted by a row that wraps
-    # (e.g. long tips in the browser, which were overflowing and cropping).
+    """Render a height-windowed selector with responsive context text."""
     body = Text(no_wrap=True, overflow="ellipsis")
-    has_actions = any(it.is_action for it in items)
+    has_actions = any(item.is_action for item in items)
+    inner_width = _inner_width()
 
-    # Partition into [leading actions … main items … trailing actions].
-    # Leading section headers count as "actions" (always visible).
-    # Only the main list gets windowed.
+    if not footer:
+        if multi:
+            footer = "↑/↓ navigate  •  Enter toggle/select  •  Esc cancel"
+        else:
+            footer = "↑/↓ navigate  •  Enter select  •  Esc cancel"
+
+    current_item = items[cursor] if 0 <= cursor < len(items) else None
+    context_blocks: list[Text] = []
+    if current_item and current_item.hint and not _inline_hint(current_item):
+        context_blocks.append(
+            Text(f" {current_item.hint}", style="dim yellow", overflow="fold")
+        )
+    if current_item and current_item.description:
+        description = Text.from_markup(
+            f" {current_item.description}", style="dim italic"
+        )
+        description.overflow = "fold"
+        context_blocks.append(description)
+    if not context_blocks:
+        context_blocks.append(Text(" "))
+
+    footer_text = Text.from_markup(f" {footer}", style="dim")
+    footer_text.overflow = "fold"
+    context_lines = sum(
+        _wrapped_line_count(block, inner_width) for block in context_blocks
+    )
+    footer_lines = _wrapped_line_count(footer_text, inner_width)
+
+    # Partition into leading actions, a windowed main list, and trailing actions.
     n = len(items)
     main_start = 0
     while main_start < n and items[main_start].is_action:
@@ -103,20 +142,16 @@ def _build_panel(
         main_end -= 1
     main_len = main_end - main_start
 
-    # Reserve chrome so the banner + panel never overflow the alt-screen and
-    # crop. Every row is one line (body is no_wrap), so this is a fixed cost:
-    # banner panel + blank (6), panel borders + padding (4), the
-    # "… more above/below" indicators (2), the body footer block (blank +
-    # description + footer ~4), plus a couple of lines of bottom margin.
-    chrome = 18 + main_start + (n - main_end)
-    max_visible = max(4, console.size.height - chrome)
+    # Banner, panel borders/padding, indicators, context separator, and margin.
+    always_visible_rows = main_start + (n - main_end)
+    chrome = 11 + always_visible_rows + context_lines + footer_lines
+    max_visible = max(1, console.size.height - chrome)
 
-    win_start_rel, win_end_rel = _compute_window(main_len, cursor - main_start, max_visible)
+    win_start_rel, win_end_rel = _compute_window(
+        main_len, cursor - main_start, max_visible
+    )
     win_start = main_start + win_start_rel
     win_end = main_start + win_end_rel
-
-    # If cursor is outside the main list (on an action button), clamp window
-    # so we still show a sensible slice of the main list.
     if cursor < main_start or cursor >= main_end:
         win_start_rel, win_end_rel = _compute_window(main_len, 0, max_visible)
         win_start = main_start + win_start_rel
@@ -124,47 +159,41 @@ def _build_panel(
 
     for i, item in enumerate(items):
         in_main = main_start <= i < main_end
-        # Interspersed action rows (section headers, mid-list actions) always
-        # render — only regular list items get windowed out.
         if in_main and not item.is_action and (i < win_start or i >= win_end):
             continue
 
         if in_main and i == win_start and win_start > main_start:
-            body.append(f"    … {win_start - main_start} more above\n", style="dim italic")
+            body.append(
+                f"    … {win_start - main_start} more above\n", style="dim italic"
+            )
 
         is_cursor = i == cursor
-
-        # Check if this is a section header (visual-only, non-interactive)
         is_section_header = (
             not item.enabled
-            and isinstance(item.value, str) and item.value == "section_header"
+            and isinstance(item.value, str)
+            and item.value == "section_header"
         )
 
-        # Insert separator before action buttons (but not section headers)
         if multi and has_actions and item.is_action and not is_section_header:
-            prev = items[i - 1] if i > 0 else None
-            if prev and not prev.is_action:
-                body.append("  ─────────────────────────\n", style="dim")
+            previous = items[i - 1] if i > 0 else None
+            if previous and not previous.is_action:
+                body.append(
+                    "  " + "─" * max(1, inner_width - 2) + "\n", style="dim"
+                )
 
-        # Section headers render as dim labels
         if is_section_header:
-            body.append(f"    {item.label}\n", style="dim bold")
+            body.append(
+                "    " + ellipsize_cells(item.label, inner_width - 4) + "\n",
+                style="dim bold",
+            )
             continue
 
-        # Build the prefix
         if multi and not item.is_action:
             check = "✓" if item.toggled else " "
-            if is_cursor:
-                prefix = f"  ❯ [{check}] "
-            else:
-                prefix = f"    [{check}] "
+            prefix = f"  ❯ [{check}] " if is_cursor else f"    [{check}] "
         else:
-            if is_cursor:
-                prefix = "  ❯ "
-            else:
-                prefix = "    "
+            prefix = "  ❯ " if is_cursor else "    "
 
-        # Determine style
         if not item.enabled:
             style = "dim"
         elif is_cursor:
@@ -173,52 +202,28 @@ def _build_panel(
             style = "white"
 
         body.append(prefix, style=style)
-
-        # Optional inline marker (anchor pin, etc.) — rendered before label
         if item.marker:
             body.append(f"{item.marker} ", style="bold yellow")
 
-        # Keep every list row to a single line so the windowing stays accurate.
-        # The cursor row marquees its full label; other rows crop with an
-        # ellipsis. Without this, long labels (e.g. the tips browser) wrap to
-        # multiple lines and the panel overflows the alt-screen and gets cropped.
-        label_text = item.label
-        if not is_section_header:
-            avail = _label_avail_width(item, multi)
-            if is_cursor:
-                label_text = marquee(item.label, avail, tick)
-            elif len(item.label) > avail:
-                label_text = item.label[: max(1, avail - 1)] + "…"
-        body.append(label_text, style=style)
+        available = _label_avail_width(item, multi)
+        label = (
+            marquee_cells(item.label, available, tick)
+            if is_cursor
+            else ellipsize_cells(item.label, available)
+        )
+        body.append(label, style=style)
 
-        # Show hint if present
-        if item.hint:
+        if _inline_hint(item):
             body.append(f"  {item.hint}", style="dim yellow")
-
         body.append("\n")
 
         if in_main and i == win_end - 1 and win_end < main_end:
-            body.append(f"    … {main_end - win_end} more below\n", style="dim italic")
-
-    # Context-help for current cursor item. Always renders (even blank) so
-    # the footer doesn't jump when moving between described/undescribed rows.
-    cur_item = items[cursor] if 0 <= cursor < len(items) else None
-    desc = cur_item.description if cur_item else ""
-    body.append("\n")
-    body.append_text(Text.from_markup(f" {desc}" if desc else " ", style="dim italic"))
-    body.append("\n")
-
-    # Footer / help text
-    if not footer:
-        if multi:
-            footer = "↑/↓ navigate  •  Enter toggle/select  •  Esc cancel"
-        else:
-            footer = "↑/↓ navigate  •  Enter select  •  Esc cancel"
-
-    body.append_text(Text.from_markup(f" {footer}", style="dim"))
+            body.append(
+                f"    … {main_end - win_end} more below\n", style="dim italic"
+            )
 
     return Panel(
-        body,
+        Group(body, Text(""), *context_blocks, footer_text),
         title=f"[bold magenta]{title}[/bold magenta]",
         border_style="bright_blue",
         padding=(1, 2),
