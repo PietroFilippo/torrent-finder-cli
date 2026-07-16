@@ -34,6 +34,7 @@ Repository = "https://github.com/PietroFilippo/torrent-finder-cli"
 
 [project.scripts]
 torrent-finder = "torrent_finder.main:main"
+torrent = "torrent_finder.main:main"
 
 # One top-level package now — discover it and its subpackages.
 [tool.setuptools.packages.find]
