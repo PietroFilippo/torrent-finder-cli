@@ -16,6 +16,7 @@ Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, n
   - **Dynamic Viewport Windowing:** Capable of rendering massive 500+ item checklists (like huge anime seasons) by automatically windowing the active selection while pinning crucial action buttons tightly to the top and bottom of your screen to prevent terminal overflow.
   - **Marquee Scrolling:** Automatically scrolls long torrent names and checklist items that exceed the physical terminal width when hovered over.
   - **Contextual Footers:** Displays dynamic helper text explaining the trade-offs, speeds, and seeding behaviors of different download options as you highlight them.
+- **Quick-Launch Commands:** The startup provider screen includes a **Terminal command** row for choosing `torrent-finder`, `tf`, `torrent`, `find-torrent`, or `tfind`. The canonical command remains available and `torrent` is built into pip/pipx installs; the other presets create one app-owned forwarding launcher, preserve every CLI argument, refuse unrelated command collisions, and can be removed safely from the same screen.
 - **Advanced Filtering:**
   - Toggle built-in presets (preferred resolutions, known uploaders/repackers, trusted release groups) using an interactive checklist.
   - Toggle individual search engines on and off per provider from the same menu.
@@ -66,10 +67,11 @@ pipx install torrent-finder-cli      # recommended
 pip install torrent-finder-cli
 ```
 
-Then run it from anywhere:
+Then run either built-in command from anywhere:
 
 ```bash
 torrent-finder
+torrent          # short form
 ```
 
 ### Without Python — standalone binary
@@ -263,15 +265,16 @@ Or update manually any time with `pipx upgrade torrent-finder-cli`.
 The easiest way to use the CLI is to run it interactively. The arrow-key driven UI will guide you through selecting a category, searching, filtering, and downloading.
 
 ```bash
-# After a pip/pipx install — the command is on your PATH
+# After a pip/pipx install — both commands are on your PATH
 torrent-finder
+torrent
 
 # From a source clone
 python -m torrent_finder
 torrent.bat            # Windows
 ```
 
-> The command is **`torrent-finder`**. The examples below shorten it to `torrent` for brevity — substitute `torrent-finder` (or, from a source clone, `torrent.bat`).
+> `torrent-finder` is canonical and `torrent` is the built-in short form. From the startup screen, **Terminal command** can also install `tf`, `find-torrent`, or `tfind` as your preferred quick command.
 
 ### Command Line Arguments
 
@@ -364,15 +367,16 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 ## Project Architecture
 
 All code lives under the `torrent_finder/` package, installed as a console script
-(`torrent-finder = torrent_finder.main:main`). The structure is modular and
+(`torrent-finder` and `torrent` both map to `torrent_finder.main:main`). The structure is modular and
 provider-based — the module paths below are relative to `torrent_finder/`:
 
 - `main.py`: The main entry point and CLI argument parser.
+- `launcher_alias.py`: Owns fixed quick-command presets, install-aware forwarding targets, managed shim creation/removal, collision checks, and optional Windows user-PATH updates.
 - `__main__.py`: Enables `python -m torrent_finder` and serves as the PyInstaller binary entry point.
 - `torrent.bat` *(repo root)*: Windows launcher that runs `python -m torrent_finder`.
 - `providers/`: Different search categories (Movies & Series, General games, Online-Fix, FitGirl, Desktop, Mobile, RuTracker, Anime, General manga, Madokami). The display menu nests some of these under groups — **Games** (General + Online-Fix + FitGirl), **Software** (Desktop + Mobile + RuTracker), and **Manga** (General + Madokami) — via `ProviderGroup`, a display-only wrapper that changes menu shape without touching slugs. Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga). Providers may also declare a `creator_facets` list to enable search-by-creator (director/studio/writer/magazine/developer/publisher).
 - `resolvers/`: The "search by creator" metadata layer that turns a person/company name into a list of works. `types.py` (`CreatorFacet` / `Entity` / `Work`), `anilist.py` (anime director & studio + manga writer, keyless GraphQL), `jikan.py` (manga serialization magazines, keyless), `wikidata.py` (keyless SPARQL fallback for movie/series director & studio and game developer & publisher), `tmdb.py` (Movies & Series, needs `TMDB_API_KEY`), `igdb.py` (Games, needs Twitch creds), and `movies.py` / `games.py` which dispatch to TMDB/IGDB when a key is configured and Wikidata otherwise. Each facet exposes `search_entities(name)` → candidates and `list_works(entity, page)` → `(works, has_more)`; `creator_search.fan_out()` then runs the normal provider search over each picked title and merges. `main._available_facets` can gate facets behind a credential when there's no keyless fallback.
-- `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt` + the per-provider "choose how to search" source screen), `creator.py` (the search-by-creator flow: name → disambiguation → paged title picker with `n`/`p` + background prefetch → fan-out), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), `tips.py` (categorized tip catalog), and `tips_page.py` (searchable tips browser).
+- `ui/`: Interactive terminal prompts and rendering using `rich`. `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt` + the per-provider "choose how to search" source screen), `creator.py` (the search-by-creator flow: name → disambiguation → paged title picker with `n`/`p` + background prefetch → fan-out), `selector.py` (reusable arrow-key selector with windowing / marquee), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (themed Panel header + terminal-control primitives for the streaming flow), `tips.py` (categorized tip catalog), `tips_page.py` (searchable tips browser), and `launcher.py` (terminal-command selector and PATH confirmation).
 - `filters.py`: Logic processing for including or excluding keywords.
 - `creator_search.py`: `fan_out()` for search-by-creator — runs the provider's normal `search()` over each picked title concurrently and merges (dedupe by info hash, sort by seeders), tagging each result with the title it came from.
 - `credentials.py`: Reads optional API credentials from environment variables (preferred) or the gitignored `subtitle_credentials.json`; powers the **🔑 Credentials** menu (subtitle logins, RuTracker/Online-Fix/Madokami, and the TMDB/IGDB creator-search upgrades).

@@ -1433,6 +1433,19 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
         # shows the folder picked in download_dir_prompt without leaving the
         # screen.
         from torrent_finder.constants import get_download_dir
+        from torrent_finder.launcher_alias import current_status
+
+        command_status = current_status()
+        command_item = SelectItem(
+            label=f"⌨ Terminal command: {command_status.name}",
+            value="__terminal_command__",
+            is_action=True,
+            hint="ready" if command_status.available else "setup needed",
+            description=(
+                "Choose a preferred quick-launch command for new terminal sessions. "
+                "The canonical torrent-finder command always remains available."
+            ),
+        )
         dir_item = SelectItem(
             label="📁 Download folder",
             value="__download_dir__",
@@ -1442,7 +1455,7 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
                 f"subtitle saves, and Online-Fix / Madokami files.\nCurrent: {get_download_dir()}"
             ),
         )
-        items = provider_items + [separator, tips_item, info_item, creds_item, dir_item]
+        items = provider_items + [separator, tips_item, info_item, creds_item, command_item, dir_item]
 
         # Fresh tip each time we enter the selector — but NOT on every render
         # (that would re-roll on every keypress and make the footer jitter).
@@ -1517,6 +1530,13 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
 
         if items[result].value == "__credentials__":
             credentials_menu()
+            start = result
+            continue
+
+        if items[result].value == "__terminal_command__":
+            from torrent_finder.ui.launcher import terminal_command_prompt
+
+            terminal_command_prompt()
             start = result
             continue
 

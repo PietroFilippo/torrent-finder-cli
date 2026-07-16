@@ -107,6 +107,14 @@ destructive sites. Everything above it (`state.py` toggles/settings/history,
 [ADR-0002](docs/adr/0002-single-store-for-persistence.md) and
 [ADR-0006](docs/adr/0006-machine-stable-state-path.md).
 
+## Launcher
+
+`torrent-finder` is the canonical package command. `launcher_alias.py` owns the
+fixed quick-command presets, install-aware forwarding targets, collision and
+ownership checks, and optional Windows user-PATH update. `ui/launcher.py` owns
+the selector and confirmation flow. See
+[ADR-0007](docs/adr/0007-managed-terminal-command-presets.md).
+
 ## Credentials
 
 Optional per-site logins/API keys, read from environment variables or
