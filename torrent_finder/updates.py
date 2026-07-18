@@ -117,6 +117,24 @@ def _pipx_install() -> bool:
     return "pipx" in sys.executable.lower() and shutil.which("pipx") is not None
 
 
+def _pipx_installed_version() -> "str | None":
+    """Version pipx reports for this package on disk, or None."""
+    try:
+        import json
+        r = subprocess.run(
+            ["pipx", "list", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if r.returncode != 0:
+            return None
+        venv = json.loads(r.stdout)["venvs"]["torrent-finder-cli"]
+        return venv["metadata"]["main_package"]["package_version"]
+    except Exception:
+        return None
+
+
 # ---- public API -------------------------------------------------------------
 
 def check_for_update(force: bool = False) -> "dict | None":
@@ -213,6 +231,16 @@ def run_update(info: dict) -> "tuple[bool, str]":
     try:
         r = subprocess.run(cmd)
         ok = r.returncode == 0
+        if not ok and cmd[0] == "pipx":
+            # On Windows, pipx's last step — re-copying the .local/bin
+            # launcher exe — fails with WinError 32 while that launcher is
+            # this very process, after the venv itself upgraded fine. Trust
+            # the installed version over the exit code.
+            new = _pipx_installed_version()
+            if _is_newer(new, __version__):
+                return (True, f"Updated to v{new} — restart to use the new version.\n"
+                        "(pipx couldn't replace the running launcher — harmless; "
+                        "it points at the already-updated install.)")
         return (ok, "Updated — restart to use the new version." if ok
                 else "Update failed — try: pipx upgrade torrent-finder-cli")
     except Exception as e:
