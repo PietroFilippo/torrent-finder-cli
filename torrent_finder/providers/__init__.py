@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from torrent_finder.providers.base import BaseProvider
 from torrent_finder.providers.anime_provider import AnimeProvider
+from torrent_finder.providers.book_provider import BookProvider
 from torrent_finder.providers.fitgirl_provider import FitGirlProvider
 from torrent_finder.providers.game_provider import GameProvider
 from torrent_finder.providers.madokami_provider import MadokamiProvider
@@ -26,6 +27,7 @@ _rutracker = RuTrackerProvider()
 _anime = AnimeProvider()
 _manga = MangaProvider()
 _madokami = MadokamiProvider()
+_books = BookProvider()
 
 # Flat registry of every provider. This is the source of truth for identity:
 # slugs (-t flag, history, stats, settings) all resolve against this list, so a
@@ -41,6 +43,7 @@ PROVIDERS: list[BaseProvider] = [
     _anime,
     _manga,
     _madokami,
+    _books,
 ]
 
 
@@ -138,6 +141,7 @@ PROVIDER_MENU: list = [
     SOFTWARE_GROUP,
     _anime,
     MANGA_GROUP,
+    _books,
 ]
 
 

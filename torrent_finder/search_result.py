@@ -19,6 +19,7 @@ HANDLE_KEYS = frozenset({
     "fg_post_url",
     "of_post_url",
     "mdk_path",
+    "lg_md5",
 })
 
 _FIELD_KEYS = {

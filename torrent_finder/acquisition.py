@@ -383,6 +383,119 @@ class MadokamiAcquisition:
         return BatchItemOutcome(ok=False)
 
 
+class LibgenAcquisition:
+    """Libgen: public direct-download library — no magnet, no login.
+
+    A pick resolves the file's keyed download link (mirror failover inside
+    ``libgen.resolve_download_url``) and streams it to the download folder
+    with a transfer bar; Esc aborts mid-file. On failure the ads page URL is
+    shown for a manual grab.
+    """
+
+    style = "direct-download"
+    has_magnet = False
+
+    def magnet(self, result) -> str | None:
+        return None
+
+    def pick(self, result) -> PickOutcome:
+        import os
+        from torrent_finder import libgen
+        from torrent_finder.constants import get_download_dir
+        from torrent_finder.utils import start_esc_listener
+        from rich.panel import Panel
+        from rich.progress import (
+            BarColumn, DownloadColumn, Progress, TextColumn, TimeRemainingColumn,
+            TransferSpeedColumn,
+        )
+
+        name = result.get("name", "Unknown")
+        md5 = result.get("lg_md5") or ""
+        page_url = result.get("page_url", "")
+
+        with console.status("[bold cyan]Resolving the download link from Libgen…[/bold cyan]", spinner="dots"):
+            url = libgen.resolve_download_url(md5)
+        if not url:
+            console.print(Panel(
+                f"[bold]{name}[/bold]\n\n"
+                "[warning]Couldn't resolve the download link[/warning] "
+                "(mirrors unreachable or page layout changed).\n"
+                f"[cyan]Open the page and grab it manually:[/cyan]\n{page_url}",
+                title="📖 Libgen", border_style="yellow", padding=(1, 2),
+            ))
+            console.print("[dim]Press any key to continue...[/dim]")
+            readchar.readkey()
+            return PickOutcome("back")
+
+        cancel_event = threading.Event()
+        stop_listener = start_esc_listener(cancel_event)
+        # markup=False: book titles routinely contain brackets, which rich
+        # would otherwise try to parse as style tags.
+        progress = Progress(
+            TextColumn("{task.description}", style="cyan", markup=False),
+            BarColumn(),
+            DownloadColumn(),
+            TransferSpeedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        )
+        console.print("[info]Downloading from Libgen — press Esc to stop.[/info]")
+        ext = result.get("lg_ext") or "bin"
+        fallback = f"libgen-{md5[:8]}.{ext}"
+        try:
+            with progress:
+                label = name if len(name) <= 46 else name[:45] + "…"
+                task = progress.add_task(label, total=None)
+
+                def _on_progress(done: int, total: int | None) -> None:
+                    progress.update(task, completed=done, total=total)
+
+                dest = libgen.download_file(
+                    url, get_download_dir(), fallback,
+                    cancel_event=cancel_event, progress_cb=_on_progress,
+                )
+        finally:
+            stop_listener.set()
+
+        if dest:
+            body = (f"[success]✓ Saved to {get_download_dir()}[/success]\n"
+                    f"[dim]{os.path.basename(dest)}[/dim]")
+        elif cancel_event.is_set():
+            body = "[warning] Download cancelled.[/warning]"
+        else:
+            body = ("[warning]Download failed.[/warning]\n"
+                    f"[cyan]Grab it manually:[/cyan]\n{page_url}")
+        console.print(Panel(
+            f"[bold]{name}[/bold]\n\n{body}",
+            title="📖 Libgen", border_style="bright_blue", padding=(1, 2),
+        ))
+        console.print("[dim]Press any key to continue...[/dim]")
+        readchar.readkey()
+        return PickOutcome("next" if dest else "back")
+
+    def batch_item(self, result, *, download_dir, cancel_event, set_status) -> BatchItemOutcome:
+        # Direct download, not a client handoff (mirrors Madokami's batch path).
+        from torrent_finder import libgen
+
+        md5 = result.get("lg_md5") or ""
+        url = libgen.resolve_download_url(md5)
+        if not url:
+            return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
+
+        def _on_progress(done, total):
+            size = (f"{done / 1048576:.1f}/{total / 1048576:.1f} MB"
+                    if total else f"{done / 1048576:.1f} MB")
+            set_status(size)
+
+        ext = result.get("lg_ext") or "bin"
+        if libgen.download_file(
+            url, download_dir, f"libgen-{md5[:8]}.{ext}",
+            cancel_event=cancel_event, progress_cb=_on_progress,
+        ):
+            return BatchItemOutcome(ok=True, saved_direct=True)
+        return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
+
+
 # The registry: one line per non-standard source. Anything absent acquires via
 # magnet-direct (Apibay, SolidTorrents, Nyaa, YTS, …).
 _DEFAULT = MagnetDirect()
@@ -391,6 +504,7 @@ _BY_SOURCE = {
     "FitGirl": FitGirlAcquisition(),
     "Online-Fix": OnlineFixAcquisition(),
     "Madokami": MadokamiAcquisition(),
+    "Libgen": LibgenAcquisition(),
 }
 
 
