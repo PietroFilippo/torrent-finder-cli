@@ -372,6 +372,14 @@ class BaseProvider(ABC):
         if cli_filters:
             merged = apply_filters(merged, cli_filters)
 
-        # Sort by seeders descending
-        merged.sort(key=lambda x: x.seeders, reverse=True)
-        return merged
+        return self._sort_results(merged)
+
+    def _sort_results(self, results: list[SearchResult]) -> list[SearchResult]:
+        """Order merged results for display. Default: seeders descending.
+
+        Providers whose primary engine has no swarm stats (e.g. Books' Libgen
+        direct downloads, always seeders=0) override this so their main source
+        isn't buried under every torrent row.
+        """
+        results.sort(key=lambda x: x.seeders, reverse=True)
+        return results
