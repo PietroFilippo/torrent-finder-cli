@@ -130,6 +130,42 @@ class BookProviderTests(unittest.TestCase):
     def test_file_picker_enabled_for_torrent_bundles(self):
         self.assertTrue(BookProvider.supports_episode_picker)
 
+    def test_apibay_falls_back_to_book_category_requests(self):
+        # cat=0 falsely returns the sentinel for many book titles that the
+        # category-scoped search finds (e.g. "Metamorphosis").
+        no_results = Mock()
+        no_results.raise_for_status.return_value = None
+        no_results.json.return_value = [{"id": "0", "name": "No results returned"}]
+        ebooks = Mock()
+        ebooks.raise_for_status.return_value = None
+        ebooks.json.return_value = [
+            {
+                "id": "1",
+                "name": "The Metamorphosis - Kafka [epub]",
+                "info_hash": "c" * 40,
+                "seeders": "12",
+                "leechers": "1",
+                "size": "300000",
+                "category": "601",
+            }
+        ]
+
+        with patch(
+            "torrent_finder.providers.base.requests.get",
+            side_effect=[no_results, ebooks, no_results],
+        ) as get:
+            results = BookProvider()._search_apibay("Metamorphosis")
+
+        self.assertEqual(
+            [r.name for r in results], ["The Metamorphosis - Kafka [epub]"]
+        )
+        from urllib.parse import parse_qs
+        cats = [
+            parse_qs(call.kwargs["params"])["cat"][0]
+            for call in get.call_args_list
+        ]
+        self.assertEqual(cats, ["0", "601", "102"])
+
     def test_libgen_rows_sort_above_torrents(self):
         # Default seeders-descending sort would bury Libgen (seeders=0) under
         # every torrent row; Books keeps Libgen first in site relevance order.
