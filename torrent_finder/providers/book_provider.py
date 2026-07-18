@@ -22,9 +22,11 @@ class BookProvider(BaseProvider):
     categories = [601, 102]  # TPB E-books + Audio books
     solidtorrents_category = "eBook"
 
-    # Direct downloads / document torrents — no video features apply.
+    # Direct downloads / document torrents — no video features apply, but the
+    # file picker does: Apibay book torrents are often bundles ("500 EPUBs",
+    # audiobook chapter folders) worth cherry-picking via aria2.
     supports_subtitles = False
-    supports_episode_picker = False
+    supports_episode_picker = True
     supports_streaming = False
 
     presets = [
@@ -56,3 +58,14 @@ class BookProvider(BaseProvider):
 
     def _search_libgen(self, query: str) -> list[SearchResult]:
         return libgen.search(query)
+
+    def _sort_results(self, results: list[SearchResult]) -> list[SearchResult]:
+        """Libgen rows first (site relevance order), then torrents by seeders.
+
+        The default seeders-descending sort would bury every Libgen row
+        (seeders=0, no swarm) under even single-seeder torrent junk.
+        """
+        direct = [r for r in results if r.source == "Libgen"]
+        torrents = [r for r in results if r.source != "Libgen"]
+        torrents.sort(key=lambda x: x.seeders, reverse=True)
+        return direct + torrents

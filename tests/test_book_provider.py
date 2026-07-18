@@ -127,6 +127,26 @@ class BookProviderTests(unittest.TestCase):
     def test_apibay_covers_ebook_and_audiobook_categories(self):
         self.assertEqual(set(BookProvider.categories), {601, 102})
 
+    def test_file_picker_enabled_for_torrent_bundles(self):
+        self.assertTrue(BookProvider.supports_episode_picker)
+
+    def test_libgen_rows_sort_above_torrents(self):
+        # Default seeders-descending sort would bury Libgen (seeders=0) under
+        # every torrent row; Books keeps Libgen first in site relevance order.
+        libgen_a = SearchResult(name="A [epub]", source="Libgen")
+        libgen_b = SearchResult(name="B [pdf]", source="Libgen")
+        torrent_low = SearchResult(name="T low", source="Apibay", seeders=1)
+        torrent_high = SearchResult(name="T high", source="Apibay", seeders=50)
+
+        ordered = BookProvider()._sort_results(
+            [torrent_low, libgen_a, torrent_high, libgen_b]
+        )
+
+        self.assertEqual(
+            [r.name for r in ordered],
+            ["A [epub]", "B [pdf]", "T high", "T low"],
+        )
+
 
 class LibgenAcquisitionTests(unittest.TestCase):
     def _result(self) -> SearchResult:
