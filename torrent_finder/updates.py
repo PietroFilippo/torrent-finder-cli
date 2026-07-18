@@ -139,6 +139,18 @@ def check_for_update(force: bool = False) -> "dict | None":
         return None
 
 
+def _banner(headline: str, action: str) -> str:
+    """High-visibility notice: black-on-yellow headline + bright action text.
+
+    ``not dim`` is load-bearing: the selector footer renders with a dim base
+    style, which would grey the notice out without it.
+    """
+    return (
+        f"[not dim bold black on yellow] ⬆ {headline} [/not dim bold black on yellow] "
+        f"[not dim bold yellow]{action}[/not dim bold yellow]"
+    )
+
+
 def notice_line(info: "dict | None") -> str:
     """Rich-markup line for an update info dict (no network), or '' if None."""
     if not info:
@@ -146,20 +158,23 @@ def notice_line(info: "dict | None") -> str:
     if info["kind"] == "git":
         n = info["behind"]
         s = "s" if n != 1 else ""
-        return (
-            f"[warning]⬆ Update available — your copy is {n} commit{s} behind.[/warning] "
-            f"Run [highlight]git pull[/highlight] to update (or open Tab → Update)."
+        return _banner(
+            f"UPDATE AVAILABLE — {n} commit{s} behind",
+            "Press [not dim bold white]U[/not dim bold white] on the menu to update, "
+            "or run [not dim bold white]git pull[/not dim bold white].",
         )
     latest = info.get("latest")
     if info["kind"] == "pip":
         cmd = "pipx upgrade torrent-finder-cli" if _pipx_install() else "pip install -U torrent-finder-cli"
-        return (
-            f"[warning]⬆ Update available — v{latest}.[/warning] "
-            f"Run [highlight]{cmd}[/highlight] (or open Tab → Update)."
+        return _banner(
+            f"UPDATE AVAILABLE — v{latest}",
+            "Press [not dim bold white]U[/not dim bold white] on the menu to update, "
+            f"or run [not dim bold white]{cmd}[/not dim bold white].",
         )
-    return (
-        f"[warning]⬆ Update available — v{latest}.[/warning] "
-        f"Download it from [highlight]{_RELEASES_URL}[/highlight]."
+    return _banner(
+        f"UPDATE AVAILABLE — v{latest}",
+        "Press [not dim bold white]U[/not dim bold white] on the menu to open "
+        f"[not dim bold white]{_RELEASES_URL}[/not dim bold white].",
     )
 
 
