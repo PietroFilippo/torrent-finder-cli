@@ -9,6 +9,7 @@ engine works without credentials.
 from torrent_finder import libgen
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.resolvers import CreatorFacet, openlibrary
 from torrent_finder.search_result import SearchResult
 
 
@@ -32,6 +33,17 @@ class BookProvider(BaseProvider):
         FilterPreset("Kindle (MOBI/AZW3)", FilterConfig(include_keywords=["mobi", "azw3", "azw"])),
         FilterPreset("Audiobook", FilterConfig(include_keywords=["audiobook", "m4b", "mp3"])),
         FilterPreset("English", FilterConfig(include_keywords=["english"])),
+    ]
+
+    # Search by creator. OpenLibrary is keyless; works come back ordered by
+    # edition count so an author's known books surface first in the picker.
+    creator_facets = [
+        CreatorFacet(
+            key="author", label="Author", icon="📝",
+            search_entities=openlibrary.author_search,
+            list_works=openlibrary.author_works,
+            note="Find an author's books via OpenLibrary, then search each title.",
+        ),
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
