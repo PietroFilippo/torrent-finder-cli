@@ -50,6 +50,7 @@ from torrent_finder.ui.prompts import (
     provider_select_prompt,
     search_again_prompt,
 )
+from torrent_finder.terminal_check import advise_limited_terminal
 from torrent_finder.ui.table import interactive_select
 from torrent_finder.updates import check_for_update, notice_line, run_update
 from torrent_finder.utils import start_esc_listener
@@ -707,6 +708,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def _main_loop() -> None:
     parser = _build_parser()
     args = parser.parse_args()
+    advise_limited_terminal()
     if not args.skip_warning:
         if not show_security_warning():
             console.print("[info]Aborted.[/info]")
