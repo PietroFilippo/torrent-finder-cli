@@ -56,9 +56,11 @@ class PipxUpgradeExitCodeTests(unittest.TestCase):
                 })
             return result
 
-        with patch.object(updates, "_pipx_install", return_value=True), patch.object(
-            updates.subprocess, "run", side_effect=fake_run
-        ):
+        # Pin the running version: a source checkout that was never built
+        # reports "0+unknown" (e.g. on CI), which _is_newer refuses to compare.
+        with patch.object(updates, "__version__", "0.1.0"), patch.object(
+            updates, "_pipx_install", return_value=True
+        ), patch.object(updates.subprocess, "run", side_effect=fake_run):
             ok, msg = updates.run_update({"kind": "pip"})
 
         self.assertTrue(ok)
