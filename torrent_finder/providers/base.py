@@ -7,6 +7,7 @@ import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Callable, Iterator
+from urllib.parse import quote, urlencode
 
 import requests
 
@@ -44,6 +45,11 @@ _APIBAY_FALLBACK_IGNORED = {
     "the",
     "to",
 }
+
+
+def _apibay_title_case(query: str) -> str:
+    """Uppercase the first letter of each word, leaving the rest untouched."""
+    return " ".join(word[:1].upper() + word[1:] for word in query.split())
 
 
 def _apibay_fallback_query(query: str) -> str | None:
@@ -134,9 +140,14 @@ class BaseProvider(ABC):
         return f"{self.icon} {self.name}"
 
     def _apibay_retry_queries(self, query: str) -> Iterator[str]:
+        # Apibay sometimes serves a stale no-results answer for an
+        # all-lowercase query while a recased spelling of the same words
+        # matches, so retry a title-cased variant before degrading the query.
+        yield _apibay_title_case(query)
         fallback = _apibay_fallback_query(query)
         if fallback:
             yield fallback
+            yield _apibay_title_case(fallback)
 
     def _search_apibay(self, query: str) -> list[SearchResult]:
         """Search Apibay with conservative provider-specific query retries.
@@ -150,7 +161,12 @@ class BaseProvider(ABC):
             try:
                 response = requests.get(
                     API_URL,
-                    params={"q": search_query, "cat": category},
+                    # Apibay's q.php does not decode "+" as a space, so the
+                    # default form encoding makes every multi-word query hit
+                    # the no-results sentinel; spaces must be sent as %20.
+                    params=urlencode(
+                        {"q": search_query, "cat": category}, quote_via=quote
+                    ),
                     timeout=45,
                     headers={"User-Agent": "Mozilla/5.0"},
                 )
@@ -213,12 +229,13 @@ class BaseProvider(ABC):
             if results:
                 return results
 
-        tried = {query.casefold()}
+        # Dedupe retries by exact string: Apibay treats differently-cased
+        # spellings of the same words as distinct queries (see above).
+        tried = {query}
         for fallback in self._apibay_retry_queries(query):
-            fallback_key = fallback.casefold()
-            if fallback_key in tried:
+            if fallback in tried:
                 continue
-            tried.add(fallback_key)
+            tried.add(fallback)
             fallback_data = fetch(fallback)
             if fallback_data is None:
                 break
