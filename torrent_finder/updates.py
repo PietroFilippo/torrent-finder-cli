@@ -13,6 +13,7 @@ comparison runs every launch.
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -109,7 +110,16 @@ def _is_newer(latest: "str | None", current: str) -> bool:
         from packaging.version import parse
         return parse(latest) > parse(current)
     except Exception:
-        return latest != current
+        pass
+    # No ``packaging`` on this install — naive numeric compare. Must never
+    # treat mere inequality as newer: a cached older latest (e.g. 0.3.0 right
+    # after updating to 0.3.1) would nag on every launch.
+    try:
+        def key(v: str) -> tuple:
+            return tuple(int(n) for n in re.findall(r"\d+", v.split("+")[0]))
+        return key(latest) > key(current)
+    except Exception:
+        return False
 
 
 def _pipx_install() -> bool:
@@ -161,10 +171,12 @@ def _banner(headline: str, action: str) -> str:
     """High-visibility notice: black-on-yellow headline + bright action text.
 
     ``not dim`` is load-bearing: the selector footer renders with a dim base
-    style, which would grey the notice out without it.
+    style, which would grey the notice out without it. No ``bold`` on the
+    headline: terminals render bold black as bright black (grey), which is
+    barely readable on the yellow background.
     """
     return (
-        f"[not dim bold black on yellow] ⬆ {headline} [/not dim bold black on yellow] "
+        f"[not dim black on yellow] ⬆ {headline} [/not dim black on yellow] "
         f"[not dim bold yellow]{action}[/not dim bold yellow]"
     )
 

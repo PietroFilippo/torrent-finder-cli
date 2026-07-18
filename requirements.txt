@@ -3,3 +3,4 @@ rich
 readchar
 subliminal
 babelfish
+packaging
