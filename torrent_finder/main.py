@@ -765,7 +765,9 @@ def _main_loop() -> None:
     update_info = check_for_update()
     update_msg = notice_line(update_info)
     if current_provider and update_msg:
-        console.print(update_msg + "\n")
+        # highlight=False: the auto-highlighter would restyle the version
+        # digits (bold → bright black) on the yellow banner.
+        console.print(update_msg + "\n", highlight=False)
 
     # One-line status (e.g. "No results", "cancelled") carried to the next
     # prompt render so it shows on the freshly-cleared screen instead of

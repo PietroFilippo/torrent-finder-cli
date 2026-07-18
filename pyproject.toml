@@ -26,6 +26,7 @@ dependencies = [
     "readchar",
     "subliminal",
     "babelfish",
+    "packaging",
 ]
 
 [project.urls]

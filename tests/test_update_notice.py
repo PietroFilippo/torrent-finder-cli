@@ -9,7 +9,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 from rich.text import Text
 
 from torrent_finder import updates
-from torrent_finder.updates import notice_line
+from torrent_finder.updates import _is_newer, notice_line
 
 
 class UpdateNoticeTests(unittest.TestCase):
@@ -32,6 +32,42 @@ class UpdateNoticeTests(unittest.TestCase):
 
         binary = notice_line({"kind": "binary", "current": "0.1.0", "latest": "9.9.9"})
         self.assertIn("releases", binary)
+
+
+class IsNewerWithoutPackagingTests(unittest.TestCase):
+    """Installs without the ``packaging`` dist must still compare sanely.
+
+    The old fallback was ``latest != current``, which showed a stale cached
+    "update to 0.3.0" banner right after updating to 0.3.1.
+    """
+
+    def _call(self, latest, current):
+        # Block the packaging import so the naive fallback path runs.
+        import sys
+
+        with patch.dict(
+            sys.modules, {"packaging": None, "packaging.version": None}
+        ):
+            return _is_newer(latest, current)
+
+    def test_older_cached_latest_is_not_an_update(self):
+        self.assertFalse(self._call("0.3.0", "0.3.1"))
+
+    def test_equal_versions_are_not_an_update(self):
+        self.assertFalse(self._call("0.3.1", "0.3.1"))
+
+    def test_newer_latest_is_an_update(self):
+        self.assertTrue(self._call("0.3.2", "0.3.1"))
+        self.assertTrue(self._call("0.10.0", "0.9.9"))
+
+
+class BannerContrastTests(unittest.TestCase):
+    def test_headline_is_not_bold_black(self):
+        # Terminals render bold black as bright black (grey) — unreadable on
+        # the yellow background.
+        line = notice_line({"kind": "pip", "current": "0.1.0", "latest": "9.9.9"})
+        self.assertIn("[not dim black on yellow]", line)
+        self.assertNotIn("bold black", line)
 
 
 class PipxUpgradeExitCodeTests(unittest.TestCase):
