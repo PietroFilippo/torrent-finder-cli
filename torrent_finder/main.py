@@ -787,6 +787,12 @@ def _main_loop() -> None:
     # keyword prompt (so Esc there lands on the source screen, not the prov list).
     show_source = False
 
+    # Double-press quit guard: the first Esc/Ctrl+C on the provider menu or
+    # search prompt re-opens the menu with a "press again to quit" hint; the
+    # next Esc/Ctrl+C there quits, any other selection disarms. Deeper flows
+    # keep instant Ctrl+C (it means "abort this operation", not idle exit).
+    exit_armed = False
+
     while True:
         # One-shot CLI creator search (--by/--name): jump into the by-creator
         # flow, then fall into the normal what's-next / keyword loop.
@@ -808,15 +814,26 @@ def _main_loop() -> None:
             continue
 
         if not current_provider:
-            result = provider_select_prompt(
-                notice=update_msg,
-                open_group=pending_open_group,
-                update_available=bool(update_info),
+            exit_hint = (
+                "[not dim bold yellow]Press Esc or Ctrl+C again to quit[/not dim bold yellow]"
+                if exit_armed else ""
             )
+            try:
+                result = provider_select_prompt(
+                    notice="\n".join(m for m in (update_msg, exit_hint) if m),
+                    open_group=pending_open_group,
+                    update_available=bool(update_info),
+                )
+            except (KeyboardInterrupt, EOFError):
+                result = None  # Ctrl+C/Ctrl+D arm the same quit guard as Esc
             pending_open_group = None
             if result is None:
-                _goodbye()
-                break
+                if exit_armed:
+                    _goodbye()
+                    break
+                exit_armed = True
+                continue
+            exit_armed = False
             if result == "__update__":
                 _run_update_flow(update_info)
                 update_info = None   # consumed → drop the notice + menu row
@@ -886,8 +903,15 @@ def _main_loop() -> None:
                     multi=True, screen_renderer=screen_renderer,
                 )
             except (EOFError, KeyboardInterrupt):
-                _goodbye()
-                break
+                # Ctrl+C at the search prompt: route to the provider menu with
+                # the quit guard armed instead of exiting outright — the next
+                # Esc/Ctrl+C there quits.
+                exit_armed = True
+                current_provider = None
+                query = None
+                show_source = False
+                clear_screen()
+                continue
 
             if query == "GO_BACK":
                 if _available_facets(provider):

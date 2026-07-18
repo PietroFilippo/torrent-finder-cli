@@ -48,7 +48,7 @@ def search_shortcuts_line(has_history: bool) -> str:
         f"  •  [/dim][bold]{MULTI_ADD_KEY_LABEL}[/bold] "
         "[dim]add another title  •  [/dim][bold]Tab[/bold] [dim]actions "
         f"(filters, history, stats, tips){history}  •  [/dim]"
-        "[bold]Esc[/bold] [dim]back[/dim]"
+        "[bold]Esc[/bold] [dim]back / undo title[/dim]"
     )
 
 
@@ -198,7 +198,10 @@ def get_query_with_shortcut(
     With ``multi=True``, Ctrl+N commits the current line and starts another;
     Enter then returns the full ``list[str]`` of titles. Ctrl+F / Tab are
     suppressed once a title has been committed so the in-progress list isn't
-    lost. Without ``multi`` the return is a single string, exactly as before.
+    lost, and Esc backs out progressively — it clears the line being typed,
+    then restores the last committed title for editing, and only returns
+    "GO_BACK" once nothing is left. Without ``multi`` the return is a single
+    string and Esc leaves immediately, exactly as before.
 
     Returns the typed text, "GO_BACK" on Esc, or ``("ACTIONS", typed)`` when Tab
     is pressed. With ``filters_shortcut=True``, Ctrl+F returns
@@ -315,6 +318,32 @@ def get_query_with_shortcut(
                 return "".join(buffer)
 
             if key == readchar.key.ESC:
+                if multi and (buffer or committed):
+                    # Progressive back-out: clear the in-progress line first,
+                    # then pop the last committed title back into the line for
+                    # editing. Leaving the screen takes one more Esc when empty.
+                    prev_col, prev_len = pos, len(buffer)
+                    restoring = not buffer
+                    if restoring:
+                        buffer[:] = list(committed.pop())
+                    else:
+                        buffer[:] = []
+                    pos = len(buffer)
+                    hpos = -1
+                    stash = ""
+                    if screen_renderer is not None:
+                        draw()
+                    elif restoring:
+                        # Erase the empty prompt line, move up over the printed
+                        # committed line, and re-render it as the edit line.
+                        sys.stdout.write("\r\033[K\033[F\r\033[K")
+                        sys.stdout.flush()
+                        console.print(prompt_str, end="")
+                        sys.stdout.write("".join(buffer))
+                        sys.stdout.flush()
+                    else:
+                        repaint(prev_col, prev_len)
+                    continue
                 if screen_renderer is None:
                     print()
                 return "GO_BACK"
