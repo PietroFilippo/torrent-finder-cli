@@ -1594,7 +1594,9 @@ def _provider_source_menu(provider, facets=None) -> "str | object | None":
     return None  # __back__
 
 
-def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
+def provider_select_prompt(
+    notice: str = "", open_group=None, update_available: bool = False
+) -> object | None:
     """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled.
 
     Press F on a highlighted provider to configure its filters without leaving the menu.
@@ -1605,6 +1607,9 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
     ``notice`` is an optional Rich-markup line (e.g. an "update available"
     banner) prepended to the footer; pass "" to show nothing.
 
+    ``update_available`` adds an "Install update" action row (and the U hotkey)
+    so the update is reachable right here, not only via Tab → quick actions.
+
     ``open_group`` (a ProviderGroup) jumps straight into that group's submenu —
     used by back-navigation from a group child so Esc returns to the source
     submenu (Esc in the submenu then falls through to the full provider list).
@@ -1613,6 +1618,7 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
         - A provider object for normal selection.
         - A ``("history", entry)`` tuple when the user picks a history entry
           (the raw entry dict; main routes keyword vs creator).
+        - ``"__update__"`` when the user picks the update row / presses U.
         - ``None`` if cancelled.
     """
     if open_group is not None:
@@ -1646,6 +1652,12 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
         value="__credentials__",
         is_action=True,
         description="Manage subtitle logins (OpenSubtitles / Addic7ed / Jimaku), search-provider logins (RuTracker / Online-Fix / Madokami), and the optional TMDB / IGDB creator-search upgrades.",
+    )
+    update_item = SelectItem(
+        label="⬆ Install update",
+        value="__update__",
+        is_action=True,
+        hint="U",
     )
     start = 0
 
@@ -1692,7 +1704,12 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
                 f"subtitle saves, and Online-Fix / Madokami files.\nCurrent: {get_download_dir()}"
             ),
         )
-        items = provider_items + [separator, tips_item, info_item, creds_item, command_item, dir_item]
+        items = (
+            provider_items
+            + [separator]
+            + ([update_item] if update_available else [])
+            + [tips_item, info_item, creds_item, command_item, dir_item]
+        )
 
         # Fresh tip each time we enter the selector — but NOT on every render
         # (that would re-roll on every keypress and make the footer jitter).
@@ -1719,6 +1736,7 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
                 "s": "stats",
                 "T": "tips",
                 "t": "tips",
+                **({"U": "update", "u": "update"} if update_available else {}),
             },
             key_actions={"F": _handle_f, "f": _handle_f},
         )
@@ -1752,6 +1770,8 @@ def provider_select_prompt(notice: str = "", open_group=None) -> object | None:
                 tips_page()
                 start = cursor
                 continue
+            if action == "update":
+                return "__update__"
 
         if items[result].value == "__tips__":
             from torrent_finder.ui.tips_page import tips_page

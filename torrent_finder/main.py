@@ -804,11 +804,20 @@ def _main_loop() -> None:
             continue
 
         if not current_provider:
-            result = provider_select_prompt(notice=update_msg, open_group=pending_open_group)
+            result = provider_select_prompt(
+                notice=update_msg,
+                open_group=pending_open_group,
+                update_available=bool(update_info),
+            )
             pending_open_group = None
             if result is None:
                 _goodbye()
                 break
+            if result == "__update__":
+                _run_update_flow(update_info)
+                update_info = None   # consumed → drop the notice + menu row
+                update_msg = ""
+                continue
             # History selection returns ("history", entry) — keyword or creator.
             if isinstance(result, tuple) and result[0] == "history":
                 prov, facet, val = _history_pick(result[1])
