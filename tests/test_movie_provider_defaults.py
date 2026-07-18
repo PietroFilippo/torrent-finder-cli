@@ -130,7 +130,7 @@ class MovieProviderDefaultsTests(unittest.TestCase):
 
         with patch(
             "torrent_finder.providers.base.requests.get",
-            side_effect=[no_results, no_results, fallback],
+            side_effect=[no_results] * 4 + [fallback],
         ) as get:
             results = self._without_category_fallback()._search_apibay(
                 "dune part two"
@@ -139,9 +139,12 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         self.assertEqual(
             [result.name for result in results], ["Dune Part Two (2024)"]
         )
+        # Empty answers are retried with the alternate space encoding, so
+        # each failing multi-word query appears twice (%20 then "+").
         self.assertEqual(
             [_params(call)["q"] for call in get.call_args_list],
-            ["dune part two", "Dune Part Two", "dune part 2"],
+            ["dune part two", "dune part two",
+             "Dune Part Two", "Dune Part Two", "dune part 2"],
         )
 
     def test_apibay_retries_with_distinctive_title_token(self):
@@ -164,7 +167,7 @@ class MovieProviderDefaultsTests(unittest.TestCase):
 
         with patch(
             "torrent_finder.providers.base.requests.get",
-            side_effect=[no_results, no_results, fallback],
+            side_effect=[no_results] * 4 + [fallback],
         ) as get:
             results = self._without_category_fallback()._search_apibay(
                 "a minecraft movie"
@@ -173,7 +176,7 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         self.assertEqual(
             [result.name for result in results], ["A Minecraft Movie (2025)"]
         )
-        self.assertEqual(_params(get.call_args_list[2])["q"], "minecraft")
+        self.assertEqual(_params(get.call_args_list[4])["q"], "minecraft")
 
     def test_apibay_retries_when_initial_rows_are_not_movies(self):
         unrelated = Mock()
@@ -209,7 +212,7 @@ class MovieProviderDefaultsTests(unittest.TestCase):
 
         with patch(
             "torrent_finder.providers.base.requests.get",
-            side_effect=[unrelated, no_results, fallback],
+            side_effect=[unrelated, no_results, no_results, fallback],
         ) as get:
             results = self._without_category_fallback()._search_apibay(
                 "the substance movie"
@@ -218,7 +221,8 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         self.assertEqual([result.name for result in results], ["The Substance (2024)"])
         self.assertEqual(
             [_params(call)["q"] for call in get.call_args_list],
-            ["the substance movie", "The Substance Movie", "substance"],
+            ["the substance movie",
+             "The Substance Movie", "The Substance Movie", "substance"],
         )
 
     def test_apibay_retries_exact_movie_title_with_yts_release_year(self):
@@ -289,7 +293,7 @@ class MovieProviderDefaultsTests(unittest.TestCase):
 
         with patch(
             "torrent_finder.providers.base.requests.get",
-            side_effect=[no_results, recased],
+            side_effect=[no_results, no_results, recased],
         ) as get:
             results = self._without_category_fallback()._search_apibay(
                 "fantastic mr fox"
@@ -300,7 +304,7 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         )
         self.assertEqual(
             [_params(call)["q"] for call in get.call_args_list],
-            ["fantastic mr fox", "Fantastic Mr Fox"],
+            ["fantastic mr fox", "fantastic mr fox", "Fantastic Mr Fox"],
         )
 
     def test_apibay_encodes_spaces_as_percent20_not_plus(self):
@@ -329,6 +333,41 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         self.assertIsInstance(raw_params, str)
         self.assertIn("q=Fantastic%20Mr%20Fox", raw_params)
         self.assertNotIn("+", raw_params)
+
+    def test_apibay_retries_empty_answer_with_plus_encoding(self):
+        # Some apibay nodes only decode "+" as a space; a %20 no-results
+        # answer is retried with the alternate encoding before giving up.
+        no_results = Mock()
+        no_results.raise_for_status.return_value = None
+        no_results.json.return_value = [{"id": "0", "name": "No results returned"}]
+        plus_hit = Mock()
+        plus_hit.raise_for_status.return_value = None
+        plus_hit.json.return_value = [
+            {
+                "id": "10",
+                "name": "Fantastic Mr Fox (2009)",
+                "info_hash": "7" * 40,
+                "seeders": "80",
+                "leechers": "8",
+                "size": "800",
+                "category": "207",
+            }
+        ]
+
+        with patch(
+            "torrent_finder.providers.base.requests.get",
+            side_effect=[no_results, plus_hit],
+        ) as get:
+            results = self._without_category_fallback()._search_apibay(
+                "Fantastic Mr Fox"
+            )
+
+        self.assertEqual(
+            [result.name for result in results], ["Fantastic Mr Fox (2009)"]
+        )
+        first, second = [call.kwargs["params"] for call in get.call_args_list]
+        self.assertIn("q=Fantastic%20Mr%20Fox", first)
+        self.assertIn("q=Fantastic+Mr+Fox", second)
 
     def test_yts_uses_the_current_api_base(self):
         response = Mock()

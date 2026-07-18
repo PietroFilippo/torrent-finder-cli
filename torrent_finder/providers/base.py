@@ -6,8 +6,9 @@ import concurrent.futures
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from html import unescape
 from typing import Callable, Iterator
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, quote_plus, urlencode
 
 import requests
 
@@ -158,28 +159,39 @@ class BaseProvider(ABC):
         retry chain.
         """
         def fetch(search_query: str, category: int = 0) -> list[dict] | None:
-            try:
-                response = requests.get(
-                    API_URL,
-                    # Apibay's q.php does not decode "+" as a space, so the
-                    # default form encoding makes every multi-word query hit
-                    # the no-results sentinel; spaces must be sent as %20.
-                    params=urlencode(
-                        {"q": search_query, "cat": category}, quote_via=quote
-                    ),
-                    timeout=45,
-                    headers={"User-Agent": "Mozilla/5.0"},
+            # Apibay's backend nodes disagree on space encoding: some only
+            # decode %20 (treating "+" as a literal), others the reverse —
+            # and which one answers varies by the hour. Try %20 first and
+            # retry a no-results answer with "+" before believing it.
+            empty: "list[dict] | None" = None
+            tried_encodings: set[str] = set()
+            for quoter in (quote, quote_plus):
+                params = urlencode(
+                    {"q": search_query, "cat": category}, quote_via=quoter
                 )
-                response.raise_for_status()
-                data = response.json()
-            except (requests.RequestException, ValueError):
-                return None
+                if params in tried_encodings:
+                    continue  # no space in the query → both encodings match
+                tried_encodings.add(params)
+                try:
+                    response = requests.get(
+                        API_URL,
+                        params=params,
+                        timeout=45,
+                        headers={"User-Agent": "Mozilla/5.0"},
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                except (requests.RequestException, ValueError):
+                    return None
 
-            if not isinstance(data, list):
-                return []
-            if not data or (len(data) == 1 and data[0].get("id") == "0"):
-                return []
-            return data
+                if (
+                    isinstance(data, list)
+                    and data
+                    and not (len(data) == 1 and data[0].get("id") == "0")
+                ):
+                    return data
+                empty = []
+            return empty
 
         wanted = {str(category) for category in self.categories}
 
@@ -190,7 +202,9 @@ class BaseProvider(ABC):
                     continue
                 tid = item.get("id")
                 results.append(SearchResult(
-                    name=item.get("name", "Unknown"),
+                    # Apibay HTML-escapes quotes in names (&quot;) to keep its
+                    # JSON valid — undo that for display.
+                    name=unescape(item.get("name", "Unknown")),
                     info_hash=item.get("info_hash", ""),
                     seeders=item.get("seeders", 0),
                     leechers=item.get("leechers", 0),
