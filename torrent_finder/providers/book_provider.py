@@ -20,6 +20,10 @@ class BookProvider(BaseProvider):
     icon = "📖"
     search_note = "Books — Libgen (direct download, no login) + public torrent trackers."
     categories = [601, 102]  # TPB E-books + Audio books
+    # Apibay's cat=0 search falsely returns the no-results sentinel for many
+    # book titles ("Metamorphosis") that the category-scoped search finds —
+    # same quirk the Movies provider works around.
+    apibay_fallback_categories = (601, 102)
     solidtorrents_category = "eBook"
 
     # Direct downloads / document torrents — no video features apply, but the
