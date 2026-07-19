@@ -67,7 +67,7 @@ class KnabenSearchTests(unittest.TestCase):
         metadata = _selected_metadata(
             results, 0, _table_layout(120, False), False
         )
-        self.assertIn("Origin: Example Tracker", metadata.plain)
+        self.assertIn("Knaben tracker: Example Tracker", metadata.plain)
 
         request = post.call_args
         self.assertEqual(request.args[0], knaben.API_URL)

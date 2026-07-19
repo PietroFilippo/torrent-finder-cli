@@ -5,10 +5,57 @@ from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from rich.console import Console
+
 from torrent_finder import acquisition
 from torrent_finder import main as app_main
 from torrent_finder import torrent_meta
-from torrent_finder.ui import creator, credentials, prompts
+from torrent_finder.ui import creator, credentials, prompts, selector, table
+from torrent_finder.ui.selector import SelectItem
+
+
+class SelectorCancelTests(unittest.TestCase):
+    def test_raised_ctrl_c_is_same_as_esc_in_file_selector(self):
+        terminal = StringIO()
+        sized_console = Console(
+            file=StringIO(),
+            width=72,
+            height=20,
+            color_system=None,
+        )
+
+        with patch.object(selector, "console", sized_console), \
+             patch.object(selector.sys, "stdout", terminal), \
+             patch.object(selector.readchar, "readkey", side_effect=KeyboardInterrupt):
+            selected = selector.arrow_select(
+                [SelectItem(label="example.mkv", value="example.mkv")],
+                title="Select Torrent Files",
+            )
+
+        self.assertIsNone(selected)
+
+
+class ResultsTableCancelTests(unittest.TestCase):
+    def test_raised_ctrl_c_is_same_as_esc_in_results_table(self):
+        sized_console = Console(
+            file=StringIO(),
+            width=90,
+            height=24,
+            color_system=None,
+        )
+        results = [{
+            "name": "Example",
+            "source": "Knaben",
+            "size": 1024,
+            "seeders": 10,
+            "leechers": 1,
+        }]
+
+        with patch.object(table, "console", sized_console), \
+             patch.object(table.readchar, "readkey", side_effect=KeyboardInterrupt):
+            selected = table.interactive_select(results)
+
+        self.assertIsNone(selected)
 
 
 class TorrentFileCancelTests(unittest.TestCase):

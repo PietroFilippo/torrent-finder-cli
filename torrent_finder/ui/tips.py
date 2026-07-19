@@ -96,7 +96,7 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
             Tip("Engine modes are explicit: On runs every search, Auto runs only after every On engine returns zero raw rows, and Off is never contacted.", ("filters", "engines", "on", "auto", "off", "fallback")),
             Tip("Knaben starts on Auto for public-tracker providers. It makes one category-scoped fallback request only on a total raw miss, before local filters are applied.", ("filters", "engines", "knaben", "auto", "fallback", "categories")),
             Tip("YTS and SolidTorrents start Off because they can be unreliable or noisy; enable them manually when you want their extra coverage.", ("filters", "engines", "yts", "solidtorrents", "off", "coverage")),
-            Tip("Knaben results show the originating tracker as Origin under the selected row, so you can see which index supplied the torrent.", ("results", "knaben", "origin", "tracker", "provenance")),
+            Tip("Knaben results show the originating tracker as Knaben tracker under the selected row, so you can see which index supplied the torrent.", ("results", "knaben", "origin", "tracker", "provenance")),
             Tip("The Clear filters action clears preset toggles only; engine modes are preserved.", ("filters", "presets", "engines", "modes")),
             Tip("Your engine modes and preset toggles persist across runs in filter_state.json.", ("filters", "engines", "modes", "state", "persistence")),
             Tip("Results are deduped by info hash across engines, then sorted by seeders.", ("results", "dedupe", "sorting")),

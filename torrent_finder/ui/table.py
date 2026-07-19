@@ -73,7 +73,7 @@ def _selected_metadata(
     if not layout.source:
         parts.append(f"Source: {_source_label(item)}")
     if item.get("source") == "Knaben" and item.get("knaben_tracker"):
-        parts.append(f"Origin: {item.get('knaben_tracker')}")
+        parts.append(f"Knaben tracker: {item.get('knaben_tracker')}")
     if show_from and not layout.from_work and item.get("from_work"):
         parts.append(f"From: {item.get('from_work')}")
     if not layout.size:
@@ -392,7 +392,12 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
 
         try:
             while True:
-                key = readchar.readkey()
+                try:
+                    key = readchar.readkey()
+                except KeyboardInterrupt:
+                    # Some terminals raise for Ctrl+C instead of returning
+                    # the CTRL_C key code handled below.
+                    return None
                 prev_current = current
                 prev_page = current_page
 
