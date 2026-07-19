@@ -98,6 +98,34 @@ Run it with `torrent-finder`, `python -m torrent_finder`, or `torrent.bat`
 (Windows). An editable install keeps pointing at your clone, so `git pull`
 updates it.
 
+To run the headless test suite:
+
+```bash
+python -m unittest discover -s tests
+```
+
+APIBay can return HTTP 200 with a false "No results returned" sentinel, so its
+live behavior is tested separately from the deterministic unit suite. The
+stress harness runs known movie, book, and game queries sequentially and
+reports success rate, cache use, request amplification, and latency:
+
+```bash
+python scripts/stress_apibay.py --rounds 3
+```
+
+Add `--strict` when a nonzero exit status is useful. A result count ending in
+`*` came from the last-known-good cache. Live APIBay searches always run
+first; a successful provider/query result is saved, and a later empty or
+failed live attempt can replay it as `Apibay*`. Cache entries are bounded to
+128 queries.
+
+When all enabled engines return zero raw rows, selected providers can also try
+a safe default-off public engine once (for example SolidTorrents). An engine
+you explicitly disable stays disabled, and results removed by filters do not
+cause a fallback search. These layers substantially improve availability, but
+cannot guarantee a first-time query or fresh results: cached seeder counts can
+be stale and every external source can be unavailable simultaneously.
+
 ### Optional direct download / streaming tools
 
 Install these only if you want terminal-managed downloads or Stream to VLC:
@@ -247,6 +275,11 @@ stats across interpreter-specific LocalCache directories.
 On first run after upgrading, prior state copies from the old platform-data,
 repository, package, and Store Python locations are consolidated into the
 machine-stable file. The originals are left untouched.
+
+Successful APIBay result sets use a separate, disposable
+`apibay_cache.json` in the same machine-stable directory. It contains at
+most 128 provider/query entries of public torrent metadata. Deleting it only
+forgets last-known-good results; it does not reset settings or history.
 
 ### Updating
 

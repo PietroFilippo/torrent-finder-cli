@@ -12,8 +12,8 @@ from torrent_finder.providers.movie_provider import MovieProvider
 def _params(call) -> dict:
     """Return a call's query params whether passed as a dict or a string.
 
-    Apibay requests pass ``params`` as a pre-encoded string (q.php does not
-    decode "+" as a space); other engines still pass a dict.
+    APIBay requests pass ``params`` as a pre-encoded string so both %20 and
+    "+" space forms can be tested; other engines still pass a dict.
     """
     params = call.kwargs["params"]
     if isinstance(params, dict):
@@ -22,6 +22,18 @@ def _params(call) -> dict:
 
 
 class MovieProviderDefaultsTests(unittest.TestCase):
+    def setUp(self):
+        cache_store_patcher = patch(
+            "torrent_finder.providers.base.apibay_cache.store"
+        )
+        self.cache_store = cache_store_patcher.start()
+        self.addCleanup(cache_store_patcher.stop)
+        cache_load_patcher = patch(
+            "torrent_finder.providers.base.apibay_cache.load", return_value=[]
+        )
+        self.cache_load = cache_load_patcher.start()
+        self.addCleanup(cache_load_patcher.stop)
+
     def _without_category_fallback(self) -> MovieProvider:
         provider = MovieProvider()
         provider.apibay_fallback_categories = ()
@@ -32,6 +44,11 @@ class MovieProviderDefaultsTests(unittest.TestCase):
 
         enabled = {engine.name for engine in provider.engines if engine.enabled}
         self.assertEqual(enabled, {"Apibay", "Nyaa"})
+        emergency = {
+            engine.name for engine in provider.engines
+            if engine.emergency_fallback
+        }
+        self.assertEqual(emergency, {"SolidTorrents", "YTS"})
 
     def test_apibay_covers_movie_and_tv_release_categories(self):
         self.assertEqual(
@@ -70,34 +87,110 @@ class MovieProviderDefaultsTests(unittest.TestCase):
 
         self.assertEqual([result.name for result in results], ["A TV release"])
 
+    def test_apibay_omits_category_for_primary_search(self):
+        """APIBay does not treat an omitted category like ``cat=0``.
+
+        This mirrors the live failure where ``finding nemo&cat=0`` returned
+        the empty sentinel while the documented ``finding nemo`` request
+        returned 100 rows.
+        """
+        no_results = Mock()
+        no_results.raise_for_status.return_value = None
+        no_results.json.return_value = [{"id": "0", "name": "No results returned"}]
+        hit = Mock()
+        hit.raise_for_status.return_value = None
+        hit.json.return_value = [
+            {
+                "id": "12",
+                "name": "Finding Nemo (2003)",
+                "info_hash": "5" * 40,
+                "seeders": "92",
+                "leechers": "4",
+                "size": "900",
+                "category": "207",
+            }
+        ]
+
+        def respond(*_args, **kwargs):
+            return no_results if "cat" in _params(Mock(kwargs=kwargs)) else hit
+
+        with patch(
+            "torrent_finder.providers.base.requests.get", side_effect=respond
+        ) as get:
+            results = self._without_category_fallback()._search_apibay(
+                "finding nemo"
+            )
+
+        self.assertEqual([result.name for result in results], ["Finding Nemo (2003)"])
+        self.assertNotIn("cat", _params(get.call_args_list[0]))
+
+    def test_apibay_retries_uppercase_as_full_lowercase_phrase(self):
+        no_results = Mock()
+        no_results.raise_for_status.return_value = None
+        no_results.json.return_value = [{"id": "0", "name": "No results returned"}]
+        hit = Mock()
+        hit.raise_for_status.return_value = None
+        hit.json.return_value = [
+            {
+                "id": "13",
+                "name": "Finding Nemo (2003)",
+                "info_hash": "4" * 40,
+                "seeders": "80",
+                "leechers": "3",
+                "size": "800",
+                "category": "207",
+            }
+        ]
+
+        def respond(*_args, **kwargs):
+            params = _params(Mock(kwargs=kwargs))
+            return hit if params.get("q") == "finding nemo" else no_results
+
+        with patch(
+            "torrent_finder.providers.base.requests.get", side_effect=respond
+        ) as get:
+            results = self._without_category_fallback()._search_apibay(
+                "FINDING NEMO"
+            )
+
+        self.assertEqual([result.name for result in results], ["Finding Nemo (2003)"])
+        self.assertIn(
+            "finding nemo", [_params(call)["q"] for call in get.call_args_list]
+        )
+
     def test_apibay_falls_back_to_historical_movie_category_requests(self):
         no_results = Mock()
         no_results.raise_for_status.return_value = None
         no_results.json.return_value = [{"id": "0", "name": "No results returned"}]
 
-        def category_response(category: str, name: str, info_hash: str) -> Mock:
+        def category_response() -> Mock:
             response = Mock()
             response.raise_for_status.return_value = None
             response.json.return_value = [
                 {
-                    "id": category,
-                    "name": name,
-                    "info_hash": info_hash,
+                    "id": "201",
+                    "name": "Interstellar movie",
+                    "info_hash": "2" * 40,
                     "seeders": "25",
                     "leechers": "2",
                     "size": "250",
-                    "category": category,
-                }
+                    "category": "201",
+                },
+                {
+                    "id": "207",
+                    "name": "Interstellar HD",
+                    "info_hash": "3" * 40,
+                    "seeders": "30",
+                    "leechers": "3",
+                    "size": "300",
+                    "category": "207",
+                },
             ]
             return response
 
         with patch(
             "torrent_finder.providers.base.requests.get",
-            side_effect=[
-                no_results,
-                category_response("201", "Interstellar movie", "2" * 40),
-                category_response("207", "Interstellar HD", "3" * 40),
-            ],
+            side_effect=[no_results, category_response()],
         ) as get:
             results = MovieProvider()._search_apibay("Interstellar")
 
@@ -105,10 +198,8 @@ class MovieProviderDefaultsTests(unittest.TestCase):
             [result.name for result in results],
             ["Interstellar movie", "Interstellar HD"],
         )
-        self.assertEqual(
-            [_params(call)["cat"] for call in get.call_args_list],
-            ["0", "201", "207"],
-        )
+        self.assertNotIn("cat", _params(get.call_args_list[0]))
+        self.assertEqual(_params(get.call_args_list[1])["cat"], "201,207")
 
     def test_apibay_retries_spelled_sequel_number(self):
         no_results = Mock()
@@ -139,12 +230,9 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         self.assertEqual(
             [result.name for result in results], ["Dune Part Two (2024)"]
         )
-        # Empty answers are retried with the alternate space encoding, so
-        # each failing multi-word query appears twice (%20 then "+").
         self.assertEqual(
             [_params(call)["q"] for call in get.call_args_list],
-            ["dune part two", "dune part two",
-             "Dune Part Two", "Dune Part Two", "dune part 2"],
+            ["dune part two"] * 2 + ["Dune Part Two"] * 2 + ["dune part 2"],
         )
 
     def test_apibay_retries_with_distinctive_title_token(self):
@@ -221,8 +309,9 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         self.assertEqual([result.name for result in results], ["The Substance (2024)"])
         self.assertEqual(
             [_params(call)["q"] for call in get.call_args_list],
-            ["the substance movie",
-             "The Substance Movie", "The Substance Movie", "substance"],
+            ["the substance movie"]
+            + ["The Substance Movie"] * 2
+            + ["substance"],
         )
 
     def test_apibay_retries_exact_movie_title_with_yts_release_year(self):
@@ -256,7 +345,7 @@ class MovieProviderDefaultsTests(unittest.TestCase):
 
         with patch(
             "torrent_finder.providers.base.requests.get",
-            side_effect=[no_results, yts_metadata, fallback],
+            side_effect=[no_results] * 3 + [yts_metadata, fallback],
         ) as get:
             results = self._without_category_fallback()._search_apibay(
                 "Interstellar"
@@ -265,10 +354,10 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         self.assertEqual([result.name for result in results], ["Interstellar (2014)"])
         self.assertEqual(_params(get.call_args_list[0])["q"], "Interstellar")
         self.assertEqual(
-            _params(get.call_args_list[1])["query_term"], "Interstellar"
+            _params(get.call_args_list[3])["query_term"], "Interstellar"
         )
         self.assertEqual(
-            _params(get.call_args_list[2])["q"], "Interstellar 2014"
+            _params(get.call_args_list[4])["q"], "Interstellar 2014"
         )
 
     def test_apibay_retries_title_cased_query_first(self):
@@ -304,7 +393,7 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         )
         self.assertEqual(
             [_params(call)["q"] for call in get.call_args_list],
-            ["fantastic mr fox", "fantastic mr fox", "Fantastic Mr Fox"],
+            ["fantastic mr fox"] * 2 + ["Fantastic Mr Fox"],
         )
 
     def test_apibay_encodes_spaces_as_percent20_not_plus(self):
@@ -368,6 +457,27 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         first, second = [call.kwargs["params"] for call in get.call_args_list]
         self.assertIn("q=Fantastic%20Mr%20Fox", first)
         self.assertIn("q=Fantastic+Mr+Fox", second)
+
+    def test_apibay_does_not_mutate_query_with_random_padding(self):
+        no_results = Mock()
+        no_results.raise_for_status.return_value = None
+        no_results.json.return_value = [{"id": "0", "name": "No results returned"}]
+        provider = self._without_category_fallback()
+
+        with (
+            patch.object(
+                provider, "_apibay_retry_queries", return_value=iter(())
+            ),
+            patch(
+                "torrent_finder.providers.base.requests.get",
+                return_value=no_results,
+            ) as get,
+        ):
+            results = provider._search_apibay("Finding Nemo")
+
+        self.assertEqual(results, [])
+        raw = [call.kwargs["params"] for call in get.call_args_list]
+        self.assertEqual(raw, ["q=Finding%20Nemo", "q=Finding+Nemo"])
 
     def test_yts_uses_the_current_api_base(self):
         response = Mock()

@@ -115,6 +115,18 @@ class LibgenResolveTests(unittest.TestCase):
 
 
 class BookProviderTests(unittest.TestCase):
+    def setUp(self):
+        cache_store_patcher = patch(
+            "torrent_finder.providers.base.apibay_cache.store"
+        )
+        self.cache_store = cache_store_patcher.start()
+        self.addCleanup(cache_store_patcher.stop)
+        cache_load_patcher = patch(
+            "torrent_finder.providers.base.apibay_cache.load", return_value=[]
+        )
+        self.cache_load = cache_load_patcher.start()
+        self.addCleanup(cache_load_patcher.stop)
+
     def test_registered_with_books_slug_and_book_alias(self):
         self.assertIsInstance(get_provider("books"), BookProvider)
         self.assertIsInstance(get_provider("book"), BookProvider)
@@ -123,6 +135,8 @@ class BookProviderTests(unittest.TestCase):
         provider = BookProvider()
         enabled = {e.name for e in provider.engines if e.enabled}
         self.assertEqual(enabled, {"Libgen", "Apibay"})
+        emergency = {e.name for e in provider.engines if e.emergency_fallback}
+        self.assertEqual(emergency, {"SolidTorrents"})
 
     def test_apibay_covers_ebook_and_audiobook_categories(self):
         self.assertEqual(set(BookProvider.categories), {601, 102})
@@ -152,7 +166,7 @@ class BookProviderTests(unittest.TestCase):
 
         with patch(
             "torrent_finder.providers.base.requests.get",
-            side_effect=[no_results, ebooks, no_results],
+            side_effect=[no_results, ebooks],
         ) as get:
             results = BookProvider()._search_apibay("Metamorphosis")
 
@@ -160,11 +174,9 @@ class BookProviderTests(unittest.TestCase):
             [r.name for r in results], ["The Metamorphosis - Kafka [epub]"]
         )
         from urllib.parse import parse_qs
-        cats = [
-            parse_qs(call.kwargs["params"])["cat"][0]
-            for call in get.call_args_list
-        ]
-        self.assertEqual(cats, ["0", "601", "102"])
+        params = [parse_qs(call.kwargs["params"]) for call in get.call_args_list]
+        self.assertNotIn("cat", params[0])
+        self.assertEqual(params[1]["cat"], ["601,102"])
 
     def test_libgen_rows_sort_above_torrents(self):
         # Default seeders-descending sort would bury Libgen (seeders=0) under

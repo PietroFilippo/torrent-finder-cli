@@ -41,5 +41,8 @@ class MobileProvider(BaseProvider):
         """Apibay on by default; SolidTorrents off (noisier, ignores category)."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
-            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=False),
+            SearchEngine(
+                "SolidTorrents", "🔗", self._search_solidtorrents,
+                enabled=False, emergency_fallback=True,
+            ),
         ]
