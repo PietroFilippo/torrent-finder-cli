@@ -34,18 +34,25 @@ group children stay in flat `PROVIDERS` with their own slugs.
 ## Engine
 
 A search backend inside a provider (`SearchEngine` in `providers/base.py`):
-Apibay, SolidTorrents, Nyaa (per-category), or a site-specific scraper. A
-provider fans a query out to all enabled engines concurrently, merges on
-`info_hash`, filters, and sorts by seeders. Engines are user-toggleable per
-provider; the toggle persists under the provider's slug.
+Apibay, Knaben, Nyaa (per-category), or a site-specific scraper. A
+provider fans a query out to all On engines concurrently, merges on
+`info_hash`, filters, and sorts by seeders. Engines are mode-configurable per
+provider; the mode persists under the provider's slug.
 
-A default-off engine may be marked as an emergency fallback. It runs only when
-the enabled engines produced zero raw rows, before filtering, and never after
-the user explicitly disables it. APIBay additionally keeps a bounded
+Modes are explicit: **On** participates in every fan-out, **Auto** runs only
+when all On engines produced zero raw rows before filtering, and **Off** is
+never contacted. An Auto engine also runs when there are no On engines. APIBay
+additionally keeps a bounded
 last-known-good result set per normalized provider/query. Live search always
 runs first; cached rows preserve `source="Apibay"` for acquisition routing
 and carry presentation-only cache provenance. See
-[ADR-0009](docs/adr/0009-apibay-last-known-good-and-emergency-engines.md).
+[ADR-0009](docs/adr/0009-apibay-last-known-good-and-emergency-engines.md)
+and [ADR-0010](docs/adr/0010-knaben-and-explicit-engine-modes.md).
+
+Knaben is the default Auto engine for public-tracker providers. Each provider
+maps to Knaben's normalized categories; the adapter makes one bounded request,
+asks the service to hide unsafe/XXX rows, accepts only valid info hashes, and
+keeps the originating tracker as result provenance.
 
 ## Result
 

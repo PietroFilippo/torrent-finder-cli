@@ -50,6 +50,8 @@ class MovieProvider(BaseProvider):
     # Apibay's cat=0 search can falsely return no results for movie titles.
     # Restore the category requests used before commit 5d895da9 as fallback.
     apibay_fallback_categories = (201, 207)
+    # Knaben's normalized TV + Movies parent categories.
+    knaben_categories = (2_000_000, 3_000_000)
     solidtorrents_category = "Movie"
     nyaa_category = "4_1"  # Live Action - English-translated (J-dramas, Asian films/TV)
 
@@ -91,18 +93,19 @@ class MovieProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Movies default to Apibay + Nyaa; SolidTorrents and YTS are opt-in."""
+        """APIBay + Nyaa on, Knaben auto, noisier engines manually off."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
             SearchEngine(
-                "SolidTorrents", "🔗", self._search_solidtorrents,
-                enabled=False, emergency_fallback=True,
-            ),
-            SearchEngine(
-                "YTS", "🎥", self._search_yts,
+                "Knaben", "🧭", self._search_knaben,
                 enabled=False, emergency_fallback=True,
             ),
             SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),
+            SearchEngine("YTS", "🎥", self._search_yts, enabled=False),
+            SearchEngine(
+                "SolidTorrents", "🔗", self._search_solidtorrents,
+                enabled=False,
+            ),
         ]
 
     def _search_yts(self, query: str) -> list[SearchResult]:

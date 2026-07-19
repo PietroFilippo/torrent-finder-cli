@@ -13,11 +13,12 @@ class GameProvider(BaseProvider):
     slug = "games"
     cli_aliases = ("game",)
     icon = "🎮"
-    search_note = "PC, consoles, ROMs & repacks from public trackers (Apibay + SolidTorrents)."
+    search_note = "PC, consoles, ROMs & repacks from public trackers and specialist sources."
     categories = [400, 401, 403, 404, 405, 406]  # All, PC, PSX, Xbox, Wii, Handheld
     # APIBay's unscoped query cache can return false empty sentinels. Retry
     # once with all game categories in a single comma-separated request.
     apibay_fallback_categories = tuple(categories)
+    knaben_categories = (4_000_000, 7_000_000)  # PC + Console
     solidtorrents_category = "Game"
 
     default_filters = FilterConfig(exclude_keywords=["update only", "update v"])
@@ -63,9 +64,16 @@ class GameProvider(BaseProvider):
         FitGirl → lazy magnet resolve)."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
-            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=True),
             SearchEngine("Online-Fix", "🔧", self._search_online_fix, enabled=True),
             SearchEngine("FitGirl", "🧚", self._search_fitgirl, enabled=True),
+            SearchEngine(
+                "Knaben", "🧭", self._search_knaben,
+                enabled=False, emergency_fallback=True,
+            ),
+            SearchEngine(
+                "SolidTorrents", "🔗", self._search_solidtorrents,
+                enabled=False,
+            ),
         ]
 
     def _search_online_fix(self, query: str) -> list[SearchResult]:

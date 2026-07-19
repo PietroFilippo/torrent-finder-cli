@@ -46,6 +46,30 @@ class SearchResultContractTests(unittest.TestCase):
         self.assertEqual(result.get("unexpected"), "kept")
 
 class BaseProviderSearchContractTests(unittest.TestCase):
+    def test_auto_engine_runs_when_there_are_no_on_engines(self):
+        provider = FakeProvider(
+            [
+                (
+                    "backup",
+                    lambda query: [
+                        {
+                            "name": "Auto row",
+                            "info_hash": "auto",
+                            "seeders": 2,
+                            "source": "Backup",
+                        }
+                    ],
+                    False,
+                ),
+            ]
+        )
+        provider.engines[0].emergency_fallback = True
+
+        self.assertEqual(
+            [result.name for result in provider.search("query")],
+            ["Auto row"],
+        )
+
     def test_search_runs_emergency_engine_only_when_enabled_engines_are_empty(self):
         emergency_calls = []
 

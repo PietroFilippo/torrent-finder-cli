@@ -14,6 +14,8 @@ class MangaProvider(BaseProvider):
     icon = "📚"
     search_note = "Manga from public trackers (Nyaa Literature + Apibay Comics)."
     categories = [602]  # Apibay/TPB Comics
+    # Nyaa Literature + Books / Comics.
+    knaben_categories = (6_006_000, 9_002_000)
     nyaa_category = "3_1"  # Literature - English-translated (default Nyaa engine)
 
     supports_subtitles = False
@@ -50,11 +52,15 @@ class MangaProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Nyaa Literature (English) + Apibay Comics on by default; Raw Nyaa off."""
+        """Nyaa EN + APIBay on, category-scoped Knaben auto, Raw Nyaa off."""
         return [
             SearchEngine("Nyaa (EN)", "🍙", self._search_nyaa, enabled=True),
             SearchEngine("Nyaa (Raw)", "🗾", self._search_nyaa_raw, enabled=False),
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
+            SearchEngine(
+                "Knaben", "🧭", self._search_knaben,
+                enabled=False, emergency_fallback=True,
+            ),
         ]
 
     def _search_nyaa_raw(self, query: str) -> list[SearchResult]:

@@ -12,7 +12,7 @@ from urllib.parse import quote, quote_plus, urlencode
 
 import requests
 
-from torrent_finder import apibay_cache
+from torrent_finder import apibay_cache, knaben
 from torrent_finder.constants import API_URL, console
 from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
 from torrent_finder.search_result import SearchResult, normalize_result
@@ -79,13 +79,41 @@ def _apibay_fallback_query(query: str) -> str | None:
 
 @dataclass
 class SearchEngine:
-    """A toggleable search engine backend."""
+    """A search backend with an On, optional Auto, or Off mode."""
     name: str
     icon: str
-    search_fn: Callable[[object, str], list[dict | SearchResult]]  # bound method reference
+    search_fn: Callable[[str], list[dict | SearchResult]]
     enabled: bool = True
     emergency_fallback: bool = False
     explicitly_disabled: bool = False
+
+    @property
+    def available_modes(self) -> tuple[str, ...]:
+        """Modes the UI may offer for this engine."""
+        return (
+            ("on", "auto", "off")
+            if self.emergency_fallback
+            else ("on", "off")
+        )
+
+    @property
+    def mode(self) -> str:
+        """Return the explicit user-facing engine mode."""
+        if self.enabled:
+            return "on"
+        if self.emergency_fallback and not self.explicitly_disabled:
+            return "auto"
+        return "off"
+
+    def set_mode(self, mode: str) -> None:
+        """Apply an explicit engine mode while preserving fallback capability."""
+        normalized = str(mode).casefold()
+        if normalized not in self.available_modes:
+            raise ValueError(
+                f"Unsupported mode {mode!r} for engine {self.name!r}"
+            )
+        self.enabled = normalized == "on"
+        self.explicitly_disabled = normalized == "off"
 
 
 class BaseProvider(ABC):
@@ -105,6 +133,7 @@ class BaseProvider(ABC):
     icon: str
     categories: list[int]
     apibay_fallback_categories: tuple[int, ...] = ()
+    knaben_categories: tuple[int, ...] = ()
     solidtorrents_category: str = "all"
     nyaa_category: str = "1_2"  # Nyaa "c" filter; e.g. "1_2" anime EngSub, "4_1" live-action EngSub
 
@@ -320,6 +349,10 @@ class BaseProvider(ABC):
             pass
         return results
 
+    def _search_knaben(self, query: str) -> list[SearchResult]:
+        """Search Knaben using this provider's category mapping."""
+        return knaben.search(query, self.knaben_categories)
+
     def _parse_nyaa_size(self, size_str: str) -> int:
         """Parse a Nyaa size string (e.g. '1.5 GiB') into bytes."""
         size_str = size_str.lower().strip()
@@ -388,9 +421,9 @@ class BaseProvider(ABC):
         seen_hashes: set[str] = set()
         merged: list[SearchResult] = []
 
-        active_engines = [e for e in self.engines if e.enabled]
-        if not active_engines:
-            return []
+        active_engines = [
+            engine for engine in self.engines if engine.mode == "on"
+        ]
 
         def run_engines(engines: list[SearchEngine]) -> None:
             with concurrent.futures.ThreadPoolExecutor(
@@ -412,16 +445,15 @@ class BaseProvider(ABC):
                     except Exception:
                         pass
 
-        run_engines(active_engines)
+        if active_engines:
+            run_engines(active_engines)
 
         if not merged:
             emergency_engines = [
                 engine
                 for engine in self.engines
                 if (
-                    not engine.enabled
-                    and engine.emergency_fallback
-                    and not engine.explicitly_disabled
+                    engine.mode == "auto"
                 )
             ]
             if emergency_engines:

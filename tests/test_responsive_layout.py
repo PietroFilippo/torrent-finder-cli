@@ -35,6 +35,21 @@ def _render(renderable, width, height=40):
 
 
 class ResponsiveSelectorTests(unittest.TestCase):
+    def test_multi_selector_renders_named_toggle_state(self):
+        items = [
+            SelectItem(
+                label="Knaben",
+                toggle_states=("On", "Auto", "Off"),
+                toggle_state="Auto",
+            ),
+        ]
+
+        panel = selector._build_panel(items, 0, "Engines", True)
+        output = _render(panel, 48, 20)
+
+        self.assertIn("[Auto]", output)
+        self.assertNotIn("[✓]", output)
+
     def test_resize_requests_an_immediate_coherent_redraw(self):
         resize = selector._ResizeRedraw((120, 30))
 

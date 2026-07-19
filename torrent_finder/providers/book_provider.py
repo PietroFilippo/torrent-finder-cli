@@ -24,6 +24,7 @@ class BookProvider(BaseProvider):
     # book titles ("Metamorphosis") that the category-scoped search finds —
     # same quirk the Movies provider works around.
     apibay_fallback_categories = (601, 102)
+    knaben_categories = (9_000_000,)  # Books parent category
     solidtorrents_category = "eBook"
 
     # Direct downloads / document torrents — no video features apply, but the
@@ -53,13 +54,17 @@ class BookProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Libgen + Apibay on by default (both anonymous); SolidTorrents opt-in."""
+        """Libgen + APIBay on, category-scoped Knaben auto, Solid manually off."""
         return [
             SearchEngine("Libgen", "📖", self._search_libgen, enabled=True),
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
             SearchEngine(
-                "SolidTorrents", "🔗", self._search_solidtorrents,
+                "Knaben", "🧭", self._search_knaben,
                 enabled=False, emergency_fallback=True,
+            ),
+            SearchEngine(
+                "SolidTorrents", "🔗", self._search_solidtorrents,
+                enabled=False,
             ),
         ]
 

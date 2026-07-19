@@ -23,6 +23,8 @@ class SoftwareProvider(BaseProvider):
     # The Pirate Bay "Applications" categories: 300 Applications, 301 Windows,
     # 302 Mac, 303 UNIX/Linux, 399 Other OS. (Mobile parked: 305 iOS, 306 Android.)
     categories = [300, 301, 302, 303, 399]
+    # Knaben PC subcategories: Software, Mac, Unix.
+    knaben_categories = (4_002_000, 4_003_000, 4_004_000)
     solidtorrents_category = "Apps"
 
     # Software isn't video/audio — no streaming or subtitle features. Use the
@@ -46,12 +48,15 @@ class SoftwareProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Apibay on by default; SolidTorrents off — its software results are
-        noisier (crack-site reposts), so make it opt-in for this provider."""
+        """APIBay on, category-scoped Knaben auto, SolidTorrents manually off."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
             SearchEngine(
-                "SolidTorrents", "🔗", self._search_solidtorrents,
+                "Knaben", "🧭", self._search_knaben,
                 enabled=False, emergency_fallback=True,
+            ),
+            SearchEngine(
+                "SolidTorrents", "🔗", self._search_solidtorrents,
+                enabled=False,
             ),
         ]

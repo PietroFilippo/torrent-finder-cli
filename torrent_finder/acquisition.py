@@ -497,7 +497,7 @@ class LibgenAcquisition:
 
 
 # The registry: one line per non-standard source. Anything absent acquires via
-# magnet-direct (Apibay, SolidTorrents, Nyaa, YTS, …).
+# magnet-direct (Apibay, Knaben, SolidTorrents, Nyaa, YTS, …).
 _DEFAULT = MagnetDirect()
 _BY_SOURCE = {
     "RuTracker": RuTrackerAcquisition(),
