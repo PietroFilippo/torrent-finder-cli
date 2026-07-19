@@ -1,6 +1,7 @@
 # ADR-0009: APIBay last-known-good cache and emergency engines
 
-Status: accepted (2026-07-18)
+Status: accepted (2026-07-18); emergency-engine representation superseded by
+[ADR-0010](0010-knaben-and-explicit-engine-modes.md)
 
 ## Context
 
@@ -39,6 +40,10 @@ emergency engines only if there are zero merged raw rows. Filtering never
 triggers emergency network traffic. An explicit user disable is persisted
 separately and always wins. Legacy saved disabled states without that metadata
 are treated conservatively as explicit.
+
+ADR-0010 later replaced this hidden enabled/disabled distinction with the
+user-visible **On / Auto / Off** model. The trigger described here is retained
+as Auto behavior, while Off is now guaranteed never to make a request.
 
 ## Consequences
 

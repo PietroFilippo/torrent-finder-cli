@@ -22,7 +22,7 @@ Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, n
   - Toggle built-in presets (preferred resolutions, known uploaders/repackers, trusted release groups) using an interactive checklist.
   - Cycle each search engine between **On** (every search), **Auto** (only after all On engines miss), and **Off** (never contacted). Engines without a safe fallback role offer On/Off only.
   - Add custom include/exclude keywords to quickly find the exact release you want.
-  - **Shared keybinds with the episode picker:** `a` select all • `i` invert • `c` clear presets • `w` save • `v` / `Shift+V` visual anchor + range toggle • `Space` toggle current.
+  - **Shared keybinds with the episode picker:** `a` select all / set On • `i` invert • `c` clear presets • `w` save • `v` / `Shift+V` visual anchor + range toggle • `Space` toggles a preset or cycles an engine mode.
   - **Persistent across runs:** engine modes, active filter presets, search history, usage stats, the quiet-mode flag, the chosen download folder, and the dismissed-warning state all live in `filter_state.json` in your user data folder (see [Where your data lives](#where-your-data-lives)), so configuration sticks after you close the program. Mutations are held in an in-memory cache and flushed on exit or after destructive actions (clear history, reset stats, filter-menu Confirm) — no per-event disk hit.
 - **Search History:** Press `H` on the provider screen (or `Tab` then `H` at the search prompt) to browse past searches. Filter by provider (`P`), date range (`D`, today/week/month), and sort order (`S`). Each entry shows the provider, relative timestamp, and the filter presets that were active at search time. Pick an entry to re-run the query; clear history with a confirmation modal.
 - **Usage Stats:** Press `S` on the provider screen (or `Tab` then `S` at the search prompt) to open a scrollable stats page showing session count, total runtime, searches, top queries, torrents picked, method picks vs. completions (with success rate), avg seeders of picks, and preset usage counters. Reset all stats from the same screen, guarded by a confirmation modal.
@@ -406,7 +406,7 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 
 - **Lists & Menus**: Use `Up` and `Down` arrows to navigate.
 - **Select**: Press `Enter` to confirm a choice or open a torrent.
-- **Toggle**: In multi-select menus (like Filters), press `Enter` or `Space` on an item to toggle its checkbox.
+- **Toggle / cycle**: In multi-select menus, press `Enter` or `Space` to toggle a checkbox. In **Filters & engines**, those keys instead cycle engine rows through their available **On / Auto / Off** modes.
 - **Search prompt (multi-title)**: `Ctrl+F` jumps to filters, `Ctrl+N` commits the current title and starts another line, and `Tab` opens quick actions. `Enter` searches all entered titles at once; `Up`/`Down` recall past searches. `Esc` backs out progressively — clear the current line, then restore the last added title for editing, then leave.
 - **Results table (multi-select / batch)**: `Space` ticks a torrent, `a` selects all results, `c` clears. With one or more ticked, `Enter` opens the batch menu (open all in client • download all with `aria2c` • copy all magnets); with nothing ticked, `Enter` opens that single torrent's download menu.
 - **Range Selection (Episode Picker)**: 
@@ -414,11 +414,12 @@ Even after dismissing, you can re-open the warning at any time from the **Select
   - `Shift + V`: Instantly mass-toggle all items between the anchor and your cursor.
   - `a` (Select All) • `i` (Invert Selection) • `c` (Clear) • `w` (Save & Continue).
 - **Configure filters from the provider screen**: Press `F` while a provider is highlighted to jump straight into its engines + filter presets menu, then return to the provider list.
-- **Filter menu keybinds**: `a` select all, `i` invert, `c` clear presets, `w` save & confirm, `v` drop anchor, `Shift+V` range toggle between anchor and cursor, `Space` toggle current. The "Clear filters" button clears preset toggles only — your engine selections are preserved.
+- **Filter menu keybinds**: `a` sets toggleable rows On, `i` inverts On/Off, `c` clears presets, `w` saves and confirms, `v` drops an anchor, `Shift+V` range-toggles between the anchor and cursor, and `Space` toggles a preset or cycles an engine mode. The "Clear filters" button clears preset toggles only — your engine modes are preserved.
 - **History / stats / tips / filters**: On the provider screen press `H` (history), `S` (stats), `T` (tips), or `F` (filters). At the search prompt, press `Tab` for the same quick-actions menu (then `F`/`H`/`S`/`T` or arrows) — your in-progress query is preserved. The prompt itself has no single-letter shortcuts, so queries can start with any letter.
 - **Tips browser**: Use `/` to search across categories, tip text, and tags; `C` to cycle categories; `X` to clear the search/filter; and `Esc` to go back.
 - **Cancel / Back**: Press `Esc` to safely cancel an action, close a menu, or go back to the previous screen.
 - **Quitting**: On the provider menu, quitting takes **two** presses of `Esc` or `Ctrl+C` (mix allowed) — the footer shows *"Press Esc or Ctrl+C again to quit"* after the first, and any other key disarms it. Deeper in a flow, `Ctrl+C` still cancels the running operation instantly.
+- **Post-action exit confirmation**: On the **What's Next?** screen, choosing **Exit** or pressing `Esc` / `Ctrl+C` opens a Y/N confirmation. Declining returns to the same menu.
 
 
 ## Project Architecture
@@ -445,7 +446,7 @@ provider-based — the module paths below are relative to `torrent_finder/`:
 - `subtitles.py`: Logic for searching and downloading subtitles using `subliminal`. Saves into the effective download folder via `constants.get_download_dir()`.
 - `security.py`: Network exposure warning, public-IP/VPN detection via `ip-api.com`.
 - `store.py`: Sole owner of the `filter_state.json` cache, dirty state, migration merge, and flush lifecycle. It writes at `atexit` and when callers explicitly request a flush after destructive actions.
-- `state.py`: Public settings and history operations over `store.py`, including engine toggles, active presets, download preferences, and the one-shot migration from legacy display-name keys (e.g. `"Movies & Series"`) to provider slugs.
+- `state.py`: Public settings and history operations over `store.py`, including engine modes, active presets, download preferences, backward-compatible migration from boolean engine toggles, and the one-shot migration from legacy display-name keys (e.g. `"Movies & Series"`) to provider slugs.
 - `stats.py`: Usage counter recorders and read helpers over the `stats` subtree owned by `store.py`, keyed by provider slug.
 - `torrent_meta.py`: Fetches a torrent's file list from a magnet via `aria2c`. Helpers for episode-number extraction, video/subtitle classification, multi-episode detection (any torrent with ≥ 2 video files), sub-to-video matching (`match_subtitles_for`), and `--select-file` range formatting.
 - `updates.py`: Install-aware update check (git clone / pip-pipx / binary). Rate-limited; compares against `origin` (git) or PyPI (`__version__`), and powers the in-app **Install update** action via `check_for_update()` / `run_update()`.

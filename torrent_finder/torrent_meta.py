@@ -88,11 +88,19 @@ def fetch_file_list(magnet: str, timeout: int = 120, cancel_event=None) -> Torre
             return None
 
         deadline = time.monotonic() + timeout
-        while proc.poll() is None:
-            if (cancel_event is not None and cancel_event.is_set()) or time.monotonic() > deadline:
-                _terminate(proc)
-                return None
-            time.sleep(0.2)
+        try:
+            while proc.poll() is None:
+                if (cancel_event is not None and cancel_event.is_set()) or time.monotonic() > deadline:
+                    _terminate(proc)
+                    return None
+                time.sleep(0.2)
+        except KeyboardInterrupt:
+            # Ctrl+C is operation cancellation here, not application exit.
+            # Mark it exactly like the Esc listener and do not orphan aria2c.
+            if cancel_event is not None:
+                cancel_event.set()
+            _terminate(proc)
+            return None
 
         torrent_path = os.path.join(td, f"{info_hash}.torrent")
         if not os.path.exists(torrent_path):
