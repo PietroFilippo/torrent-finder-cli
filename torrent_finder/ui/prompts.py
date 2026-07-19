@@ -1077,7 +1077,10 @@ def confirm_prompt(message: str, title: str = "Confirm") -> bool:
     sys.stdout.flush()
     try:
         console.print(panel)
-        key = readchar.readkey()
+        try:
+            key = readchar.readkey()
+        except (EOFError, KeyboardInterrupt):
+            return False
         return key.lower() == "y"
     finally:
         sys.stdout.write("\033[?25h\033[?1049l\033[2J\033[H")
@@ -1103,8 +1106,12 @@ def torrent_info_screen(result: dict) -> None:
     import textwrap
     from torrent_finder.torrent_info import fetch_torrent_info
 
-    with console.status("[bold cyan]Fetching torrent info…[/bold cyan]", spinner="dots"):
-        info, err = fetch_torrent_info(result)
+    try:
+        with console.status("[bold cyan]Fetching torrent info…[/bold cyan]", spinner="dots"):
+            info, err = fetch_torrent_info(result)
+    except KeyboardInterrupt:
+        console.print("[warning]Torrent info fetch cancelled.[/warning]")
+        return
 
     if info is None:
         console.print(f"[warning]{err}[/warning]")
@@ -1871,7 +1878,8 @@ def search_again_prompt() -> str | tuple | None:
         - ``'search'`` to search again with the same provider.
         - ``'provider'`` to change provider.
         - ``("history", entry)`` when the user picks a history entry (raw entry dict).
-        - ``None`` (exit).
+        - ``'exit'`` when the Exit row is chosen.
+        - ``None`` when Esc or Ctrl+C cancels the menu.
     """
     items = [
         SelectItem(label="🔍 Search Again", value="search"),
@@ -1895,7 +1903,7 @@ def search_again_prompt() -> str | tuple | None:
             banner=_make_banner_panel(),
             start_index=start,
             footer=(
-                "↑/↓ navigate  •  Enter select  •  Esc cancel\n\n"
+                "↑/↓ navigate  •  Enter select  •  Esc request exit\n\n"
                 f"   {tip_line}"
             ),
         )
@@ -1931,6 +1939,6 @@ def search_again_prompt() -> str | tuple | None:
             continue
 
         if selected == "exit":
-            return None
+            return "exit"
 
         return selected

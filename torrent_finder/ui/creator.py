@@ -48,6 +48,8 @@ def _run_cancellable(fn, message: str, cancel: "threading.Event | None" = None):
         with console.status(f"[bold cyan]{message}[/bold cyan]", spinner="dots"):
             while not out.get("done") and not cancel.is_set():
                 time.sleep(0.05)
+    except KeyboardInterrupt:
+        cancel.set()
     finally:
         stop.set()
     return (cancel.is_set(), out.get("v"))

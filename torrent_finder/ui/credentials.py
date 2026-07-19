@@ -136,8 +136,12 @@ def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) ->
         readchar.readkey()
         return False
 
-    with console.status("[bold cyan]Verifying credentials…[/bold cyan]", spinner="dots"):
-        ok, message = meta.verify(effective)
+    try:
+        with console.status("[bold cyan]Verifying credentials…[/bold cyan]", spinner="dots"):
+            ok, message = meta.verify(effective)
+    except KeyboardInterrupt:
+        console.print("[warning]Verification cancelled — nothing saved.[/warning]")
+        return False
     if ok is True:
         console.print(f"[success]✓ Verified: {message}[/success]")
     elif ok is None:

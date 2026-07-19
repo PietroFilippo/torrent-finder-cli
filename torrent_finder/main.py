@@ -362,6 +362,20 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
 
 
 def browse_results(provider, results, note: str = "") -> str:
+    """Run the results/download flow with Ctrl+C scoped as local Back.
+
+    Individual operations handle cancellation more precisely when they own a
+    child process or cancel event. This boundary catches any remaining nested
+    menu/status interrupt so it can never fall through to ``main()`` and exit.
+    """
+    while True:
+        try:
+            return _browse_results(provider, results, note=note)
+        except KeyboardInterrupt:
+            clear_screen()
+
+
+def _browse_results(provider, results, note: str = "") -> str:
     """Show the torrent results table + download-method UI for ``results``.
 
     Returns ``"back"`` if the user Esc'd the results table (caller steps back a
@@ -382,7 +396,14 @@ def browse_results(provider, results, note: str = "") -> str:
         # next?". A single pick falls through to the full per-torrent download
         # menu below (unchanged).
         if choice[0] == "many":
-            if _batch_flow(provider, results, choice[1]) == "back":
+            try:
+                batch_outcome = _batch_flow(provider, results, choice[1])
+            except KeyboardInterrupt:
+                # A batch status screen is still a nested operation: Ctrl+C
+                # cancels back to the results rather than exiting the app.
+                clear_screen()
+                continue
+            if batch_outcome == "back":
                 continue
             return "next"
 
@@ -394,7 +415,13 @@ def browse_results(provider, results, note: str = "") -> str:
         # to the download-method menu; handoff / direct-download styles finish
         # (or abort) the whole acquisition inside ``pick``. "back" means
         # nothing happened — re-show the results table.
-        outcome = acquisition.for_result(selected).pick(selected)
+        try:
+            outcome = acquisition.for_result(selected).pick(selected)
+        except KeyboardInterrupt:
+            # Magnet resolution / direct handoff is nested below the results
+            # screen, so Ctrl+C behaves like Back here.
+            clear_screen()
+            continue
         if outcome.action == "back":
             clear_screen()
             continue
@@ -451,12 +478,18 @@ def browse_results(provider, results, note: str = "") -> str:
                     continue
                 console.print("[info]Fetching torrent metadata via DHT (this can take 30–60s).[/info]")
                 console.print("[dim]Needs peers — if the torrent has no seeders, this won't work.[/dim]")
-                console.print("[dim]Press Esc to cancel and go back.[/dim]\n")
+                console.print("[dim]Press Esc or Ctrl+C to cancel and go back.[/dim]\n")
                 cancel_event = threading.Event()
                 stop_listener = start_esc_listener(cancel_event)
                 try:
-                    with console.status("[bold cyan]Fetching file list...[/bold cyan]", spinner="dots"):
-                        metadata = session.fetch_files_meta(cancel_event=cancel_event)
+                    try:
+                        with console.status("[bold cyan]Fetching file list...[/bold cyan]", spinner="dots"):
+                            metadata = session.fetch_files_meta(cancel_event=cancel_event)
+                    except KeyboardInterrupt:
+                        # Deeper flows cancel locally. Only the idle provider /
+                        # search screens participate in the double-press quit guard.
+                        cancel_event.set()
+                        metadata = None
                 finally:
                     stop_listener.set()
                 if cancel_event.is_set():
@@ -628,7 +661,13 @@ def _provider_entry(provider, cli_filters) -> str:
             # the keyword prompt shows under the banner like every other provider.
             clear_screen()
             return "keyword"
-        if creator_search_flow(provider, cli_filters, choice, browse_results) == "next":
+        try:
+            creator_outcome = creator_search_flow(
+                provider, cli_filters, choice, browse_results
+            )
+        except KeyboardInterrupt:
+            creator_outcome = "back"
+        if creator_outcome == "next":
             return "next"
         # "back" → re-show the source screen
 
@@ -657,32 +696,47 @@ def _handle_whats_next(current_provider):
     seeds the by-creator one-shot); otherwise it's None and ``query`` drives a
     normal search.
     """
-    choice = search_again_prompt()
-    if isinstance(choice, tuple) and choice[0] == "history":
-        clear_screen()
-        prov, facet, val = _history_pick(choice[1])
-        if prov is None:
-            return (None, current_provider, None, None)  # provider gone → just re-prompt
-        if facet:
-            return (None, prov, facet, val)              # creator replay
-        return (val, prov, None, None)                   # keyword replay
-    if choice == "search":
-        clear_screen()
-        return (None, current_provider, None, None)
-    if choice == "provider":
-        return (None, None, None, None)
-    return "EXIT"
+    from torrent_finder.ui.prompts import confirm_prompt
+
+    while True:
+        choice = search_again_prompt()
+        if choice in (None, "exit"):
+            if confirm_prompt("Exit Torrent Finder?", title="Exit"):
+                return "EXIT"
+            clear_screen()
+            continue
+        if isinstance(choice, tuple) and choice[0] == "history":
+            clear_screen()
+            prov, facet, val = _history_pick(choice[1])
+            if prov is None:
+                return (None, current_provider, None, None)  # provider gone → just re-prompt
+            if facet:
+                return (None, prov, facet, val)              # creator replay
+            return (val, prov, None, None)                   # keyword replay
+        if choice == "search":
+            clear_screen()
+            return (None, current_provider, None, None)
+        if choice == "provider":
+            return (None, None, None, None)
 
 
 def _run_update_flow(info: dict) -> None:
     """Run the install-appropriate update (git pull / pipx / open Releases)."""
     clear_screen()
     console.print("[info]Updating…[/info]\n")
-    ok, msg = run_update(info)
+    try:
+        ok, msg = run_update(info)
+    except KeyboardInterrupt:
+        console.print("\n[warning]Update cancelled.[/warning]")
+        clear_screen()
+        return
     style = "success" if ok else "warning"
     console.print(f"\n[{style}]{msg}[/{style}]")
     console.print("\n[dim]Press any key to continue...[/dim]")
-    readchar.readkey()
+    try:
+        readchar.readkey()
+    except KeyboardInterrupt:
+        pass
     clear_screen()
 
 
@@ -800,7 +854,14 @@ def _main_loop() -> None:
             from torrent_finder.ui.creator import creator_search_flow
             facet, nm = cli_facet, pending_creator_name
             cli_facet = pending_creator_name = None
-            if creator_search_flow(current_provider, cli_filters, facet, browse_results, initial_name=nm) == "next":
+            try:
+                creator_outcome = creator_search_flow(
+                    current_provider, cli_filters, facet, browse_results,
+                    initial_name=nm,
+                )
+            except KeyboardInterrupt:
+                creator_outcome = "back"
+            if creator_outcome == "next":
                 res = _handle_whats_next(current_provider)
                 if res == "EXIT":
                     _goodbye()
@@ -1024,6 +1085,8 @@ def _main_loop() -> None:
             with console.status(f"[bold cyan]Searching {provider.name}...[/bold cyan]", spinner="dots"):
                 while not search_result.get("done") and not cancel_event.is_set():
                     time.sleep(0.05)
+        except KeyboardInterrupt:
+            cancel_event.set()
         finally:
             stop_listener.set()
 

@@ -74,7 +74,7 @@ in `acquisition.py` behind one interface
 (see [ADR-0003](docs/adr/0003-acquisition-seam.md)):
 
 1. **magnet-direct** — result carries a real `info_hash`; build a magnet
-   (Apibay, SolidTorrents, Nyaa, YTS — and any unregistered source).
+   (Apibay, Knaben, SolidTorrents, Nyaa, YTS — and any unregistered source).
 2. **magnet-lazy-resolve** — hash lives on the topic/post page, fetched on
    demand (`rutracker.resolve_info_hash`, `fitgirl.resolve_info_hash`).
 3. **torrent-file-handoff** — no public magnet; fetch the `.torrent` and open
@@ -116,7 +116,7 @@ name persist in history as `kind="creator"` entries.
 
 `store.py` is the single owner of `filter_state.json`: machine-stable location,
 legacy-copy consolidation, in-memory cache, dirty flag, and flush at exit + at
-destructive sites. Everything above it (`state.py` toggles/settings/history,
+destructive sites. Everything above it (`state.py` engine modes/settings/history,
 `stats.py` counters) goes through `store.read()` / `store.write()` /
 `store.flush()` and never touches the file. See
 [ADR-0002](docs/adr/0002-single-store-for-persistence.md) and

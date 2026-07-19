@@ -1,6 +1,6 @@
 """Categorized help and tip catalog for the interactive UI.
 
-The random footer tip and the upcoming all-tips browser read from the same
+The random footer tip and the searchable all-tips browser read from the same
 catalog so shortcut hints, menu guidance, and safety notes stay in one place.
 """
 
@@ -21,7 +21,7 @@ _PROVIDER_CLI_NAMES = ", ".join(provider_cli_choices())
 class Tip:
     """A single user-facing hint.
 
-    ``tags`` are intentionally plain text so the tips browser can later filter
+    ``tags`` are intentionally plain text so the tips browser can filter
     by query without knowing about UI labels or categories.
     """
 
@@ -49,9 +49,10 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
             Tip("Press Esc at the search prompt to go back to provider selection.", ("search", "navigation", "hotkey")),
             Tip("Added a title by mistake? With Ctrl+N titles queued, Esc backs out one step at a time — it clears the line being typed, then restores the last added title for editing; leaving the screen takes one more Esc once everything is empty.", ("search", "multi-title", "undo", "hotkey")),
             Tip("Esc or Ctrl+C on the provider menu asks for a second press before quitting, so a stray key can't close the app; Ctrl+C during an operation still cancels just that operation.", ("navigation", "quit", "hotkey")),
+            Tip("On the What's Next screen, choosing Exit or pressing Esc/Ctrl+C opens a confirmation; declining it returns to the menu.", ("navigation", "quit", "confirmation", "hotkey")),
             Tip("Is a search slow? Press Esc to cancel it instead of waiting out the engine timeouts.", ("search", "cancel", "hotkey")),
             Tip("While typing a query, Left/Right move the cursor and Home/End jump to the ends, so you can fix a typo mid-word.", ("search", "editing", "cursor")),
-            Tip("PirateBay (Apibay) answers slowly (~20s) and paces Movies and Games searches; toggle it off via F on the provider screen for instant results.", ("search", "apibay", "speed")),
+            Tip("APIBay can be slow or intermittently empty. Keep Knaben on Auto for a category-scoped backup when every On engine returns nothing; set APIBay to Off if you prefer speed over its coverage.", ("search", "apibay", "knaben", "auto", "speed", "fallback")),
             Tip("Press F on a highlighted provider to configure its engines and filters without leaving the provider menu.", ("provider", "filters", "hotkey")),
             Tip("Press H on the provider screen to browse search history.", ("provider", "history", "hotkey")),
             Tip("Press S on the provider screen to open usage stats.", ("provider", "stats", "hotkey")),
@@ -61,15 +62,15 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
             Tip("Use -f and -x on the CLI to add ad-hoc include or exclude keywords.", ("cli", "filters")),
             Tip(f"Use -t with a provider name for direct CLI searches. Accepted names: {_PROVIDER_CLI_NAMES}.", ("cli", "provider")),
             Tip("Software is a group: pick it to choose Desktop, Mobile, or RuTracker as the source.", ("software", "apps", "provider")),
-            Tip("Need a desktop program? Software → Desktop searches The Pirate Bay Applications plus SolidTorrents; or -t software on the CLI.", ("software", "apps", "cli")),
-            Tip("Looking for an Android app? Software → Mobile searches The Pirate Bay's Android category (APK/MOD/OBB); it's Android-only. Try -t mobile.", ("mobile", "android", "cli")),
+            Tip("Need a desktop program? Software → Desktop keeps APIBay On, Knaben Auto, and the noisier SolidTorrents Off unless you enable it; or use -t software.", ("software", "apps", "apibay", "knaben", "solidtorrents", "cli")),
+            Tip("Looking for an Android app? Software → Mobile searches APIBay's Android category (APK/MOD/OBB), with Knaben on Auto as a category-scoped backup; it's Android-only. Try -t mobile.", ("mobile", "android", "apibay", "knaben", "cli")),
             Tip("RuTracker (Software → RuTracker) is great for software, audio, and rare content — add your rutracker.org login under Credentials first.", ("rutracker", "credentials", "cli")),
             Tip("Games is a group: pick General (public trackers), Online-Fix (co-op / online game cracks from online-fix.me — no account needed; it saves the .torrent, opens your client, and shows the archive password), or FitGirl (repacks).", ("games", "online-fix", "fitgirl", "provider")),
             Tip("FitGirl (Games → FitGirl) searches the official fitgirl-repacks.site — the trustworthy source for FitGirl repacks (fake 'FitGirl' uploads on public trackers are a known malware vector). No account needed; try -t fitgirl.", ("games", "fitgirl", "cli")),
             Tip("Looking for J-dramas or Asian live-action? Movies & Series searches Nyaa too.", ("movies", "nyaa")),
-            Tip("Manga is a group: pick General (Nyaa Literature + Apibay Comics; try -t manga) or Madokami (private library, direct downloads).", ("manga", "nyaa", "madokami", "provider", "cli")),
+            Tip("Manga is a group: pick General (Nyaa Literature + APIBay Comics, with Knaben Auto fallback; try -t manga) or Madokami (private library, direct downloads).", ("manga", "nyaa", "apibay", "knaben", "madokami", "provider", "cli")),
             Tip("Madokami (Manga → Madokami) downloads volume archives directly — no torrent client involved; picking a series folder opens a volume picker. Needs a madokami.al login under Credentials; try -t madokami.", ("manga", "madokami", "credentials", "cli")),
-            Tip("Books searches Libgen plus The Pirate Bay's E-books and Audio books categories — no login for any of it; try -t books.", ("books", "libgen", "provider", "cli")),
+            Tip("Books keeps Libgen and APIBay's E-books/Audio books search On, with Knaben Auto fallback — no login needed; try -t books.", ("books", "libgen", "apibay", "knaben", "provider", "cli")),
             Tip("Libgen results download the file directly (no torrent client) and show the format and language in the name; Libgen rows always sort above torrent results.", ("books", "libgen", "downloads", "sorting")),
             Tip("Books filter presets cover EPUB, PDF, Kindle (MOBI/AZW3), Audiobook, and English — they match both Libgen rows and torrent release names.", ("books", "filters", "presets")),
         ),
@@ -89,11 +90,15 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
     TipCategory(
         "Filters & Selection",
         (
-            Tip("Filter menu keybinds: a select all, i invert, c clear presets, w save.", ("filters", "keybinds")),
+            Tip("Filter menu keybinds: a sets toggleable rows On, i inverts On/Off, c clears presets, and w saves.", ("filters", "engines", "modes", "keybinds")),
             Tip("Episode and filter pickers share keybinds: v drops an anchor, Shift+V toggles the range.", ("selection", "keybinds", "range")),
-            Tip("Press Space or Enter on toggleable rows to change their checkbox state.", ("selection", "keybinds")),
-            Tip("The Clear filters action clears preset toggles only; engine selections are preserved.", ("filters", "presets", "engines")),
-            Tip("Your engine and preset toggles persist across runs in filter_state.json.", ("filters", "state", "persistence")),
+            Tip("In Filters & engines, Space or Enter cycles an engine through its available modes; preset and episode rows still toggle checkboxes.", ("selection", "filters", "engines", "modes", "keybinds")),
+            Tip("Engine modes are explicit: On runs every search, Auto runs only after every On engine returns zero raw rows, and Off is never contacted.", ("filters", "engines", "on", "auto", "off", "fallback")),
+            Tip("Knaben starts on Auto for public-tracker providers. It makes one category-scoped fallback request only on a total raw miss, before local filters are applied.", ("filters", "engines", "knaben", "auto", "fallback", "categories")),
+            Tip("YTS and SolidTorrents start Off because they can be unreliable or noisy; enable them manually when you want their extra coverage.", ("filters", "engines", "yts", "solidtorrents", "off", "coverage")),
+            Tip("Knaben results show the originating tracker as Origin under the selected row, so you can see which index supplied the torrent.", ("results", "knaben", "origin", "tracker", "provenance")),
+            Tip("The Clear filters action clears preset toggles only; engine modes are preserved.", ("filters", "presets", "engines", "modes")),
+            Tip("Your engine modes and preset toggles persist across runs in filter_state.json.", ("filters", "engines", "modes", "state", "persistence")),
             Tip("Results are deduped by info hash across engines, then sorted by seeders.", ("results", "dedupe", "sorting")),
             Tip("Want untranslated manga? Turn on the Nyaa (Raw) engine from the filter menu (press F on the provider screen); it is off by default.", ("manga", "nyaa", "filters")),
             Tip("The result table stays on screen after selection so you can see what you picked.", ("results", "ui")),
@@ -115,7 +120,7 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
             Tip("Book torrents are often bundles (\"500 EPUBs\", audiobook chapter folders) — Browse torrent files + aria2c grabs only the files you tick.", ("books", "downloads", "episode picker", "selection")),
             Tip("The episode picker remembers your previous selection; re-open it to refine, not rebuild.", ("episode picker", "selection", "state")),
             Tip("Confirming the picker with nothing checked clears the selection; Esc keeps your prior picks.", ("episode picker", "selection", "hotkey")),
-            Tip("File-list fetch stalling on a low-seed torrent? Press Esc to cancel and go back.", ("episode picker", "metadata", "hotkey")),
+            Tip("File-list fetch stalling on a low-seed torrent? Press Esc or Ctrl+C to cancel it and return to the download menu — Ctrl+C does not exit the app there.", ("episode picker", "metadata", "cancel", "hotkey")),
             Tip("The desktop-client magnet option cannot pre-filter files; uncheck unwanted files in the client dialog.", ("downloads", "magnet", "selection")),
             Tip("Copy magnet link puts the selected torrent's magnet URI on your clipboard.", ("downloads", "magnet", "clipboard")),
             Tip("Set a default save folder with Save to (download menu) or 📁 Download folder (provider screen); it applies to aria2c, webtorrent, peerflix, subtitles, and Online-Fix / Madokami file saves.", ("downloads", "settings", "folder", "provider")),
@@ -220,8 +225,7 @@ def iter_tips(*, rotating_only: bool = False) -> tuple[Tip, ...]:
 def find_tips(query: str = "", category: str | None = None) -> list[tuple[TipCategory, Tip]]:
     """Return catalog tips matching a text query and optional category name.
 
-    Matching is case-insensitive across category name, tip text, and tags. The
-    viewer will use this in a later commit for in-page search and filtering.
+    Matching is case-insensitive across category name, tip text, and tags.
     """
     needle = query.strip().lower()
     category_key = category.strip().lower() if category else ""
