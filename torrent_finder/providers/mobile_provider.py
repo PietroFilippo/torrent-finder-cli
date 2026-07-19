@@ -15,6 +15,7 @@ class MobileProvider(BaseProvider):
     slug = "mobile"
     icon = "📱"
     categories = [306]  # The Pirate Bay "Android" (iOS 305 left out on purpose)
+    knaben_categories = (8_001_000,)  # Mobile / Android
     solidtorrents_category = "Apps"
     search_note = "Mobile is Android-only (APK / MOD / OBB); iOS/IPA isn't covered."
 
@@ -38,11 +39,15 @@ class MobileProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Apibay on by default; SolidTorrents off (noisier, ignores category)."""
+        """APIBay on, Android-scoped Knaben auto, SolidTorrents manually off."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
             SearchEngine(
-                "SolidTorrents", "🔗", self._search_solidtorrents,
+                "Knaben", "🧭", self._search_knaben,
                 enabled=False, emergency_fallback=True,
+            ),
+            SearchEngine(
+                "SolidTorrents", "🔗", self._search_solidtorrents,
+                enabled=False,
             ),
         ]

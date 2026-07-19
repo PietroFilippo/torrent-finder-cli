@@ -10,6 +10,7 @@ class AnimeProvider(BaseProvider):
     slug = "anime"
     icon = "🍙"
     categories = [201, 205, 207, 208]  # Movies, TV, HD Movies, HD TV
+    knaben_categories = (6_000_000,)  # Anime parent category
     solidtorrents_category = "Anime"
     nyaa_category = "1_2"  # Anime - English-translated
 
@@ -47,12 +48,16 @@ class AnimeProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Nyaa enabled by default; Apibay and SolidTorrents available but off."""
+        """Nyaa on, category-scoped Knaben auto, other public engines off."""
         return [
             SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),
+            SearchEngine(
+                "Knaben", "🧭", self._search_knaben,
+                enabled=False, emergency_fallback=True,
+            ),
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=False),
             SearchEngine(
                 "SolidTorrents", "🔗", self._search_solidtorrents,
-                enabled=False, emergency_fallback=True,
+                enabled=False,
             ),
         ]

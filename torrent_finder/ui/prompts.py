@@ -536,7 +536,10 @@ def filter_menu(provider) -> None:
             items.append(SelectItem(
                 label=f"{engine.icon} {engine.name}",
                 value=("engine", engine),
-                toggled=engine.enabled,
+                toggle_states=tuple(
+                    mode.title() for mode in engine.available_modes
+                ),
+                toggle_state=engine.mode.title(),
             ))
             engine_indices.append(len(items) - 1)
 
@@ -577,13 +580,23 @@ def filter_menu(provider) -> None:
     def _select_all(cursor, items_list):
         for i in toggle_indexes:
             if items_list[i].enabled:
-                items_list[i].toggled = True
+                if items_list[i].toggle_states:
+                    items_list[i].toggle_state = "On"
+                else:
+                    items_list[i].toggled = True
         return True
 
     def _invert(cursor, items_list):
         for i in toggle_indexes:
             if items_list[i].enabled:
-                items_list[i].toggled = not items_list[i].toggled
+                if items_list[i].toggle_states:
+                    items_list[i].toggle_state = (
+                        "Off"
+                        if items_list[i].toggle_state == "On"
+                        else "On"
+                    )
+                else:
+                    items_list[i].toggled = not items_list[i].toggled
         return True
 
     def _clear(cursor, items_list):
@@ -610,18 +623,26 @@ def filter_menu(provider) -> None:
             return _set_anchor(cursor, items_list)
         t_set = _toggle_set()
         lo, hi = sorted([anchor["idx"], cursor])
-        anchor_now = items_list[anchor["idx"]].toggled
+        anchor_item = items_list[anchor["idx"]]
+        anchor_now = (
+            anchor_item.toggle_state == "On"
+            if anchor_item.toggle_states
+            else anchor_item.toggled
+        )
         target = not anchor_now
         for i in range(lo, hi + 1):
             if i in t_set and items_list[i].enabled:
-                items_list[i].toggled = target
+                if items_list[i].toggle_states:
+                    items_list[i].toggle_state = "On" if target else "Off"
+                else:
+                    items_list[i].toggled = target
         items_list[anchor["idx"]].marker = ""
         anchor["idx"] = None
         return True
 
     def _toggle_current(cursor, items_list):
         if cursor in _toggle_set() and items_list[cursor].enabled:
-            items_list[cursor].toggled = not items_list[cursor].toggled
+            items_list[cursor].cycle_toggle()
         return True
 
     def handle_filter_action(idx, items):
@@ -655,7 +676,7 @@ def filter_menu(provider) -> None:
         start_index=start,
         key_actions=key_actions,
         footer=(
-            "↑/↓ nav  •  Space/Enter toggle  •  "
+            "↑/↓ nav  •  Space/Enter cycle  •  "
             "[bold yellow]v[/bold yellow] anchor  •  [bold yellow]shift + v or V[/bold yellow] range  •  "
             "[bold yellow]a[/bold yellow]ll/[bold yellow]i[/bold yellow]nvert/[bold yellow]c[/bold yellow]lear  •  "
             "[bold green]w[/bold green] save  •  Esc cancel"
@@ -668,13 +689,11 @@ def filter_menu(provider) -> None:
     action = items[result_idx].value
 
     if action == "confirm":
-        # Apply engine toggles
+        # Apply engine modes
         for idx in engine_indices:
             item = items[idx]
             _type, engine = item.value
-            if engine.enabled != item.toggled:
-                engine.explicitly_disabled = not item.toggled
-            engine.enabled = item.toggled
+            engine.set_mode(item.toggle_state.casefold())
 
         # Apply preset toggles
         provider.active_presets.clear()

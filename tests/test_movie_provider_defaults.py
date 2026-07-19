@@ -48,7 +48,7 @@ class MovieProviderDefaultsTests(unittest.TestCase):
             engine.name for engine in provider.engines
             if engine.emergency_fallback
         }
-        self.assertEqual(emergency, {"SolidTorrents", "YTS"})
+        self.assertEqual(emergency, {"Knaben"})
 
     def test_apibay_covers_movie_and_tv_release_categories(self):
         self.assertEqual(

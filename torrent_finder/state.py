@@ -1,4 +1,4 @@
-"""Persist engine toggles, active filter presets, history, and misc settings.
+"""Persist engine modes, active filter presets, history, and misc settings.
 
 Persistence itself (cache / dirty / flush of filter_state.json) is owned by
 ``store.py``; this module reads and mutates the dict through that interface.
@@ -71,10 +71,17 @@ def load_state(providers) -> None:
             continue
 
         saved_engines = pstate.get("engines", {})
+        saved_modes = pstate.get("engine_modes")
         explicit_names = pstate.get("explicitly_disabled_engines")
         has_explicit_metadata = isinstance(explicit_names, list)
         explicit_names = set(explicit_names or ())
         for engine in provider.engines:
+            if isinstance(saved_modes, dict) and engine.name in saved_modes:
+                try:
+                    engine.set_mode(saved_modes[engine.name])
+                    continue
+                except (TypeError, ValueError):
+                    pass
             if engine.name in saved_engines:
                 engine.enabled = bool(saved_engines[engine.name])
                 engine.explicitly_disabled = (
@@ -99,8 +106,11 @@ def save_state(providers) -> None:
     data["providers"] = {
         p.slug: {
             "engines": {e.name: e.enabled for e in p.engines},
+            "engine_modes": {e.name: e.mode for e in p.engines},
             "explicitly_disabled_engines": [
-                e.name for e in p.engines if e.explicitly_disabled
+                e.name
+                for e in p.engines
+                if e.mode == "off" and e.explicitly_disabled
             ],
             "active_presets": [pr.name for pr in p.active_presets],
         }

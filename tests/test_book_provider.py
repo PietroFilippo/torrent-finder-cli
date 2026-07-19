@@ -136,7 +136,7 @@ class BookProviderTests(unittest.TestCase):
         enabled = {e.name for e in provider.engines if e.enabled}
         self.assertEqual(enabled, {"Libgen", "Apibay"})
         emergency = {e.name for e in provider.engines if e.emergency_fallback}
-        self.assertEqual(emergency, {"SolidTorrents"})
+        self.assertEqual(emergency, {"Knaben"})
 
     def test_apibay_covers_ebook_and_audiobook_categories(self):
         self.assertEqual(set(BookProvider.categories), {601, 102})

@@ -72,6 +72,8 @@ def _selected_metadata(
     parts: list[str] = []
     if not layout.source:
         parts.append(f"Source: {_source_label(item)}")
+    if item.get("source") == "Knaben" and item.get("knaben_tracker"):
+        parts.append(f"Origin: {item.get('knaben_tracker')}")
     if show_from and not layout.from_work and item.get("from_work"):
         parts.append(f"From: {item.get('from_work')}")
     if not layout.size:

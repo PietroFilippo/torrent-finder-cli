@@ -46,6 +46,30 @@ class SelectItem:
     description: str = ""  # Dim context-help shown above the footer when cursor on this item
     marker: str = ""      # Inline marker (e.g. 📍 for range-select anchor)
     passive: bool = False  # Navigable but Enter is a no-op (for read-only rows in a scroll view)
+    # Named states are appended to preserve the positional constructor order
+    # used by older SelectItem call sites.
+    toggle_states: tuple[str, ...] = ()
+    toggle_state: str = ""
+
+    def __post_init__(self) -> None:
+        if self.toggle_states and self.toggle_state not in self.toggle_states:
+            self.toggle_state = self.toggle_states[0]
+
+    def cycle_toggle(self) -> None:
+        """Cycle a named state, or flip the legacy boolean checkbox."""
+        if not self.toggle_states:
+            self.toggled = not self.toggled
+            return
+        current = self.toggle_states.index(self.toggle_state)
+        self.toggle_state = self.toggle_states[
+            (current + 1) % len(self.toggle_states)
+        ]
+
+
+def _toggle_badge(item: "SelectItem") -> str:
+    if item.toggle_states:
+        return f"[{item.toggle_state}]"
+    return f"[{'✓' if item.toggled else ' '}]"
 
 
 def _compute_window(n: int, cursor: int, max_visible: int) -> tuple[int, int]:
@@ -82,7 +106,7 @@ def _inline_hint(item: "SelectItem") -> bool:
 def _label_avail_width(item: "SelectItem", multi: bool) -> int:
     """Return terminal cells available for an item's one-line label."""
     if multi and not item.is_action:
-        prefix_len = cell_len("  ❯ [✓] ")
+        prefix_len = cell_len(f"  ❯ {_toggle_badge(item)} ")
     else:
         prefix_len = cell_len("  ❯ ")
     hint_len = cell_len(f"  {item.hint}") if _inline_hint(item) else 0
@@ -202,8 +226,8 @@ def _build_panel(
             continue
 
         if multi and not item.is_action:
-            check = "✓" if item.toggled else " "
-            prefix = f"  ❯ [{check}] " if is_cursor else f"    [{check}] "
+            badge = _toggle_badge(item)
+            prefix = f"  ❯ {badge} " if is_cursor else f"    {badge} "
         else:
             prefix = "  ❯ " if is_cursor else "    "
 
@@ -437,9 +461,9 @@ def arrow_select(
                         else:
                             return cursor
                     else:
-                        # Toggle the item
+                        # Toggle/cycle the item
                         if items[cursor].enabled:
-                            items[cursor].toggled = not items[cursor].toggled
+                            items[cursor].cycle_toggle()
                 else:
                     if items[cursor].enabled:
                         if items[cursor].passive:
