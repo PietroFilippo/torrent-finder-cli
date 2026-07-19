@@ -46,6 +46,114 @@ class SearchResultContractTests(unittest.TestCase):
         self.assertEqual(result.get("unexpected"), "kept")
 
 class BaseProviderSearchContractTests(unittest.TestCase):
+    def test_search_runs_emergency_engine_only_when_enabled_engines_are_empty(self):
+        emergency_calls = []
+
+        def empty_engine(query):
+            return []
+
+        def emergency_engine(query):
+            emergency_calls.append(query)
+            return [
+                {
+                    "name": "Emergency row",
+                    "info_hash": "emergency",
+                    "seeders": "4",
+                    "source": "Backup",
+                }
+            ]
+
+        provider = FakeProvider(
+            [
+                ("primary", empty_engine, True),
+                ("backup", emergency_engine, False),
+            ]
+        )
+        provider.engines[1].emergency_fallback = True
+
+        results = provider.search("query")
+
+        self.assertEqual([result.name for result in results], ["Emergency row"])
+        self.assertEqual(emergency_calls, ["query"])
+
+    def test_search_skips_emergency_engine_after_any_enabled_engine_hit(self):
+        emergency_calls = []
+
+        def primary_engine(query):
+            return [
+                {
+                    "name": "Primary row",
+                    "info_hash": "primary",
+                    "seeders": "5",
+                    "source": "Primary",
+                }
+            ]
+
+        def emergency_engine(query):
+            emergency_calls.append(query)
+            return []
+
+        provider = FakeProvider(
+            [
+                ("primary", primary_engine, True),
+                ("backup", emergency_engine, False),
+            ]
+        )
+        provider.engines[1].emergency_fallback = True
+
+        results = provider.search("query")
+
+        self.assertEqual([result.name for result in results], ["Primary row"])
+        self.assertEqual(emergency_calls, [])
+
+    def test_search_respects_explicitly_disabled_emergency_engine(self):
+        emergency_calls = []
+
+        def emergency_engine(query):
+            emergency_calls.append(query)
+            return []
+
+        provider = FakeProvider(
+            [
+                ("primary", lambda query: [], True),
+                ("backup", emergency_engine, False),
+            ]
+        )
+        provider.engines[1].emergency_fallback = True
+        provider.engines[1].explicitly_disabled = True
+
+        self.assertEqual(provider.search("query"), [])
+        self.assertEqual(emergency_calls, [])
+
+    def test_filters_do_not_turn_a_primary_hit_into_an_emergency_search(self):
+        emergency_calls = []
+
+        def primary_engine(query):
+            return [
+                {
+                    "name": "Low seed primary row",
+                    "info_hash": "primary",
+                    "seeders": "1",
+                    "source": "Primary",
+                }
+            ]
+
+        def emergency_engine(query):
+            emergency_calls.append(query)
+            return []
+
+        provider = FakeProvider(
+            [
+                ("primary", primary_engine, True),
+                ("backup", emergency_engine, False),
+            ]
+        )
+        provider.engines[1].emergency_fallback = True
+        provider.default_filters = FilterConfig(min_seeds=5)
+
+        self.assertEqual(provider.search("query"), [])
+        self.assertEqual(emergency_calls, [])
+
     def test_search_merges_enabled_engines_dedupes_hashes_and_sorts_by_seeders(self):
         def engine_one(query):
             self.assertEqual(query, "query")

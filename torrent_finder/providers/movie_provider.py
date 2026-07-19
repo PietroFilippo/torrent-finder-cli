@@ -94,8 +94,14 @@ class MovieProvider(BaseProvider):
         """Movies default to Apibay + Nyaa; SolidTorrents and YTS are opt-in."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
-            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=False),
-            SearchEngine("YTS", "🎥", self._search_yts, enabled=False),
+            SearchEngine(
+                "SolidTorrents", "🔗", self._search_solidtorrents,
+                enabled=False, emergency_fallback=True,
+            ),
+            SearchEngine(
+                "YTS", "🎥", self._search_yts,
+                enabled=False, emergency_fallback=True,
+            ),
             SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),
         ]
 

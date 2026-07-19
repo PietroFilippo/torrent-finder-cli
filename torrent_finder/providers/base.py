@@ -12,6 +12,7 @@ from urllib.parse import quote, quote_plus, urlencode
 
 import requests
 
+from torrent_finder import apibay_cache
 from torrent_finder.constants import API_URL, console
 from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
 from torrent_finder.search_result import SearchResult, normalize_result
@@ -49,8 +50,8 @@ _APIBAY_FALLBACK_IGNORED = {
 
 
 def _apibay_title_case(query: str) -> str:
-    """Uppercase the first letter of each word, leaving the rest untouched."""
-    return " ".join(word[:1].upper() + word[1:] for word in query.split())
+    """Return a stable title-cased spelling, including all-uppercase input."""
+    return " ".join(word.capitalize() for word in query.casefold().split())
 
 
 def _apibay_fallback_query(query: str) -> str | None:
@@ -83,6 +84,8 @@ class SearchEngine:
     icon: str
     search_fn: Callable[[object, str], list[dict | SearchResult]]  # bound method reference
     enabled: bool = True
+    emergency_fallback: bool = False
+    explicitly_disabled: bool = False
 
 
 class BaseProvider(ABC):
@@ -120,6 +123,7 @@ class BaseProvider(ABC):
     # disables the by-creator quick action for this provider. Populated by
     # subclasses with resolvers.CreatorFacet instances.
     creator_facets: list = []
+    apibay_cache_enabled: bool = True
 
     # Optional one-line caveat shown when this provider is selected/searched
     # (e.g. Mobile noting it's Android-only). Empty = no note.
@@ -141,16 +145,29 @@ class BaseProvider(ABC):
         return f"{self.icon} {self.name}"
 
     def _apibay_retry_queries(self, query: str) -> Iterator[str]:
-        # Apibay sometimes serves a stale no-results answer for an
-        # all-lowercase query while a recased spelling of the same words
-        # matches, so retry a title-cased variant before degrading the query.
-        yield _apibay_title_case(query)
+        # APIBay's query cache is case-sensitive. Preserve the user's spelling
+        # for the first request, then retry the complete normalized phrase in
+        # lowercase and title case before degrading it. In particular,
+        # FINDING NEMO must be able to become finding nemo.
+        normalized = " ".join(query.split())
+        yield normalized.casefold()
+        yield _apibay_title_case(normalized)
         fallback = _apibay_fallback_query(query)
         if fallback:
             yield fallback
             yield _apibay_title_case(fallback)
 
     def _search_apibay(self, query: str) -> list[SearchResult]:
+        """Search APIBay live, then use its last successful rows on empties."""
+        results = self._search_apibay_live(query)
+        if not self.apibay_cache_enabled:
+            return results
+        if results:
+            apibay_cache.store(self.slug, query, results)
+            return results
+        return apibay_cache.load(self.slug, query)
+
+    def _search_apibay_live(self, query: str) -> list[SearchResult]:
         """Search Apibay with conservative provider-specific query retries.
 
         Apibay's phrase matching can return either a no-results sentinel or
@@ -158,20 +175,27 @@ class BaseProvider(ABC):
         after filtering leaves no provider results. Network failures stop the
         retry chain.
         """
-        def fetch(search_query: str, category: int = 0) -> list[dict] | None:
-            # Apibay's backend nodes disagree on space encoding: some only
-            # decode %20 (treating "+" as a literal), others the reverse —
-            # and which one answers varies by the hour. Try %20 first and
-            # retry a no-results answer with "+" before believing it.
-            empty: "list[dict] | None" = None
-            tried_encodings: set[str] = set()
+        def fetch(
+            search_query: str, category: str | int | None = None
+        ) -> list[dict] | None:
+            # The documented all-category request omits cat. APIBay's cache
+            # does not treat that as equivalent to cat=0: during the July
+            # 2026 incident, finding nemo&cat=0 returned the empty sentinel
+            # while omitting cat returned 100 rows.
+            query_params: dict[str, str | int] = {"q": search_query}
+            if category is not None:
+                query_params["cat"] = category
+
+            # Edge nodes have disagreed on %20 versus "+" space decoding.
+            # Keep both deterministic encodings, but do not mutate the query
+            # or add random cache keys: that multiplied one search into more
+            # than twenty requests without fixing poisoned queries.
+            tried: set[str] = set()
+            answered = False
             for quoter in (quote, quote_plus):
-                params = urlencode(
-                    {"q": search_query, "cat": category}, quote_via=quoter
-                )
-                if params in tried_encodings:
-                    continue  # no space in the query → both encodings match
-                tried_encodings.add(params)
+                params = urlencode(query_params, quote_via=quoter)
+                if params in tried:
+                    continue
                 try:
                     response = requests.get(
                         API_URL,
@@ -182,16 +206,21 @@ class BaseProvider(ABC):
                     response.raise_for_status()
                     data = response.json()
                 except (requests.RequestException, ValueError):
-                    return None
-
-                if (
-                    isinstance(data, list)
-                    and data
-                    and not (len(data) == 1 and data[0].get("id") == "0")
-                ):
-                    return data
-                empty = []
-            return empty
+                    # Do not mark a failed encoding as tried. For a one-word
+                    # query, the second encoder then provides one transport
+                    # retry even though its query string is identical.
+                    continue
+                tried.add(params)
+                if not isinstance(data, list):
+                    continue
+                answered = True
+                rows = [item for item in data if isinstance(item, dict)]
+                if not rows:
+                    continue
+                if len(rows) == 1 and str(rows[0].get("id")) == "0":
+                    continue
+                return rows
+            return [] if answered else None
 
         wanted = {str(category) for category in self.categories}
 
@@ -201,10 +230,16 @@ class BaseProvider(ABC):
                 if str(item.get("category", "")) not in wanted:
                     continue
                 tid = item.get("id")
+                raw_name = item.get("name")
+                name = (
+                    raw_name
+                    if isinstance(raw_name, str) and raw_name
+                    else "Unknown"
+                )
                 results.append(SearchResult(
                     # Apibay HTML-escapes quotes in names (&quot;) to keep its
                     # JSON valid — undo that for display.
-                    name=unescape(item.get("name", "Unknown")),
+                    name=unescape(name),
                     info_hash=item.get("info_hash", ""),
                     seeders=item.get("seeders", 0),
                     leechers=item.get("leechers", 0),
@@ -218,7 +253,11 @@ class BaseProvider(ABC):
                 ))
             return results
 
-        data = fetch(query)
+        normalized_query = " ".join(query.split())
+        if not normalized_query:
+            return []
+
+        data = fetch(normalized_query)
         if data is None:
             return []
 
@@ -227,26 +266,22 @@ class BaseProvider(ABC):
             return results
 
         if self.apibay_fallback_categories:
-            seen: set[str] = set()
-            for category in self.apibay_fallback_categories:
-                category_data = fetch(query, category)
-                if category_data is None:
-                    continue
-                for item in matching_results(category_data):
-                    key = (
-                        item.info_hash.casefold()
-                        or f"name:{item.name.casefold()}"
-                    )
-                    if key not in seen:
-                        seen.add(key)
-                        results.append(item)
+            # APIBay accepts comma-separated categories (the same form used
+            # by TPB indexer clients). One scoped fallback is both broader and
+            # gentler on the service than one request per category.
+            category_filter = ",".join(
+                str(category) for category in self.apibay_fallback_categories
+            )
+            category_data = fetch(normalized_query, category_filter)
+            if category_data is not None:
+                results = matching_results(category_data)
             if results:
                 return results
 
         # Dedupe retries by exact string: Apibay treats differently-cased
         # spellings of the same words as distinct queries (see above).
-        tried = {query}
-        for fallback in self._apibay_retry_queries(query):
+        tried = {normalized_query}
+        for fallback in self._apibay_retry_queries(normalized_query):
             if fallback in tried:
                 continue
             tried.add(fallback)
@@ -349,7 +384,7 @@ class BaseProvider(ABC):
         return results
 
     def search(self, query: str, cli_filters: FilterConfig | None = None) -> list[SearchResult]:
-        """Search all enabled engines concurrently, merge, dedupe, and sort by seeds."""
+        """Search enabled engines, then safe emergency engines if all are empty."""
         seen_hashes: set[str] = set()
         merged: list[SearchResult] = []
 
@@ -357,21 +392,40 @@ class BaseProvider(ABC):
         if not active_engines:
             return []
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(active_engines)) as executor:
-            future_to_engine = {
-                executor.submit(e.search_fn, query): e for e in active_engines
-            }
-            for future in concurrent.futures.as_completed(future_to_engine):
-                try:
-                    data = future.result()
-                    for raw_item in data:
-                        item = normalize_result(raw_item)
-                        h = item.info_hash.lower()
-                        if h and h not in seen_hashes:
-                            seen_hashes.add(h)
-                            merged.append(item)
-                except Exception:
-                    pass
+        def run_engines(engines: list[SearchEngine]) -> None:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=len(engines)
+            ) as executor:
+                future_to_engine = {
+                    executor.submit(engine.search_fn, query): engine
+                    for engine in engines
+                }
+                for future in concurrent.futures.as_completed(future_to_engine):
+                    try:
+                        data = future.result()
+                        for raw_item in data:
+                            item = normalize_result(raw_item)
+                            info_hash = item.info_hash.lower()
+                            if info_hash and info_hash not in seen_hashes:
+                                seen_hashes.add(info_hash)
+                                merged.append(item)
+                    except Exception:
+                        pass
+
+        run_engines(active_engines)
+
+        if not merged:
+            emergency_engines = [
+                engine
+                for engine in self.engines
+                if (
+                    not engine.enabled
+                    and engine.emergency_fallback
+                    and not engine.explicitly_disabled
+                )
+            ]
+            if emergency_engines:
+                run_engines(emergency_engines)
 
         # Apply filters
         # 1. Default provider filters

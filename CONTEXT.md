@@ -39,6 +39,14 @@ provider fans a query out to all enabled engines concurrently, merges on
 `info_hash`, filters, and sorts by seeders. Engines are user-toggleable per
 provider; the toggle persists under the provider's slug.
 
+A default-off engine may be marked as an emergency fallback. It runs only when
+the enabled engines produced zero raw rows, before filtering, and never after
+the user explicitly disables it. APIBay additionally keeps a bounded
+last-known-good result set per normalized provider/query. Live search always
+runs first; cached rows preserve `source="Apibay"` for acquisition routing
+and carry presentation-only cache provenance. See
+[ADR-0009](docs/adr/0009-apibay-last-known-good-and-emergency-engines.md).
+
 ## Result
 
 What a search returns: a `SearchResult` (`search_result.py`) per row. Common

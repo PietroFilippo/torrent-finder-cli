@@ -50,5 +50,8 @@ class SoftwareProvider(BaseProvider):
         noisier (crack-site reposts), so make it opt-in for this provider."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
-            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=False),
+            SearchEngine(
+                "SolidTorrents", "🔗", self._search_solidtorrents,
+                enabled=False, emergency_fallback=True,
+            ),
         ]

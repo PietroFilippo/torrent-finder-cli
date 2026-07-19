@@ -71,9 +71,17 @@ def load_state(providers) -> None:
             continue
 
         saved_engines = pstate.get("engines", {})
+        explicit_names = pstate.get("explicitly_disabled_engines")
+        has_explicit_metadata = isinstance(explicit_names, list)
+        explicit_names = set(explicit_names or ())
         for engine in provider.engines:
             if engine.name in saved_engines:
                 engine.enabled = bool(saved_engines[engine.name])
+                engine.explicitly_disabled = (
+                    engine.name in explicit_names
+                    if has_explicit_metadata
+                    else not engine.enabled
+                )
 
         saved_preset_names = pstate.get("active_presets", [])
         provider.active_presets = [
@@ -91,6 +99,9 @@ def save_state(providers) -> None:
     data["providers"] = {
         p.slug: {
             "engines": {e.name: e.enabled for e in p.engines},
+            "explicitly_disabled_engines": [
+                e.name for e in p.engines if e.explicitly_disabled
+            ],
             "active_presets": [pr.name for pr in p.active_presets],
         }
         for p in providers

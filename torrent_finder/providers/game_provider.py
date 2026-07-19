@@ -15,6 +15,9 @@ class GameProvider(BaseProvider):
     icon = "🎮"
     search_note = "PC, consoles, ROMs & repacks from public trackers (Apibay + SolidTorrents)."
     categories = [400, 401, 403, 404, 405, 406]  # All, PC, PSX, Xbox, Wii, Handheld
+    # APIBay's unscoped query cache can return false empty sentinels. Retry
+    # once with all game categories in a single comma-separated request.
+    apibay_fallback_categories = tuple(categories)
     solidtorrents_category = "Game"
 
     default_filters = FilterConfig(exclude_keywords=["update only", "update v"])

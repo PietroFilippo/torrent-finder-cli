@@ -57,7 +57,10 @@ class BookProvider(BaseProvider):
         return [
             SearchEngine("Libgen", "📖", self._search_libgen, enabled=True),
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
-            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=False),
+            SearchEngine(
+                "SolidTorrents", "🔗", self._search_solidtorrents,
+                enabled=False, emergency_fallback=True,
+            ),
         ]
 
     def _search_libgen(self, query: str) -> list[SearchResult]:

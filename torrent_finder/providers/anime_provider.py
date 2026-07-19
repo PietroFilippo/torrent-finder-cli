@@ -51,5 +51,8 @@ class AnimeProvider(BaseProvider):
         return [
             SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=False),
-            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=False),
+            SearchEngine(
+                "SolidTorrents", "🔗", self._search_solidtorrents,
+                enabled=False, emergency_fallback=True,
+            ),
         ]

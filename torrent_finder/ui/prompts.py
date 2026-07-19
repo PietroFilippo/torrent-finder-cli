@@ -672,6 +672,8 @@ def filter_menu(provider) -> None:
         for idx in engine_indices:
             item = items[idx]
             _type, engine = item.value
+            if engine.enabled != item.toggled:
+                engine.explicitly_disabled = not item.toggled
             engine.enabled = item.toggled
 
         # Apply preset toggles
