@@ -445,7 +445,12 @@ def arrow_select(
         draw(0)
 
         while True:
-            key = readchar.readkey()
+            try:
+                key = readchar.readkey()
+            except KeyboardInterrupt:
+                # Some terminals raise for Ctrl+C instead of returning \x03.
+                # Treat both forms exactly like Esc at the active selector.
+                return None
             prev_cursor = cursor
 
             if key == readchar.key.UP:
