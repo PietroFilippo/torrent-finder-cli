@@ -52,7 +52,10 @@ from torrent_finder.ui.prompts import (
 )
 from torrent_finder.terminal_check import advise_limited_terminal
 from torrent_finder.ui.table import interactive_select
-from torrent_finder.updates import check_for_update, notice_line, run_update
+from torrent_finder.updates import (
+    check_for_update, consume_update_report, needs_exit_before_update,
+    notice_line, run_update,
+)
 from torrent_finder.utils import start_esc_listener
 
 load_state(PROVIDERS)
@@ -476,8 +479,8 @@ def _browse_results(provider, results, note: str = "") -> str:
                     console.print("[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
-                console.print("[info]Fetching torrent metadata via DHT (this can take 30–60s).[/info]")
-                console.print("[dim]Needs peers — if the torrent has no seeders, this won't work.[/dim]")
+                console.print("[info]Looking for online peers that can share the torrent's file list…[/info]")
+                console.print("[dim]This may take a minute or time out. Listed seed counts can be stale; even a torrent showing seeders may have no reachable metadata peers right now.[/dim]")
                 console.print("[dim]Press Esc or Ctrl+C to cancel and go back.[/dim]\n")
                 cancel_event = threading.Event()
                 stop_listener = start_esc_listener(cancel_event)
@@ -732,6 +735,13 @@ def _run_update_flow(info: dict) -> None:
         return
     style = "success" if ok else "warning"
     console.print(f"\n[{style}]{msg}[/{style}]")
+    if ok and needs_exit_before_update(info):
+        console.print("[dim]Press any key to close and let the update finish.[/dim]")
+        try:
+            readchar.readkey()
+        except KeyboardInterrupt:
+            pass
+        raise SystemExit(0)
     console.print("\n[dim]Press any key to continue...[/dim]")
     try:
         readchar.readkey()
@@ -818,6 +828,10 @@ def _main_loop() -> None:
     # printed once here for direct -q/-t runs that skip the menu.
     update_info = check_for_update()
     update_msg = notice_line(update_info)
+    from rich.markup import escape
+    update_report = consume_update_report()
+    if update_report:
+        update_msg = "\n".join(filter(None, (update_msg, escape(update_report))))
     if current_provider and update_msg:
         # highlight=False: the auto-highlighter would restyle the version
         # digits (bold → bright black) on the yellow banner.
@@ -1073,8 +1087,11 @@ def _main_loop() -> None:
                         provider, [Work(title=q) for q in queries], cli_filters,
                         cancel_event=cancel_event,
                     )
-            except Exception:
+            except Exception as error:
+                from torrent_finder.search_errors import SearchError
                 search_result["results"] = []
+                if isinstance(error, SearchError):
+                    search_result["error"] = str(error)
             finally:
                 search_result["done"] = True
 
@@ -1098,7 +1115,9 @@ def _main_loop() -> None:
 
         results = search_result.get("results") or []
         if not results:
-            notice_msg = "[warning] No results found.[/warning]\n"
+            from rich.markup import escape
+            message = search_result.get("error") or "No results found."
+            notice_msg = f"[warning] {escape(message)}[/warning]\n"
             clear_screen()
             query = None
             continue

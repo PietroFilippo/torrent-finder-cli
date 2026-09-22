@@ -158,6 +158,7 @@ class CredentialStorageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "credentials.json"
             with patch.object(credentials, "_CRED_FILE", path), \
+                 patch.object(credentials, "_LEGACY_CRED_PATHS", []), \
                  patch.object(credentials, "_file_cache", None), \
                  patch.dict(os.environ, all_env_keys, clear=False):
                 spec.save({"TMDB_API_KEY": "  saved-key  "})
@@ -176,7 +177,8 @@ class CredentialMenuTests(unittest.TestCase):
     def test_menu_rows_are_derived_from_the_registry(self):
         from torrent_finder.ui import credentials as credentials_ui
 
-        with patch.object(credentials_ui, "arrow_select", return_value=None) as select:
+        with patch.object(credentials_ui, "arrow_select", return_value=None) as select, \
+             patch.object(credentials, "_file_cache", {}):
             credentials_ui.credentials_menu()
 
         items = select.call_args.args[0]

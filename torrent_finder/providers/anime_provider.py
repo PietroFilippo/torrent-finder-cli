@@ -13,6 +13,7 @@ class AnimeProvider(BaseProvider):
     knaben_categories = (6_000_000,)  # Anime parent category
     solidtorrents_category = "Anime"
     nyaa_category = "1_2"  # Anime - English-translated
+    prefer_title_matches = True
 
     supports_subtitles = True
     supports_episode_picker = True

@@ -3,7 +3,7 @@
 Credentials are read at runtime from two sources, in order:
 
 1. Environment variables (recommended) — e.g. ``OPENSUBTITLES_USERNAME``.
-2. A local ``subtitle_credentials.json`` next to this file (gitignored).
+2. ``subtitle_credentials.json`` in the machine-stable user data directory.
 
 The in-program credentials manager writes to source #2 (the JSON file), never
 to environment variables. Real values must NEVER be committed; the JSON file is
@@ -12,32 +12,94 @@ listed in ``.gitignore``. See README for setup.
 
 import json
 import os
+import tempfile
+import threading
 from pathlib import Path
 
 from torrent_finder.credential_registry import credential_file_keys
-from torrent_finder.constants import data_path
+from torrent_finder.constants import legacy_data_paths, machine_state_path
 
-_CRED_FILE = Path(data_path("subtitle_credentials.json"))
+_CRED_FILE = Path(machine_state_path("subtitle_credentials.json"))
+_LEGACY_CRED_PATHS = legacy_data_paths("subtitle_credentials.json")
+_lock = threading.RLock()
 
 # Maps public env-var names to JSON keys, derived from the credential registry.
 _FILE_KEYS = credential_file_keys()
 
 _file_cache: dict | None = None
+_file_problem = ""
+
+
+def storage_problem() -> str:
+    _load_file()
+    return _file_problem
+
+
+def _read_credentials(path: Path) -> dict:
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(data, dict):
+        raise ValueError("Credential file must contain a JSON object")
+    return data
+
+
+def _write_file(data: dict) -> None:
+    _CRED_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # Unique temp files prevent two app instances from sharing a partial write.
+    fd, name = tempfile.mkstemp(prefix="credentials-", suffix=".tmp", dir=_CRED_FILE.parent)
+    temp = Path(name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(data, stream, indent=2)
+        _restrict_permissions(temp)
+        os.replace(temp, _CRED_FILE)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def _migrate_legacy_file() -> None:
+    if _CRED_FILE.exists():
+        return  # Existing file (including explicit clears) is authoritative.
+    copies = []
+    for candidate in _LEGACY_CRED_PATHS:
+        path = Path(candidate)
+        if path == _CRED_FILE:
+            continue
+        try:
+            copies.append((path.stat().st_mtime, _read_credentials(path)))
+        except FileNotFoundError:
+            continue
+        except (OSError, ValueError) as error:
+            raise OSError(f"Cannot read legacy credentials at {path}; the file was preserved.") from error
+    if copies:
+        # Keep each integration's username/password from the same source.
+        # The newest file containing that integration wins as a complete group.
+        from torrent_finder.credential_registry import CREDENTIAL_REGISTRY
+        merged = {}
+        for _mtime, data in sorted(copies, key=lambda pair: pair[0]):
+            for spec in CREDENTIAL_REGISTRY:
+                keys = [_file_key(field.env_key) for field in spec.fields]
+                if any(key in data for key in keys):
+                    for key in keys:
+                        merged.pop(key, None)
+                        if key in data:
+                            merged[key] = data[key]
+        _write_file(merged)
 
 
 def _load_file() -> dict:
     """Read the gitignored JSON file once, tolerating a missing/broken file."""
-    global _file_cache
-    if _file_cache is None:
-        _file_cache = {}
-        try:
-            if _CRED_FILE.exists():
-                data = json.loads(_CRED_FILE.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
-                    _file_cache = data
-        except Exception:
-            _file_cache = {}
-    return _file_cache
+    global _file_cache, _file_problem
+    with _lock:
+        if _file_cache is None:
+            try:
+                _migrate_legacy_file()
+                _file_cache = _read_credentials(_CRED_FILE) if _CRED_FILE.exists() else {}
+                _file_problem = ""
+            except (OSError, ValueError):
+                # Do not cache a transient read error as an empty credential store.
+                _file_problem = f"Cannot read or migrate credentials to {_CRED_FILE}. Existing files were preserved."
+                return {}
+        return _file_cache
 
 
 def _file_key(env_key: str) -> str:
@@ -106,30 +168,20 @@ def save_credentials(updates: dict) -> None:
     string removes that key. The in-memory cache is invalidated so the change
     takes effect immediately within the running program.
     """
-    data: dict = {}
-    try:
-        if _CRED_FILE.exists():
-            existing = json.loads(_CRED_FILE.read_text(encoding="utf-8"))
-            if isinstance(existing, dict):
-                data = existing
-    except Exception:
-        data = {}
-
-    for env_key, value in updates.items():
-        fkey = _file_key(env_key)
-        if value is None or not str(value).strip():
-            data.pop(fkey, None)
-        else:
-            data[fkey] = str(value).strip()
-
-    # Write atomically, then lock down permissions.
-    tmp = _CRED_FILE.with_name(_CRED_FILE.name + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    os.replace(tmp, _CRED_FILE)
-    _restrict_permissions(_CRED_FILE)
-
-    global _file_cache
-    _file_cache = None  # force reload on next read
+    global _file_cache, _file_problem
+    with _lock:
+        _migrate_legacy_file()
+        # A read/parse failure must abort, never overwrite other saved entries.
+        data = _read_credentials(_CRED_FILE) if _CRED_FILE.exists() else {}
+        for env_key, value in updates.items():
+            fkey = _file_key(env_key)
+            if value is None or not str(value).strip():
+                data.pop(fkey, None)
+            else:
+                data[fkey] = str(value).strip()
+        _write_file(data)
+        _file_cache = None
+        _file_problem = ""
 
 
 def opensubtitles_config() -> dict | None:

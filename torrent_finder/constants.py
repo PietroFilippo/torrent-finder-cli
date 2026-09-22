@@ -23,9 +23,8 @@ custom_theme = Theme(
 console = Console(theme=custom_theme)
 
 # --- User data directory ------------------------------------------------------
-# Credentials and (by default) downloads live in the platform user-data
-# directory. filter_state.json uses machine_state_dir() so Store Python cannot
-# split history/stats across interpreter-specific LocalCache directories.
+# Downloads default to the platform user-data directory. Credentials and state
+# use machine_state_dir() so Store Python cannot split them across runtimes.
 APP_DIRNAME = "torrent-finder-cli"
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -74,8 +73,9 @@ def legacy_data_paths(name: str) -> list[str]:
         os.path.join(_PKG_DIR, name),
     ]
     if sys.platform == "win32":
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        if local_app_data:
+        bases = {os.environ.get("LOCALAPPDATA"), os.path.expanduser("~/AppData/Local")}
+        for local_app_data in filter(None, bases):
+            candidates.append(os.path.join(local_app_data, APP_DIRNAME, name))
             candidates.extend(glob.glob(os.path.join(
                 local_app_data,
                 "Packages",

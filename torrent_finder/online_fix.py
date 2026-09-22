@@ -34,6 +34,7 @@ from urllib.parse import urljoin, unquote
 import requests
 
 from torrent_finder.search_result import SearchResult
+from torrent_finder.result_view import matches_name
 
 _BASE = "https://online-fix.me"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -142,8 +143,8 @@ def _anon_http() -> requests.Session:
 def search(query: str) -> list[SearchResult]:
     """Search online-fix.me. Returns SearchResult rows with the post id as a
     placeholder ``info_hash`` (the real ``.torrent`` is resolved on select via
-    ``resolve_torrent``). Search is public — no login needed; credentials only
-    gate the download bridge. Empty list on any error.
+    ``resolve_torrent``). Search and download are public — no login needed.
+    Empty list on network failure.
 
     Results carry no seeders / size — the DLE listing exposes neither, so those
     are zero-filled and the table just won't differentiate on them.
@@ -172,11 +173,16 @@ def search(query: str) -> list[SearchResult]:
         # Title: the cover <img alt="…"> carries the clean name; fall back to a
         # title="…" attribute, then the de-slugified URL (the primary result
         # anchor itself is empty).
-        window = html[m.start():m.start() + 600]
+        anchor_start = html.rfind("<a", 0, m.start())
+        anchor_end = html.find("</a>", m.end())
+        window = html[max(0, anchor_start):anchor_end] if anchor_end != -1 else ""
         title_m = _ALT_ATTR_RE.search(window) or _TITLE_ATTR_RE.search(window)
         name = _strip_tags(title_m.group(1)) if title_m else ""
+        name = name or _deslug(path)
+        if not matches_name(name, query):
+            continue
         results.append(SearchResult(
-            name=name or _deslug(path),
+            name=name,
             info_hash=post_id,    # placeholder; no public hash exists
             seeders=0,          # online-fix listing carries no swarm stats
             leechers=0,

@@ -6,7 +6,7 @@ Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, n
 
 ## Features
 
-- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga, Books), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs via The Pirate Bay's Applications categories plus SolidTorrents), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and stays dormant until one is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`. **Games** is likewise a group: pick it and choose **General** (PC, consoles, ROMs & repacks from public trackers — The Pirate Bay's game categories plus SolidTorrents), **Online-Fix** (scrapes [online-fix.me](https://online-fix.me) for co-op/online game cracks), or **FitGirl** (searches the official [fitgirl-repacks.site](https://fitgirl-repacks.site) — the one trustworthy source for FitGirl repacks, since fake "FitGirl" uploads on public trackers are a known malware vector; no account needed, the magnet resolves from the post when you pick a result). On the CLI they're `-t game`, `-t online-fix`, and `-t fitgirl`. Online-Fix needs **no account** — both search and download are anonymous (the file host is referer-gated, not login-gated); picking a result downloads the `.torrent` into your download folder and opens it in your system torrent client, showing the archive password (`online-fix.me`) to unpack the game with. **Manga** is also a group: **General** (Nyaa Literature + Apibay Comics) or **Madokami** (the private [manga.madokami.al](https://manga.madokami.al) library — needs an account under the credentials menu; hits are **direct downloads**, no torrent client involved: picking a series folder opens a volume picker and the chosen archives are saved straight to your download folder). On the CLI: `-t manga` and `-t madokami`. **Books** searches **Libgen** (the live libgen mirror family — anonymous, **direct file downloads**: picking a result resolves the download link and streams the file straight to your download folder with a progress bar, no torrent client involved) plus The Pirate Bay's E-books and Audio books categories, with SolidTorrents' eBook category as an opt-in engine. Neither default engine needs a login. Libgen rows show the format and language (e.g. `[epub, English]`), and filter presets cover EPUB / PDF / Kindle (MOBI/AZW3) / Audiobook / English. On the CLI: `-t books` (or `-t book`).
+- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga, Books), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs via The Pirate Bay's Applications categories plus SolidTorrents), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and warns when no login is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`. **Games** is likewise a group: pick it and choose **General** (PC, consoles, ROMs & repacks from public trackers — The Pirate Bay's game categories plus SolidTorrents), **Online-Fix** (scrapes [online-fix.me](https://online-fix.me) for co-op/online game cracks), or **FitGirl** (searches the official [fitgirl-repacks.site](https://fitgirl-repacks.site) — the one trustworthy source for FitGirl repacks, since fake "FitGirl" uploads on public trackers are a known malware vector; no account needed, the magnet resolves from the post when you pick a result). On the CLI they're `-t game`, `-t online-fix`, and `-t fitgirl`. Online-Fix needs **no account** — both search and download are anonymous (the file host is referer-gated, not login-gated); picking a result downloads the `.torrent` into your download folder and opens it in your system torrent client, showing the archive password (`online-fix.me`) to unpack the game with. **Manga** is also a group: **General** (Nyaa Literature + Apibay Comics) or **Madokami** (the private [manga.madokami.al](https://manga.madokami.al) library — needs an account under the credentials menu; hits are **direct downloads**, no torrent client involved: picking a series folder opens a volume picker and the chosen archives are saved straight to your download folder). On the CLI: `-t manga` and `-t madokami`. **Books** searches **Libgen** (the live libgen mirror family — anonymous, **direct file downloads**: picking a result resolves the download link and streams the file straight to your download folder with a progress bar, no torrent client involved) plus The Pirate Bay's E-books and Audio books categories, with SolidTorrents' eBook category as an opt-in engine. Neither default engine needs a login. Libgen rows show the format and language (e.g. `[epub, English]`), and filter presets cover EPUB / PDF / Kindle (MOBI/AZW3) / Audiobook / English. On the CLI: `-t books` (or `-t book`).
 - **Multi-Engine Fan-Out:** Each provider queries its **On** sources in parallel and merges results, deduplicating by info hash and sorting by seeders. If they all return zero raw rows, a category-scoped **Auto** Knaben search runs. **Off** engines are skipped unless an active preset explicitly requires them for that search. Movies & Series keeps Apibay + Nyaa live-action On, Anime uses Nyaa, Manga combines Nyaa Literature + Apibay Comics, and Books pairs Libgen with Apibay E-books/Audio books. YTS and SolidTorrents remain available as manual Off-by-default options.
 - **Search by Creator:** Search by the people and companies behind the content instead of by title. After choosing a provider, a "choose how to search" screen offers normal keyword search **plus** by-creator options — **Anime** and **Movies & Series** by **director** or **studio**, **Manga** by **writer** or serialization **magazine**, **Games** by **developer** or **publisher** (kept separate — a company can be both), **Books** by **author**. You type a name, disambiguate between matches, then multi-select which of that creator's titles to include (a paged checklist, 100 per page with `n`/`p`); the app runs a normal torrent search for each picked title and merges the results — so picking still uses all the usual download/stream/episode options. It works **keyless out of the box** (AniList for anime/manga staff, Jikan for manga magazines, Wikidata for movies/games, OpenLibrary for book authors — works ordered so an author's best-known books come first), and an optional **TMDB** key (Movies & Series) or **Twitch/IGDB** credentials (Games) added under **🔑 Credentials** transparently upgrade those two to richer, better-ranked data. Online-Fix is included in the Games developer/publisher results. From the CLI: `--by <role> --name "<creator>"` alongside `-t`, e.g. `torrent -t anime --by director --name "Hayao Miyazaki"`.
 - **Search Several at Once (multi-title):** At the keyword prompt, press **Ctrl+N** to add another title, then `Enter` to search them all together — results fan out across the provider's engines and merge into one list. A **From** column shows which searched title each result came from, so interleaved results are easy to tell apart. `Esc` backs out one step at a time: it clears the line being typed, then restores the last added title for editing, and only leaves the screen once everything is empty.
@@ -14,7 +14,7 @@ Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, n
 - **Arrow-Key Driven UI:** Fully interactive, flicker-free terminal interface.
   - Utilizes an alternate screen buffer so your scrollback history remains flawlessly clean.
   - **Dynamic Viewport Windowing:** Capable of rendering massive 500+ item checklists (like huge anime seasons) by automatically windowing the active selection while pinning crucial action buttons tightly to the top and bottom of your screen to prevent terminal overflow.
-  - **Responsive Narrow Layouts:** Selector hints, descriptions, and controls wrap without changing selectable-row height. Search results progressively collapse to the fields that fit, with hidden metadata kept under the selected row; resizing an open screen recalculates the viewport automatically.
+  - **Responsive Narrow Layouts:** Selector hints, descriptions, and controls wrap without changing selectable-row height. Search results progressively collapse to the fields that fit, with hidden metadata kept under the selected row; resizing an open screen recalculates the viewport automatically. Short windows use a one-line banner and tighter padding, with a position indicator in the menu border instead of “more below” rows. PgUp/PgDn and Home/End move through menus.
   - **Marquee Scrolling:** Automatically scrolls long torrent names and checklist items that exceed the physical terminal width when hovered over.
   - **Contextual Footers:** Displays dynamic helper text explaining the trade-offs, speeds, and seeding behaviors of different download options as you highlight them.
 - **Quick-Launch Commands:** The startup provider screen includes a **Terminal command** row for choosing `torrent-finder`, `tf`, `torrent`, `find-torrent`, or `tfind`. The canonical command remains available and `torrent` is built into pip/pipx installs; the other presets create one app-owned forwarding launcher, preserve every CLI argument, refuse unrelated command collisions, and can be removed safely from the same screen.
@@ -49,6 +49,8 @@ Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, n
 - **Network Exposure Warning:** At startup a red panel queries `ip-api.com` and shows your public IP, ISP, ASN, location, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
 - **Install-Aware Update Check:** On startup the app checks for a newer version (at most once a day, fail-silent) and shows a notice tailored to how you installed it — a pip/pipx install compares against PyPI, a git clone against `origin`, a standalone binary against the latest Release. The notice is a high-visibility black-on-yellow banner; press **U** on the provider menu (an **⬆ Install update** row also appears there) or **Tab → ⬆ Install update** at the search prompt to update in place (`pipx upgrade`/`pip -U`, `git pull`, or open the Releases page).
 - **Pagination & Navigation:** Navigate through large sets of search results cleanly, with the ability to safely go back to your previous search results after viewing download options.
+- **Refine Results:** Press **f** in the results table to match words, an exact media title (ignoring common release tags), or an exact full filename. Sort by original search order, newest upload, most seeders, name, or size. Unknown upload dates sort last. Filtering keeps only visible selections; sorting preserves the selected downloads.
+- **Short Anime Titles:** Anime search ranks matching titles ahead of incidental word matches. When a short title such as **Saki** is crowded out of Nyaa's recent RSS feed, one bounded catalog lookup helps recover older releases. FitGirl and Online-Fix results must match the words in the game title, avoiding matches from post bodies or neighboring links.
 
 ## Prerequisites
 
@@ -269,8 +271,9 @@ Or create `subtitle_credentials.json` in your user data folder (see [Where your 
 }
 ```
 
-Environment variables take precedence over the file. All keys are optional —
-anything unset just falls back to the anonymous provider set.
+Environment variables take precedence over the file. Subtitle and creator-search
+keys are optional. Madokami and RuTracker require a login and show an explicit
+message when credentials are missing or rejected.
 
 ### Where your data lives
 
@@ -281,15 +284,24 @@ machine-stable `filter_state.json`:
 - **macOS:** `~/Library/Application Support/torrent-finder-cli/filter_state.json`
 - **Linux:** `$XDG_DATA_HOME/torrent-finder-cli/filter_state.json` (or `~/.local/share/torrent-finder-cli/filter_state.json`)
 
-Credentials and the default downloads folder stay in the platform user-data
-directory. On Windows that is `%LOCALAPPDATA%\torrent-finder-cli\`; on macOS
-and Linux it is the same app directory shown above. Keeping Windows state under
-the user profile prevents Microsoft Store Python from splitting history and
-stats across interpreter-specific LocalCache directories.
+Credentials live beside settings in `subtitle_credentials.json` (on Windows:
+`%USERPROFILE%\.torrent-finder-cli\subtitle_credentials.json`). This stable path
+prevents Python installation changes from switching to an apparently empty
+credential store. The default downloads folder still uses the platform data
+directory: `%LOCALAPPDATA%\torrent-finder-cli\` on Windows, or the app directory
+shown above on macOS/Linux.
 
 On first run after upgrading, prior state copies from the old platform-data,
 repository, package, and Store Python locations are consolidated into the
 machine-stable file. The originals are left untouched.
+
+Credentials are also recovered from those legacy locations when the stable
+credential file does not exist. Each integration uses the newest copy containing
+its fields; username/password pairs stay together. An existing stable file,
+including an empty one after clearing credentials, is authoritative. Unreadable
+or malformed files produce a warning and block saving rather than overwriting
+other credentials. Saves replace the file atomically. Credentials saved only in
+environment variables still need to be configured in each shell or machine.
 
 Successful APIBay result sets use a separate, disposable
 `apibay_cache.json` in the same machine-stable directory. It contains at
@@ -304,11 +316,14 @@ with **U** on the provider menu (an **⬆ Install update** row also appears
 there) or **Tab → ⬆ Install update** at the search prompt — either does the
 right thing for your install type:
 
-- **pip / pipx** — runs `pipx upgrade torrent-finder-cli` (or `pip install -U`); restart the app afterward.
+- **pip / pipx** — runs `pipx upgrade torrent-finder-cli` (or `pip install -U`). On Windows the app queues a hidden helper, then closes after you press a key so pipx can replace the launcher. Close any other Torrent Finder windows too, and let the update finish before reopening. The next launch reports success or failure; `update.log` beside your settings contains the output. A partial upgrade is reported as a failure.
 - **standalone binary** — opens the Releases page so you can download the new file.
 - **source clone** — runs `git pull`.
 
-Or update manually any time with `pipx upgrade torrent-finder-cli`.
+Or close the app and update manually with `pipx upgrade torrent-finder-cli`.
+If an older version reports Windows `WinError 32` while replacing
+`torrent-finder.exe`, close all running copies and rerun that command from a
+separate terminal. Its earlier “harmless” message did not guarantee completion.
 
 ## Usage
 

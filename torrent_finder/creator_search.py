@@ -11,6 +11,7 @@ search.
 import concurrent.futures
 
 from torrent_finder.search_result import SearchResult, normalize_result
+from torrent_finder.search_errors import SearchError
 
 
 def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6) -> list[SearchResult]:
@@ -44,6 +45,8 @@ def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6)
             work = future_to_work[future]
             try:
                 rows = future.result() or []
+            except SearchError:
+                raise
             except Exception:
                 rows = []
             for raw_row in rows:

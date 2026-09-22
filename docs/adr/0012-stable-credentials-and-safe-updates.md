@@ -1,0 +1,45 @@
+# Stable credentials and deferred Windows package updates
+
+Status: Accepted
+
+## Context
+
+A Windows laptop appeared to lose all credentials, and Madokami searches returned
+empty results without a login warning. The previous credential store used
+LOCALAPPDATA, which can vary between Store Python installations. Saving after a
+read or JSON error silently replaced the entire store with the edited fields.
+These are plausible causes; the laptop's original files were not inspected.
+
+In-app pipx upgrades also attempted to replace the currently running Windows
+launcher. The resulting WinError 32 was treated as success if package metadata
+had changed, even though pipx had exited with an error.
+
+## Decision
+
+Use the existing machine-stable user directory for credentials. When the target
+does not exist, read legacy locations and merge by integration, keeping each
+username/password pair from one source. The newest source containing fields for
+that integration wins. Keep originals and honor existing stable files, even
+empty ones. Abort migration/save on unreadable data, retry failed reads, and
+replace files atomically. Do not print secret values in diagnostics.
+
+Surface missing/rejected logins as actionable SearchError messages. Refresh
+cached sessions after credential changes.
+
+Queue Windows pip/pipx upgrades in a hidden helper that waits for the app process
+to exit. Preserve output in update.log and record the actual exit code in a
+status file consumed on next launch. Expired pending jobs report incomplete;
+nonzero exits never become success because package metadata advanced.
+
+## Consequences
+
+Python installation changes no longer change the credential location. Existing
+legacy credentials can be recovered without destroying evidence. Truly deleted
+files or missing environment variables cannot be recovered by this migration.
+The store remains plaintext; environment overrides retain precedence.
+
+Windows users must close other app instances and wait before reopening during
+an update. The helper avoids the active launcher's file lock but still reports
+network, permission, or locks held by other processes as failures. Updating an
+old version for the first time may require running pipx manually after closing
+the app.

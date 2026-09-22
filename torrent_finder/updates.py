@@ -18,6 +18,8 @@ import shutil
 import subprocess
 import sys
 import time
+import json
+from pathlib import Path
 
 from torrent_finder import __version__
 from torrent_finder.state import load_setting, save_setting
@@ -127,24 +129,6 @@ def _pipx_install() -> bool:
     return "pipx" in sys.executable.lower() and shutil.which("pipx") is not None
 
 
-def _pipx_installed_version() -> "str | None":
-    """Version pipx reports for this package on disk, or None."""
-    try:
-        import json
-        r = subprocess.run(
-            ["pipx", "list", "--json"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if r.returncode != 0:
-            return None
-        venv = json.loads(r.stdout)["venvs"]["torrent-finder-cli"]
-        return venv["metadata"]["main_package"]["package_version"]
-    except Exception:
-        return None
-
-
 # ---- public API -------------------------------------------------------------
 
 def check_for_update(force: bool = False) -> "dict | None":
@@ -213,11 +197,67 @@ def update_notice(force: bool = False) -> str:
     return notice_line(check_for_update(force=force))
 
 
+def needs_exit_before_update(info: dict) -> bool:
+    return sys.platform == "win32" and info.get("kind") == "pip"
+
+
+def _update_files() -> tuple[Path, Path]:
+    from torrent_finder.constants import machine_state_path
+    return Path(machine_state_path("update-status.json")), Path(machine_state_path("update.log"))
+
+
+def _schedule_update(command: list[str]) -> tuple[bool, str]:
+    from torrent_finder.update_worker import write_status
+    status, log = _update_files()
+    if status.exists():
+        try:
+            previous = json.loads(status.read_text(encoding="utf-8"))
+            if isinstance(previous, dict) and previous.get("state") == "pending" and time.time() - float(previous.get("started_at", 0)) < 1900:
+                return True, "An update is already waiting. Close all Torrent Finder windows so it can finish."
+        except (OSError, ValueError, TypeError):
+            pass
+    try:
+        write_status(status, state="pending", started_at=time.time(), log=str(log))
+        subprocess.Popen(
+            [sys.executable, "-m", "torrent_finder.update_worker", "--parent", str(os.getpid()),
+             "--status", str(status), "--log", str(log), "--", *command],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+            close_fds=True,
+        )
+    except OSError as error:
+        try:
+            write_status(status, state="failed", log=str(log), error=str(error))
+        except OSError:
+            pass
+        return False, f"Could not start the updater: {error}"
+    return True, f"Update queued. This app will close to release its launcher. Wait for the update before reopening. Log: {log}"
+
+
+def consume_update_report() -> str:
+    status, log = _update_files()
+    try:
+        data = json.loads(status.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return ""
+        state = data.get("state")
+        if state == "pending":
+            if time.time() - float(data.get("started_at", 0)) < 1900:
+                return f"Update is still pending. Close other Torrent Finder windows and check {log}."
+            data["error"] = "The updater did not report completion."
+        status.replace(status.with_name("last-update-status.json"))
+        if state == "succeeded":
+            return "Package update completed successfully."
+        return f"Update did not complete. Close all Torrent Finder windows, then retry from your terminal. Details: {log}. {data.get('error', '')}"
+    except (OSError, ValueError, TypeError):
+        return ""
+
+
 def run_update(info: dict) -> "tuple[bool, str]":
     """Perform the update for the detected install kind. Returns (ok, message).
 
-    git/pip run with live output (the user sees progress); a frozen binary just
-    opens the Releases page (a running .exe can't replace itself on Windows).
+    Windows pip installs queue a helper and require the caller to exit first.
+    Other git/pip installs run with live output; binaries open Releases.
     """
     kind = info.get("kind")
     if kind == "git":
@@ -240,20 +280,13 @@ def run_update(info: dict) -> "tuple[bool, str]":
     # pip / pipx
     cmd = (["pipx", "upgrade", "torrent-finder-cli"] if _pipx_install()
            else [sys.executable, "-m", "pip", "install", "-U", "torrent-finder-cli"])
+    if needs_exit_before_update(info):
+        return _schedule_update(cmd)
+    manual = "pipx upgrade torrent-finder-cli" if _pipx_install() else "python -m pip install -U torrent-finder-cli"
     try:
         r = subprocess.run(cmd)
         ok = r.returncode == 0
-        if not ok and cmd[0] == "pipx":
-            # On Windows, pipx's last step — re-copying the .local/bin
-            # launcher exe — fails with WinError 32 while that launcher is
-            # this very process, after the venv itself upgraded fine. Trust
-            # the installed version over the exit code.
-            new = _pipx_installed_version()
-            if _is_newer(new, __version__):
-                return (True, f"Updated to v{new} — restart to use the new version.\n"
-                        "(pipx couldn't replace the running launcher — harmless; "
-                        "it points at the already-updated install.)")
         return (ok, "Updated — restart to use the new version." if ok
-                else "Update failed — try: pipx upgrade torrent-finder-cli")
+                else f"Update failed — close the app, then try: {manual}")
     except Exception as e:
-        return (False, f"Update failed: {e}. Try: pipx upgrade torrent-finder-cli")
+        return (False, f"Update failed: {e}. Close the app, then try: {manual}")

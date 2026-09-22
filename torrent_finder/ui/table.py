@@ -4,6 +4,7 @@ import math
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import readchar
 from rich.cells import cell_len
@@ -15,6 +16,8 @@ from rich.text import Text
 from torrent_finder.constants import RESULTS_PER_PAGE, console
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 from torrent_finder.utils import format_size, leech_style, seed_style
+from torrent_finder.result_view import result_indices, timestamp
+from torrent_finder.ui.result_filters import refine_results
 
 
 # Marquee timing for the selected-row name
@@ -70,6 +73,8 @@ def _selected_metadata(
 
     item = results[selected_idx]
     parts: list[str] = []
+    uploaded = timestamp(item.get("uploaded_at"))
+    parts.append("Uploaded: " + (datetime.fromtimestamp(uploaded, timezone.utc).strftime("%Y-%m-%d") if uploaded else "unknown"))
     if not layout.source:
         parts.append(f"Source: {_source_label(item)}")
     if item.get("source") == "Knaben" and item.get("knaben_tracker"):
@@ -109,7 +114,7 @@ def _table_caption(
         if picked
         else "  |  Enter open"
     )
-    controls += "  |  Esc back"
+    controls += "  |  f refine/sort  |  Esc back"
     caption.append(controls, style="dim")
     caption.overflow = "fold"
     return caption
@@ -127,7 +132,8 @@ def _visible_count(
     """Return rows that fit after responsive caption and metadata lines."""
     layout = _table_layout(width, show_from)
     extra = {"full": 0, "medium": 1, "compact": 2, "minimal": 4}[layout.mode]
-    available = max(1, height - 14 - _note_line_count(note, width) - extra)
+    chrome = 10 if height < 28 else 16
+    available = max(1, height - chrome - _note_line_count(note, width) - extra)
     return min(total, available)
 
 
@@ -143,12 +149,13 @@ def build_table(
     tick: int = 0,
     picked: "frozenset[int]" = frozenset(),
     show_from: bool = False,
+    original_indices: list[int] | None = None,
 ) -> Table:
     """Build a result table whose columns progressively collapse by width."""
     width = console.size.width
     layout = _table_layout(width, show_from)
     end_idx = min(scroll_offset + visible_count, total)
-    scroll_info = f"[dim]({scroll_offset + 1}-{end_idx} of {total})[/dim]"
+    scroll_info = f"[dim]({scroll_offset + 1}-{end_idx} of {total})[/dim]" if total else "[dim](No matching results — f to refine)[/dim]"
     page_info = (
         f"  [bold cyan]Page {current_page + 1}/{total_pages}[/bold cyan]"
         if total_pages > 1
@@ -194,7 +201,7 @@ def build_table(
 
     for visible_idx, item in enumerate(results[scroll_offset:end_idx]):
         index = scroll_offset + visible_idx
-        global_index = global_offset + index
+        global_index = original_indices[index] if original_indices is not None else global_offset + index
         seeds = int(item.get("seeders", 0) or 0)
         leeches = int(item.get("leechers", 0) or 0)
         size = int(item.get("size", 0) or 0)
@@ -268,12 +275,14 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
         (batch hand-off);
       - ``None`` if cancelled (Esc).
     """
+    view_query, view_mode, view_order = "", "contains", "relevance"
+    view_indexes = result_indices(results)
     all_results = results
     total_all = len(all_results)
     # Provenance "From" column: only when results came from more than one searched
     # title (multi-title search); redundant for a single query.
     show_from = len({r.get("from_work") for r in all_results if r.get("from_work")}) > 1
-    total_pages = math.ceil(total_all / RESULTS_PER_PAGE)
+    total_pages = max(1, math.ceil(total_all / RESULTS_PER_PAGE))
     current_page = 0
 
     def page_results():
@@ -311,10 +320,12 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
     banner = _make_banner_panel()
 
     def framed(tbl):
+        heading = Text("Torrent Search CLI", style="bold magenta") if console.size.height < 28 else banner
+        view_status = Text(f"{view_mode}: {view_query or 'all names'}  •  sort: {view_order}", style="dim", no_wrap=True, overflow="ellipsis")
         if note:
             note_line = Text(note, style="yellow", overflow="fold")
-            return Group(banner, Text(""), note_line, tbl)
-        return Group(banner, Text(""), tbl)
+            return Group(heading, view_status, note_line, tbl)
+        return Group(heading, view_status, tbl)
 
     # screen=True renders into the terminal's alternate-screen buffer — a fixed
     # viewport that never scrolls. Without it, Live updates (e.g. the marquee on
@@ -326,6 +337,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
             page_items, current, scroll_offset, visible_count, total,
             current_page, total_pages, global_offset, tick=0,
             picked=frozenset(picked), show_from=show_from,
+            original_indices=view_indexes[global_offset:global_offset + total],
         )),
         console=console,
         refresh_per_second=15,
@@ -384,6 +396,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                         page_items, cur, scroll_offset, visible_count, total,
                         current_page, total_pages, global_offset, tick=new_tick,
                         picked=frozenset(picked), show_from=show_from,
+                        original_indices=view_indexes[global_offset:global_offset + total],
                     ))
                 )
 
@@ -405,7 +418,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                     current = max(0, current - 1)
                     num_buffer = ""
                 elif key == readchar.key.DOWN:
-                    current = min(total - 1, current + 1)
+                    current = max(0, min(total - 1, current + 1))
                     num_buffer = ""
                 elif key == readchar.key.LEFT:
                     if current_page > 0:
@@ -440,14 +453,16 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                         )
                     num_buffer = ""
                 elif key == " ":
-                    gi = global_offset + current
+                    if not total:
+                        continue
+                    gi = view_indexes[global_offset + current]
                     if gi in picked:
                         picked.discard(gi)
                     else:
                         picked.add(gi)
                     num_buffer = ""
                 elif key in ("a", "A"):
-                    picked.update(range(total_all))
+                    picked.update(view_indexes)
                     num_buffer = ""
                 elif key in ("c", "C"):
                     picked.clear()
@@ -455,7 +470,33 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                 elif key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
                     if picked:
                         return _pick_result(picked)
-                    return ("one", global_offset + current)
+                    if total:
+                        return ("one", view_indexes[global_offset + current])
+                elif key in ("f", "F"):
+                    num_buffer = ""
+                    # Stop background redraws while the modal owns the terminal.
+                    stop_event.set()
+                    ticker_thread.join(timeout=1)
+                    live.stop()
+                    try:
+                        view_query, view_mode, view_order = refine_results(view_query, view_mode, view_order)
+                    except KeyboardInterrupt:
+                        pass
+                    view_indexes = result_indices(results, view_query, view_mode, view_order)
+                    all_results = [results[i] for i in view_indexes]
+                    picked.intersection_update(view_indexes)
+                    total_all = len(all_results)
+                    total_pages = max(1, math.ceil(total_all / RESULTS_PER_PAGE))
+                    current_page = current = scroll_offset = global_offset = 0
+                    page_items = page_results()
+                    total = len(page_items)
+                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from)
+                    marquee_state["tick"] = 0
+                    marquee_state["cursor_changed_at"] = time.monotonic()
+                    live.start()
+                    stop_event.clear()
+                    ticker_thread = threading.Thread(target=ticker, daemon=True)
+                    ticker_thread.start()
                 elif key in ("d", "D"):
                     if picked:
                         return _pick_result(picked)
@@ -467,14 +508,18 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                 elif key.isdigit():
                     num_buffer += key
                     try:
-                        idx = int(num_buffer)
-                        if 0 <= idx < total:
-                            current = idx
-                        if idx >= total and idx * 10 > total * 10:
+                        if not any(str(i).startswith(num_buffer) for i in view_indexes):
                             num_buffer = key
-                            idx = int(key)
-                            if 0 <= idx < total:
-                                current = idx
+                        original = int(num_buffer)
+                        if original in view_indexes:
+                            position = view_indexes.index(original)
+                            current_page, current = divmod(position, RESULTS_PER_PAGE)
+                            page_items = page_results()
+                            total = len(page_items)
+                            global_offset = current_page * RESULTS_PER_PAGE
+                            visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from)
+                            if current_page != prev_page:
+                                scroll_offset = 0
                     except ValueError:
                         num_buffer = ""
                 else:
@@ -497,6 +542,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                         current_page, total_pages, global_offset,
                         tick=marquee_state["tick"],
                         picked=frozenset(picked), show_from=show_from,
+                        original_indices=view_indexes[global_offset:global_offset + total],
                     ))
                 )
         finally:

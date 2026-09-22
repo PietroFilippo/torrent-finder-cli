@@ -16,6 +16,8 @@ from torrent_finder import apibay_cache, knaben
 from torrent_finder.constants import API_URL, console
 from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
 from torrent_finder.search_result import SearchResult, normalize_result
+from torrent_finder.search_errors import SearchError
+from torrent_finder.result_view import title_score
 
 
 _APIBAY_NUMBER_WORDS = {
@@ -158,6 +160,7 @@ class BaseProvider(ABC):
     # subclasses with resolvers.CreatorFacet instances.
     creator_facets: list = []
     apibay_cache_enabled: bool = True
+    prefer_title_matches: bool = False
 
     # Optional one-line caveat shown when this provider is selected/searched
     # (e.g. Mobile noting it's Android-only). Empty = no note.
@@ -294,6 +297,7 @@ class BaseProvider(ABC):
                         if tid
                         else ""
                     ),
+                    uploaded_at=item.get("added", 0),
                 ))
             return results
 
@@ -426,9 +430,17 @@ class BaseProvider(ABC):
                         size=size_bytes,
                         source="Nyaa",
                         page_url=guid.text if guid is not None and guid.text else "",
+                        uploaded_at=item.findtext("pubDate", ""),
                     ))
         except Exception:
             pass
+        # RSS is fixed to the latest 75 uploads and ignores sort parameters.
+        # A short title like Saki can be buried by a current unrelated series.
+        if self.prefer_title_matches and 0 < len(query.split()) <= 2 and not any(
+            title_score(row.name, query) == 3 for row in results
+        ):
+            from torrent_finder.nyaa import discovery_query, popular
+            results.extend(popular(discovery_query(query, results), category))
         return results
 
     def expand_queries(self, query: str) -> list[str]:
@@ -491,6 +503,8 @@ class BaseProvider(ABC):
                             info_hash = item.info_hash.lower()
                             if info_hash:
                                 merged.append(item)
+                    except SearchError:
+                        raise
                     except Exception:
                         pass
 
@@ -535,7 +549,10 @@ class BaseProvider(ABC):
             if info_hash not in seen_hashes:
                 seen_hashes.add(info_hash)
                 unique.append(item)
-        return self._sort_results(unique)
+        ordered = self._sort_results(unique)
+        if self.prefer_title_matches:
+            ordered.sort(key=lambda row: title_score(row.name, query), reverse=True)
+        return ordered
 
     def _sort_results(self, results: list[SearchResult]) -> list[SearchResult]:
         """Order merged results for display. Default: seeders descending.

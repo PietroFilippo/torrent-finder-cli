@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import Any
+from torrent_finder.result_view import timestamp
 
 
 HANDLE_KEYS = frozenset({
@@ -31,6 +32,7 @@ _FIELD_KEYS = {
     "source": "source",
     "page_url": "page_url",
     "from_work": "from_work",
+    "uploaded_at": "uploaded_at",
 }
 
 _FIELD_DEFAULTS = {
@@ -42,6 +44,7 @@ _FIELD_DEFAULTS = {
     "source": "",
     "page_url": "",
     "from_work": "",
+    "uploaded_at": 0,
 }
 
 
@@ -71,6 +74,7 @@ class SearchResult(MutableMapping[str, Any]):
     from_work: str = ""
     handle: dict[str, Any] = field(default_factory=dict)
     extra: dict[str, Any] = field(default_factory=dict)
+    uploaded_at: int = 0
 
     def __post_init__(self) -> None:
         self.name = _as_str(self.name, "Unknown")
@@ -81,6 +85,7 @@ class SearchResult(MutableMapping[str, Any]):
         self.source = _as_str(self.source)
         self.page_url = _as_str(self.page_url)
         self.from_work = _as_str(self.from_work)
+        self.uploaded_at = timestamp(self.uploaded_at)
         self.handle = dict(self.handle or {})
         self.extra = dict(self.extra or {})
 
@@ -129,7 +134,9 @@ class SearchResult(MutableMapping[str, Any]):
 
     def __setitem__(self, key: str, value: Any) -> None:
         if key in _FIELD_KEYS:
-            if key in ("seeders", "leechers", "size"):
+            if key == "uploaded_at":
+                value = timestamp(value)
+            elif key in ("seeders", "leechers", "size"):
                 value = _as_int(value)
             elif key == "name":
                 value = _as_str(value, "Unknown")

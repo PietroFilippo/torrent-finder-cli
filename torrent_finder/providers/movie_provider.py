@@ -145,6 +145,7 @@ class MovieProvider(BaseProvider):
                     size=torrent.get("size_bytes", 0),
                     source="YTS",
                     page_url=movie.get("url", ""),
+                    uploaded_at=torrent.get("date_uploaded_unix", 0),
                 ))
         return results
 

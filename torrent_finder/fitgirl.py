@@ -29,6 +29,7 @@ from html import unescape
 import requests
 
 from torrent_finder.search_result import SearchResult
+from torrent_finder.result_view import matches_name
 
 _BASE = "https://fitgirl-repacks.site"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -80,7 +81,7 @@ def _parse_size(article: str) -> str:
     return str(int(num * _UNIT_BYTES.get(m.group(2).upper(), 1)))
 
 
-def _parse_page(html: str, results: list[SearchResult], seen: set[str]) -> None:
+def _parse_page(html: str, results: list[SearchResult], seen: set[str], query: str = "") -> None:
     """Append one search page's repack posts to ``results`` (dedup on post id).
 
     Only ``category-lossless-repack`` articles are repacks — the search also
@@ -99,8 +100,16 @@ def _parse_page(html: str, results: list[SearchResult], seen: set[str]) -> None:
             continue
         seen.add(post_id)
         url = title_m.group(1)
+        name = _strip_tags(title_m.group(2)) or "Unknown"
+        if not matches_name(name, query):
+            continue
+        published = None
+        for tag in re.findall(r'<time\b[^>]*>', article):
+            if re.search(r'class="[^"]*\bpublished\b', tag):
+                published = re.search(r'datetime="([^"]+)"', tag)
+                break
         results.append(SearchResult(
-            name=_strip_tags(title_m.group(2)) or "Unknown",
+            name=name,
             # "fitgirl-" prefix keeps the placeholder from colliding with other
             # engines' numeric placeholders (Online-Fix post ids) in the merged
             # Games results, where dedupe is by info_hash.
@@ -111,6 +120,7 @@ def _parse_page(html: str, results: list[SearchResult], seen: set[str]) -> None:
             source="FitGirl",
             page_url=url,
             handle={"fg_post_url": url},      # explicit handle for the magnet resolver
+            uploaded_at=published.group(1) if published else 0,
         ))
 
 
@@ -127,10 +137,10 @@ def search(query: str) -> list[SearchResult]:
     seen: set[str] = set()
     try:
         r = session.get(f"{_BASE}/", params={"s": query}, timeout=30)
-        _parse_page(r.text, results, seen)
+        _parse_page(r.text, results, seen, query)
         if _NEXT_PAGE_RE.search(r.text):
             r2 = session.get(f"{_BASE}/page/2/", params={"s": query}, timeout=30)
-            _parse_page(r2.text, results, seen)
+            _parse_page(r2.text, results, seen, query)
     except requests.RequestException:
         return results  # keep whatever page 1 yielded
     return results
