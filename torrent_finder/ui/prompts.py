@@ -557,6 +557,7 @@ def filter_menu(provider) -> None:
                 label=p.name,
                 value=("preset", p),
                 toggled=p in provider.active_presets,
+                description=p.description,
             ))
             preset_indices.append(len(items) - 1)
 

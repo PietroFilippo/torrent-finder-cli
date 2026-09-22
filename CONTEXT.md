@@ -35,13 +35,15 @@ group children stay in flat `PROVIDERS` with their own slugs.
 
 A search backend inside a provider (`SearchEngine` in `providers/base.py`):
 Apibay, Knaben, Nyaa (per-category), or a site-specific scraper. A
-provider fans a query out to all On engines concurrently, merges on
-`info_hash`, filters, and sorts by seeders. Engines are mode-configurable per
+provider fans a query out to all On engines concurrently, filters release
+variants before merging on `info_hash`, and sorts by seeders. This preserves
+language tags when indexers give the same hash different names. Engines are mode-configurable per
 provider; the mode persists under the provider's slug.
 
 Modes are explicit: **On** participates in every fan-out, **Auto** runs only
 when all On engines produced zero raw rows before filtering, and **Off** is
-never contacted. An Auto engine also runs when there are no On engines. APIBay
+not contacted unless an active preset explicitly requires it for that search.
+An Auto engine also runs when there are no primary engines. APIBay
 additionally keeps a bounded
 last-known-good result set per normalized provider/query. Live search always
 runs first; cached rows preserve `source="Apibay"` for acquisition routing
@@ -101,9 +103,29 @@ stay session-unaware.**
 ## Filters & Presets
 
 `FilterConfig` (`filters.py`) structures result filtering (size/seeders/
-keywords). Applied in order: provider defaults → active presets → CLI flags.
+keywords, plus optional `include_regex` and a name-only `name_predicate`).
+Applied in order: provider defaults → active presets → CLI flags.
 A `FilterPreset` is a named config the user toggles per provider; active
 presets persist under the provider's slug.
+
+A preset may also shape the search itself, not just the rows it returns
+(see [ADR-0011](docs/adr/0011-presets-may-shape-the-search.md)):
+`query_terms` fans one query out over extra spellings (`Toy Story` →
+`Toy Story dublado`), and `require_engines` forces named engines On for the
+duration of that search only — never persisted, never written back to the
+engine's saved mode. Both are bounded in `providers/base.py`. This exists
+because language is not a property of rows an English query returns: the
+indexers file Portuguese releases under Portuguese release names, so
+**Dublado (PT-BR)** has to ask different questions, not filter better answers.
+APIBay retries keep the full title when a preset term is appended, so a
+fallback never searches only for `dublado` or `pt-br`. `effective_engines`
+is the shared source for the primary search and the search-screen status.
+
+`language_tags.py` owns the Portuguese name predicates. Audio and subtitle
+labels are interpreted separately; uploader names are not audio evidence.
+The Brazilian preset requires explicit regional audio tags: `PT-BR`,
+`Português Brasileiro`, etc. Generic Portuguese/dub tags and Brazilian subtitle
+tags alone do not qualify. Tags remain a heuristic, not proof of track contents.
 
 ## Resolver (creator search)
 

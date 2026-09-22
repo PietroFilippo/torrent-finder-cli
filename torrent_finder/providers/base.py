@@ -31,6 +31,11 @@ _APIBAY_NUMBER_WORDS = {
     "nine": "9",
     "ten": "10",
 }
+# One search already costs engines x retries; query expansion multiplies that.
+# Keep both bounded so a preset stack stays polite to the indexers.
+_MAX_QUERY_EXPANSIONS = 4
+_MAX_SEARCH_WORKERS = 12
+
 _APIBAY_FALLBACK_IGNORED = {
     "a",
     "an",
@@ -181,6 +186,16 @@ class BaseProvider(ABC):
         normalized = " ".join(query.split())
         yield normalized.casefold()
         yield _apibay_title_case(normalized)
+        # A preset suffix is not a title token. Keep the complete title for
+        # these retries: the longest-word fallback could otherwise search for
+        # just "dublado" or "nacional" and return unrelated movies.
+        if any(
+            normalized.casefold().endswith(f" {term.strip().casefold()}")
+            for preset in self.active_presets
+            for term in preset.query_terms
+            if term.strip()
+        ):
+            return
         fallback = _apibay_fallback_query(query)
         if fallback:
             yield fallback
@@ -416,31 +431,65 @@ class BaseProvider(ABC):
             pass
         return results
 
+    def expand_queries(self, query: str) -> list[str]:
+        """Return the query spellings a search should fan out over.
+
+        Just the query itself unless an active preset declares ``query_terms``
+        (see FilterPreset). Capped at ``_MAX_QUERY_EXPANSIONS`` so stacking
+        presets can't multiply one search into a request storm.
+        """
+        queries = [query]
+        for preset in self.active_presets:
+            for term in getattr(preset, "query_terms", ()):
+                candidate = f"{query} {term}".strip()
+                if candidate not in queries:
+                    queries.append(candidate)
+        return queries[:_MAX_QUERY_EXPANSIONS]
+
+    def _required_engine_names(self) -> set[str]:
+        """Engine names active presets need forced On for this search only."""
+        return {
+            name
+            for preset in self.active_presets
+            for name in getattr(preset, "require_engines", ())
+        }
+
+    @property
+    def effective_engines(self) -> list[SearchEngine]:
+        """Primary engines for the current presets, without changing saved modes."""
+        required = self._required_engine_names()
+        return [e for e in self.engines if e.mode == "on" or e.name in required]
+
     def search(self, query: str, cli_filters: FilterConfig | None = None) -> list[SearchResult]:
         """Search enabled engines, then safe emergency engines if all are empty."""
-        seen_hashes: set[str] = set()
         merged: list[SearchResult] = []
 
-        active_engines = [
-            engine for engine in self.engines if engine.mode == "on"
-        ]
+        queries = self.expand_queries(query)
+        # A preset may need an engine the user left Off — e.g. the Portuguese
+        # filter needs the aggregators that actually index Brazilian releases.
+        # This is per-search only; saved engine modes are untouched.
+        active_engines = self.effective_engines
 
         def run_engines(engines: list[SearchEngine]) -> None:
+            tasks = [
+                (engine, engine_query)
+                for engine in engines
+                for engine_query in queries
+            ]
             with concurrent.futures.ThreadPoolExecutor(
-                max_workers=len(engines)
+                max_workers=min(len(tasks), _MAX_SEARCH_WORKERS)
             ) as executor:
-                future_to_engine = {
-                    executor.submit(engine.search_fn, query): engine
-                    for engine in engines
-                }
-                for future in concurrent.futures.as_completed(future_to_engine):
+                futures = [
+                    executor.submit(engine.search_fn, engine_query)
+                    for engine, engine_query in tasks
+                ]
+                for future in concurrent.futures.as_completed(futures):
                     try:
                         data = future.result()
                         for raw_item in data:
                             item = normalize_result(raw_item)
                             info_hash = item.info_hash.lower()
-                            if info_hash and info_hash not in seen_hashes:
-                                seen_hashes.add(info_hash)
+                            if info_hash:
                                 merged.append(item)
                     except Exception:
                         pass
@@ -449,11 +498,15 @@ class BaseProvider(ABC):
             run_engines(active_engines)
 
         if not merged:
+            # A preset may already have forced an Auto engine to run above;
+            # don't ask it the same questions twice.
+            already_run = {engine.name for engine in active_engines}
             emergency_engines = [
                 engine
                 for engine in self.engines
                 if (
                     engine.mode == "auto"
+                    and engine.name not in already_run
                 )
             ]
             if emergency_engines:
@@ -472,7 +525,17 @@ class BaseProvider(ABC):
         if cli_filters:
             merged = apply_filters(merged, cli_filters)
 
-        return self._sort_results(merged)
+        # Indexers can give the same hash different names. Filter before
+        # deduplicating so a plain title arriving first cannot hide a later
+        # release name that supplies the requested language/quality tags.
+        seen_hashes: set[str] = set()
+        unique: list[SearchResult] = []
+        for item in merged:
+            info_hash = item.info_hash.lower()
+            if info_hash not in seen_hashes:
+                seen_hashes.add(info_hash)
+                unique.append(item)
+        return self._sort_results(unique)
 
     def _sort_results(self, results: list[SearchResult]) -> list[SearchResult]:
         """Order merged results for display. Default: seeders descending.

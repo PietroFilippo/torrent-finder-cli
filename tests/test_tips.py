@@ -12,10 +12,13 @@ class TipsCatalogTests(unittest.TestCase):
         self.assertTrue(any("Knaben tracker" in text for text in texts))
 
     def test_engine_mode_semantics_are_searchable(self):
-        matches = find_tips("Off is never contacted")
+        matches = find_tips("Off engines")
 
         self.assertTrue(matches)
-        self.assertTrue(any("Auto runs only" in tip.text for _category, tip in matches))
+        self.assertTrue(any(
+            "Auto runs after" in tip.text and "unless an active preset" in tip.text
+            for _category, tip in matches
+        ))
 
 
 if __name__ == "__main__":

@@ -944,7 +944,7 @@ def _main_loop() -> None:
         # 2. Get query
         if not query:
             # Build status line showing active engines and filters
-            engine_names = [e.name for e in provider.engines if e.enabled] if hasattr(provider, 'engines') else []
+            engine_names = [e.name for e in provider.effective_engines]
             engine_str = ", ".join(engine_names) if engine_names else "None"
             active_names = [p.name for p in provider.active_presets]
             active_name = ", ".join(active_names) if active_names else "None"
