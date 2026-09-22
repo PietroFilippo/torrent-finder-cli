@@ -5,6 +5,7 @@ from typing import Iterator
 import requests
 
 from torrent_finder.filters import FilterConfig, FilterPreset
+from torrent_finder.language_tags import has_brazilian_audio, has_portuguese_subtitles
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
 from torrent_finder.resolvers import CreatorFacet, movies
@@ -14,7 +15,6 @@ _YTS_API_URLS = (
     "https://movies-api.accel.li/api/v2/list_movies.json",
     "https://yts.gg/api/v2/list_movies.json",
 )
-
 
 def _fetch_yts_movies(query: str) -> list[dict]:
     for api_url in _YTS_API_URLS:
@@ -70,6 +70,27 @@ class MovieProvider(BaseProvider):
             "yify", "yts", "rarbg", "fgt", "sparks", "evo",
             "qxr", "tgx", "anoxmous", "etrg", "mkvcage", "galaxy",
         ])),
+        FilterPreset(
+            "Dublado (PT-BR)",
+            FilterConfig(name_predicate=has_brazilian_audio),
+            query_terms=("pt-br", "dublado"),
+            require_engines=("Knaben", "SolidTorrents"),
+            description=(
+                "Requires Brazilian Portuguese audio tags (PT-BR, Português Brasileiro). "
+                "Generic dublado/Português and subtitle-only tags do not qualify. "
+                "Also searches pt-br/dublado with Knaben + SolidTorrents, even if saved Off."
+            ),
+        ),
+        FilterPreset(
+            "Legendado (PT subs)",
+            FilterConfig(name_predicate=has_portuguese_subtitles),
+            query_terms=("legendado",),
+            require_engines=("Knaben", "SolidTorrents"),
+            description=(
+                "Portuguese subtitle tags; audio language alone is not enough. "
+                "Also searches legendado with Knaben + SolidTorrents, even if saved Off."
+            ),
+        ),
     ]
 
     # Search by creator. Always available: uses the keyless Wikidata fallback by
