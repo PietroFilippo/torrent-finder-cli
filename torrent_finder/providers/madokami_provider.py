@@ -1,8 +1,8 @@
 """Madokami provider — credentialed search of manga.madokami.al (Basic auth).
 
 A private, curated manga library — direct-download archives, not torrents. It
-needs a Madokami login (HTTP Basic auth); without one it returns nothing and
-``search_note`` points the user at the credentials menu. Results carry the
+needs a Madokami login (HTTP Basic auth); missing or rejected credentials produce
+an explicit search error pointing to the credentials menu. Results carry the
 library path as a placeholder ``info_hash`` — selecting one downloads the
 archive(s) directly (a directory hit opens a volume picker first) instead of
 entering the magnet pipeline (see main.py's Madokami branch).

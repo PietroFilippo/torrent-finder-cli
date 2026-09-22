@@ -16,8 +16,7 @@ The shape:
      (``download_file``). Both reuse the same authenticated session.
 
 Credentials come from ``credentials.py`` (env var or gitignored file) and are
-**required** — with none configured every call returns nothing and the provider
-stays dormant.
+**required** — searches report a missing or rejected login explicitly.
 
 Parsing is deliberately generic (anchors to nested library paths) because the
 markup couldn't be pinned down without an account at development time; sizes
@@ -67,13 +66,15 @@ def _get_session() -> requests.Session | None:
     bad credentials just surface as 401s on the first real request."""
     global _session
     with _session_lock:
-        if _session is None:
-            cfg = madokami_config()
-            if cfg:
-                s = requests.Session()
-                s.headers.update(_UA)
-                s.auth = (cfg["username"], cfg["password"])
-                _session = s
+        cfg = madokami_config()
+        auth = (cfg["username"], cfg["password"]) if cfg else None
+        if _session is not None and _session.auth != auth:
+            _session.close()
+            _session = None
+        if _session is None and auth:
+            _session = requests.Session()
+            _session.headers.update(_UA)
+            _session.auth = auth
         return _session
 
 
@@ -113,7 +114,7 @@ def _content_paths(html: str) -> list[tuple[str, str]]:
 def search(query: str) -> list[SearchResult]:
     """Search Madokami. Returns SearchResult rows whose placeholder ``info_hash`` is
     the library path (prefixed, so it can't collide with real hashes). Empty
-    list when no credentials are configured or on any error.
+    list on network failure; missing/rejected credentials raise SearchError.
 
     Madokami is a file library, not a tracker — results carry no swarm stats or
     reliable sizes, and a pick is downloaded directly (see main.py's Madokami
@@ -121,9 +122,13 @@ def search(query: str) -> list[SearchResult]:
     """
     session = _get_session()
     if session is None:
-        return []
+        from torrent_finder.search_errors import login_required
+        raise login_required("Madokami")
     try:
         r = session.get(f"{_BASE}/search", params={"q": query}, timeout=30)
+        if r.status_code in (401, 403):
+            from torrent_finder.search_errors import SearchError
+            raise SearchError("Madokami rejected the login. Check your saved credentials in Credentials.")
         if r.status_code != 200:
             return []
         html = r.text

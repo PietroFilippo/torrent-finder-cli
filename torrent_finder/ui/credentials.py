@@ -156,7 +156,12 @@ def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) ->
             readchar.readkey()
             return False
 
-    meta.save(entered)
+    try:
+        meta.save(entered)
+    except (OSError, ValueError):
+        console.print("[error]Could not save credentials. The existing file was preserved; check its permissions and JSON format.[/error]")
+        readchar.readkey()
+        return False
     console.print(f"[success]Saved {meta.name} credentials.[/success]")
     console.print("[dim]Press any key to continue...[/dim]")
     readchar.readkey()
@@ -255,7 +260,12 @@ def _manage_credentials(meta: CredentialSpec) -> None:
         elif action == "edit":
             _edit_credentials(meta)
         elif action == "clear" and confirm_prompt(f"Clear stored {meta.name} credentials?"):
-            meta.clear_saved()
+            try:
+                meta.clear_saved()
+            except (OSError, ValueError):
+                console.print("[error]Could not clear credentials; the existing file was preserved.[/error]")
+                readchar.readkey()
+                continue
             console.print(f"[success]Cleared {meta.name} credentials from the file.[/success]")
             overrides = meta.environment_override_keys()
             if overrides:
@@ -271,7 +281,10 @@ def _manage_credentials(meta: CredentialSpec) -> None:
 
 def credentials_menu() -> None:
     """Render all credential entries grouped by registry category."""
+    from torrent_finder.credentials import storage_problem
+    from rich.markup import escape
     while True:
+        problem = storage_problem()
         items = []
         last_category = None
         for meta in CREDENTIAL_REGISTRY:
@@ -297,7 +310,8 @@ def credentials_menu() -> None:
             title="Credentials",
             banner=_make_banner_panel(),
             footer=(
-                "Stored in subtitle_credentials.json (gitignored, plaintext) — "
+                (escape(problem) + "\n" if problem else "")
+                + "Stored in subtitle_credentials.json (gitignored, plaintext) — "
                 "holds all of these. Env vars override the file."
             ),
             start_index=1,

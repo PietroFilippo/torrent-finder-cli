@@ -11,7 +11,7 @@ in the search results. So this module:
      actually picked (``resolve_info_hash``) — one request, not one per row.
 
 Credentials come from ``credentials.py`` (env var or gitignored file). With none
-configured, every call returns nothing so the provider stays dormant. This is
+configured, searches report that a login is required. This is
 HTML scraping behind a login, so it's inherently fragile: a RuTracker layout
 change will need updates here.
 """
@@ -30,6 +30,7 @@ _BASE = "https://rutracker.org/forum"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
 _session: requests.Session | None = None
+_session_credentials: tuple[str, str] | None = None
 _session_lock = threading.Lock()
 
 _ROW_RE = re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
@@ -62,12 +63,17 @@ def _post_login(username: str, password: str) -> requests.Session | None:
 
 def _get_session() -> requests.Session | None:
     """Return a logged-in session (cached for the process), or None."""
-    global _session
+    global _session, _session_credentials
     with _session_lock:
-        if _session is None:
-            cfg = rutracker_config()
-            if cfg:
-                _session = _post_login(cfg["username"], cfg["password"])
+        cfg = rutracker_config()
+        auth = (cfg["username"], cfg["password"]) if cfg else None
+        if auth != _session_credentials:
+            if _session is not None:
+                _session.close()
+            _session = None
+            _session_credentials = auth
+        if _session is None and auth:
+            _session = _post_login(*auth)
         return _session
 
 
@@ -76,9 +82,15 @@ def search(query: str) -> list[SearchResult]:
     ``info_hash`` (resolve the real one with ``resolve_info_hash`` on select)."""
     session = _get_session()
     if session is None:
-        return []
+        from torrent_finder.search_errors import SearchError, login_required
+        if not rutracker_config():
+            raise login_required("RuTracker")
+        raise SearchError("RuTracker could not log in. Check Credentials or try again when the site is reachable.")
     try:
         r = session.get(f"{_BASE}/tracker.php", params={"nm": query}, timeout=30)
+        if r.status_code in (401, 403) or "login.php" in r.url:
+            from torrent_finder.search_errors import SearchError
+            raise SearchError("RuTracker requires a new login. Check your saved credentials in Credentials.")
         r.encoding = "cp1251"
         html = r.text
     except requests.RequestException:

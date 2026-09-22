@@ -16,6 +16,7 @@ import readchar
 
 from torrent_finder.constants import console
 from torrent_finder.creator_search import fan_out
+from torrent_finder.search_errors import SearchError
 from torrent_finder.state import add_history_entry, creator_history
 from torrent_finder.stats import record_creator_search
 from torrent_finder.ui.prompts import _make_banner_panel, clear_screen, filter_menu, get_query_with_shortcut
@@ -36,6 +37,8 @@ def _run_cancellable(fn, message: str, cancel: "threading.Event | None" = None):
     def work() -> None:
         try:
             out["v"] = fn()
+        except SearchError as error:
+            out["v"] = error
         except Exception:
             out["v"] = None
         finally:
@@ -56,7 +59,8 @@ def _run_cancellable(fn, message: str, cancel: "threading.Event | None" = None):
 
 
 def _notice(msg: str) -> None:
-    console.print(f"[warning] {msg}[/warning]")
+    from rich.markup import escape
+    console.print(f"[warning] {escape(msg)}[/warning]")
     console.print("[dim]Press any key to continue...[/dim]")
     readchar.readkey()
 
@@ -546,6 +550,10 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
                 cancel=cancel,
             )
             if cancelled:
+                stage = "works"
+                continue
+            if isinstance(results, SearchError):
+                _notice(str(results))
                 stage = "works"
                 continue
             results = results or []

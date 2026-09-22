@@ -181,7 +181,16 @@ def _build_panel(
 
     # Banner, panel borders/padding, indicators, context separator, and margin.
     always_visible_rows = main_start + (n - main_end)
-    chrome = 11 + always_visible_rows + context_lines + footer_lines
+    compact = console.size.height < 28
+    if not main_len or always_visible_rows > max(3, console.size.height // 3):
+        # Action-only menus (credentials, provider picker) need scrolling too.
+        main_start, main_end, main_len = 0, n, n
+        always_visible_rows = 0
+    separators = sum(
+        item.is_action and item.value != "section_header" and not items[i - 1].is_action
+        for i, item in enumerate(items) if i > 0
+    ) if multi and has_actions else 0
+    chrome = (5 if compact else 12) + always_visible_rows + separators + context_lines + footer_lines
     max_visible = max(1, console.size.height - chrome)
 
     win_start_rel, win_end_rel = _compute_window(
@@ -196,13 +205,8 @@ def _build_panel(
 
     for i, item in enumerate(items):
         in_main = main_start <= i < main_end
-        if in_main and not item.is_action and (i < win_start or i >= win_end):
+        if in_main and (i < win_start or i >= win_end):
             continue
-
-        if in_main and i == win_start and win_start > main_start:
-            body.append(
-                f"    … {win_start - main_start} more above\n", style="dim italic"
-            )
 
         is_cursor = i == cursor
         is_section_header = (
@@ -254,16 +258,12 @@ def _build_panel(
             body.append(f"  {item.hint}", style="dim yellow")
         body.append("\n")
 
-        if in_main and i == win_end - 1 and win_end < main_end:
-            body.append(
-                f"    … {main_end - win_end} more below\n", style="dim italic"
-            )
-
     return Panel(
         Group(body, Text(""), *context_blocks, footer_text),
         title=f"[bold magenta]{title}[/bold magenta]",
         border_style="bright_blue",
-        padding=(1, 2),
+        padding=(0, 2) if compact else (1, 2),
+        subtitle=(f"[dim]↑ {win_start_rel + 1}–{win_end_rel} / {main_len} ↓  •  PgUp/PgDn[/dim]" if main_len > max_visible else None),
     )
 
 
@@ -300,8 +300,11 @@ def _render(
         force_terminal=True,
     )
     if banner:
-        tmp.print(banner)
-        tmp.print()  # Blank line after banner
+        if console.size.height < 28:
+            tmp.print("Torrent Search CLI", style="bold magenta")
+        else:
+            tmp.print(banner)
+            tmp.print()
     tmp.print(panel)
     content = buf.getvalue()
 
@@ -457,6 +460,17 @@ def arrow_select(
                 cursor = _next_enabled(items, cursor, -1)
             elif key == readchar.key.DOWN:
                 cursor = _next_enabled(items, cursor, 1)
+            elif key in (readchar.key.PAGE_UP, readchar.key.PAGE_DOWN, readchar.key.HOME, readchar.key.END):
+                enabled = [i for i, item in enumerate(items) if item.enabled]
+                position = enabled.index(cursor)
+                step = max(1, console.size.height - 10)
+                if key == readchar.key.HOME:
+                    position = 0
+                elif key == readchar.key.END:
+                    position = len(enabled) - 1
+                else:
+                    position = max(0, min(len(enabled) - 1, position + (step if key == readchar.key.PAGE_DOWN else -step)))
+                cursor = enabled[position]
             elif key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
                 if multi:
                     if items[cursor].is_action:

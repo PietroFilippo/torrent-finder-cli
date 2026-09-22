@@ -127,6 +127,15 @@ The Brazilian preset requires explicit regional audio tags: `PT-BR`,
 `Português Brasileiro`, etc. Generic Portuguese/dub tags and Brazilian subtitle
 tags alone do not qualify. Tags remain a heuristic, not proof of track contents.
 
+`result_view.py` owns title matching and index-preserving result refinement.
+The table's `f` menu filters fetched rows and sorts them without changing their
+acquisition identity. `uploaded_at` is a UTC epoch timestamp (0 = unknown),
+provided by sources with an upload/publication date; last-seen is not upload time.
+Anime prefers exact/prefix title matches. `nyaa.py` supplements short queries
+with one popular-catalog page when RSS contains no exact title, optionally
+excluding dominant unrelated title prefixes. Original RSS rows are retained.
+FitGirl and Online-Fix require query words in their parsed title.
+
 ## Resolver (creator search)
 
 The resolver layer (`resolvers/`) translates a person/company name into works
@@ -166,6 +175,10 @@ result table watch live size changes. Streaming headers reserve their measured
 wrapped height before subprocess output begins. See
 [ADR-0008](docs/adr/0008-responsive-terminal-layout.md).
 
+Short viewports use a one-line banner and tighter padding. Windowed selectors
+show position in the border instead of extra “more above/below” rows and accept
+PgUp/PgDn/Home/End. Action-only menus scroll too.
+
 ## Credentials
 
 Optional per-site logins/API keys, read from environment variables or
@@ -176,3 +189,19 @@ typed fields, required/optional rules, display metadata, status/save/clear
 semantics, and one lazy verifier adapter. `credentials.py` owns generic
 environment/file storage; `ui/credentials.py` owns rendering and interaction.
 See [ADR-0005](docs/adr/0005-credential-registry-owns-integration-metadata.md).
+
+The credential file uses the same machine-stable directory as settings. Legacy
+copies migrate only when the destination is absent, per integration, with newest
+fields kept together. Read failures never become a writable empty store; writes
+use an atomic replacement. Existing stable files, including explicit clears,
+win over legacy copies. Madokami and RuTracker refresh sessions when credentials
+change. `SearchError` carries actionable login failures through search fan-out
+to the UI. See [ADR-0012](docs/adr/0012-stable-credentials-and-safe-updates.md).
+
+## Updates
+
+Windows pip/pipx updates run through `update_worker.py` after the parent process
+exits, releasing the running launcher. A hidden helper writes output to a local
+log and records the real exit status; startup consumes the report. Nonzero exits
+are failures even when package version metadata changed. Other install types
+retain their existing git/pip or Releases-page flow.
