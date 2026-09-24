@@ -57,10 +57,11 @@ def make_search_screen_renderer(
     active_filters: str,
     has_history: bool,
     notice: str = "",
+    scope_label: str = "Engines",
 ) -> Callable[[Console], None]:
     """Return the responsive header renderer used by the search editor."""
     status = (
-        f"[dim]Engines:[/dim] [cyan]{engine_names}[/cyan]   "
+        f"[dim]{scope_label}:[/dim] [cyan]{engine_names}[/cyan]   "
         f"[dim]Filters:[/dim] [cyan]{active_filters}[/cyan]"
     )
     compact_shortcuts = (
@@ -512,8 +513,12 @@ def quick_actions_menu(update_available: bool = False) -> "str | None":
     return items[idx].value
 
 
-def filter_menu(provider) -> None:
+def filter_menu(provider, on_save=None) -> None:
     """Show engine toggles and filter presets in a single menu."""
+    if getattr(provider, "is_combined", False):
+        from torrent_finder.ui.combined import combined_filter_menu
+        combined_filter_menu(provider)
+        return
     has_engines = hasattr(provider, 'engines') and provider.engines
     has_presets = bool(provider.presets)
 
@@ -704,8 +709,11 @@ def filter_menu(provider) -> None:
                 _type, preset = item.value
                 provider.active_presets.append(preset)
 
-        from torrent_finder.state import save_state
-        save_state(PROVIDERS)
+        if on_save is not None:
+            on_save()
+        else:
+            from torrent_finder.state import save_state
+            save_state(PROVIDERS)
     # "back" — just return
 
 

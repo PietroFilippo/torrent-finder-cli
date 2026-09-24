@@ -70,30 +70,41 @@ def load_state(providers) -> None:
         if not pstate:
             continue
 
-        saved_engines = pstate.get("engines", {})
-        saved_modes = pstate.get("engine_modes")
-        explicit_names = pstate.get("explicitly_disabled_engines")
-        has_explicit_metadata = isinstance(explicit_names, list)
-        explicit_names = set(explicit_names or ())
-        for engine in provider.engines:
-            if isinstance(saved_modes, dict) and engine.name in saved_modes:
-                try:
-                    engine.set_mode(saved_modes[engine.name])
-                    continue
-                except (TypeError, ValueError):
-                    pass
-            if engine.name in saved_engines:
-                engine.enabled = bool(saved_engines[engine.name])
-                engine.explicitly_disabled = (
-                    engine.name in explicit_names
-                    if has_explicit_metadata
-                    else not engine.enabled
-                )
+        apply_provider_state(provider, pstate)
 
-        saved_preset_names = pstate.get("active_presets", [])
-        provider.active_presets = [
-            p for p in provider.presets if p.name in saved_preset_names
-        ]
+
+def apply_provider_state(provider, pstate: dict) -> None:
+    """Apply a provider snapshot without reading or writing the shared store."""
+    saved_engines = pstate.get("engines", {})
+    saved_modes = pstate.get("engine_modes")
+    explicit_names = pstate.get("explicitly_disabled_engines")
+    has_explicit_metadata = isinstance(explicit_names, list)
+    explicit_names = set(explicit_names or ())
+    for engine in provider.engines:
+        if isinstance(saved_modes, dict) and engine.name in saved_modes:
+            try:
+                engine.set_mode(saved_modes[engine.name])
+                continue
+            except (TypeError, ValueError):
+                pass
+        if engine.name in saved_engines:
+            engine.enabled = bool(saved_engines[engine.name])
+            engine.explicitly_disabled = (
+                engine.name in explicit_names if has_explicit_metadata else not engine.enabled
+            )
+    saved_preset_names = pstate.get("active_presets", [])
+    provider.active_presets = [p for p in provider.presets if p.name in saved_preset_names]
+
+
+def provider_snapshot(provider) -> dict:
+    return {
+        "engines": {e.name: e.enabled for e in provider.engines},
+        "engine_modes": {e.name: e.mode for e in provider.engines},
+        "explicitly_disabled_engines": [
+            e.name for e in provider.engines if e.mode == "off" and e.explicitly_disabled
+        ],
+        "active_presets": [p.name for p in provider.active_presets],
+    }
 
 
 def save_state(providers) -> None:
@@ -103,19 +114,7 @@ def save_state(providers) -> None:
     should survive a hard kill.
     """
     data = store.read()
-    data["providers"] = {
-        p.slug: {
-            "engines": {e.name: e.enabled for e in p.engines},
-            "engine_modes": {e.name: e.mode for e in p.engines},
-            "explicitly_disabled_engines": [
-                e.name
-                for e in p.engines
-                if e.mode == "off" and e.explicitly_disabled
-            ],
-            "active_presets": [pr.name for pr in p.active_presets],
-        }
-        for p in providers
-    }
+    data["providers"] = {p.slug: provider_snapshot(p) for p in providers}
     store.write(data)
     store.flush()
 
@@ -161,6 +160,7 @@ def add_history_entry(
     kind: str = "keyword",
     facet: str | None = None,
     name: str | None = None,
+    search_profile: dict | None = None,
 ) -> None:
     """Record a search, newest on top, deduplicated.
 
@@ -200,6 +200,9 @@ def add_history_entry(
         entry["kind"] = "creator"
         entry["facet"] = facet
         entry["name"] = name
+    if search_profile is not None:
+        from copy import deepcopy
+        entry["search_profile"] = deepcopy(search_profile)
     history.insert(0, entry)
     save_history(history)
 

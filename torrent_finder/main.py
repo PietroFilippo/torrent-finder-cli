@@ -26,6 +26,7 @@ from torrent_finder.providers import (
     get_provider,
     group_for,
     provider_cli_choices,
+    provider_for_result,
 )
 from torrent_finder.security import show_security_warning
 from torrent_finder.state import history_queries, load_state
@@ -199,7 +200,7 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
                         saved_direct += 1
                     if outcome.password:
                         ofix_pw = outcome.password
-                    record_torrent_picked(provider.slug, int(r.get("seeders", 0) or 0))
+                    record_torrent_picked(provider_for_result(r, provider).slug, int(r.get("seeders", 0) or 0))
                     if not outcome.saved_direct:  # a saved file isn't a magnet dispatch
                         record_magnet_dispatch()
                 elif cancel_event.is_set():
@@ -315,7 +316,7 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> None:
     if ok:
         record_method_complete("aria")
         for r in picked:
-            record_torrent_picked(provider.slug, int(r.get("seeders", 0) or 0))
+            record_torrent_picked(provider_for_result(r, provider).slug, int(r.get("seeders", 0) or 0))
     console.print("[dim]Press any key to continue...[/dim]")
     readchar.readkey()
     clear_screen()
@@ -412,7 +413,8 @@ def _browse_results(provider, results, note: str = "") -> str:
 
         idx = choice[1]
         selected = results[idx]
-        record_torrent_picked(provider.slug, int(selected.get("seeders", 0) or 0))
+        selected_provider = provider_for_result(selected, provider)
+        record_torrent_picked(selected_provider.slug, int(selected.get("seeders", 0) or 0))
 
         # Acquisition seam: magnet styles hand back a magnet and fall through
         # to the download-method menu; handoff / direct-download styles finish
@@ -436,9 +438,9 @@ def _browse_results(provider, results, note: str = "") -> str:
 
         go_back_to_results = False
         while True:
-            show_subs = getattr(provider, "supports_subtitles", False)
-            show_picker = getattr(provider, "supports_episode_picker", False)
-            show_stream = getattr(provider, "supports_streaming", True)
+            show_subs = getattr(selected_provider, "supports_subtitles", False)
+            show_picker = getattr(selected_provider, "supports_episode_picker", False)
+            show_stream = getattr(selected_provider, "supports_streaming", True)
             method = download_method_prompt(
                 magnet=session.magnet,
                 show_subtitles=show_subs,
@@ -573,7 +575,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                 sub_paths: list[str] = []
                 # Anime: try Jimaku first (best anime coverage) when a key is
                 # configured; it returns None to fall through to subliminal.
-                if getattr(provider, "slug", "") == "anime":
+                if getattr(selected_provider, "slug", "") == "anime":
                     from torrent_finder.jimaku import search_and_download
                     jp = search_and_download(session.name)
                     if jp:
@@ -683,6 +685,8 @@ def _history_pick(entry):
     stored facet is gone (caller then treats ``value`` as a keyword fallback).
     """
     prov = get_provider(entry.get("provider", "") or "")
+    if getattr(prov, "is_combined", False) and isinstance(entry.get("search_profile"), dict):
+        prov.restore(entry["search_profile"])
     if entry.get("kind") == "creator":
         facet = None
         if prov:
@@ -753,6 +757,8 @@ def _run_update_flow(info: dict) -> None:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument("--providers", nargs="+", metavar="PROVIDER", choices=[p for p in provider_cli_choices() if p != "all"],
+                        help="Providers for -t all (for example: --providers anime manga)")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
     parser.add_argument(
         "-t", "--type", type=str, choices=provider_cli_choices(),
@@ -772,6 +778,8 @@ def _build_parser() -> argparse.ArgumentParser:
 def _main_loop() -> None:
     parser = _build_parser()
     args = parser.parse_args()
+    if args.providers and args.type != "all":
+        parser.error("--providers requires -t all")
     advise_limited_terminal()
     if not args.skip_warning:
         if not show_security_warning():
@@ -792,6 +800,10 @@ def _main_loop() -> None:
 
     session_provider = initial_provider
     current_provider = session_provider
+    if args.providers:
+        profile = current_provider.snapshot()
+        profile["selected"] = [get_provider(name).slug for name in args.providers]
+        current_provider.restore(profile)
 
     cli_filters = None
     if args.filter or args.exclude:
@@ -962,12 +974,15 @@ def _main_loop() -> None:
             engine_str = ", ".join(engine_names) if engine_names else "None"
             active_names = [p.name for p in provider.active_presets]
             active_name = ", ".join(active_names) if active_names else "None"
+            if getattr(provider, "is_combined", False):
+                engine_str, active_name = provider.summary()
             prov_history = history_queries(provider.slug)
             screen_renderer = make_search_screen_renderer(
                 engine_str,
                 active_name,
                 has_history=bool(prov_history),
                 notice=notice_msg or "",
+                scope_label="Providers" if getattr(provider, "is_combined", False) else "Engines",
             )
             notice_msg = None
             initial, pending_query = pending_query, ""
@@ -1076,9 +1091,12 @@ def _main_loop() -> None:
         search_result: dict = {}
         cancel_event = threading.Event()
 
-        def _run_search() -> None:
+        def _run_search(provider=provider, queries=queries, cli_filters=cli_filters,
+                        cancel_event=cancel_event, search_result=search_result) -> None:
             try:
-                if len(queries) == 1:
+                if getattr(provider, "is_combined", False):
+                    search_result["results"] = provider.search_many(queries, cli_filters, cancel_event)
+                elif len(queries) == 1:
                     search_result["results"] = provider.search(queries[0], cli_filters=cli_filters)
                 else:
                     from torrent_finder.resolvers.types import Work
@@ -1113,10 +1131,12 @@ def _main_loop() -> None:
             query = None
             continue
 
-        results = search_result.get("results") or []
+        raw_results = search_result.get("results")
+        notices = list(getattr(raw_results, "notices", ()))
+        results = raw_results or []
         if not results:
             from rich.markup import escape
-            message = search_result.get("error") or "No results found."
+            message = search_result.get("error") or "\n".join(["No results found.", *notices])
             notice_msg = f"[warning] {escape(message)}[/warning]\n"
             clear_screen()
             query = None
@@ -1127,7 +1147,8 @@ def _main_loop() -> None:
         from torrent_finder.state import add_history_entry
         active_preset_names = [pr.name for pr in getattr(provider, "active_presets", [])]
         for q in queries:
-            add_history_entry(q, provider.slug, active_preset_names)
+            extra = {"search_profile": provider.snapshot()} if getattr(provider, "is_combined", False) else {}
+            add_history_entry(q, provider.slug, active_preset_names, **extra)
             record_search(provider.slug, q, active_preset_names)
 
         # Note any searched titles that returned nothing (multi-title only). It
@@ -1135,13 +1156,15 @@ def _main_loop() -> None:
         # table's own screen clear).
         note = ""
         if len(queries) > 1:
-            found = {r.get("from_work") for r in results}
+            found = {q for r in results for q in r.get("matched_queries", [r.get("from_work")])}
             missing = [q for q in queries if q not in found]
             if missing:
                 cap = 4
                 more = f" +{len(missing) - cap} more" if len(missing) > cap else ""
                 note = (f"⚠  No torrents for {len(missing)} of {len(queries)} titles: "
                         + ", ".join(missing[:cap]) + more)
+        if notices:
+            note = "\n".join(filter(None, [note, *notices]))
 
         # Results + download (shared with the by-creator flow). Esc on the
         # results table steps back to the keyword prompt; a completed download

@@ -40,15 +40,18 @@ class _TableLayout:
     size: bool
     seeds: bool
     leeches: bool
+    provider: bool = False
 
 
-def _table_layout(width: int, show_from: bool) -> _TableLayout:
+def _table_layout(width: int, show_from: bool, show_provider: bool = False) -> _TableLayout:
     """Choose progressively smaller result columns for the terminal width."""
     full_min = 128 if show_from else 112
     if width >= full_min:
         fixed = 84 if show_from else 69
+        if show_provider:
+            fixed += 17
         return _TableLayout(
-            "full", max(18, min(46, width - fixed)), True, show_from, True, True, True
+            "full", max(18, min(46, width - fixed)), True, show_from, True, True, True, show_provider
         )
     if width >= 80:
         return _TableLayout(
@@ -73,9 +76,11 @@ def _selected_metadata(
 
     item = results[selected_idx]
     parts: list[str] = []
+    if item.get("provider_label"):
+        details.append(f"  Provider: {item['provider_label']}  |  Source: {_source_label(item)}\n", style="dim")
     uploaded = timestamp(item.get("uploaded_at"))
     parts.append("Uploaded: " + (datetime.fromtimestamp(uploaded, timezone.utc).strftime("%Y-%m-%d") if uploaded else "unknown"))
-    if not layout.source:
+    if not layout.source and not item.get("provider_label"):
         parts.append(f"Source: {_source_label(item)}")
     if item.get("source") == "Knaben" and item.get("knaben_tracker"):
         parts.append(f"Knaben tracker: {item.get('knaben_tracker')}")
@@ -120,20 +125,40 @@ def _table_caption(
     return caption
 
 
+def _note_preview(note: str) -> Text:
+    """Keep partial-search notices from crowding results out of short windows."""
+    count = len(note.splitlines())
+    if console.size.height < 28 or count > 2:
+        return Text(f"⚠ {count} search notice{'s' if count != 1 else ''} — n to read", style="yellow",
+                    no_wrap=True, overflow="ellipsis")
+    return Text(note + "\nn: read search notices", style="yellow", overflow="fold")
+
+
+def _show_search_notices(note: str) -> None:
+    from rich.markup import escape
+    from torrent_finder.ui.prompts import _make_banner_panel
+    from torrent_finder.ui.selector import SelectItem, arrow_select
+    items = [SelectItem(line.split(":", 1)[0], description=escape(line), passive=True)
+             for line in note.splitlines() if line.strip()]
+    items.append(SelectItem("Back to results", is_action=True))
+    arrow_select(items, title="Search notices", banner=_make_banner_panel(),
+                 footer="↑/↓ read notices • Esc back to results")
+
+
 def _note_line_count(note: str, width: int) -> int:
     if not note:
         return 0
-    return max(1, len(Text(note).wrap(console, max(8, width), overflow="fold")))
+    return max(1, len(_note_preview(note).wrap(console, max(8, width))))
 
 
 def _visible_count(
-    total: int, height: int, width: int, note: str, show_from: bool
+    total: int, height: int, width: int, note: str, show_from: bool, show_provider: bool = False
 ) -> int:
     """Return rows that fit after responsive caption and metadata lines."""
     layout = _table_layout(width, show_from)
     extra = {"full": 0, "medium": 1, "compact": 2, "minimal": 4}[layout.mode]
     chrome = 10 if height < 28 else 16
-    available = max(1, height - chrome - _note_line_count(note, width) - extra)
+    available = max(1, height - chrome - _note_line_count(note, width) - extra - (2 if show_provider else 0))
     return min(total, available)
 
 
@@ -153,7 +178,7 @@ def build_table(
 ) -> Table:
     """Build a result table whose columns progressively collapse by width."""
     width = console.size.width
-    layout = _table_layout(width, show_from)
+    layout = _table_layout(width, show_from, any(r.get("provider_slug") for r in results))
     end_idx = min(scroll_offset + visible_count, total)
     scroll_info = f"[dim]({scroll_offset + 1}-{end_idx} of {total})[/dim]" if total else "[dim](No matching results — f to refine)[/dim]"
     page_info = (
@@ -185,6 +210,8 @@ def build_table(
         table.add_column("#", style="bold white", justify="right", width=7)
         if layout.source:
             table.add_column("Source", style="magenta", width=9)
+        if layout.provider:
+            table.add_column("Provider", style="green", width=14, no_wrap=True, overflow="ellipsis")
         if layout.from_work:
             table.add_column(
                 "From", style="green", width=12, no_wrap=True, overflow="ellipsis"
@@ -206,6 +233,8 @@ def build_table(
         leeches = int(item.get("leechers", 0) or 0)
         size = int(item.get("size", 0) or 0)
         name = str(item.get("name", "Unknown"))
+        if item.get("provider_label") and not layout.provider:
+            name = f"{item['provider_label']} · {name}"
         is_selected = index == selected_idx
 
         display_name = (
@@ -238,6 +267,8 @@ def build_table(
         cells: list[object] = [check_text, number]
         if layout.source:
             cells.append(Text(_source_label(item)))
+        if layout.provider:
+            cells.append(Text(str(item.get("provider_label", ""))))
         if layout.from_work:
             cells.append(Text(str(item.get("from_work", "") or "")))
         cells.append(Text(display_name))
@@ -282,6 +313,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
     # Provenance "From" column: only when results came from more than one searched
     # title (multi-title search); redundant for a single query.
     show_from = len({r.get("from_work") for r in all_results if r.get("from_work")}) > 1
+    show_provider = any(r.get("provider_slug") for r in all_results)
     total_pages = max(1, math.ceil(total_all / RESULTS_PER_PAGE))
     current_page = 0
 
@@ -302,7 +334,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
 
     # Reserve room for the banner, wrapping caption, and hidden metadata line.
     visible_count = _visible_count(
-        total, console.size.height, console.size.width, note, show_from
+        total, console.size.height, console.size.width, note, show_from, show_provider
     )
 
     scroll_offset = 0
@@ -323,8 +355,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
         heading = Text("Torrent Search CLI", style="bold magenta") if console.size.height < 28 else banner
         view_status = Text(f"{view_mode}: {view_query or 'all names'}  •  sort: {view_order}", style="dim", no_wrap=True, overflow="ellipsis")
         if note:
-            note_line = Text(note, style="yellow", overflow="fold")
-            return Group(heading, view_status, note_line, tbl)
+            return Group(heading, view_status, _note_preview(note), tbl)
         return Group(heading, view_status, tbl)
 
     # screen=True renders into the terminal's alternate-screen buffer — a fixed
@@ -367,14 +398,17 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                         current_size.width,
                         note,
                         show_from,
+                        show_provider,
                     )
                     if cur < scroll_offset:
                         scroll_offset = cur
                     elif cur >= scroll_offset + visible_count:
                         scroll_offset = max(0, cur - visible_count + 1)
 
-                layout = _table_layout(current_size.width, show_from)
+                layout = _table_layout(current_size.width, show_from, show_provider)
                 name = str(page_items[cur].get("name", ""))
+                if show_provider and not layout.provider:
+                    name = f"{page_items[cur].get('provider_label', '')} · {name}"
                 tick_changed = False
                 new_tick = 0
                 if cell_len(name) > layout.name_width:
@@ -434,6 +468,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                             console.size.width,
                             note,
                             show_from,
+                            show_provider,
                         )
                     num_buffer = ""
                 elif key == readchar.key.RIGHT:
@@ -450,6 +485,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                             console.size.width,
                             note,
                             show_from,
+                            show_provider,
                         )
                     num_buffer = ""
                 elif key == " ":
@@ -472,6 +508,19 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                         return _pick_result(picked)
                     if total:
                         return ("one", view_indexes[global_offset + current])
+                elif key in ("n", "N") and note:
+                    stop_event.set()
+                    ticker_thread.join(timeout=1)
+                    live.stop()
+                    try:
+                        _show_search_notices(note)
+                    except KeyboardInterrupt:
+                        pass
+                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider)
+                    live.start()
+                    stop_event.clear()
+                    ticker_thread = threading.Thread(target=ticker, daemon=True)
+                    ticker_thread.start()
                 elif key in ("f", "F"):
                     num_buffer = ""
                     # Stop background redraws while the modal owns the terminal.
@@ -490,7 +539,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                     current_page = current = scroll_offset = global_offset = 0
                     page_items = page_results()
                     total = len(page_items)
-                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from)
+                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider)
                     marquee_state["tick"] = 0
                     marquee_state["cursor_changed_at"] = time.monotonic()
                     live.start()
@@ -517,7 +566,7 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
                             page_items = page_results()
                             total = len(page_items)
                             global_offset = current_page * RESULTS_PER_PAGE
-                            visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from)
+                            visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider)
                             if current_page != prev_page:
                                 scroll_offset = 0
                     except ValueError:

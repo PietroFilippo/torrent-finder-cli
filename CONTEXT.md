@@ -13,7 +13,7 @@ for, not where it comes from. One instance of a `BaseProvider` subclass
 
 - **`slug` is the identity key** — immutable, lowercase (`movies`, `games`,
   `online-fix`, `fitgirl`, `software`, `mobile`, `rutracker`, `anime`, `manga`,
-  `madokami`). Persistence (history, stats, settings), the `-t` CLI flag, and
+  `madokami`, `books`, `all`). Persistence (history, stats, settings), the `-t` CLI flag, and
   all lookups resolve against it. See [ADR-0001](docs/adr/0001-provider-slug-identity.md).
 - **`name` is a display label** — free to change (`"Movies & Series"`,
   `"General"`), never used for identity. Duplicate names across providers are
@@ -30,6 +30,22 @@ for, not where it comes from. One instance of a `BaseProvider` subclass
 **ProviderGroup** is display-only nesting on the Select Provider screen
 (Games, Software, Manga umbrellas). It changes menu shape, never identity —
 group children stay in flat `PROVIDERS` with their own slugs.
+
+**CombinedProvider** (`slug="all"`) orchestrates a selection of concrete
+providers. It creates independent provider instances for its settings profile
+and for each search invocation; it never borrows mutable registry instances.
+Its profile lives under `settings.combined_search`: selected slugs, per-provider
+engine modes/presets, and shared name include/exclude rules. Initial settings
+copy solo settings except Anime resolution presets. No fresh Anime search
+requires a resolution; explicitly saved resolution choices remain respected.
+See [ADR-0013](docs/adr/0013-combined-provider-search.md).
+
+Combined searches retain provider/category boundaries, with at most three
+provider/query jobs and six engine invocations running concurrently per search.
+Shared rules run before per-provider hash deduplication through `result_filter`;
+they match names only. Search errors become notices alongside partial results.
+History's optional `search_profile` snapshots reproduce combined settings.
+Creator facets stay on concrete providers.
 
 ## Engine
 
@@ -68,6 +84,15 @@ Source-specific acquisition identifiers live in `SearchResult.handle`:
 `rt_topic_id` (RuTracker), `fg_post_url` (FitGirl), `of_post_url` (Online-Fix),
 `mdk_path` (Madokami). During migration, `SearchResult` still behaves like a
 mapping, so legacy reads such as `result.get("rt_topic_id")` continue to work.
+
+Combined rows additionally carry `provider_slug`, `provider_label`,
+`matched_providers`, and `matched_queries` in `extra`. Copies protect cached
+source rows from these annotations. Real 40-digit hex hashes deduplicate across
+providers; other identifiers are scoped by source and URL/handle. The first
+matching provider in registry order supplies the row, and all origins are kept.
+`provider_for_result` selects download capabilities and pick statistics; the
+unchanged source still selects the acquisition adapter. Title relevance orders
+the combined table, preserving provider ordering for equal scores.
 
 ## Acquisition
 
@@ -178,6 +203,9 @@ wrapped height before subprocess output begins. See
 Short viewports use a one-line banner and tighter padding. Windowed selectors
 show position in the border instead of extra “more above/below” rows and accept
 PgUp/PgDn/Home/End. Action-only menus scroll too.
+Search notices collapse to one line in short windows; `n` opens a notice
+browser without resetting the result selection. Mixed results show provider
+labels and selected-row provenance even when columns collapse.
 
 ## Credentials
 
