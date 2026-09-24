@@ -9,6 +9,7 @@ from typing import Iterable
 import requests
 
 from torrent_finder.search_result import SearchResult
+from torrent_finder.search_control import search_request
 
 
 API_URL = "https://api.knaben.org/v1"
@@ -41,7 +42,7 @@ def search(query: str, categories: Iterable[int]) -> list[SearchResult]:
         "hide_xxx": True,
     }
     try:
-        response = requests.post(
+        response = search_request(requests.post,
             API_URL,
             json=body,
             timeout=15,

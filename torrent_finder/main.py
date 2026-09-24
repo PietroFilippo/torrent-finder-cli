@@ -1081,21 +1081,38 @@ def _main_loop() -> None:
         # and merge (dedupe by hash, sort by seeders), reusing the by-creator
         # search path.
         shown = ", ".join(queries)
-        console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{shown}[/highlight]...")
-        if getattr(provider, "search_note", ""):
+        combined = getattr(provider, "is_combined", False)
+        if combined:
+            # CLI -q can reach this screen before the lazy profile is loaded.
+            count = sum(p.slug in provider.selected_slugs for p in provider.children)
+            console.print(f"[info]Searching {count} provider{'s' if count != 1 else ''} for:[/info] [highlight]{shown}[/highlight]")
+            console.print("[dim]Results appear when the search finishes or after 30 seconds.[/dim]")
+            console.print("[dim]Press Enter to view results so far, or Esc to cancel.[/dim]")
+        else:
+            console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{shown}[/highlight]...")
+        if not combined and getattr(provider, "search_note", ""):
             console.print(f"[dim]{provider.search_note}[/dim]")
-        console.print("[dim]Press Esc to cancel and go back.[/dim]")
+        if not combined:
+            console.print("[dim]Press Esc to cancel and go back.[/dim]")
 
         # Run the search on a worker thread so Esc can abort the wait instead of
         # forcing the user to sit through the engine timeouts (or Ctrl+C).
         search_result: dict = {}
         cancel_event = threading.Event()
+        finish_event = threading.Event()
+
+        def report_progress(progress, target=search_result):
+            target["progress"] = progress
 
         def _run_search(provider=provider, queries=queries, cli_filters=cli_filters,
-                        cancel_event=cancel_event, search_result=search_result) -> None:
+                        cancel_event=cancel_event, finish_event=finish_event,
+                        search_result=search_result, report_progress=report_progress) -> None:
             try:
                 if getattr(provider, "is_combined", False):
-                    search_result["results"] = provider.search_many(queries, cli_filters, cancel_event)
+                    search_result["results"] = provider.search_many(
+                        queries, cli_filters, cancel_event,
+                        finish_event=finish_event, on_progress=report_progress,
+                    )
                 elif len(queries) == 1:
                     search_result["results"] = provider.search(queries[0], cli_filters=cli_filters)
                 else:
@@ -1115,10 +1132,22 @@ def _main_loop() -> None:
 
         worker = threading.Thread(target=_run_search, daemon=True)
         worker.start()
-        stop_listener = start_esc_listener(cancel_event)
+        stop_listener = start_esc_listener(cancel_event, finish_event=finish_event) if combined else start_esc_listener(cancel_event)
+        started = time.monotonic()
         try:
-            with console.status(f"[bold cyan]Searching {provider.name}...[/bold cyan]", spinner="dots"):
+            status_text = "Contacting selected providers..." if combined else f"Searching {provider.name}..."
+            with console.status(f"[bold cyan]{status_text}[/bold cyan]", spinner="dots") as status:
                 while not search_result.get("done") and not cancel_event.is_set():
+                    progress = search_result.get("progress")
+                    if progress is not None:
+                        pending = ", ".join(progress.waiting[:2])
+                        if len(progress.waiting) > 2:
+                            pending += f" +{len(progress.waiting) - 2} more"
+                        status.update(
+                            f"[bold cyan]{progress.completed}/{progress.total} providers finished · "
+                            f"{progress.results} results ready · {int(time.monotonic() - started)}s[/bold cyan]"
+                            + (f"\n[dim]Waiting: {pending}[/dim]" if pending else "")
+                        )
                     time.sleep(0.05)
         except KeyboardInterrupt:
             cancel_event.set()

@@ -34,6 +34,7 @@ from urllib.parse import urljoin, unquote
 import requests
 
 from torrent_finder.search_result import SearchResult
+from torrent_finder.search_control import search_request
 from torrent_finder.result_view import matches_name
 
 _BASE = "https://online-fix.me"
@@ -133,7 +134,7 @@ def _anon_http() -> requests.Session:
             s = requests.Session()
             s.headers.update(_UA)
             try:
-                s.get(_BASE + "/", timeout=25)
+                search_request(s.get, _BASE + "/", timeout=25)
             except requests.RequestException:
                 pass
             _anon_session = s
@@ -152,7 +153,7 @@ def search(query: str) -> list[SearchResult]:
     # The site's search form is a GET to /index.php with do/subaction/story.
     session = _anon_http()
     try:
-        r = session.get(
+        r = search_request(session.get,
             _BASE + "/index.php",
             params={"do": "search", "subaction": "search", "story": query},
             headers={"Referer": _BASE + "/"},

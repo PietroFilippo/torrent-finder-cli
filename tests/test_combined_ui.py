@@ -97,7 +97,7 @@ class CombinedUITests(unittest.TestCase):
         results = CombinedResults([dict(name="Saki", source="Nyaa", provider_slug="anime")],
                                   ["Madokami: not logged in"])
         with patch("sys.argv", ["torrent", "-y", "-t", "all", "-q", "Saki"]), \
-             patch.object(main, "console"), \
+             patch.object(main, "console") as console, \
              patch.object(main, "advise_limited_terminal"), \
              patch.object(main, "get_provider", return_value=provider), \
              patch.object(provider, "search_many", return_value=results) as search, \
@@ -113,6 +113,11 @@ class CombinedUITests(unittest.TestCase):
         self.assertEqual(search.call_args.args[0], ["Saki"])
         self.assertEqual(browse.call_args.kwargs["note"], "Madokami: not logged in")
         self.assertEqual(history.call_args.kwargs["search_profile"], provider.snapshot())
+        output = "\n".join(str(call.args[0]) for call in console.print.call_args_list)
+        self.assertIn("Searching 2 providers for:", output)
+        self.assertIn("Press Enter to view results so far", output)
+        self.assertNotIn("Searching Search across providers", output)
+        self.assertNotIn("Ctrl+F", output)
 
     def test_mixed_table_frame_fits_compact_windows_and_identifies_the_provider(self):
         rows = [dict(name=f"Saki volume {i}", source="Nyaa", provider_slug="manga",
