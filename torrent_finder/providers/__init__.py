@@ -14,6 +14,7 @@ from torrent_finder.providers.movie_provider import MovieProvider
 from torrent_finder.providers.online_fix_provider import OnlineFixProvider
 from torrent_finder.providers.rutracker_provider import RuTrackerProvider
 from torrent_finder.providers.software_provider import SoftwareProvider
+from torrent_finder.providers.combined_provider import CombinedProvider
 
 # Singleton provider instances. Named so the display menu can nest some of them
 # under a group without changing the flat registry below.
@@ -45,6 +46,8 @@ PROVIDERS: list[BaseProvider] = [
     _madokami,
     _books,
 ]
+_all = CombinedProvider(PROVIDERS)
+PROVIDERS.append(_all)
 
 
 def _provider_names(provider: BaseProvider) -> tuple[str, ...]:
@@ -136,6 +139,7 @@ MANGA_GROUP = ProviderGroup(
 # Display order for the Select Provider screen (mixes standalone providers and
 # groups). Distinct from PROVIDERS, which stays flat for identity lookups.
 PROVIDER_MENU: list = [
+    _all,
     _movie,
     GAMES_GROUP,
     SOFTWARE_GROUP,
@@ -195,3 +199,8 @@ def group_for(provider) -> "ProviderGroup | None":
         if isinstance(item, ProviderGroup) and provider in item.children:
             return item
     return None
+
+
+def provider_for_result(result, fallback):
+    """Resolve mixed-result capabilities/stats without changing its source adapter."""
+    return get_provider_by_slug(result.get("provider_slug", "")) or fallback

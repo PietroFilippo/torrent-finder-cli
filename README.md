@@ -4,10 +4,11 @@ An interactive command-line application for searching and downloading torrents d
 
 Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, no-Python binary from [Releases](https://github.com/PietroFilippo/torrent-finder-cli/releases) — see [Installation](#installation).
 
-See the [v0.6.0 release notes](docs/releases/v0.6.0.md) for the latest features and upgrade guidance.
+See the [v0.6.0 release notes](docs/releases/v0.6.0.md) for the latest published release and upgrade guidance. The source branch also includes the unreleased [search across providers](#search-across-providers) feature described below.
 
 ## Features
 
+- **Search Across Providers (unreleased):** Choose **Search across providers** to search every provider or a saved selection, such as Anime + Manga. **Ctrl+F** chooses providers, shared name rules, and each provider's own engines/presets. The combined profile is saved separately from individual searches. Results retain their provider and source, merge duplicate torrents, and offer the appropriate download/stream actions. Missing logins produce notices while other providers' results remain usable.
 - **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga, Books), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs via The Pirate Bay's Applications categories plus SolidTorrents), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and warns when no login is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`. **Games** is likewise a group: pick it and choose **General** (PC, consoles, ROMs & repacks from public trackers — The Pirate Bay's game categories plus SolidTorrents), **Online-Fix** (scrapes [online-fix.me](https://online-fix.me) for co-op/online game cracks), or **FitGirl** (searches the official [fitgirl-repacks.site](https://fitgirl-repacks.site) — the one trustworthy source for FitGirl repacks, since fake "FitGirl" uploads on public trackers are a known malware vector; no account needed, the magnet resolves from the post when you pick a result). On the CLI they're `-t game`, `-t online-fix`, and `-t fitgirl`. Online-Fix needs **no account** — both search and download are anonymous (the file host is referer-gated, not login-gated); picking a result downloads the `.torrent` into your download folder and opens it in your system torrent client, showing the archive password (`online-fix.me`) to unpack the game with. **Manga** is also a group: **General** (Nyaa Literature + Apibay Comics) or **Madokami** (the private [manga.madokami.al](https://manga.madokami.al) library — needs an account under the credentials menu; hits are **direct downloads**, no torrent client involved: picking a series folder opens a volume picker and the chosen archives are saved straight to your download folder). On the CLI: `-t manga` and `-t madokami`. **Books** searches **Libgen** (the live libgen mirror family — anonymous, **direct file downloads**: picking a result resolves the download link and streams the file straight to your download folder with a progress bar, no torrent client involved) plus The Pirate Bay's E-books and Audio books categories, with SolidTorrents' eBook category as an opt-in engine. Neither default engine needs a login. Libgen rows show the format and language (e.g. `[epub, English]`), and filter presets cover EPUB / PDF / Kindle (MOBI/AZW3) / Audiobook / English. On the CLI: `-t books` (or `-t book`).
 - **Multi-Engine Fan-Out:** Each provider queries its **On** sources in parallel and merges results, deduplicating by info hash and sorting by seeders. If they all return zero raw rows, a category-scoped **Auto** Knaben search runs. **Off** engines are skipped unless an active preset explicitly requires them for that search. Movies & Series keeps Apibay + Nyaa live-action On, Anime uses Nyaa, Manga combines Nyaa Literature + Apibay Comics, and Books pairs Libgen with Apibay E-books/Audio books. YTS and SolidTorrents remain available as manual Off-by-default options.
 - **Search by Creator:** Search by the people and companies behind the content instead of by title. After choosing a provider, a "choose how to search" screen offers normal keyword search **plus** by-creator options — **Anime** and **Movies & Series** by **director** or **studio**, **Manga** by **writer** or serialization **magazine**, **Games** by **developer** or **publisher** (kept separate — a company can be both), **Books** by **author**. You type a name, disambiguate between matches, then multi-select which of that creator's titles to include (a paged checklist, 100 per page with `n`/`p`); the app runs a normal torrent search for each picked title and merges the results — so picking still uses all the usual download/stream/episode options. It works **keyless out of the box** (AniList for anime/manga staff, Jikan for manga magazines, Wikidata for movies/games, OpenLibrary for book authors — works ordered so an author's best-known books come first), and an optional **TMDB** key (Movies & Series) or **Twitch/IGDB** credentials (Games) added under **🔑 Credentials** transparently upgrade those two to richer, better-ranked data. Online-Fix is included in the Games developer/publisher results. From the CLI: `--by <role> --name "<creator>"` alongside `-t`, e.g. `torrent -t anime --by director --name "Hayao Miyazaki"`.
@@ -22,6 +23,7 @@ See the [v0.6.0 release notes](docs/releases/v0.6.0.md) for the latest features 
 - **Quick-Launch Commands:** The startup provider screen includes a **Terminal command** row for choosing `torrent-finder`, `tf`, `torrent`, `find-torrent`, or `tfind`. The canonical command remains available and `torrent` is built into pip/pipx installs; the other presets create one app-owned forwarding launcher, preserve every CLI argument, refuse unrelated command collisions, and can be removed safely from the same screen.
 - **Advanced Filtering:**
   - Toggle built-in presets (preferred resolutions, known uploaders/repackers, trusted release groups) using an interactive checklist.
+  - **Anime has no default resolution filter.** Older 480p/720p releases remain eligible. If 1080p is checked, it is a saved selection: open **Ctrl+F**, uncheck it, and save with **w**. New combined profiles also start with Anime resolution presets cleared; explicit choices made afterward persist.
   - Cycle each search engine between **On** (every search), **Auto** (only after all On engines miss), and **Off** (skipped unless required by an active preset). Engines without a safe fallback role offer On/Off only.
   - Add custom include/exclude keywords to quickly find the exact release you want.
   - **Brazilian Portuguese audio (Movies & Series):** at the search prompt, press **Ctrl+F**, toggle **Dublado (PT-BR)** with **Space**, and press **w** to save. The preset requires explicit Brazilian audio tags such as `PT-BR`, `PTBR`, `Português Brasileiro`, or `Brazilian Portuguese`; generic `dublado`, `nacional`, `Português`, uploader names, and PT-PT-only audio do not qualify. A PT-BR subtitle tag alone never qualifies the audio. **Legendado (PT subs)** is a separate preset for Portuguese subtitles; selecting both requires both kinds of tags. The presets also search with release words appended (`Toy Story` → `Toy Story pt-br`, `Toy Story dublado`; subtitles add `legendado`) and include Knaben + SolidTorrents while active, even if their saved mode is Off. The search screen shows these effective engines; clearing the preset restores the original selection. Language checks use release names rather than inspecting tracks, so genuinely Brazilian releases without a regional tag stay hidden and mistagged releases cannot be verified. "Dual Audio" alone is not Brazilian Portuguese evidence. Titles are not automatically translated: try the Portuguese release title if the English one finds nothing. SolidTorrents may report zero seeders, which puts its rows last in the default sort.
@@ -345,11 +347,52 @@ torrent.bat            # Windows
 
 > `torrent-finder` is canonical and `torrent` is the built-in short form. From the startup screen, **Terminal command** can also install `tf`, `find-torrent`, or `tfind` as your preferred quick command.
 
+### Search across providers
+
+Available on the source branch; not included in v0.6.0 packages or binaries.
+
+1. Choose **Search across providers** on the provider screen.
+2. At the search prompt, press **Ctrl+F** and open **Providers**. Press **c** to clear the selection, toggle **Anime** and **Manga · General** with Space, and press **w** to confirm. Select **Manga · Madokami** too if you want its library and have a login configured.
+3. Optionally add shared include/exclude name phrases, or open **Provider engines and presets** to configure each source. Anime's resolution presets apply only to Anime; Manga's volume/chapter presets apply only to Manga. Every provider retains its own On/Auto/Off engine choices and category restrictions.
+4. Choose **Save and return** (**w**), enter a title, and search. **Ctrl+N** adds more titles as usual. **Esc** in the combined settings menu discards all unsaved edits, including nested provider settings.
+
+The first profile starts with all providers selected and copies your individual
+engine/preset settings, except that Anime starts without a resolution restriction.
+Later edits are independent: changing this profile does not change solo searches.
+Shared includes match at least one comma-separated phrase; any excluded phrase
+removes the result. Matching is case-insensitive and checks the result name.
+Provider presets and shared rules must both pass. History stores the combined
+profile with each query so choosing an entry restores that search's settings.
+
+The merged table prioritizes title relevance, then preserves each provider's
+ordering for ties. Press **f** for exact-title/filename filtering or a different
+sort, including newest. The provider appears in a column on wide terminals and
+beside the title on narrower ones; the focused row shows its full provider and
+source. A duplicate torrent appears once. Its first matching provider supplies
+the download actions, while all matching providers and query titles are retained.
+Direct downloads and unresolved site entries stay separate unless they share
+the same source-specific identity.
+
+Missing/rejected credentials and other reported provider failures appear as
+search notices; successful providers still contribute results. Short windows
+show a compact notice count: press **n** to read the details and return to the
+same result. Search concurrency is capped across providers. Creator searches
+remain available through the individual providers.
+
 ### Command Line Arguments
 
 ```bash
 # Direct search (defaults to Movies)
 torrent -q "The Matrix"
+
+# Search across providers using the saved combined profile (initially all)
+torrent -t all -q "Saki"
+
+# Override the selected providers for this session
+torrent -t all --providers anime manga -q "Saki"
+
+# Add shared name rules; provider-specific presets still apply
+torrent -t all --providers anime manga -q "Saki" -x sample
 
 # Specify the search type (movie, game, online-fix, fitgirl, software, mobile, rutracker, anime, manga, madokami, books). `movie` covers both films and series.
 torrent -q "Elden Ring" -t game

@@ -1,6 +1,7 @@
 """Abstract base class for torrent search providers."""
 
 from abc import ABC, abstractmethod
+from contextlib import nullcontext
 
 import concurrent.futures
 import re
@@ -169,6 +170,8 @@ class BaseProvider(ABC):
     def __init__(self):
         self.active_presets: list[FilterPreset] = []
         self.engines: list[SearchEngine] = self._init_engines()
+        self.search_slots = None
+        self.cancel_event = None
 
     def _init_engines(self) -> list[SearchEngine]:
         """Define available search engines. Override in subclasses to customize."""
@@ -472,7 +475,10 @@ class BaseProvider(ABC):
         required = self._required_engine_names()
         return [e for e in self.engines if e.mode == "on" or e.name in required]
 
-    def search(self, query: str, cli_filters: FilterConfig | None = None) -> list[SearchResult]:
+    def search(
+        self, query: str, cli_filters: FilterConfig | None = None, *,
+        result_filter: Callable[[SearchResult], bool] | None = None,
+    ) -> list[SearchResult]:
         """Search enabled engines, then safe emergency engines if all are empty."""
         merged: list[SearchResult] = []
 
@@ -483,6 +489,12 @@ class BaseProvider(ABC):
         active_engines = self.effective_engines
 
         def run_engines(engines: list[SearchEngine]) -> None:
+            def run_one(engine, engine_query):
+                with self.search_slots if self.search_slots is not None else nullcontext():
+                    if self.cancel_event is not None and self.cancel_event.is_set():
+                        return []
+                    return engine.search_fn(engine_query)
+
             tasks = [
                 (engine, engine_query)
                 for engine in engines
@@ -492,7 +504,7 @@ class BaseProvider(ABC):
                 max_workers=min(len(tasks), _MAX_SEARCH_WORKERS)
             ) as executor:
                 futures = [
-                    executor.submit(engine.search_fn, engine_query)
+                    executor.submit(run_one, engine, engine_query)
                     for engine, engine_query in tasks
                 ]
                 for future in concurrent.futures.as_completed(futures):
@@ -538,6 +550,11 @@ class BaseProvider(ABC):
         # 3. CLI filters
         if cli_filters:
             merged = apply_filters(merged, cli_filters)
+
+        # Combined searches apply shared name rules before aliases of the
+        # same torrent collapse, just like a provider's own presets.
+        if result_filter is not None:
+            merged = [item for item in merged if result_filter(item)]
 
         # Indexers can give the same hash different names. Filter before
         # deduplicating so a plain title arriving first cannot hide a later
