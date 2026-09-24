@@ -4,6 +4,31 @@ from torrent_finder.providers.combined_provider import CombinedProvider, provide
 from torrent_finder.ui.selector import SelectItem, arrow_select
 
 
+_SHARED_HELP = {
+    "include_keywords": (
+        "Keep only results whose name contains at least one of these phrases, from ANY selected provider. "
+        "Example: batch, volume keeps names containing batch OR volume. Matching ignores letter case. "
+        "Empty means no include restriction."
+    ),
+    "exclude_keywords": (
+        "Hide results whose name contains any of these phrases, from ANY selected provider. "
+        "Example: sample, trailer hides either word. Matching ignores letter case. "
+        "An exclusion wins even if an include phrase matches. Empty excludes nothing."
+    ),
+}
+
+
+def _shared_filter_screen(action):
+    from rich.text import Text
+    def render(target):
+        target.print(Text("Name filters for all selected providers", style="bold cyan"))
+        target.print(Text(_SHARED_HELP[action]))
+        target.print(Text("These filter returned names; they do not add words to your search. "
+                          "Provider presets still apply. For Anime-only 1080p, use Provider engines and presets.", style="dim"))
+        target.print(Text("Enter saves this draft field • Esc cancels", style="dim"))
+    return render
+
+
 def _choose_providers(draft):
     from torrent_finder.ui.prompts import _make_banner_panel
     items = [
@@ -63,12 +88,12 @@ def combined_filter_menu(provider):
     while True:
         items = [
             SelectItem(f"Providers: {len(draft.selected_slugs)} selected", "providers"),
-            SelectItem("Shared: include names containing…", "include_keywords",
+            SelectItem("All providers: include name phrases…", "include_keywords",
                        hint=", ".join(draft.shared_filters.include_keywords) or "any name",
-                       description="Comma-separated phrases; match at least one. Applies to every selected provider."),
-            SelectItem("Shared: exclude names containing…", "exclude_keywords",
+                       description=_SHARED_HELP["include_keywords"]),
+            SelectItem("All providers: exclude name phrases…", "exclude_keywords",
                        hint=", ".join(draft.shared_filters.exclude_keywords) or "none",
-                       description="Comma-separated phrases; exclude a name matching any phrase."),
+                       description=_SHARED_HELP["exclude_keywords"]),
             SelectItem("Provider engines and presets…", "configure",
                        description="Each provider keeps its own settings. Resolution and language presets stay scoped to that provider."),
             SelectItem("Save and return  [w]", "save", enabled=bool(draft.selected_slugs),
@@ -94,6 +119,7 @@ def combined_filter_menu(provider):
             return
         else:
             previous = ", ".join(getattr(draft.shared_filters, action))
-            value = get_query_with_shortcut("Name phrases (comma separated; empty clears): ", initial=previous)
+            value = get_query_with_shortcut("Name phrases (comma separated; empty clears): ", initial=previous,
+                                            screen_renderer=_shared_filter_screen(action))
             if isinstance(value, str) and value != "GO_BACK":
                 setattr(draft.shared_filters, action, [v.strip() for v in value.split(",") if v.strip()])

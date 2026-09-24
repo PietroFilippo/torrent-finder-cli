@@ -23,6 +23,7 @@ from html import unescape
 import requests
 
 from torrent_finder.search_result import SearchResult
+from torrent_finder.search_control import search_request
 
 from torrent_finder.credentials import rutracker_config
 
@@ -50,7 +51,7 @@ def _post_login(username: str, password: str) -> requests.Session | None:
         f"{k}={requests.utils.quote(str(v).encode('cp1251'))}" for k, v in fields.items()
     )
     try:
-        s.post(
+        search_request(s.post,
             f"{_BASE}/login.php",
             data=body,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -87,7 +88,7 @@ def search(query: str) -> list[SearchResult]:
             raise login_required("RuTracker")
         raise SearchError("RuTracker could not log in. Check Credentials or try again when the site is reachable.")
     try:
-        r = session.get(f"{_BASE}/tracker.php", params={"nm": query}, timeout=30)
+        r = search_request(session.get, f"{_BASE}/tracker.php", params={"nm": query}, timeout=30)
         if r.status_code in (401, 403) or "login.php" in r.url:
             from torrent_finder.search_errors import SearchError
             raise SearchError("RuTracker requires a new login. Check your saved credentials in Credentials.")

@@ -40,12 +40,20 @@ copy solo settings except Anime resolution presets. No fresh Anime search
 requires a resolution; explicitly saved resolution choices remain respected.
 See [ADR-0013](docs/adr/0013-combined-provider-search.md).
 
-Combined searches retain provider/category boundaries, with at most three
-provider/query jobs and six engine invocations running concurrently per search.
+Combined searches retain provider/category boundaries. Each selected provider
+has an independent coordinator, processing its titles sequentially; six engine
+invocations share the search's concurrency budget. `SearchControl` limits the
+combined wait to 30 seconds and scopes shorter request/retry deadlines to engine
+threads. `search_request` leaves standalone searches and downloads unchanged.
+Engines publish filtered rows as they complete, so partial results survive a
+deadline or Enter (show results now). Esc discards the search in the UI.
+Progress reports providers finished, distinct results ready, and pending names.
 Shared rules run before per-provider hash deduplication through `result_filter`;
 they match names only. Search errors become notices alongside partial results.
 History's optional `search_profile` snapshots reproduce combined settings.
 Creator facets stay on concrete providers.
+See [ADR-0014](docs/adr/0014-bounded-combined-search.md) for the latency correction
+to ADR-0013's original coordinator scheduling.
 
 ## Engine
 

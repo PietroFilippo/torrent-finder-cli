@@ -18,6 +18,7 @@ from torrent_finder.constants import API_URL, console
 from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
 from torrent_finder.search_result import SearchResult, normalize_result
 from torrent_finder.search_errors import SearchError
+from torrent_finder.search_control import search_request
 from torrent_finder.result_view import title_score
 
 
@@ -172,6 +173,7 @@ class BaseProvider(ABC):
         self.engines: list[SearchEngine] = self._init_engines()
         self.search_slots = None
         self.cancel_event = None
+        self.search_control = None
 
     def _init_engines(self) -> list[SearchEngine]:
         """Define available search engines. Override in subclasses to customize."""
@@ -247,7 +249,7 @@ class BaseProvider(ABC):
                 if params in tried:
                     continue
                 try:
-                    response = requests.get(
+                    response = search_request(requests.get,
                         API_URL,
                         params=params,
                         timeout=45,
@@ -348,7 +350,7 @@ class BaseProvider(ABC):
         """Search SolidTorrents API for the query."""
         results: list[SearchResult] = []
         try:
-            response = requests.get(
+            response = search_request(requests.get,
                 "https://solidtorrents.to/api/v1/search",
                 params={"q": query, "category": self.solidtorrents_category},
                 timeout=10
@@ -402,7 +404,7 @@ class BaseProvider(ABC):
         """
         results: list[SearchResult] = []
         try:
-            response = requests.get(
+            response = search_request(requests.get,
                 "https://nyaa.si/",
                 params={"page": "rss", "q": query, "c": category},
                 timeout=10
@@ -478,6 +480,7 @@ class BaseProvider(ABC):
     def search(
         self, query: str, cli_filters: FilterConfig | None = None, *,
         result_filter: Callable[[SearchResult], bool] | None = None,
+        on_results: Callable[[list[SearchResult]], None] | None = None,
     ) -> list[SearchResult]:
         """Search enabled engines, then safe emergency engines if all are empty."""
         merged: list[SearchResult] = []
@@ -490,6 +493,10 @@ class BaseProvider(ABC):
 
         def run_engines(engines: list[SearchEngine]) -> None:
             def run_one(engine, engine_query):
+                if self.search_control is not None:
+                    return self.search_control.run_engine(
+                        self.slug, engine.name, lambda: engine.search_fn(engine_query), self.search_slots,
+                    )
                 with self.search_slots if self.search_slots is not None else nullcontext():
                     if self.cancel_event is not None and self.cancel_event.is_set():
                         return []
@@ -500,30 +507,39 @@ class BaseProvider(ABC):
                 for engine in engines
                 for engine_query in queries
             ]
-            with concurrent.futures.ThreadPoolExecutor(
+            executor = concurrent.futures.ThreadPoolExecutor(
                 max_workers=min(len(tasks), _MAX_SEARCH_WORKERS)
-            ) as executor:
-                futures = [
+            )
+            try:
+                pending = {
                     executor.submit(run_one, engine, engine_query)
                     for engine, engine_query in tasks
-                ]
-                for future in concurrent.futures.as_completed(futures):
-                    try:
-                        data = future.result()
-                        for raw_item in data:
-                            item = normalize_result(raw_item)
-                            info_hash = item.info_hash.lower()
-                            if info_hash:
-                                merged.append(item)
-                    except SearchError:
-                        raise
-                    except Exception:
-                        pass
+                }
+                while pending:
+                    done, pending = concurrent.futures.wait(pending, timeout=0.05,
+                                                           return_when=concurrent.futures.FIRST_COMPLETED)
+                    for future in done:
+                        try:
+                            for raw_item in future.result():
+                                item = normalize_result(raw_item)
+                                if item.info_hash:
+                                    merged.append(item)
+                        except SearchError:
+                            raise
+                        except Exception:
+                            pass
+                    if done and on_results is not None:
+                        on_results(self._filter_search_results(merged, query, cli_filters, result_filter))
+                    if self.search_control is not None and self.search_control.stopped():
+                        break
+            finally:
+                stopped = self.search_control is not None and self.search_control.stopped()
+                executor.shutdown(wait=not stopped, cancel_futures=True)
 
         if active_engines:
             run_engines(active_engines)
 
-        if not merged:
+        if not merged and not (self.search_control is not None and self.search_control.stopped()):
             # A preset may already have forced an Auto engine to run above;
             # don't ask it the same questions twice.
             already_run = {engine.name for engine in active_engines}
@@ -538,6 +554,9 @@ class BaseProvider(ABC):
             if emergency_engines:
                 run_engines(emergency_engines)
 
+        return self._filter_search_results(merged, query, cli_filters, result_filter)
+
+    def _filter_search_results(self, merged, query, cli_filters, result_filter):
         # Apply filters
         # 1. Default provider filters
         if self.default_filters:

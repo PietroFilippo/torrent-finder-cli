@@ -25,6 +25,7 @@ from html import unescape
 import requests
 
 from torrent_finder.search_result import SearchResult
+from torrent_finder.search_control import search_request
 
 _MIRRORS = ("https://libgen.li", "https://libgen.vg", "https://libgen.la")
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -120,7 +121,7 @@ def search(query: str) -> list[SearchResult]:
     """
     for mirror in _MIRRORS:
         try:
-            r = requests.get(
+            r = search_request(requests.get,
                 f"{mirror}/index.php",
                 params={"req": query, "res": 100},
                 headers=_UA,

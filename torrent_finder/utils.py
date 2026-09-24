@@ -7,13 +7,14 @@ import time
 from torrent_finder.constants import TRACKERS
 
 
-def start_esc_listener(cancel_event: "threading.Event") -> "threading.Event":
+def start_esc_listener(cancel_event: "threading.Event", *, finish_event=None) -> "threading.Event":
     """Watch for Esc on a daemon thread and set ``cancel_event`` when pressed.
 
     Lets a blocking, non-interactive wait (search fan-out, DHT metadata fetch,
     creator lookups) be aborted with Esc instead of Ctrl+C — which would kill
     the whole program. Returns a ``stop`` event the caller sets to tear the
     listener down once the wait completes.
+    With ``finish_event``, Enter ends the wait and keeps partial search results.
     """
     import platform
 
@@ -24,8 +25,14 @@ def start_esc_listener(cancel_event: "threading.Event") -> "threading.Event":
             import msvcrt
             while not stop.is_set():
                 if msvcrt.kbhit():
-                    if msvcrt.getch() == b"\x1b":  # Esc
+                    key = msvcrt.getch()
+                    if key in (b"\x00", b"\xe0"):
+                        msvcrt.getch()  # consume the second byte of a special key
+                    elif key == b"\x1b":  # Esc
                         cancel_event.set()
+                        return
+                    elif finish_event is not None and key in (b"\r", b"\n"):
+                        finish_event.set()
                         return
                 time.sleep(0.1)
         else:
@@ -42,8 +49,12 @@ def start_esc_listener(cancel_event: "threading.Event") -> "threading.Event":
                 tty.setcbreak(fd)
                 while not stop.is_set():
                     if select.select([sys.stdin], [], [], 0.1)[0]:
-                        if sys.stdin.read(1) == "\x1b":  # Esc
+                        key = sys.stdin.read(1)
+                        if key == "\x1b":  # Esc
                             cancel_event.set()
+                            return
+                        if finish_event is not None and key in ("\r", "\n"):
+                            finish_event.set()
                             return
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old)

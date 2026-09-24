@@ -353,14 +353,20 @@ Available on the source branch; not included in v0.6.0 packages or binaries.
 
 1. Choose **Search across providers** on the provider screen.
 2. At the search prompt, press **Ctrl+F** and open **Providers**. Press **c** to clear the selection, toggle **Anime** and **Manga · General** with Space, and press **w** to confirm. Select **Manga · Madokami** too if you want its library and have a login configured.
-3. Optionally add shared include/exclude name phrases, or open **Provider engines and presets** to configure each source. Anime's resolution presets apply only to Anime; Manga's volume/chapter presets apply only to Manga. Every provider retains its own On/Auto/Off engine choices and category restrictions.
+3. Optionally use **All providers: include/exclude name phrases**, or open **Provider engines and presets** to configure each source. Anime's resolution presets apply only to Anime; Manga's volume/chapter presets apply only to Manga. Every provider retains its own On/Auto/Off engine choices and category restrictions.
 4. Choose **Save and return** (**w**), enter a title, and search. **Ctrl+N** adds more titles as usual. **Esc** in the combined settings menu discards all unsaved edits, including nested provider settings.
 
 The first profile starts with all providers selected and copies your individual
 engine/preset settings, except that Anime starts without a resolution restriction.
 Later edits are independent: changing this profile does not change solo searches.
-Shared includes match at least one comma-separated phrase; any excluded phrase
-removes the result. Matching is case-insensitive and checks the result name.
+Shared includes match at least one comma-separated phrase: `batch, volume` keeps
+names containing **batch OR volume**, from any selected provider. Shared excludes
+remove a result when any phrase matches: `sample, trailer` hides names containing
+either phrase, even if an include phrase also matches. Matching ignores case and
+checks the result name, not the source label. Empty fields impose no restriction.
+These rules filter returned results; they do not append words to your query.
+For a resolution restriction on Anime alone, use its provider presets—putting
+`1080p` in the shared include field also hides manga/books without that text.
 Provider presets and shared rules must both pass. History stores the combined
 profile with each query so choosing an entry restores that search's settings.
 
@@ -376,8 +382,22 @@ the same source-specific identity.
 Missing/rejected credentials and other reported provider failures appear as
 search notices; successful providers still contribute results. Short windows
 show a compact notice count: press **n** to read the details and return to the
-same result. Search concurrency is capped across providers. Creator searches
-remain available through the individual providers.
+same result.
+
+While searching, the screen shows providers finished, results ready, elapsed
+time, and which providers are still pending. **Enter** opens results received
+so far; **Esc** cancels back to the search prompt. Combined searches stop waiting
+after **30 seconds** and retain completed engine results, including those from
+providers whose other engines are still waiting. Notices identify incomplete
+providers and request timeouts. Filters can be changed at the search prompt,
+before starting another search.
+
+Providers start independently while engine calls share a concurrency limit.
+Combined mode bounds network timeouts and retry chains; ongoing requests finish
+in the background after cancellation, but no new retries start. A time-limited
+search can miss results from slow sources—search those providers individually
+to retry with their normal timeout behavior. Creator searches remain available
+through the individual providers.
 
 ### Command Line Arguments
 

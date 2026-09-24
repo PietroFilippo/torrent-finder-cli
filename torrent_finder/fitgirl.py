@@ -29,6 +29,7 @@ from html import unescape
 import requests
 
 from torrent_finder.search_result import SearchResult
+from torrent_finder.search_control import search_request
 from torrent_finder.result_view import matches_name
 
 _BASE = "https://fitgirl-repacks.site"
@@ -136,10 +137,10 @@ def search(query: str) -> list[SearchResult]:
     results: list[SearchResult] = []
     seen: set[str] = set()
     try:
-        r = session.get(f"{_BASE}/", params={"s": query}, timeout=30)
+        r = search_request(session.get, f"{_BASE}/", params={"s": query}, timeout=30)
         _parse_page(r.text, results, seen, query)
         if _NEXT_PAGE_RE.search(r.text):
-            r2 = session.get(f"{_BASE}/page/2/", params={"s": query}, timeout=30)
+            r2 = search_request(session.get, f"{_BASE}/page/2/", params={"s": query}, timeout=30)
             _parse_page(r2.text, results, seen, query)
     except requests.RequestException:
         return results  # keep whatever page 1 yielded

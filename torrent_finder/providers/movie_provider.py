@@ -8,6 +8,7 @@ from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.language_tags import has_brazilian_audio, has_portuguese_subtitles
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
+from torrent_finder.search_control import search_request
 from torrent_finder.resolvers import CreatorFacet, movies
 
 
@@ -19,7 +20,7 @@ _YTS_API_URLS = (
 def _fetch_yts_movies(query: str) -> list[dict]:
     for api_url in _YTS_API_URLS:
         try:
-            response = requests.get(
+            response = search_request(requests.get,
                 api_url,
                 params={"query_term": query, "limit": 50},
                 timeout=10,

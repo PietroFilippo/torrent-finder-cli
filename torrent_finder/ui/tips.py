@@ -43,7 +43,8 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
         "Search & Navigation",
         (
             Tip("For best results, search using the complete release name.", ("search", "query")),
-            Tip("Search across providers combines categories in one list. Ctrl+F chooses sources and edits shared name rules or provider-specific presets; these settings are separate from solo searches.", ("search", "all", "providers", "filters")),
+            Tip("Search across providers combines categories in one list. Ctrl+F at the search prompt chooses sources and edits shared name rules or provider-specific presets; these settings are separate from solo searches.", ("search", "all", "providers", "filters")),
+            Tip("During a combined search, Enter opens results received so far; Esc cancels. After 30 seconds, available results open with notices for unfinished sources.", ("search", "all", "providers", "cancel")),
             Tip("Anime starts without a resolution filter. If older shows are missing, check Ctrl+F for a previously saved 1080p or 4K preset and clear it.", ("anime", "resolution", "filters", "1080p")),
             Tip("The search prompt has no single-letter shortcuts, so a query can start with any letter (even F, H, S, or T).", ("search", "navigation", "query")),
             Tip("Press Tab at the search prompt for quick actions — filters, history, stats, tips — then F/H/S/T or arrows; your typed query is kept.", ("search", "actions", "hotkey")),

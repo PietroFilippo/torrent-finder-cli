@@ -7,6 +7,7 @@ from html.parser import HTMLParser
 import requests
 
 from torrent_finder.search_result import SearchResult
+from torrent_finder.search_control import search_request
 from torrent_finder.result_view import media_title, title_score, words
 
 
@@ -77,7 +78,7 @@ class _Catalog(HTMLParser):
 
 def popular(query: str, category: str) -> list[SearchResult]:
     try:
-        response = requests.get("https://nyaa.si/", params={
+        response = search_request(requests.get, "https://nyaa.si/", params={
             "q": query, "c": category, "s": "seeders", "o": "desc",
         }, timeout=10)
         response.raise_for_status()

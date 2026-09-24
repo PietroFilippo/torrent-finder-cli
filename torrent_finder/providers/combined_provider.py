@@ -4,8 +4,8 @@ Profiles contain settings, never credentials or shared provider instances.
 Each invocation gets its own provider copies, request budget and notices.
 """
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import replace
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+from dataclasses import dataclass, replace
 import re
 import threading
 
@@ -14,12 +14,14 @@ from torrent_finder.providers.base import BaseProvider
 from torrent_finder.result_view import title_score
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_result import SearchResult
+from torrent_finder.search_control import SearchControl
 from torrent_finder.state import (
     apply_provider_state, load_setting, provider_snapshot, save_setting,
 )
 
 _PROFILE_KEY = "combined_search"
 _REQUEST_LIMIT = 6
+SEARCH_SECONDS = 30.0
 _LABELS = {
     "games": "Games · General", "online-fix": "Games · Online-Fix",
     "fitgirl": "Games · FitGirl", "software": "Software · Desktop",
@@ -47,6 +49,14 @@ class CombinedResults(list):
         self.notices = tuple(notices)
 
 
+@dataclass(frozen=True)
+class SearchProgress:
+    completed: int
+    total: int
+    results: int
+    waiting: tuple[str, ...]
+
+
 class CombinedProvider(BaseProvider):
     name = "Search across providers"
     slug = "all"
@@ -54,7 +64,7 @@ class CombinedProvider(BaseProvider):
     categories = []
     is_combined = True
     supports_subtitles = supports_episode_picker = supports_streaming = False
-    search_note = "Ctrl+F chooses providers, shared name filters, and each provider's engines/presets."
+    search_note = "Search selected providers together; each keeps its own engines and filters."
 
     def __init__(self, templates):
         super().__init__()
@@ -120,7 +130,8 @@ class CombinedProvider(BaseProvider):
     def search(self, query, cli_filters=None):
         return self.search_many([query], cli_filters)
 
-    def search_many(self, queries, cli_filters=None, cancel_event=None):
+    def search_many(self, queries, cli_filters=None, cancel_event=None, *, finish_event=None,
+                    on_progress=None, timeout=None):
         # Snapshot before starting threads: changing a menu after cancellation
         # cannot alter an old request that is still finishing.
         session = CombinedProvider(self.templates)
@@ -131,10 +142,11 @@ class CombinedProvider(BaseProvider):
             raise SearchError("No providers selected. Press Ctrl+F to choose at least one.")
         if not queries:
             return CombinedResults()
-        cancel = cancel_event or threading.Event()
+        control = SearchControl(SEARCH_SECONDS if timeout is None else timeout, cancel_event, finish_event)
         slots = threading.BoundedSemaphore(_REQUEST_LIMIT)
         for provider in providers:
-            provider.search_slots, provider.cancel_event = slots, cancel
+            provider.search_slots, provider.cancel_event = slots, control.cancel
+            provider.search_control = control
 
         def matches_shared_rules(row):
             # Name rules must not match source labels. Seed requirements only
@@ -147,30 +159,77 @@ class CombinedProvider(BaseProvider):
                     return False
             return True
 
-        def search_one(provider, query):
-            if cancel.is_set():
-                return []
-            return provider.search(query, result_filter=matches_shared_rules)
-
         batches, notices = {}, {}
-        executor = ThreadPoolExecutor(max_workers=3)
-        futures = {
-            executor.submit(search_one, provider, query): (i, j, provider, query)
-            for i, provider in enumerate(providers) for j, query in enumerate(queries)
-        }
-        try:
-            for future in as_completed(futures):
-                if cancel.is_set():
-                    break
-                i, j, provider, query = futures[future]
+        finished = set()
+        lock = threading.Lock()
+        accepting = True
+
+        def publish():
+            if on_progress is None:
+                return
+            with lock:
+                if not accepting:
+                    return
+                keys = {result_identity(row) for rows in batches.values() for row in rows}
+                progress = SearchProgress(len(finished), len(providers), len(keys),
+                                          tuple(provider_label(p) for i, p in enumerate(providers) if i not in finished))
+                # Serialize callbacks so an older count cannot replace a newer one.
+                on_progress(progress)
+
+        def update_batch(i, j, rows):
+            with lock:
+                if not accepting:
+                    return
+                batches[i, j] = rows
+            publish()
+
+        def search_provider(i, provider):
+            # One coordinator per provider prevents slow early entries from
+            # blocking unrelated providers. Engine calls still share six slots.
+            for j, query in enumerate(queries):
+                if control.stopped():
+                    return
                 try:
-                    batches[i, j] = future.result()
+                    rows = provider.search(query, result_filter=matches_shared_rules,
+                                           on_results=lambda rows, j=j: update_batch(i, j, rows))
+                    update_batch(i, j, rows)
                 except SearchError as error:
-                    notices[i] = str(error)
+                    with lock:
+                        if accepting:
+                            notices[i] = str(error)
+                    break
                 except Exception:
-                    notices[i] = f"{provider_label(provider)} could not be searched. Try again later."
+                    with lock:
+                        if accepting:
+                            notices[i] = f"{provider_label(provider)} could not be searched. Try again later."
+                    break
+            if not control.stopped():
+                with lock:
+                    if accepting:
+                        finished.add(i)
+                publish()
+
+        publish()
+        executor = ThreadPoolExecutor(max_workers=len(providers))
+        pending = {executor.submit(search_provider, i, provider) for i, provider in enumerate(providers)}
+        try:
+            while pending and not control.stopped():
+                _, pending = wait(pending, timeout=0.05, return_when=FIRST_COMPLETED)
         finally:
-            executor.shutdown(wait=not cancel.is_set(), cancel_futures=True)
+            executor.shutdown(wait=False, cancel_futures=True)
+            with lock:
+                accepting = False
+                batches = dict(batches)
+                notices = dict(notices)
+                incomplete = [i for i in range(len(providers)) if i not in finished]
+
+        messages = [notices[i] for i in sorted(notices)]
+        labels = {p.slug: provider_label(p) for p in providers}
+        messages.extend(f"{labels[slug]}: {engine} timed out; results may be incomplete."
+                        for slug, engine in sorted(control.timeouts()))
+        for i in incomplete:
+            reason = "Stopped waiting" if control.finish.is_set() else "Search time limit reached"
+            messages.append(f"{provider_label(providers[i])}: {reason.lower()}; showing results received so far. Search this provider separately to try again.")
 
         merged = {}
         for (i, j), rows in sorted(batches.items()):
@@ -194,4 +253,4 @@ class CombinedProvider(BaseProvider):
         # Preserve each provider's ordering among equally relevant rows. This
         # keeps direct downloads useful even without swarm statistics.
         ordered = sorted(merged.values(), key=lambda r: max(title_score(r.name, q) for q in queries), reverse=True)
-        return CombinedResults(ordered, [notices[i] for i in sorted(notices)])
+        return CombinedResults(ordered, messages)

@@ -34,6 +34,7 @@ from urllib.parse import unquote, urlsplit
 import requests
 
 from torrent_finder.search_result import SearchResult
+from torrent_finder.search_control import search_request
 
 from torrent_finder.credentials import madokami_config
 
@@ -125,7 +126,7 @@ def search(query: str) -> list[SearchResult]:
         from torrent_finder.search_errors import login_required
         raise login_required("Madokami")
     try:
-        r = session.get(f"{_BASE}/search", params={"q": query}, timeout=30)
+        r = search_request(session.get, f"{_BASE}/search", params={"q": query}, timeout=30)
         if r.status_code in (401, 403):
             from torrent_finder.search_errors import SearchError
             raise SearchError("Madokami rejected the login. Check your saved credentials in Credentials.")
