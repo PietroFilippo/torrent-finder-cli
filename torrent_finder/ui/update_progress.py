@@ -3,6 +3,7 @@
 import argparse
 from dataclasses import dataclass, replace
 import json
+import math
 from pathlib import Path
 import sys
 import time
@@ -77,7 +78,7 @@ class UpdateDisplay:
 
     def update(self, stage, detail=""):
         self.view = replace(self.view, stage=stage, detail=detail)
-        if stage in _FINISHED:
+        if stage in _FINISHED and self.finished_at is None:
             self.finished_at = time.monotonic()
         self.live.refresh()
 
@@ -89,6 +90,19 @@ class UpdateDisplay:
         self.live.stop()
 
 
+def completion_detail(reopen=None, seconds=0):
+    message = "The update was installed successfully.\n"
+    if reopen == "waiting":
+        if seconds > 0:
+            return message + f"Reopening Torrent Finder in {seconds} second{'s' if seconds != 1 else ''}..."
+        return message + "Reopening Torrent Finder..."
+    if reopen == "started":
+        return message + "Starting Torrent Finder..."
+    if reopen == "failed":
+        return message + "Could not reopen automatically. Open Torrent Finder manually."
+    return message + "You can reopen Torrent Finder now."
+
+
 def preview_view(elapsed, outcome="success"):
     if elapsed < 1:
         return UpdateView("preparing", "Preparing the updater.")
@@ -98,17 +112,19 @@ def preview_view(elapsed, outcome="success"):
         return UpdateView("installing", "Downloading and installing the latest version.\nLeave Torrent Finder closed until this finishes.")
     if outcome == "failure":
         return UpdateView("failed", "The update could not be completed.\nCheck update.log, then retry the update.")
-    return UpdateView("succeeded", "The update was installed successfully.\nYou can reopen Torrent Finder now.")
+    return UpdateView("succeeded", completion_detail(
+        "waiting" if elapsed < 10 else "started", max(0, math.ceil(10 - elapsed))))
 
 
 def preview_update(outcome="success", *, console=None, pause=True):
     """Exercise the actual display without invoking installers or status files."""
     with UpdateDisplay(console, preview=True) as display:
-        for stage_time in (0, 1, 2, 7):
+        stages = (0, 1, 2, 7, 8, 9, 10) if outcome == "success" else (0, 1, 2, 7)
+        for index, stage_time in enumerate(stages):
             view = preview_view(stage_time, outcome)
             display.update(view.stage, view.detail)
-            if stage_time < 7:
-                time.sleep(1 if stage_time < 2 else 5)
+            if index + 1 < len(stages):
+                time.sleep(stages[index + 1] - stage_time)
         if pause:
             display.console.print("Press any key to close the preview.")
             try:
@@ -135,17 +151,21 @@ def watch_update(status: Path, job_id: str, *, console=None, pause=True):
         while True:
             data = read_job(status, job_id)
             if data:
+                if data.get("reopen") == "waiting" and time.time() > data.get("reopen_at", 0) + 10:
+                    data = {**data, "reopen": "failed"}
                 state = data.get("state")
                 stage = data.get("phase", "waiting") if state == "pending" else state
                 detail = {
                     "waiting": "Return to the main app and press any key to begin.",
                     "installing": "Downloading and installing the latest version.\nLeave Torrent Finder closed until this finishes.",
-                    "succeeded": "The update was installed successfully.\nYou can reopen Torrent Finder now.",
+                    "succeeded": completion_detail(data.get("reopen"), max(0, math.ceil(data.get("reopen_at", 0) - time.time()))),
                     "failed": f"Check the update log, then retry.\n{data.get('log', status.with_name('update.log'))}",
                 }.get(stage, "Waiting for the updater to report its status.")
                 display.view = replace(display.view, current=str(data.get("current", "")), latest=str(data.get("latest", "")))
                 display.update(stage, detail)
-                if stage in _FINISHED:
+                if stage == "succeeded" and data.get("reopen") == "started":
+                    return  # The app owns a new console; close the updater window.
+                if stage in _FINISHED and data.get("reopen") != "waiting":
                     break
             if time.monotonic() - display.started > 1900:
                 display.update("failed", "The updater did not report completion. Check update.log before trying again.")

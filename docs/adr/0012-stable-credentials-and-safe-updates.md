@@ -39,6 +39,13 @@ indeterminate activity bar because the installer has no reliable overall percent
 The terminal preview and exported visual replay share the production renderer
 and never invoke an installer.
 
+After a successful interactive Windows update, the worker waits three seconds
+and reopens the package with a fresh interpreter in a new console. The viewer
+only observes that countdown and closes when the worker reports launch; closing
+it early cannot cancel reopening. Installation failure never starts the app.
+If launch fails, preserve the successful installation status and offer manual
+reopening. Previews simulate this countdown without launching the application.
+
 ## Consequences
 
 Python installation changes no longer change the credential location. Existing

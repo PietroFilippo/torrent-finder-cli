@@ -241,7 +241,13 @@ exits, releasing the running launcher. A hidden helper writes output to a local
 log and records the real exit status; startup consumes the report. Nonzero exits
 are failures even when package version metadata changed. A separate read-only
 console viewer observes the job ID and waiting/installing/final states; closing
-it never cancels the hidden worker. It can read an archived completion report if
+it never cancels the hidden worker. After a successful interactive update, the
+worker waits three seconds and starts the updated package in a fresh Python
+process and Windows console. The viewer shows the countdown, then closes without
+a keypress. Reopening failure preserves the successful install result and asks
+the user to open the app manually. Failed installs never trigger reopening.
+Startup leaves an active countdown report for the worker to finish.
+The viewer can read an archived completion report if
 startup consumed it first. Failure to open the viewer leaves the queued job intact.
 
 `ui/update_progress.py` renders an indeterminate activity bar, elapsed time, and
@@ -249,4 +255,5 @@ the actual outcome. Git/non-Windows package updates use the same display inline
 and redirect installer output to the local log; binaries open Releases.
 `--preview-update [success|failure]` bypasses normal startup, settings loading,
 usage stats, and installers. `scripts/preview_update.py` exports a browser replay
-from the same renderer for visual QA. Neither preview changes update status.
+from the same renderer for visual QA. Neither preview changes update status or
+opens the application; both simulate the three-second success countdown.

@@ -9,7 +9,10 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import time
+
+REOPEN_DELAY = 3
 
 
 def _wait_for_parent(pid: int) -> bool:
@@ -35,7 +38,7 @@ def write_status(path: Path, **data) -> None:
     os.replace(temporary, path)
 
 
-def run_job(parent_pid: int, command: list[str], status: Path, log: Path) -> None:
+def run_job(parent_pid: int, command: list[str], status: Path, log: Path, *, reopen=False) -> None:
     try:
         queued = json.loads(status.read_text(encoding="utf-8"))
         metadata = {}
@@ -51,8 +54,22 @@ def run_job(parent_pid: int, command: list[str], status: Path, log: Path) -> Non
         write_status(status, state="pending", phase="installing", log=str(log), **metadata)
         with log.open("w", encoding="utf-8") as output:
             result = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, timeout=900)
-        write_status(status, state="succeeded" if result.returncode == 0 else "failed",
-                     log=str(log), returncode=result.returncode, **metadata)
+        report = dict(state="succeeded" if result.returncode == 0 else "failed",
+                      log=str(log), returncode=result.returncode, **metadata)
+        if reopen and result.returncode == 0:
+            write_status(status, **report, reopen="waiting", reopen_at=time.time() + REOPEN_DELAY)
+            time.sleep(REOPEN_DELAY)
+            try:
+                # A fresh interpreter loads the updated package. Never reuse the
+                # old process or depend on the optional progress viewer staying open.
+                subprocess.Popen([sys.executable, "-m", "torrent_finder"],
+                                 creationflags=subprocess.CREATE_NEW_CONSOLE, close_fds=True)
+            except OSError as error:
+                write_status(status, **report, reopen="failed", reopen_error=str(error))
+            else:
+                write_status(status, **report, reopen="started")
+        else:
+            write_status(status, **report)
     except Exception as error:
         write_status(status, state="failed", log=str(log), error=str(error), **metadata)
 
@@ -62,10 +79,11 @@ def main() -> None:
     parser.add_argument("--parent", type=int, required=True)
     parser.add_argument("--status", type=Path, required=True)
     parser.add_argument("--log", type=Path, required=True)
+    parser.add_argument("--reopen", action="store_true")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
-    run_job(args.parent, command, args.status, args.log)
+    run_job(args.parent, command, args.status, args.log, reopen=args.reopen)
 
 
 if __name__ == "__main__":

@@ -110,6 +110,7 @@ class UpdateProgressTests(unittest.TestCase):
                 self.assertEqual(popen.call_count, 2)
                 worker, viewer = popen.call_args_list
                 self.assertIn("torrent_finder.update_worker", worker.args[0])
+                self.assertIn("--reopen", worker.args[0])
                 self.assertIn("torrent_finder.ui.update_progress", viewer.args[0])
                 self.assertNotEqual(worker.kwargs["creationflags"], viewer.kwargs["creationflags"])
                 self.assertEqual(json.loads(status.read_text())["state"], "pending")
@@ -143,6 +144,85 @@ class UpdateProgressTests(unittest.TestCase):
     def test_failed_browser_launch_does_not_claim_it_opened(self):
         with patch("webbrowser.open", return_value=False):
             self.assertFalse(updates.run_update({"kind": "binary"})[0])
+
+    def test_worker_reopens_only_successful_updates_after_three_seconds(self):
+        for code in (0, 1):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as directory:
+                status, log = Path(directory)/"status.json", Path(directory)/"update.log"
+                events = []
+                def sleep(seconds):
+                    events.append(("wait", seconds))
+                    if seconds == 3:
+                        data = json.loads(status.read_text())
+                        self.assertEqual(data["state"], "succeeded")
+                        self.assertEqual(data["reopen"], "waiting")
+                with patch.object(update_worker, "_wait_for_parent", return_value=True), \
+                     patch.object(update_worker.time, "sleep", side_effect=sleep), \
+                     patch.object(update_worker.subprocess, "run", side_effect=lambda *a, **k: events.append("install") or Mock(returncode=code)), \
+                     patch.object(update_worker.subprocess, "CREATE_NEW_CONSOLE", 16, create=True), \
+                     patch.object(update_worker.subprocess, "Popen", side_effect=lambda *a, **k: events.append("open")) as popen:
+                    update_worker.run_job(123, ["fixture"], status, log, reopen=True)
+                data = json.loads(status.read_text())
+                if code == 0:
+                    self.assertEqual(events, [("wait", 1), "install", ("wait", 3), "open"])
+                    popen.assert_called_once_with([update_worker.sys.executable, "-m", "torrent_finder"],
+                                                 creationflags=16, close_fds=True)
+                    self.assertEqual(data["reopen"], "started")
+                else:
+                    popen.assert_not_called()
+                    self.assertEqual(events, [("wait", 1), "install"])
+                    self.assertEqual(data["state"], "failed")
+
+    def test_reopening_failure_does_not_turn_a_completed_install_into_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            status, log = Path(directory)/"status.json", Path(directory)/"update.log"
+            with patch.object(update_worker, "_wait_for_parent", return_value=True), \
+                 patch.object(update_worker.time, "sleep"), \
+                 patch.object(update_worker.subprocess, "run", return_value=Mock(returncode=0)), \
+                 patch.object(update_worker.subprocess, "CREATE_NEW_CONSOLE", 16, create=True), \
+                 patch.object(update_worker.subprocess, "Popen", side_effect=OSError("fixture failure")):
+                update_worker.run_job(123, ["fixture"], status, log, reopen=True)
+            data = json.loads(status.read_text())
+            self.assertEqual(data["state"], "succeeded")
+            self.assertEqual(data["reopen"], "failed")
+            self.assertIn("manually", ui.completion_detail(data["reopen"]))
+
+    def test_viewer_counts_down_then_closes_without_waiting_for_a_key(self):
+        display = Mock()
+        display.started = 0
+        display.view = ui.UpdateView()
+        with patch.object(ui, "UpdateDisplay") as factory, \
+             patch.object(ui, "read_job", side_effect=[
+                 {"state": "succeeded", "reopen": "waiting", "reopen_at": 103},
+                 {"state": "succeeded", "reopen": "started"},
+             ]), \
+             patch.object(ui.time, "time", return_value=100), \
+             patch.object(ui.time, "monotonic", return_value=1), \
+             patch.object(ui.time, "sleep"), patch.object(ui.readchar, "readkey") as key:
+            factory.return_value.__enter__.return_value = display
+            ui.watch_update(Path("unused.json"), "job")
+        self.assertIn("3 seconds", display.update.call_args_list[0].args[1])
+        self.assertIn("Starting Torrent Finder", display.update.call_args.args[1])
+        key.assert_not_called()
+
+    def test_startup_leaves_countdown_report_for_worker_but_consumes_expired_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            status, log = Path(directory)/"status.json", Path(directory)/"update.log"
+            status.write_text('{"state":"succeeded", "reopen":"waiting", "reopen_at":103}')
+            with patch.object(updates, "_update_files", return_value=(status, log)), \
+                 patch.object(updates.time, "time", return_value=100):
+                self.assertEqual(updates.consume_update_report(), "")
+                self.assertTrue(status.exists())
+            with patch.object(updates, "_update_files", return_value=(status, log)), \
+                 patch.object(updates.time, "time", return_value=114):
+                self.assertIn("successfully", updates.consume_update_report())
+
+    def test_preview_countdown_matches_worker_delay_and_never_reopens(self):
+        self.assertEqual(update_worker.REOPEN_DELAY, 3)
+        for elapsed, remaining in ((7, 3), (8, 2), (9, 1)):
+            self.assertIn(f"in {remaining} second", ui.preview_view(elapsed).detail)
+        self.assertIn("Starting Torrent Finder", ui.preview_view(10).detail)
+        self.assertNotIn("Reopening", ui.preview_view(7, "failure").detail)
 
 
 if __name__ == "__main__":

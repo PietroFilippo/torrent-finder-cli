@@ -237,7 +237,8 @@ def _schedule_update(command: list[str], *, show_progress=False, info=None) -> t
         write_status(status, state="pending", phase="waiting", log=str(log), **job)
         subprocess.Popen(
             [sys.executable, "-m", "torrent_finder.update_worker", "--parent", str(os.getpid()),
-             "--status", str(status), "--log", str(log), "--", *command],
+             "--status", str(status), "--log", str(log),
+             *(["--reopen"] if show_progress else []), "--", *command],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
             close_fds=True,
@@ -249,7 +250,9 @@ def _schedule_update(command: list[str], *, show_progress=False, info=None) -> t
             pass
         return False, f"Could not start the updater: {error}"
     if show_progress and _open_update_viewer(status, job["job_id"]):
-        return True, "Update queued. Press any key to close this app and begin. Follow progress in the separate updater window."
+        return True, "Update queued. Press any key to close this app and begin. The updater will reopen Torrent Finder after a successful update."
+    if show_progress:
+        return True, f"Update queued. Close this app to begin. Torrent Finder will reopen after a successful update. Log: {log}"
     return True, f"Update queued. This app will close to release its launcher. Wait for the update before reopening. Log: {log}"
 
 
@@ -260,6 +263,9 @@ def consume_update_report() -> str:
         if not isinstance(data, dict):
             return ""
         state = data.get("state")
+        if state == "succeeded" and data.get("reopen") == "waiting" and time.time() < float(data.get("reopen_at", 0)) + 10:
+            # The worker still owns this report while counting down to reopen.
+            return ""
         if state == "pending":
             if time.time() - float(data.get("started_at", 0)) < 1900:
                 return f"Update is still pending. Close other Torrent Finder windows and check {log}."
