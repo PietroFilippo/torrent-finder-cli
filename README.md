@@ -330,7 +330,11 @@ The bar moves while the installer is working; pip/pipx does not provide a reliab
 overall percentage. Full installer output stays in `update.log`.
 On Windows a separate progress window stays open while the main app closes and
 the hidden helper installs the update. Closing the progress window does not stop
-the installer. Other platforms and source clones show progress in the current
+the installer or automatic reopening. After a successful Windows package update,
+a three-second countdown runs, Torrent Finder opens automatically, and the
+progress window closes. Failed updates stay on the error screen; if reopening
+fails after installation, the display tells you to open the app manually.
+Other platforms and source clones show progress in the current
 terminal. Standalone binaries still open the download page.
 
 Preview this display now, without installing anything or changing your settings:
@@ -342,7 +346,9 @@ python -m torrent_finder --preview-update failure
 torrent-finder --preview-update
 ```
 
-Each preview takes about seven seconds, then waits for a key. For a browser replay
+The success preview takes about ten seconds, including the reopening countdown;
+the failure preview takes about seven seconds. Both wait for a key afterward,
+and neither installs an update nor opens another app instance. For a browser replay
 with success/failure and compact-terminal controls, run
 `python -m scripts.preview_update` from the source checkout and open
 `dist/update-preview/index.html`. Both previews use the real terminal renderer.

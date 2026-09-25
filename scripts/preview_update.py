@@ -20,10 +20,10 @@ def export_preview(destination=Path("dist/update-preview/index.html")):
         for outcome in ("success", "failure"):
             key = f"{width}-{outcome}"
             frames[key] = []
-            for tick in range(57):
+            for tick in range(81):
                 elapsed = tick / 8
                 console = Console(file=io.StringIO(), width=width, record=True, color_system="truecolor", legacy_windows=False)
-                console.print(update_panel(preview_view(elapsed, outcome), elapsed, min(72, width)))
+                console.print(update_panel(preview_view(elapsed, outcome), min(elapsed, 7), min(72, width)))
                 frames[key].append(console.export_html(inline_styles=True, code_format="{code}", theme=MONOKAI))
     html = '''<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -49,7 +49,8 @@ it becomes full only when the update succeeds. No percentage is estimated.</p>
 <label>Terminal <select id="width"><option value="80">Normal · 80 columns</option><option value="48">Compact · 48 columns</option></select></label></div>
 <div class="terminal"><div class="titlebar"><span>Update progress</span><span class="badge">PREVIEW ONLY · NOTHING IS INSTALLED</span></div>
 <div class="screen"><pre id="frame" aria-label="Terminal update preview"></pre></div></div>
-<p class="note">On Windows, this display opens separately while the main app closes. Closing the display does not stop the installer.</p>
+<p class="note">After a successful Windows update, Torrent Finder reopens automatically after three seconds and the updater window closes.
+Closing the progress display early does not stop the update or automatic reopening. This preview never opens the app.</p>
 <p class="note">Try it in your terminal: <code>python -m torrent_finder --preview-update</code><br>
 Preview a failure: <code>python -m torrent_finder --preview-update failure</code></p></main>
 <script>
