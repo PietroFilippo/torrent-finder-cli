@@ -24,6 +24,7 @@ class DeferredUpdateTests(unittest.TestCase):
         with patch.object(app, "run_update", return_value=(True, "Queued")), \
              patch.object(app, "needs_exit_before_update", return_value=True), \
              patch.object(app, "clear_screen"), patch.object(app, "console"), \
+             patch.object(app, "UpdateDisplay"), \
              patch.object(app.readchar, "readkey", return_value=" "):
             with self.assertRaises(SystemExit):
                 app._run_update_flow({"kind": "pip"})

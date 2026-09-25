@@ -239,5 +239,14 @@ to the UI. See [ADR-0012](docs/adr/0012-stable-credentials-and-safe-updates.md).
 Windows pip/pipx updates run through `update_worker.py` after the parent process
 exits, releasing the running launcher. A hidden helper writes output to a local
 log and records the real exit status; startup consumes the report. Nonzero exits
-are failures even when package version metadata changed. Other install types
-retain their existing git/pip or Releases-page flow.
+are failures even when package version metadata changed. A separate read-only
+console viewer observes the job ID and waiting/installing/final states; closing
+it never cancels the hidden worker. It can read an archived completion report if
+startup consumed it first. Failure to open the viewer leaves the queued job intact.
+
+`ui/update_progress.py` renders an indeterminate activity bar, elapsed time, and
+the actual outcome. Git/non-Windows package updates use the same display inline
+and redirect installer output to the local log; binaries open Releases.
+`--preview-update [success|failure]` bypasses normal startup, settings loading,
+usage stats, and installers. `scripts/preview_update.py` exports a browser replay
+from the same renderer for visual QA. Neither preview changes update status.

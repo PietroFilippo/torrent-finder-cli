@@ -1,6 +1,7 @@
 import json
 import unittest
 import warnings
+from io import StringIO
 from unittest.mock import Mock, patch
 
 warnings.filterwarnings("ignore", module=".*requests.*")
@@ -71,6 +72,15 @@ class BannerContrastTests(unittest.TestCase):
 
 
 class PipxUpgradeExitCodeTests(unittest.TestCase):
+    def setUp(self):
+        # These tests simulate installers; never overwrite a real update log.
+        log = Mock()
+        log.open.return_value.__enter__ = Mock(return_value=StringIO())
+        log.open.return_value.__exit__ = Mock(return_value=False)
+        patcher = patch.object(updates, "_update_files", return_value=(Mock(), log))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_partial_package_upgrade_is_not_reported_as_success(self):
         # On Windows, pipx exits nonzero when it can't replace the running
         # .local/bin launcher even though the venv upgraded fine. The flow

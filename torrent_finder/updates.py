@@ -20,6 +20,7 @@ import sys
 import time
 import json
 from pathlib import Path
+from uuid import uuid4
 
 from torrent_finder import __version__
 from torrent_finder.state import load_setting, save_setting
@@ -206,7 +207,21 @@ def _update_files() -> tuple[Path, Path]:
     return Path(machine_state_path("update-status.json")), Path(machine_state_path("update.log"))
 
 
-def _schedule_update(command: list[str]) -> tuple[bool, str]:
+def _open_update_viewer(status: Path, job_id: str) -> bool:
+    try:
+        subprocess.Popen(
+            [sys.executable, "-m", "torrent_finder.ui.update_progress",
+             "--watch", str(status), "--job-id", job_id],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NEW_CONSOLE, close_fds=True,
+        )
+        return True
+    except OSError:
+        # The installer is independent; a missing display must not cancel it.
+        return False
+
+
+def _schedule_update(command: list[str], *, show_progress=False, info=None) -> tuple[bool, str]:
     from torrent_finder.update_worker import write_status
     status, log = _update_files()
     if status.exists():
@@ -216,8 +231,10 @@ def _schedule_update(command: list[str]) -> tuple[bool, str]:
                 return True, "An update is already waiting. Close all Torrent Finder windows so it can finish."
         except (OSError, ValueError, TypeError):
             pass
+    job = {"job_id": uuid4().hex, "started_at": time.time(),
+           "current": (info or {}).get("current", ""), "latest": (info or {}).get("latest", "")}
     try:
-        write_status(status, state="pending", started_at=time.time(), log=str(log))
+        write_status(status, state="pending", phase="waiting", log=str(log), **job)
         subprocess.Popen(
             [sys.executable, "-m", "torrent_finder.update_worker", "--parent", str(os.getpid()),
              "--status", str(status), "--log", str(log), "--", *command],
@@ -227,10 +244,12 @@ def _schedule_update(command: list[str]) -> tuple[bool, str]:
         )
     except OSError as error:
         try:
-            write_status(status, state="failed", log=str(log), error=str(error))
+            write_status(status, state="failed", log=str(log), error=str(error), **job)
         except OSError:
             pass
         return False, f"Could not start the updater: {error}"
+    if show_progress and _open_update_viewer(status, job["job_id"]):
+        return True, "Update queued. Press any key to close this app and begin. Follow progress in the separate updater window."
     return True, f"Update queued. This app will close to release its launcher. Wait for the update before reopening. Log: {log}"
 
 
@@ -253,26 +272,40 @@ def consume_update_report() -> str:
         return ""
 
 
-def run_update(info: dict) -> "tuple[bool, str]":
+def _run_logged_update(command):
+    _, log = _update_files()
+    with log.open("w", encoding="utf-8") as output:
+        result = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, timeout=900)
+    return result.returncode == 0, log
+
+
+def run_update(info: dict, *, on_progress=None) -> "tuple[bool, str]":
     """Perform the update for the detected install kind. Returns (ok, message).
 
     Windows pip installs queue a helper and require the caller to exit first.
-    Other git/pip installs run with live output; binaries open Releases.
+    Installer output goes to update.log; on_progress receives stage and detail.
+    Binaries open Releases without claiming an installation completed.
     """
     kind = info.get("kind")
+    def progress(stage, detail):
+        if on_progress:
+            on_progress(stage, detail)
+
     if kind == "git":
         try:
-            r = subprocess.run(["git", "-C", _REPO_DIR, "pull", "--ff-only"])
-            ok = r.returncode == 0
+            progress("installing", "Downloading the latest source changes.")
+            ok, log = _run_logged_update(["git", "-C", _REPO_DIR, "pull", "--ff-only"])
             return (ok, "Updated — restart to use the new version." if ok
-                    else "git pull failed — resolve it manually, then restart.")
+                    else f"git pull failed — resolve it manually, then restart. Log: {log}")
         except Exception as e:
             return (False, f"git pull failed: {e}")
 
     if kind == "binary":
         try:
             import webbrowser
-            webbrowser.open(_RELEASES_URL)
+            progress("opening", "Opening the download page in your browser.")
+            if not webbrowser.open(_RELEASES_URL):
+                return False, f"Open {_RELEASES_URL} to download the new version."
             return (True, f"Opened the Releases page — download v{info.get('latest')}.")
         except Exception:
             return (False, f"Open {_RELEASES_URL} to download the new version.")
@@ -281,12 +314,15 @@ def run_update(info: dict) -> "tuple[bool, str]":
     cmd = (["pipx", "upgrade", "torrent-finder-cli"] if _pipx_install()
            else [sys.executable, "-m", "pip", "install", "-U", "torrent-finder-cli"])
     if needs_exit_before_update(info):
+        if on_progress:
+            progress("preparing", "Preparing a separate updater window.")
+            return _schedule_update(cmd, show_progress=True, info=info)
         return _schedule_update(cmd)
     manual = "pipx upgrade torrent-finder-cli" if _pipx_install() else "python -m pip install -U torrent-finder-cli"
     try:
-        r = subprocess.run(cmd)
-        ok = r.returncode == 0
+        progress("installing", "Downloading and installing the latest version.")
+        ok, log = _run_logged_update(cmd)
         return (ok, "Updated — restart to use the new version." if ok
-                else f"Update failed — close the app, then try: {manual}")
+                else f"Update failed — close the app, then try: {manual}. Log: {log}")
     except Exception as e:
         return (False, f"Update failed: {e}. Close the app, then try: {manual}")
