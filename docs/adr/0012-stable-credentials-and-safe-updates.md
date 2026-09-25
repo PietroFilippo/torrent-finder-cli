@@ -31,6 +31,14 @@ to exit. Preserve output in update.log and record the actual exit code in a
 status file consumed on next launch. Expired pending jobs report incomplete;
 nonzero exits never become success because package metadata advanced.
 
+Show progress in a separate read-only console viewer on Windows. The hidden
+worker remains independent so closing the viewer cannot interrupt installation.
+Identify status records by job ID, preserve phase and version metadata, and allow
+the viewer to read a completion report already archived by startup. Use an
+indeterminate activity bar because the installer has no reliable overall percent.
+The terminal preview and exported visual replay share the production renderer
+and never invoke an installer.
+
 ## Consequences
 
 Python installation changes no longer change the credential location. Existing

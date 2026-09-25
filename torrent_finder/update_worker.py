@@ -37,16 +37,24 @@ def write_status(path: Path, **data) -> None:
 
 def run_job(parent_pid: int, command: list[str], status: Path, log: Path) -> None:
     try:
+        queued = json.loads(status.read_text(encoding="utf-8"))
+        metadata = {}
+        if isinstance(queued, dict):
+            metadata = {key: queued[key] for key in ("job_id", "started_at", "current", "latest") if key in queued}
+    except (OSError, ValueError):
+        metadata = {}
+    try:
         if not _wait_for_parent(parent_pid):
             raise RuntimeError("The app did not exit within 15 minutes; no update was attempted.")
         # Console-script launcher wrappers exit just after their Python child.
         time.sleep(1)
+        write_status(status, state="pending", phase="installing", log=str(log), **metadata)
         with log.open("w", encoding="utf-8") as output:
             result = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, timeout=900)
         write_status(status, state="succeeded" if result.returncode == 0 else "failed",
-                     log=str(log), returncode=result.returncode)
+                     log=str(log), returncode=result.returncode, **metadata)
     except Exception as error:
-        write_status(status, state="failed", log=str(log), error=str(error))
+        write_status(status, state="failed", log=str(log), error=str(error), **metadata)
 
 
 def main() -> None:

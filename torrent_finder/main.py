@@ -53,14 +53,12 @@ from torrent_finder.ui.prompts import (
 )
 from torrent_finder.terminal_check import advise_limited_terminal
 from torrent_finder.ui.table import interactive_select
+from torrent_finder.ui.update_progress import UpdateDisplay, preview_update
 from torrent_finder.updates import (
     check_for_update, consume_update_report, needs_exit_before_update,
     notice_line, run_update,
 )
 from torrent_finder.utils import start_esc_listener
-
-load_state(PROVIDERS)
-
 
 # Maps download-method values returned by download_method_prompt to the
 # stable method names stored in stats.
@@ -730,15 +728,22 @@ def _handle_whats_next(current_provider):
 def _run_update_flow(info: dict) -> None:
     """Run the install-appropriate update (git pull / pipx / open Releases)."""
     clear_screen()
-    console.print("[info]Updating…[/info]\n")
     try:
-        ok, msg = run_update(info)
+        with UpdateDisplay(console, current=info.get("current", ""), latest=info.get("latest", "")) as display:
+            ok, msg = run_update(info, on_progress=display.update)
+            stage = "failed"
+            if ok:
+                if needs_exit_before_update(info):
+                    stage = "waiting"
+                elif info.get("kind") == "binary":
+                    stage = "opened"
+                else:
+                    stage = "succeeded"
+            display.update(stage, msg)
     except KeyboardInterrupt:
         console.print("\n[warning]Update cancelled.[/warning]")
         clear_screen()
         return
-    style = "success" if ok else "warning"
-    console.print(f"\n[{style}]{msg}[/{style}]")
     if ok and needs_exit_before_update(info):
         console.print("[dim]Press any key to close and let the update finish.[/dim]")
         try:
@@ -757,6 +762,8 @@ def _run_update_flow(info: dict) -> None:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument("--preview-update", nargs="?", const="success", choices=("success", "failure"),
+                        help="Preview the update display without installing anything")
     parser.add_argument("--providers", nargs="+", metavar="PROVIDER", choices=[p for p in provider_cli_choices() if p != "all"],
                         help="Providers for -t all (for example: --providers anime manga)")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
@@ -775,9 +782,13 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _main_loop() -> None:
+def _main_loop(args=None) -> None:
     parser = _build_parser()
-    args = parser.parse_args()
+    args = args or parser.parse_args()
+    if args.preview_update:
+        preview_update(args.preview_update)
+        return
+    load_state(PROVIDERS)
     if args.providers and args.type != "all":
         parser.error("--providers requires -t all")
     advise_limited_terminal()
@@ -1213,10 +1224,17 @@ def _main_loop() -> None:
         continue
 
 def main() -> None:
+    args = _build_parser().parse_args()
+    if args.preview_update:
+        try:
+            preview_update(args.preview_update)
+        except (KeyboardInterrupt, EOFError):
+            pass
+        return
     record_session_start()
     t0 = time.monotonic()
     try:
-        _main_loop()
+        _main_loop(args)
     except (KeyboardInterrupt, EOFError):
         # Ctrl+C / Ctrl+D from any menu (readchar raises these from readkey).
         # Caught here so every entry point — the console script, python -m,

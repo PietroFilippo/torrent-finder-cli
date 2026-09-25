@@ -324,6 +324,31 @@ right thing for your install type:
 - **standalone binary** — opens the Releases page so you can download the new file.
 - **source clone** — runs `git pull`.
 
+The source branch also includes an **update progress display (unreleased)**:
+an animated activity bar, elapsed time, and a clear success or failure result.
+The bar moves while the installer is working; pip/pipx does not provide a reliable
+overall percentage. Full installer output stays in `update.log`.
+On Windows a separate progress window stays open while the main app closes and
+the hidden helper installs the update. Closing the progress window does not stop
+the installer. Other platforms and source clones show progress in the current
+terminal. Standalone binaries still open the download page.
+
+Preview this display now, without installing anything or changing your settings:
+
+```bash
+python -m torrent_finder --preview-update
+python -m torrent_finder --preview-update failure
+# After installing a version containing this feature:
+torrent-finder --preview-update
+```
+
+Each preview takes about seven seconds, then waits for a key. For a browser replay
+with success/failure and compact-terminal controls, run
+`python -m scripts.preview_update` from the source checkout and open
+`dist/update-preview/index.html`. Both previews use the real terminal renderer.
+The installed version controls the update UI: installing the release that adds
+this feature uses the old screen; subsequent in-app updates use the new one.
+
 Or close the app and update manually with `pipx upgrade torrent-finder-cli`.
 If an older version reports Windows `WinError 32` while replacing
 `torrent-finder.exe`, close all running copies and rerun that command from a
@@ -533,6 +558,7 @@ provider-based — the module paths below are relative to `torrent_finder/`:
 - `stats.py`: Usage counter recorders and read helpers over the `stats` subtree owned by `store.py`, keyed by provider slug.
 - `torrent_meta.py`: Fetches a torrent's file list from a magnet via `aria2c`. Helpers for episode-number extraction, video/subtitle classification, multi-episode detection (any torrent with ≥ 2 video files), sub-to-video matching (`match_subtitles_for`), and `--select-file` range formatting.
 - `update_worker.py`: Hidden Windows helper that waits for the app to exit, runs a queued pip/pipx update, and records its output and actual result.
+- `ui/update_progress.py`: Shared update renderer, safe terminal preview, and read-only Windows progress viewer.
 - `updates.py`: Install-aware update check (git clone / pip-pipx / binary). Rate-limited; compares against `origin` (git) or PyPI (`__version__`), and powers the in-app **Install update** action via `check_for_update()` / `run_update()`.
 - `constants.py`: Configuration constants, trackers, UI themes, the platform user-data resolver (`user_data_dir()` / `data_path()`), the machine-stable state resolver (`machine_state_dir()` / `machine_state_path()`), legacy-location discovery, and `get_download_dir()` (returns the user's chosen `download_dir` setting or falls back to `DOWNLOADS_DIR`).
 
