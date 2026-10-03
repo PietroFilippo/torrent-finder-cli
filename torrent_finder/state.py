@@ -75,6 +75,11 @@ def load_state(providers) -> None:
 
 def apply_provider_state(provider, pstate: dict) -> None:
     """Apply a provider snapshot without reading or writing the shared store."""
+    from torrent_finder.name_rules import NameRules
+    provider.name_rules = NameRules.restore(pstate.get("name_rules", {}))
+    categories = getattr(provider, "nyaa_categories", {})
+    if pstate.get("nyaa_category") in categories:
+        provider.nyaa_category = pstate["nyaa_category"]
     saved_engines = pstate.get("engines", {})
     saved_modes = pstate.get("engine_modes")
     explicit_names = pstate.get("explicitly_disabled_engines")
@@ -102,8 +107,18 @@ def apply_provider_state(provider, pstate: dict) -> None:
     provider.result_sort = order if isinstance(order, str) and order in SORT_ORDERS else "relevance"
 
 
+def reload_state(providers) -> None:
+    """Reset omitted provider choices before applying a replaced settings file."""
+    for provider in providers:
+        if not getattr(provider, "is_combined", False):
+            apply_provider_state(provider, provider_snapshot(type(provider)()))
+    load_state(providers)
+
+
 def provider_snapshot(provider) -> dict:
     return {
+        "name_rules": provider.name_rules.snapshot(),
+        **({"nyaa_category": provider.nyaa_category} if getattr(provider, "nyaa_categories", {}) else {}),
         "engines": {e.name: e.enabled for e in provider.engines},
         "engine_modes": {e.name: e.mode for e in provider.engines},
         "explicitly_disabled_engines": [

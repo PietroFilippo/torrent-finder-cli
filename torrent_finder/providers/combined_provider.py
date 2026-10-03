@@ -91,7 +91,9 @@ class CombinedProvider(BaseProvider):
         self.profile_id, self.profile_name = None, "History search (unsaved)"
 
     def restore(self, profile):
+        from torrent_finder.name_rules import NameRules
         profile = profile if isinstance(profile, dict) else {}
+        self.name_rules = NameRules.restore(profile.get("name_rules", {}))
         saved = profile.get("providers", {})
         self._children = []
         for original in self.templates:
@@ -116,6 +118,7 @@ class CombinedProvider(BaseProvider):
     def snapshot(self):
         children = self.children
         return {
+            "name_rules": self.name_rules.snapshot(),
             "selected": [p.slug for p in children if p.slug in self.selected_slugs],
             "providers": {p.slug: provider_snapshot(p) for p in children},
             "shared": {
@@ -150,9 +153,11 @@ class CombinedProvider(BaseProvider):
         selection = names if len(selected) <= 3 else f"{len(selected)} providers selected"
         required = sum(len(p.active_presets) for p in selected)
         preferred = sum(len(p.preferred_presets) for p in selected)
-        shared = len(self.shared_filters.include_keywords) + len(self.shared_filters.exclude_keywords)
+        shared = (len(self.shared_filters.include_keywords) + len(self.shared_filters.exclude_keywords)
+                  + sum(bool(value.strip()) for value in self.name_rules.snapshot().values()))
         return (selection or "No providers selected",
-                f"{self.profile_name} · Require: {required}; Prefer: {preferred}; {shared} name rules")
+                f"{self.profile_name} · Require: {required}; Prefer: {preferred}; {shared} name rules"
+                + (" · " + self.name_rules.summary() if self.name_rules.summary() else ""))
 
     def filter_summary(self):
         return self.summary()[1]
@@ -179,6 +184,8 @@ class CombinedProvider(BaseProvider):
             provider.search_control = control
 
         def matches_shared_rules(row):
+            if not session.name_rules.matches(row.name):
+                return False
             # Name rules must not match source labels. Seed requirements only
             # apply where swarm statistics exist, never to direct downloads.
             for config in (session.shared_filters, cli_filters):

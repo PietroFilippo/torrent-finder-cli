@@ -47,7 +47,7 @@ def search_shortcuts_line(has_history: bool) -> str:
         "[dim]Type to search  •  [/dim][bold]Ctrl+F[/bold] [dim]filters"
         f"  •  [/dim][bold]{MULTI_ADD_KEY_LABEL}[/bold] "
         "[dim]add another title  •  [/dim][bold]Tab[/bold] [dim]actions "
-        f"(filters, history, stats, tips){history}  •  [/dim]"
+        f"(bookmarks, backup, history, more){history}  •  [/dim]"
         "[bold]Esc[/bold] [dim]back / undo title[/dim]"
     )
 
@@ -481,6 +481,9 @@ def quick_actions_menu(update_available: bool = False) -> "str | None":
     base = [
         ("🔍 Filters & engines", "filter", "F"),
         ("🕑 Search history", "history", "H"),
+        ("Bookmarks / download later", "bookmarks", "B"),
+        ("Bookmark current search", "save_search", "L"),
+        ("Settings backup / import", "backup", "E"),
         ("📊 Usage stats", "stats", "S"),
         ("💡 Tips & shortcuts", "tips", "T"),
     ]
@@ -501,7 +504,7 @@ def quick_actions_menu(update_available: bool = False) -> "str | None":
         key_actions[key] = _pick(i + offset)
         key_actions[key.lower()] = _pick(i + offset)
 
-    jump = "U / F / H / S / T" if update_available else "F / H / S / T"
+    jump = " / ".join((["U"] if update_available else []) + [key for _, _, key in base])
     idx = arrow_select(
         items,
         title="Quick actions",
@@ -525,6 +528,8 @@ def filter_menu(provider, on_save=None) -> None:
     from torrent_finder.result_view import SORT_ORDERS
     from torrent_finder.ui.result_filters import choose_result_sort
     draft_sort = provider.result_sort
+    draft_rules = provider.name_rules
+    draft_category = provider.nyaa_category
 
     items = []
 
@@ -569,10 +574,23 @@ def filter_menu(provider, on_save=None) -> None:
             preset_indices.append(len(items) - 1)
 
     # --- Action buttons ---
+    items.append(SelectItem("Literal release-name rules…", "rules", is_action=True,
+                            description="All words / any word / exact phrase / exclusions. Release names only."))
+    rules_idx = len(items) - 1
+    categories = getattr(provider, "nyaa_categories", {})
+    category_idx = None
+    if categories:
+        items.append(SelectItem("Nyaa category: " + categories[draft_category], "category", is_action=True,
+                                description="Nyaa only; other engines cannot enforce this language category. Category labels do not verify audio or subtitle tracks."))
+        category_idx = len(items) - 1
+    if provider.slug == "manga":
+        for idx in engine_indices:
+            if items[idx].value[1].name.startswith("Nyaa"):
+                items[idx].description = "EN = English-translated; Raw = untranslated; Non-English = other translations, including Portuguese. Other engines do not enforce these scopes."
     items.append(SelectItem(label=f"Result order: {SORT_ORDERS[draft_sort]}", value="sort", is_action=True,
                             description="Saved for this provider. In a combined profile, its overall result order takes precedence."))
     sort_idx = len(items) - 1
-    items.append(SelectItem(label="Clear filters  [c]", value="clear", is_action=True))
+    items.append(SelectItem(label="Clear preset filters  [c]", value="clear", is_action=True))
     items.append(SelectItem(label="✅ Confirm  [w]", value="confirm", is_action=True))
     items.append(SelectItem(label="↩ Go Back", value="back", is_action=True))
 
@@ -688,6 +706,19 @@ def filter_menu(provider, on_save=None) -> None:
             key_actions=key_actions,
             footer="↑/↓ nav • Space/Enter cycle • a all • i invert • c clear • v/V range • w save • Esc cancel",
         )
+        if result_idx == rules_idx:
+            from torrent_finder.ui.name_rules import edit_name_rules
+            draft_rules = edit_name_rules(draft_rules)
+            start = rules_idx
+            continue
+        if category_idx is not None and result_idx == category_idx:
+            choices = [SelectItem(label, key) for key, label in categories.items()]
+            pick = arrow_select(choices, title="Nyaa Anime category", footer="Nyaa only • Esc keep current category")
+            if pick is not None:
+                draft_category = choices[pick].value
+                items[category_idx].label = "Nyaa category: " + categories[draft_category]
+            start = category_idx
+            continue
         if result_idx != sort_idx:
             break
         # The selector's redraw thread must stop before another menu opens.
@@ -718,6 +749,8 @@ def filter_menu(provider, on_save=None) -> None:
             elif item.toggle_state == "Prefer":
                 provider.preferred_presets.append(preset)
         provider.result_sort = draft_sort
+        provider.name_rules = draft_rules
+        provider.nyaa_category = draft_category
 
         if on_save is not None:
             on_save()

@@ -18,6 +18,7 @@ from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 from torrent_finder.utils import format_size, leech_style, seed_style
 from torrent_finder.result_view import SORT_ORDERS, result_indices, timestamp
 from torrent_finder.ui.result_filters import refine_results
+from torrent_finder.result_details import detail_lines
 
 
 # Marquee timing for the selected-row name
@@ -97,6 +98,16 @@ def _selected_metadata(
     return details
 
 
+def _wrapped_details(item, layout):
+    width = max(8, console.size.width - 6) if layout.mode == "minimal" else layout.name_width
+    return Text("\n".join(detail_lines(item))).wrap(console, width)
+
+
+def _detail_count():
+    # Leave a line for the compact search-notice banner, including bookmarks.
+    return max(2, min(8, console.size.height // 4) - 1)
+
+
 def _table_caption(
     results: list[dict],
     selected_idx: int,
@@ -104,8 +115,17 @@ def _table_caption(
     show_from: bool,
     total_pages: int,
     picked: "frozenset[int]",
+    expanded: bool = False,
 ) -> Text:
-    caption = _selected_metadata(results, selected_idx, layout, show_from)
+    caption = Text() if expanded else _selected_metadata(results, selected_idx, layout, show_from)
+    if expanded:
+        caption.append("i close • [/] scroll details • b bookmark • Esc back", style="dim")
+        return caption
+    if console.size.width < 52:
+        caption.append("↑/↓ move • Space pick • a all • c clear\nEnter open • i details • b save • f refine • Esc back", style="dim")
+        if total_pages > 1:
+            caption.append(" • ←/→ page", style="dim")
+        return caption
     if any(item.get("apibay_cached_at") for item in results):
         caption.append(
             "  Apibay* = cached last-known-good results\n",
@@ -119,7 +139,7 @@ def _table_caption(
         if picked
         else "  |  Enter open"
     )
-    controls += "  |  f refine/sort  |  Esc back"
+    controls += "  |  i details  |  b bookmark  |  f refine/sort  |  Esc back"
     caption.append(controls, style="dim")
     caption.overflow = "fold"
     return caption
@@ -175,6 +195,8 @@ def build_table(
     picked: "frozenset[int]" = frozenset(),
     show_from: bool = False,
     original_indices: list[int] | None = None,
+    expanded: bool = False,
+    detail_offset: int = 0,
 ) -> Table:
     """Build a result table whose columns progressively collapse by width."""
     width = console.size.width
@@ -198,13 +220,13 @@ def build_table(
         show_lines=False,
         padding=(0, 1),
         caption=_table_caption(
-            results, selected_idx, layout, show_from, total_pages, picked
+            results, selected_idx, layout, show_from, total_pages, picked, expanded
         ),
         caption_style="dim",
     )
 
     if layout.mode == "minimal":
-        table.add_column("Result", style="white", no_wrap=True, overflow="ellipsis")
+        table.add_column("Result", style="white", no_wrap=not expanded, overflow="fold" if expanded else "ellipsis")
     else:
         table.add_column("Sel", justify="center", width=5)
         table.add_column("#", style="bold white", justify="right", width=7)
@@ -217,7 +239,7 @@ def build_table(
                 "From", style="green", width=12, no_wrap=True, overflow="ellipsis"
             )
         table.add_column(
-            "Name", style="white", width=layout.name_width, no_wrap=True
+            "Name", style="white", width=layout.name_width, no_wrap=not expanded
         )
         if layout.size:
             table.add_column("Size", style="cyan", justify="right", width=10)
@@ -254,12 +276,21 @@ def build_table(
             seed_text = f"[{seed_style(seeds)}]{seeds}[/{seed_style(seeds)}]"
             leech_text = f"[{leech_style(leeches)}]{leeches}[/{leech_style(leeches)}]"
 
+        name_cell = Text(display_name)
+        if expanded and is_selected:
+            lines = _wrapped_details(item, layout)
+            count = _detail_count()
+            offset = min(detail_offset, max(0, len(lines) - count))
+            name_cell.append(f"\nDetails {offset + 1}-{min(len(lines), offset + count)}/{len(lines)} ([/])", style="cyan")
+            for line in lines[offset:offset + count]:
+                name_cell.append("\n")
+                name_cell.append(line)
         checked = global_index in picked
         if layout.mode == "minimal":
             result_cell = Text()
             result_cell.append("[✓]" if checked else "[ ]", style="green" if checked else "dim")
             result_cell.append(f"  {number}  ")
-            result_cell.append(display_name)
+            result_cell.append(name_cell)
             table.add_row(result_cell, style=row_style)
             continue
 
@@ -271,7 +302,7 @@ def build_table(
             cells.append(Text(str(item.get("provider_label", ""))))
         if layout.from_work:
             cells.append(Text(str(item.get("from_work", "") or "")))
-        cells.append(Text(display_name))
+        cells.append(name_cell)
         if layout.size:
             cells.append(format_size(size))
         if layout.seeds:
@@ -294,7 +325,7 @@ def _pick_result(picked: set[int]) -> tuple:
 
 
 def interactive_select(results: list[dict], note: str = "", *, initial_order: str = "relevance",
-                       search_summary: str = "") -> "tuple | None":
+                       search_summary: str = "", on_bookmark=None) -> "tuple | None":
     """Interactive torrent results table with multi-select.
 
     Navigate with arrows; Left/Right switch pages; type a number to jump.
@@ -339,6 +370,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     )
 
     scroll_offset = 0
+    expanded, detail_offset, saved_scroll = False, 0, 0
+    feedback = ""
 
     # Marquee state shared with the ticker thread
     marquee_state = {
@@ -360,6 +393,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         view_status = Text(f"Sort: {order_label} • {view_mode}: {view_query or 'all names'}"
                            + (f" • {search_summary}" if search_summary else ""),
                            style="dim", no_wrap=True, overflow="ellipsis")
+        if feedback:
+            view_status = Text(feedback, style="yellow", no_wrap=True, overflow="ellipsis")
         if note:
             return Group(heading, view_status, _note_preview(note), tbl)
         return Group(heading, view_status, tbl)
@@ -371,10 +406,11 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     # alternate-screen trick.
     with Live(
         framed(build_table(
-            page_items, current, scroll_offset, visible_count, total,
+            page_items, current, current if expanded else scroll_offset, 1 if expanded else visible_count, total,
             current_page, total_pages, global_offset, tick=0,
             picked=frozenset(picked), show_from=show_from,
             original_indices=view_indexes[global_offset:global_offset + total],
+            expanded=expanded, detail_offset=detail_offset,
         )),
         console=console,
         refresh_per_second=15,
@@ -433,10 +469,11 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                 marquee_state["tick"] = new_tick
                 live.update(
                     framed(build_table(
-                        page_items, cur, scroll_offset, visible_count, total,
+                        page_items, cur, cur if expanded else scroll_offset, 1 if expanded else visible_count, total,
                         current_page, total_pages, global_offset, tick=new_tick,
                         picked=frozenset(picked), show_from=show_from,
                         original_indices=view_indexes[global_offset:global_offset + total],
+                        expanded=expanded, detail_offset=detail_offset,
                     ))
                 )
 
@@ -514,6 +551,24 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         return _pick_result(picked)
                     if total:
                         return ("one", view_indexes[global_offset + current])
+                elif key in ("i", "I") and total:
+                    expanded = not expanded
+                    detail_offset = 0
+                    if expanded:
+                        saved_scroll = scroll_offset
+                        scroll_offset = current
+                    else:
+                        scroll_offset = saved_scroll
+                elif key in ("[", "]") and expanded:
+                    layout = _table_layout(console.size.width, show_from, show_provider)
+                    limit = max(0, len(_wrapped_details(page_items[current], layout)) - _detail_count())
+                    detail_offset = min(limit, max(0, min(limit, detail_offset) + (1 if key == "]" else -1)))
+                elif key in ("b", "B") and on_bookmark and total:
+                    ids = sorted(picked) if picked else [view_indexes[global_offset + current]]
+                    try:
+                        feedback = on_bookmark([results[i] for i in ids])
+                    except (OSError, ValueError) as error:
+                        feedback = "Bookmark not saved: " + str(error)
                 elif key in ("n", "N") and note:
                     stop_event.set()
                     ticker_thread.join(timeout=1)
@@ -588,16 +643,19 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
 
                 # Reset marquee on selection or page change
                 if current != prev_current or current_page != prev_page:
+                    detail_offset = 0
+                    feedback = ""
                     marquee_state["tick"] = 0
                     marquee_state["cursor_changed_at"] = time.monotonic()
 
                 live.update(
                     framed(build_table(
-                        page_items, current, scroll_offset, visible_count, total,
+                        page_items, current, current if expanded else scroll_offset, 1 if expanded else visible_count, total,
                         current_page, total_pages, global_offset,
                         tick=marquee_state["tick"],
                         picked=frozenset(picked), show_from=show_from,
                         original_indices=view_indexes[global_offset:global_offset + total],
+                        expanded=expanded, detail_offset=detail_offset,
                     ))
                 )
         finally:

@@ -194,11 +194,37 @@ name persist in history as `kind="creator"` entries.
 
 ## Store
 
+`NameRules` (`name_rules.py`) is the portable, name-only user rule contract:
+all/any normalized words, a consecutive-word phrase, and excluded words. It
+runs before hash deduplication in both solo and combined searches. Preset
+`FilterConfig` keeps its existing source-aware semantics for repack presets.
+Anime's `nyaa_category` is a saved source scope; Manga expresses scopes through
+separate EN / Non-English / Raw engines (`3_1` / `3_2` / `3_3`). Language-name
+checks remain evidence from tags, never track verification.
+
+`bookmarks.py` stores search snapshots or complete result mappings under the
+top-level `bookmarks` list. Stable IDs identify saved entries; canonical result
+identity prevents duplicates and gates refresh updates. Missing refreshed rows
+retain their old handles and fetched time. Reopening uses the acquisition seam;
+comparison uses the existing table and original result indexes. `result_details`
+provides offline listing metadata and separately labelled filename hints.
+
 `store.py` is the single owner of `filter_state.json`: machine-stable location,
 legacy-copy consolidation, in-memory cache, dirty flag, and flush at exit + at
 destructive sites. Everything above it (`state.py` engine modes/settings/history,
 `stats.py` counters) goes through `store.read()` / `store.write()` /
-`store.flush()` and never touches the file. See
+`store.flush()` and never touches the file. Explicit bookmark/import transactions
+use `store.commit(candidate)`: write/fsync a unique sibling temporary file,
+atomically replace, then update the cache. Failures preserve the prior file and
+cache; unreadable authoritative files block replacement and legacy migration.
+Ordinary flush uses the same atomic writer while keeping its fail-silent API.
+
+`settings_backup.py` validates versioned transfer documents, allowlists portable
+settings, prepares detached merge/replace candidates and previews, and excludes
+credentials from normal exports. Separate credential documents go through the
+credential store's atomic writer. Import resets omitted runtime provider options
+before reloading persisted preferences. See
+[ADR-0016](docs/adr/0016-portable-settings-and-saved-results.md),
 [ADR-0002](docs/adr/0002-single-store-for-persistence.md) and
 [ADR-0006](docs/adr/0006-machine-stable-state-path.md).
 

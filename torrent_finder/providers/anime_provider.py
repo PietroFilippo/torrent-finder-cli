@@ -3,6 +3,7 @@
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.resolvers import CreatorFacet, anilist
+from torrent_finder.language_tags import has_brazilian_audio, has_brazilian_subtitles
 
 
 class AnimeProvider(BaseProvider):
@@ -13,12 +14,18 @@ class AnimeProvider(BaseProvider):
     knaben_categories = (6_000_000,)  # Anime parent category
     solidtorrents_category = "Anime"
     nyaa_category = "1_2"  # Anime - English-translated
+    nyaa_categories = {"1_2": "English-translated", "1_3": "Non-English-translated",
+                       "1_4": "Raw", "1_0": "All Anime (including music videos)"}
     prefer_title_matches = True
 
     supports_subtitles = True
     supports_episode_picker = True
 
     presets = [
+        FilterPreset("PT-BR audio tags", FilterConfig(name_predicate=has_brazilian_audio),
+                     description="Filename evidence only. Not PT-PT or subtitle tags. Choose an appropriate Nyaa category separately."),
+        FilterPreset("PT-BR subtitle tags", FilterConfig(name_predicate=has_brazilian_subtitles),
+                     description="Explicit Brazilian subtitle tags in the name; generic Portuguese does not qualify. Tracks are not verified."),
         FilterPreset("720p", FilterConfig(quality=["720p"])),
         FilterPreset("1080p", FilterConfig(quality=["1080p"])),
         FilterPreset("4K", FilterConfig(quality=["2160p", "4k"])),

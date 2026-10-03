@@ -163,6 +163,9 @@ def combined_filter_menu(provider):
                        description="Hide names matching any listed phrase, even if included. Enter for examples and editing."),
             SelectItem("Provider engines and presets…", "configure",
                        description="Each provider keeps its own settings. Resolution and language presets stay scoped to that provider."),
+            SelectItem("All providers: literal name rules…", "rules",
+                       hint=draft.name_rules.summary() or "off",
+                       description="All words / any word / exact phrase / exclusions. Applies together with existing phrase rules."),
             SelectItem(f"Result order: {SORT_ORDERS[draft.result_sort]}", "sort",
                        description="Saved in this profile. Recommended uses title relevance, then preferences. Other sorts override ranking; required filters still apply."),
             SelectItem("Save and return  [w]", "save", enabled=bool(draft.selected_slugs),
@@ -187,6 +190,9 @@ def combined_filter_menu(provider):
             draft.result_sort = choose_result_sort(draft.result_sort)
         elif action == "configure":
             _configure_provider(draft)
+        elif action == "rules":
+            from torrent_finder.ui.name_rules import edit_name_rules
+            draft.name_rules = edit_name_rules(draft.name_rules)
         elif action == "save":
             try:
                 draft.save_profile(library)

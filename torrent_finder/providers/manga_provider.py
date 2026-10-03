@@ -56,6 +56,7 @@ class MangaProvider(BaseProvider):
         return [
             SearchEngine("Nyaa (EN)", "🍙", self._search_nyaa, enabled=True),
             SearchEngine("Nyaa (Raw)", "🗾", self._search_nyaa_raw, enabled=False),
+            SearchEngine("Nyaa (Non-English)", "🌐", self._search_nyaa_other, enabled=False),
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
             SearchEngine(
                 "Knaben", "🧭", self._search_knaben,
@@ -64,5 +65,9 @@ class MangaProvider(BaseProvider):
         ]
 
     def _search_nyaa_raw(self, query: str) -> list[SearchResult]:
-        """Nyaa Literature - Raw (Japanese), c=3_2. Off by default."""
+        """Nyaa Literature - Raw, c=3_3. Off by default."""
+        return self._search_nyaa_in(query, "3_3")
+
+    def _search_nyaa_other(self, query: str) -> list[SearchResult]:
+        """Non-English-translated literature, including Portuguese; not region-specific."""
         return self._search_nyaa_in(query, "3_2")

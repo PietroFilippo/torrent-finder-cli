@@ -409,7 +409,7 @@ class LanguageSearchRegressionTests(unittest.TestCase):
 
         results = provider.search("Example", cli_filters=FilterConfig(min_seeds=3))
 
-        self.assertEqual(results, [keep])
+        self.assertEqual([{k: v for k, v in row.items() if k != "fetched_at"} for row in results], [dict(keep)])
 
     def test_apibay_retries_keep_the_title_with_language_terms(self):
         for preset_name, title in [

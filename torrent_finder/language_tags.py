@@ -71,3 +71,10 @@ def has_portuguese_subtitles(name: str) -> bool:
     text = _normalize(name)
     _audio, subs = _track_tags(text)
     return bool(re.search(r"\b(?:legendad[oa]|leg)\b", text) or subs)
+
+
+def has_brazilian_subtitles(name: str) -> bool:
+    """An explicit Brazilian subtitle tag; generic Portuguese is insufficient."""
+    text = _normalize(name)
+    _audio, subs = _track_tags(text)
+    return any(_BRAZIL_TAG.search(text[start:end]) for start, end in subs)

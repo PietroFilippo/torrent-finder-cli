@@ -15,6 +15,8 @@ user action survives a hard kill.
 import atexit
 import json
 import os
+import tempfile
+from copy import deepcopy
 
 from torrent_finder.constants import legacy_data_paths, machine_state_path
 
@@ -33,7 +35,7 @@ def _read_json(path: str) -> dict | None:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else None
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError, UnicodeError):
         return None
 
 
@@ -130,6 +132,8 @@ def _load_initial_state(target_path: str, legacy_paths: list[str]) -> dict:
     current = _read_json(target_path)
     if current is not None:
         return current
+    if os.path.exists(target_path):
+        return {}  # Preserve an unreadable authoritative file for recovery.
 
     copies = []
     seen = set()
@@ -151,11 +155,7 @@ def _load_initial_state(target_path: str, legacy_paths: list[str]) -> dict:
 
     merged = _merge_state_copies(copies)
     try:
-        parent = os.path.dirname(target_path)
-        if parent:
-            os.makedirs(parent, exist_ok=True)
-        with open(target_path, "w", encoding="utf-8") as f:
-            json.dump(merged, f, indent=2)
+        atomic_json(target_path, merged)
     except OSError:
         pass
     return merged
@@ -183,14 +183,38 @@ def write(data: dict) -> None:
     _dirty = True
 
 
+def atomic_json(path, data) -> None:
+    """Replace one complete JSON document; failed writes leave its old bytes intact."""
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".torrent-settings-", suffix=".tmp", dir=parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(data, stream, indent=2, ensure_ascii=False)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def commit(data: dict) -> None:
+    """Explicit transactional save. Validate existing data and report failures."""
+    global _cache, _dirty
+    if os.path.exists(STATE_PATH) and _read_json(STATE_PATH) is None:
+        raise ValueError("Existing settings cannot be read; the file was preserved.")
+    candidate = deepcopy(data)
+    atomic_json(STATE_PATH, candidate)
+    _cache, _dirty = candidate, False
+
+
 def flush() -> None:
     """Persist the cache to disk if dirty. Called from atexit + destructive sites."""
     global _dirty
     if not _dirty or _cache is None:
         return
     try:
-        with open(STATE_PATH, "w", encoding="utf-8") as f:
-            json.dump(_cache, f, indent=2)
-        _dirty = False
-    except OSError:
+        commit(_cache)
+    except (OSError, ValueError):
         pass

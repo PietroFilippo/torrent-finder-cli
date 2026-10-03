@@ -85,6 +85,18 @@ def _goodbye() -> None:
     console.print("[info]Goodbye![/info]")
 
 
+def _saved_data_action(action):
+    """Keep a local read/write failure inside its UI flow, preserving stored data."""
+    try:
+        return action()
+    except (OSError, ValueError) as error:
+        from rich.markup import escape
+        from torrent_finder.ui.selector import SelectItem, arrow_select
+        arrow_select([SelectItem("Back", description=escape(str(error)))],
+                     title="Saved data could not be updated", footer="Enter / Esc back")
+        return None
+
+
 def _locate_downloaded_video(torrent_name: str) -> str | None:
     """Best-effort: find an already-downloaded video file for this torrent.
 
@@ -389,8 +401,10 @@ def _browse_results(provider, results, note: str = "") -> str:
     """
     while True:
         clear_screen()
+        from torrent_finder.bookmarks import save_results
         choice = interactive_select(results, note=note, initial_order=provider.result_sort,
-                                    search_summary=provider.filter_summary())
+                                    search_summary=provider.filter_summary(),
+                                    on_bookmark=lambda rows: save_results(provider, rows))
         if choice is None:
             return "back"
 
@@ -884,6 +898,7 @@ def _main_loop(args=None) -> None:
     # In-progress query preserved across a Tab quick-action excursion, so popping
     # into Filters/Stats/Tips and back doesn't lose what was typed.
     pending_query = ""
+    refresh_bookmark = None
 
     # When set, the next provider selection re-opens this group's submenu (so
     # backing out of a group child returns to its source list, not the top list).
@@ -1066,6 +1081,46 @@ def _main_loop(args=None) -> None:
                         update_msg = ""
                     elif action == "filter":
                         filter_menu(provider)
+                    elif action == "save_search":
+                        from torrent_finder.bookmarks import save_search
+                        value = typed.strip() or get_query_with_shortcut("Bookmark search: ")
+                        if isinstance(value, str) and value and value != "GO_BACK":
+                            if _saved_data_action(lambda: save_search(provider, value)):
+                                notice_msg = "[success]Search bookmarked. Tab → Bookmarks to run it later.[/success]"
+                    elif action == "bookmarks":
+                        from torrent_finder.ui.bookmarks import bookmark_menu
+                        from torrent_finder.bookmarks import search_provider
+                        chosen = _saved_data_action(bookmark_menu)
+                        if chosen:
+                            operation, entry = chosen
+                            if operation == "compare":
+                                from torrent_finder.providers.combined_provider import CombinedProvider
+                                saved_provider = CombinedProvider(get_provider("all").templates)
+                                saved_provider.filter_summary = lambda: "Saved bookmarks; metadata may be stale"
+                                rows = [dict(e["result"], fetched_at=e["fetched_at"]) for e in entry]
+                                browse_results(saved_provider, rows)
+                                continue
+                            saved_provider = _saved_data_action(lambda: search_provider(entry))
+                            if saved_provider is None:
+                                continue
+                            if operation == "open" and entry["kind"] == "result":
+                                row = dict(entry["result"], fetched_at=entry["fetched_at"])
+                                browse_results(saved_provider, [row], note="Saved listing; current availability is unverified. i: metadata details")
+                            else:
+                                current_provider = saved_provider
+                                query = entry["queries"]
+                                refresh_bookmark = entry["id"] if operation == "refresh" else None
+                                break
+                    elif action == "backup":
+                        from torrent_finder.ui.backup import backup_menu
+                        if backup_menu():
+                            from torrent_finder.state import reload_state
+                            reload_state(PROVIDERS)
+                            from torrent_finder.search_profiles import ProfileLibrary
+                            combined_provider = get_provider("all")
+                            combined_provider.use_profile(ProfileLibrary.load().current)
+                            current_provider = get_provider(provider.slug)
+                            provider = current_provider
                     elif action == "history":
                         from torrent_finder.ui.history import history_select_prompt
                         pick = history_select_prompt()
@@ -1182,6 +1237,7 @@ def _main_loop(args=None) -> None:
             stop_listener.set()
 
         if cancel_event.is_set():
+            refresh_bookmark = None
             notice_msg = "[warning] Search cancelled — returning to the prompt.[/warning]\n"
             clear_screen()
             query = None
@@ -1190,6 +1246,11 @@ def _main_loop(args=None) -> None:
         raw_results = search_result.get("results")
         notices = list(getattr(raw_results, "notices", ()))
         results = raw_results or []
+        provider.last_queries = queries
+        if refresh_bookmark is not None:
+            from torrent_finder.bookmarks import refresh
+            _saved_data_action(lambda: refresh(refresh_bookmark, results))
+            refresh_bookmark = None
         if not results:
             from rich.markup import escape
             message = search_result.get("error") or "\n".join(["No results found.", *notices])

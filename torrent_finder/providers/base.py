@@ -169,6 +169,8 @@ class BaseProvider(ABC):
     search_note: str = ""
     
     def __init__(self):
+        from torrent_finder.name_rules import NameRules
+        self.name_rules = NameRules()
         self.active_presets: list[FilterPreset] = []
         self.preferred_presets: list[FilterPreset] = []
         self.result_sort = "relevance"
@@ -402,7 +404,7 @@ class BaseProvider(ABC):
 
         Split out from ``_search_nyaa`` so one provider can register multiple
         Nyaa engines on different categories (e.g. Manga's English-translated
-        ``3_1`` + Raw ``3_2``).
+        ``3_1`` + Raw ``3_3``).
         """
         results: list[SearchResult] = []
         try:
@@ -559,6 +561,12 @@ class BaseProvider(ABC):
         return self._filter_search_results(merged, query, cli_filters, result_filter)
 
     def _filter_search_results(self, merged, query, cli_filters, result_filter):
+        from datetime import datetime, timezone
+        fetched = datetime.now(timezone.utc).isoformat()
+        merged = [SearchResult.from_mapping(dict(row)) for row in merged]
+        for row in merged:
+            row.setdefault("fetched_at", row.get("apibay_cached_at") or fetched)
+        merged = [row for row in merged if self.name_rules.matches(row.get("name", ""))]
         # Apply filters
         # 1. Default provider filters
         if self.default_filters:
@@ -612,6 +620,10 @@ class BaseProvider(ABC):
 
     def filter_summary(self) -> str:
         parts = []
+        if self.name_rules.summary():
+            parts.append("Names: " + self.name_rules.summary())
+        if getattr(self, "nyaa_categories", None):
+            parts.append("Nyaa: " + self.nyaa_categories[self.nyaa_category])
         if self.active_presets:
             parts.append("Require: " + ", ".join(p.name for p in self.active_presets))
         if self.preferred_presets:

@@ -41,7 +41,10 @@ class PreferenceTests(unittest.TestCase):
 
     def test_unavailable_preference_retains_every_result(self):
         self.provider.preferred_presets = [preset(self.provider, "4K")]
-        self.assertEqual(self.provider.search("Example"), self.rows)
+        found = self.provider.search("Example")
+        self.assertTrue(all(row.get("fetched_at") for row in found))
+        self.assertEqual([{k: v for k, v in row.items() if k != "fetched_at"} for row in found],
+                         [dict(row) for row in self.rows])
         self.provider.active_presets = [preset(self.provider, "4K")]
         self.assertEqual(self.provider.search("Example"), [])
 
@@ -92,7 +95,7 @@ class PreferenceTests(unittest.TestCase):
         self.provider.result_sort = "newest"
         restored = AnimeProvider()
         apply_provider_state(restored, provider_snapshot(self.provider))
-        self.assertEqual(restored.filter_summary(), "Require: 1080p; Prefer: Batch")
+        self.assertIn("Require: 1080p; Prefer: Batch", restored.filter_summary())
         self.assertEqual(restored.result_sort, "newest")
 
     def test_preferred_search_terms_and_required_engines_are_bounded_and_not_persisted(self):

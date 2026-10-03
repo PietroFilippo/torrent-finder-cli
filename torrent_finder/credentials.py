@@ -201,6 +201,29 @@ def opensubtitles_config() -> dict | None:
     return cfg
 
 
+def export_file_values() -> dict:
+    """Explicit local transfer: saved file values only, never environment secrets."""
+    with _lock:
+        _migrate_legacy_file()
+        data = _read_credentials(_CRED_FILE) if _CRED_FILE.exists() else {}
+        return {env: data[key] for env, key in _FILE_KEYS.items() if key in data}
+
+
+def import_file_values(values: dict, *, replace=False) -> None:
+    """One atomic credential-file transaction; environment overrides still win."""
+    global _file_cache, _file_problem
+    if (not isinstance(values, dict) or set(values) - set(_FILE_KEYS)
+            or any(not isinstance(value, str) for value in values.values())):
+        raise ValueError("Invalid credential backup")
+    with _lock:
+        _migrate_legacy_file()
+        current = _read_credentials(_CRED_FILE) if _CRED_FILE.exists() else {}
+        data = {} if replace else current
+        data.update({_file_key(key): value for key, value in values.items()})
+        _write_file(data)
+        _file_cache, _file_problem = None, ""
+
+
 def addic7ed_config() -> dict | None:
     """Provider config for subliminal's ``addic7ed`` provider (TV series).
 

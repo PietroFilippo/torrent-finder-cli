@@ -380,6 +380,69 @@ torrent.bat            # Windows
 
 > `torrent-finder` is canonical and `torrent` is the built-in short form. From the startup screen, **Terminal command** can also install `tf`, `find-torrent`, or `tfind` as your preferred quick command.
 
+### Result details, bookmarks, and portable settings
+
+These features are available on the source branch, ahead of the next release.
+
+In the result table, press **i** to expand the highlighted release. Use **[** and
+**]** to scroll its full name and metadata, then **i** to return to the same
+selection and position. Available listing metadata takes priority; filename
+hints are labelled separately and do not verify audio/subtitle tracks.
+
+Press **b** to bookmark checked results, or the highlighted result when nothing
+is checked. At the search prompt, **Tab → Bookmarks / download later** lets you
+reopen their normal acquisition flow, compare saved results in one table,
+refresh a listing with its original search settings, or remove entries.
+**Tab → Bookmark current search** saves the typed query and its provider/profile
+settings. Bookmarks survive restarts. They retain direct-download and unresolved
+source handles; saving a bookmark does not download or resolve anything.
+The list shows when metadata was fetched. Refresh keeps the old entry if the
+same listing is not returned; saved metadata does not establish availability.
+
+Use **Tab → Settings backup / import** to transfer a local JSON file between
+computers. Normal exports contain provider choices, named profiles, download
+folder and stream-output preferences. History is optional. Credentials,
+bookmarks, usage statistics and machine-specific launcher/update state are
+excluded. Choose a new export filename; existing files are never overwritten.
+
+Import validates the file and shows a preview before **Apply import**.
+**Merge** retains other entries; incoming provider preferences win conflicts,
+profiles match by name, and the current active profile stays selected.
+**Replace** replaces portable preferences and provider choices. Both modes keep
+bookmarks, statistics and machine settings. History changes only if the backup
+includes it. Check an imported download folder exists on the destination.
+Malformed input or a failed write leaves existing settings intact.
+
+Credential transfer has separate, explicitly labelled export/import actions.
+Its plaintext file contains saved credential-file values, never environment
+variables. Environment overrides still take precedence after import.
+
+### Literal name rules and Nyaa language categories
+
+Under **Ctrl+F → Literal release-name rules**, enter **All words**, **Any word**,
+an **Exact phrase**, or **Exclude words**. Rules match returned release names
+only, with consistent case, accent and punctuation normalization. Words match
+whole tokens; a phrase requires consecutive tokens. All populated rules apply
+together, and exclusions win. For example, All `Saki`, Any `720p 1080p`, Exclude
+`sample` keeps either resolution without matching `sample` releases. Clear a
+field to disable that rule. Apply the editor, then save the outer settings menu.
+Combined profiles also have shared literal rules, alongside the existing phrase
+filters and each provider's own rules. These controls do not perform genre/topic
+discovery or send Boolean operators to external search engines.
+
+Anime's filter menu includes **Nyaa category**: English-translated (the default),
+Non-English-translated, Raw, or all Anime. This applies to Nyaa only; other
+enabled engines cannot enforce that language scope. Manga keeps separate **Nyaa
+(EN)** and **Nyaa (Raw)** switches and adds **Nyaa (Non-English)**. Raw literature
+uses Nyaa category `3_3`; `3_2` is non-English-translated literature.
+These choices persist independently in solo settings and named profiles.
+
+Anime also offers separate **PT-BR audio tags** and **PT-BR subtitle tags**
+presets. Require excludes names without the relevant explicit evidence; Prefer
+ranks matches. Generic Portuguese and PT-PT do not establish PT-BR. Pick the
+appropriate source category separately; a non-English category includes many
+languages and is not a guarantee of Brazilian Portuguese coverage.
+
 ### Search across providers
 
 Available on the source branch; not included in v0.6.0 packages or binaries.
