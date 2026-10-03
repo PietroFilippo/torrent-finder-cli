@@ -36,9 +36,15 @@ class _Catalog(HTMLParser):
         self.in_cell = False
         self.name = self.info_hash = self.url = ""
         self.uploaded_at = 0
+        self.has_more = False
+        self.is_catalog = False
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if tag == "table" and "torrent-list" in attrs.get("class", ""):
+            self.is_catalog = True
+        if tag == "a" and "p=" in attrs.get("href", "") and attrs.get("rel") == "next":
+            self.has_more = True
         if tag == "tr":
             self.cells = []
             self.name = self.info_hash = self.url = ""
@@ -85,5 +91,27 @@ def popular(query: str, category: str) -> list[SearchResult]:
         parser = _Catalog()
         parser.feed(response.text)
         return parser.rows
-    except (requests.RequestException, ValueError):
+    except (requests.RequestException, ValueError) as error:
+        from torrent_finder.search_diagnostics import record_failure
+        record_failure(error)
         return []
+
+
+def search_page(query: str, category: str, page: int):
+    """Fetch one chronological catalog page; RSS is a separate first request."""
+    from torrent_finder.search_session import PageRows
+    from torrent_finder.search_errors import SearchError
+    response = search_request(requests.get, "https://nyaa.si/", params={
+        "q": query, "c": category, "p": page, "s": "id", "o": "desc",
+    }, timeout=10)
+    response.raise_for_status()
+    parser = _Catalog()
+    parser.feed(response.text)
+    if not parser.is_catalog and "No results found" not in response.text:
+        raise SearchError("Nyaa returned an unrecognized catalog page.")
+    # The site uses a next-page anchor, including when rel=next is absent.
+    from urllib.parse import parse_qs, urlparse
+    links = re.findall(r'href=[\"\']([^\"\']+)[\"\']', response.text)
+    from html import unescape
+    more = any(parse_qs(urlparse(unescape(link)).query).get("p") == [str(page + 1)] for link in links)
+    return PageRows(parser.rows, has_more=more)

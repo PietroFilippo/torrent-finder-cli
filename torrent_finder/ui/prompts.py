@@ -480,6 +480,7 @@ def quick_actions_menu(update_available: bool = False) -> "str | None":
         items.append(SelectItem(label="⬆ Install update", value="update", is_action=True, hint="U"))
     base = [
         ("🔍 Filters & engines", "filter", "F"),
+        ("Alternate-title search", "titles", "A"),
         ("🕑 Search history", "history", "H"),
         ("Bookmarks / download later", "bookmarks", "B"),
         ("Bookmark current search", "save_search", "L"),
@@ -1676,6 +1677,8 @@ def _provider_source_menu(provider, facets=None) -> "str | object | None":
             description="Type a query and search the enabled engines, as usual.",
         ),
     ]
+    items.append(SelectItem(label="Alternate-title search", value="__titles__",
+                            description="Identify a work in a catalog, review its English/native/alternative names, then search them together."))
     header = "By " + " / ".join(f.label for f in facets)
     items.append(SelectItem(label=f"─── {header} ───", value="section_header", enabled=False, is_action=True))
     for f in facets:
@@ -1698,6 +1701,8 @@ def _provider_source_menu(provider, facets=None) -> "str | object | None":
     val = items[idx].value
     if val == "__search__":
         return "search"
+    if val == "__titles__":
+        return "titles"
     if isinstance(val, tuple) and val and val[0] == "facet":
         return val[1]
     return None  # __back__

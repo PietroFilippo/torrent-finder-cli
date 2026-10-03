@@ -48,18 +48,24 @@ CLI `--profile` and `--providers` select/override a session without changing sav
 settings. See [ADR-0013](docs/adr/0013-combined-provider-search.md) and
 [ADR-0015](docs/adr/0015-named-profiles-and-preset-preferences.md).
 
-Combined searches retain provider/category boundaries. Each selected provider
-has an independent coordinator, processing its titles sequentially; six engine
-invocations share the search's concurrency budget. `SearchControl` limits the
-combined wait to 30 seconds and scopes shorter request/retry deadlines to engine
-threads. `search_request` leaves standalone searches and downloads unchanged.
-Engines publish filtered rows as they complete, so partial results survive a
-deadline or Enter (show results now). Esc discards the search in the UI.
+Searches retain provider/category boundaries. `SearchSession` owns attempts keyed
+by provider/query group, engine, expanded query and page. One coordinator commits
+completed attempts; six engine invocations share its request budget. Initial
+tasks are interleaved across provider/query groups so one provider's extra
+engines cannot occupy the entire queue. `SearchControl` limits each initial,
+retry or pagination action to 30 seconds and scopes shorter request deadlines
+to engine threads. `search_request` leaves calls outside search sessions and
+downloads unchanged. Partial results survive a deadline or Enter (show results
+now). Esc discards an initial search; stopping a retry/page action retains
+received rows. Late workers cannot mutate a completed action.
 Progress reports providers finished, distinct results ready, and pending names.
 Shared rules run before per-provider hash deduplication through `result_filter`;
 they match names only. Search errors become notices alongside partial results.
 History's optional `search_profile` snapshots reproduce combined settings.
-Creator facets stay on concrete providers.
+Creator facets stay on concrete providers. Keyword, creator and alternate-title
+flows share the session executor. `SearchResults` is a list with notices and a
+session reference (`CombinedResults` remains a compatibility alias). The result
+table can show an empty list while keeping diagnostics and retry available.
 See [ADR-0014](docs/adr/0014-bounded-combined-search.md) for the latency correction
 to ADR-0013's original coordinator scheduling.
 
@@ -86,7 +92,25 @@ and [ADR-0010](docs/adr/0010-knaben-and-explicit-engine-modes.md).
 Knaben is the default Auto engine for public-tracker providers. Each provider
 maps to Knaben's normalized categories; the adapter makes one bounded request,
 asks the service to hide unsafe/XXX rows, accepts only valid info hashes, and
-keeps the originating tracker as result provenance.
+keeps the originating tracker as result provenance. `SearchEngine.page_fn` and
+`initial_page` opt into deeper retrieval. Nyaa's RSS covers catalog page 1;
+subsequent requests use chronological catalog pages. Knaben pages by 50 source
+hits, before adapter filtering. `PageRows.has_more` drives exhaustion. Sessions
+retain failed page cursors for targeted retry and cap each click at 24 pages,
+with ten pages per source/query. Other engines explicitly report deeper
+retrieval unavailable. UI refresh maps cursor and checkboxes by result identity,
+then reapplies the current refinement and ordering.
+
+`search_diagnostics.py` scopes request evidence to each engine worker through a
+context variable. Transport errors swallowed by legacy adapters still appear
+as search failures. Diagnostics distinguish results, empty/filtered responses,
+missing or rejected login, other login errors, source errors, timeouts, skipped
+Auto engines and Off engines. Counts describe normalized rows before dedup and
+first exclusion at each ordered filter stage. A response with rows plus failed
+requests remains retryable; earlier rows are retained. Generic errors never
+include request URLs, headers or credential values. Credential configuration
+status is labelled separately from verification, using the existing registry.
+See [ADR-0017](docs/adr/0017-resumable-search-and-title-identification.md).
 
 ## Result
 
@@ -185,12 +209,26 @@ with one popular-catalog page when RSS contains no exact title, optionally
 excluding dominant unrelated title prefixes. Original RSS rows are retained.
 FitGirl and Online-Fix require query words in their parsed title.
 
-## Resolver (creator search)
+## Resolver (creator and title search)
 
 The resolver layer (`resolvers/`) translates a person/company name into works
-to search for (AniList today; TMDB/IGDB/Jikan planned). A provider opts in by
+to search for (AniList, TMDB, IGDB, Jikan, Open Library and keyless fallbacks). A provider opts in by
 declaring `creator_facets` (e.g. anime director/studio). Facet key + creator
 name persist in history as `kind="creator"` entries.
+
+`resolvers/titles.py` identifies individual works using AniList (Anime/Manga),
+TMDB (Movies/Series), IGDB (Games), or Open Library (Books). `TitleMatch` pairs a
+catalog-local ID with the existing `Work` contract. Year, format, author/platform
+hints and ID keep same-name works selectable separately. One selected work's
+extra names are fetched on demand; lookup errors are distinct from no matches.
+The UI offers applicable catalogs for the selected providers, retains explicit
+credential requirements, and permits manual names for every provider. Users
+review at most six chosen aliases before release search; catalogs are capped
+at three user-requested pages. Unicode/whitespace/case normalization removes
+duplicate names without inventing translations. The chosen query list persists
+in keyword history's optional `queries` field and survives settings transfer;
+ordinary keyword entries with the same display title remain distinct. Creator
+fan-out also bounds aliases per Work to six and preserves their title provenance.
 
 ## Store
 

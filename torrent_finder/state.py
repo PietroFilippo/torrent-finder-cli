@@ -184,6 +184,7 @@ def add_history_entry(
     facet: str | None = None,
     name: str | None = None,
     search_profile: dict | None = None,
+    queries: list[str] | None = None,
 ) -> None:
     """Record a search, newest on top, deduplicated.
 
@@ -210,7 +211,8 @@ def add_history_entry(
             e for e in history
             if not (e.get("kind", "keyword") == "keyword"
                     and e.get("query", "").lower() == query.lower()
-                    and e.get("provider") == provider_name)
+                    and e.get("provider") == provider_name
+                    and e.get("queries") == queries)
         ]
 
     entry = {
@@ -226,6 +228,8 @@ def add_history_entry(
     if search_profile is not None:
         from copy import deepcopy
         entry["search_profile"] = deepcopy(search_profile)
+    if queries:
+        entry["queries"] = list(queries)
     history.insert(0, entry)
     save_history(history)
 

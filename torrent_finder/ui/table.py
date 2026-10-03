@@ -122,9 +122,8 @@ def _table_caption(
         caption.append("i close • [/] scroll details • b bookmark • Esc back", style="dim")
         return caption
     if console.size.width < 52:
-        caption.append("↑/↓ move • Space pick • a all • c clear\nEnter open • i details • b save • f refine • Esc back", style="dim")
-        if total_pages > 1:
-            caption.append(" • ←/→ page", style="dim")
+        caption.append("↑/↓ move • Space pick • Enter open\ni details • b save • f refine\n", style="dim")
+        caption.append("←/→ page • Esc back" if total_pages > 1 else "Esc back • a all • c clear", style="dim")
         return caption
     if any(item.get("apibay_cached_at") for item in results):
         caption.append(
@@ -212,13 +211,21 @@ def build_table(
         f"  [bold green]✓ {len(picked)} selected[/bold green]" if picked else ""
     )
 
+    title = f"Torrent Results {scroll_info}{page_info}{selected_info}"
+    if width < 52:
+        title = f"Results {scroll_info}" if total else "No matching results"
+        if total_pages > 1:
+            title += f" • p{current_page + 1}/{total_pages}"
+        if picked:
+            title += f" • ✓{len(picked)}"
     table = Table(
-        title=f"Torrent Results {scroll_info}{page_info}{selected_info}",
+        title=title,
         title_style="bold magenta",
         border_style="bright_blue",
         header_style="bold cyan",
         show_lines=False,
         padding=(0, 1),
+        width=width if layout.mode == "minimal" else None,
         caption=_table_caption(
             results, selected_idx, layout, show_from, total_pages, picked, expanded
         ),
@@ -339,6 +346,10 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
       - ``None`` if cancelled (Esc).
     """
     view_query, view_mode, view_order = "", "contains", initial_order
+    session = getattr(results, "session", None)
+    if session is not None:
+        # Reserve one compact line for diagnostics/actions even with zero rows.
+        note = note or "Search diagnostics"
     view_indexes = result_indices(results, order=view_order)
     all_results = [results[i] for i in view_indexes]
     total_all = len(all_results)
@@ -395,6 +406,13 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                            style="dim", no_wrap=True, overflow="ellipsis")
         if feedback:
             view_status = Text(feedback, style="yellow", no_wrap=True, overflow="ellipsis")
+        if session is not None:
+            failures = sum(d.retryable for d in session.diagnostics)
+            retry_label = f"r retry ({failures})" if failures else "r retry"
+            controls = Text(f"n diagnostics • {retry_label} • m more", style="cyan", no_wrap=True, overflow="ellipsis")
+            if not results and not feedback:
+                view_status = Text("No results • n explains the search", style="yellow", no_wrap=True, overflow="ellipsis")
+            return Group(heading, view_status, controls, tbl)
         if note:
             return Group(heading, view_status, _note_preview(note), tbl)
         return Group(heading, view_status, tbl)
@@ -430,8 +448,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                 size_changed = current_size != previous_size
                 previous_size = current_size
                 cur = current
-                if not (0 <= cur < len(page_items)):
-                    continue
+                has_current = 0 <= cur < len(page_items)
 
                 if size_changed:
                     visible_count = _visible_count(
@@ -448,8 +465,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         scroll_offset = max(0, cur - visible_count + 1)
 
                 layout = _table_layout(current_size.width, show_from, show_provider)
-                name = str(page_items[cur].get("name", ""))
-                if show_provider and not layout.provider:
+                name = str(page_items[cur].get("name", "")) if has_current else ""
+                if has_current and show_provider and not layout.provider:
                     name = f"{page_items[cur].get('provider_label', '')} · {name}"
                 tick_changed = False
                 new_tick = 0
@@ -569,6 +586,52 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         feedback = on_bookmark([results[i] for i in ids])
                     except (OSError, ValueError) as error:
                         feedback = "Bookmark not saved: " + str(error)
+                elif key.lower() in ("n", "r", "m") and session is not None:
+                    from torrent_finder.ui.search_diagnostics import diagnostics_menu, run_action
+                    from torrent_finder.providers.combined_provider import result_identity
+                    selected_id = result_identity(page_items[current]) if total else None
+                    checked_ids = {result_identity(results[i]) for i in picked}
+                    stop_event.set()
+                    ticker_thread.join(timeout=1)
+                    live.stop()
+                    try:
+                        action = diagnostics_menu(session) if key.lower() == "n" else "retry" if key.lower() == "r" else "more"
+                        if action:
+                            available = session.can_retry if action == "retry" else session.can_load_more
+                            if available:
+                                updated, error = run_action(session, action)
+                                if updated is not None:
+                                    old_count = len(results)
+                                    results[:] = updated
+                                    results.notices = updated.notices
+                                    feedback = f"{len(results) - old_count} added • {len(results)} total • n: diagnostics"
+                                if error:
+                                    feedback = error
+                            else:
+                                feedback = "No failed sources to retry" if action == "retry" else "No more pages available • n: details"
+                    except KeyboardInterrupt:
+                        pass
+                    view_indexes = result_indices(results, view_query, view_mode, view_order)
+                    all_results = [results[i] for i in view_indexes]
+                    picked = {i for i in view_indexes if result_identity(results[i]) in checked_ids}
+                    total_all = len(all_results)
+                    total_pages = max(1, math.ceil(total_all / RESULTS_PER_PAGE))
+                    position = next((i for i, row in enumerate(all_results) if result_identity(row) == selected_id), 0)
+                    current_page, current = divmod(position, RESULTS_PER_PAGE)
+                    global_offset = current_page * RESULTS_PER_PAGE
+                    page_items = page_results()
+                    total = len(page_items)
+                    show_from = len({r.get("from_work") for r in all_results if r.get("from_work")}) > 1
+                    show_provider = any(r.get("provider_slug") for r in all_results)
+                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider)
+                    scroll_offset = min(scroll_offset, max(0, total - visible_count))
+                    num_buffer = ""
+                    # These are identity-preserving changes, not a user move.
+                    prev_page, prev_current = current_page, current
+                    live.start()
+                    stop_event.clear()
+                    ticker_thread = threading.Thread(target=ticker, daemon=True)
+                    ticker_thread.start()
                 elif key in ("n", "N") and note:
                     stop_event.set()
                     ticker_thread.join(timeout=1)

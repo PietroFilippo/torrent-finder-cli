@@ -311,7 +311,9 @@ def _render(
             tmp.print(banner)
             tmp.print()
     tmp.print(panel)
-    content = buf.getvalue()
+    # A final newline scrolls a frame that exactly fills the viewport, hiding
+    # its heading in short terminals. The next redraw already homes the cursor.
+    content = buf.getvalue().rstrip("\n")
 
     # Home + clear entire screen + write content. The 2J clear avoids
     # ghost borders when a prior render overflowed and scrolled the

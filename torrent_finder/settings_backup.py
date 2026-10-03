@@ -85,7 +85,11 @@ def validate_payload(data):
         if not isinstance(data["history"], list):
             raise ValueError("Invalid history")
         for entry in data["history"]:
-            _object(entry, {"query", "provider", "timestamp", "presets", "kind", "facet", "name", "search_profile"})
+            _object(entry, {"query", "provider", "timestamp", "presets", "kind", "facet", "name", "search_profile", "queries"})
+            if "queries" in entry:
+                queries = entry["queries"]
+                if not isinstance(queries, list) or not 1 <= len(queries) <= 6 or any(not isinstance(q, str) or not q.strip() for q in queries):
+                    raise ValueError("Invalid alternate-title history queries")
             for key in ("query", "provider", "timestamp"):
                 if not isinstance(entry.get(key), str):
                     raise ValueError("Invalid history entry")

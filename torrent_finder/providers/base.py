@@ -1,9 +1,7 @@
 """Abstract base class for torrent search providers."""
 
 from abc import ABC, abstractmethod
-from contextlib import nullcontext
 
-import concurrent.futures
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -19,6 +17,7 @@ from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
 from torrent_finder.search_result import SearchResult, normalize_result
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_control import search_request
+from torrent_finder.search_diagnostics import record_failure
 from torrent_finder.result_view import title_score
 
 
@@ -38,7 +37,6 @@ _APIBAY_NUMBER_WORDS = {
 # One search already costs engines x retries; query expansion multiplies that.
 # Keep both bounded so a preset stack stays polite to the indexers.
 _MAX_QUERY_EXPANSIONS = 4
-_MAX_SEARCH_WORKERS = 12
 
 _APIBAY_FALLBACK_IGNORED = {
     "a",
@@ -95,6 +93,8 @@ class SearchEngine:
     enabled: bool = True
     emergency_fallback: bool = False
     explicitly_disabled: bool = False
+    page_fn: Callable | None = None
+    initial_page: int = 0
 
     @property
     def available_modes(self) -> tuple[str, ...]:
@@ -175,9 +175,18 @@ class BaseProvider(ABC):
         self.preferred_presets: list[FilterPreset] = []
         self.result_sort = "relevance"
         self.engines: list[SearchEngine] = self._init_engines()
-        self.search_slots = None
-        self.cancel_event = None
-        self.search_control = None
+        from functools import partial
+        for engine in self.engines:
+            method = getattr(engine.search_fn, "__name__", "")
+            if method == "_search_knaben":
+                engine.page_fn = lambda query, page: knaben.search(query, self.knaben_categories, page=page)
+                engine.initial_page = 1
+            elif method in {"_search_nyaa", "_search_nyaa_raw", "_search_nyaa_other"}:
+                # Read the category at call time: profiles can change it later.
+                engine.page_fn = partial(self._nyaa_page, method=method)
+                # The RSS feed already covers the latest 75 uploads (catalog
+                # page 1). Deeper retrieval starts at page 2 in the same order.
+                engine.initial_page = 1
 
     def _init_engines(self) -> list[SearchEngine]:
         """Define available search engines. Override in subclasses to customize."""
@@ -261,13 +270,15 @@ class BaseProvider(ABC):
                     )
                     response.raise_for_status()
                     data = response.json()
-                except (requests.RequestException, ValueError):
+                except (requests.RequestException, ValueError) as error:
+                    record_failure(error)
                     # Do not mark a failed encoding as tried. For a one-word
                     # query, the second encoder then provides one transport
                     # retry even though its query string is identical.
                     continue
                 tried.add(params)
                 if not isinstance(data, list):
+                    record_failure(message="APIBay returned an invalid results list.")
                     continue
                 answered = True
                 rows = [item for item in data if isinstance(item, dict)]
@@ -373,13 +384,18 @@ class BaseProvider(ABC):
                     source="SolidTorrents",
                     page_url=f"https://solidtorrents.to/torrents/t/{rid}" if rid else "",
                 ))
-        except Exception:
-            pass
+        except Exception as error:
+            record_failure(error)
         return results
 
     def _search_knaben(self, query: str) -> list[SearchResult]:
         """Search Knaben using this provider's category mapping."""
         return knaben.search(query, self.knaben_categories)
+
+    def _nyaa_page(self, query, page, *, method="_search_nyaa"):
+        from torrent_finder import nyaa
+        category = {"_search_nyaa_raw": "3_3", "_search_nyaa_other": "3_2"}.get(method, self.nyaa_category)
+        return nyaa.search_page(query, category, page)
 
     def _parse_nyaa_size(self, size_str: str) -> int:
         """Parse a Nyaa size string (e.g. '1.5 GiB') into bytes."""
@@ -407,6 +423,7 @@ class BaseProvider(ABC):
         ``3_1`` + Raw ``3_3``).
         """
         results: list[SearchResult] = []
+        rss_more = True  # unknown until a successful feed response
         try:
             response = search_request(requests.get,
                 "https://nyaa.si/",
@@ -416,6 +433,8 @@ class BaseProvider(ABC):
             response.raise_for_status()
 
             root = ET.fromstring(response.text)
+            if root.tag != "rss":
+                record_failure(message="Nyaa returned an unrecognized RSS response.")
             nyaa_ns = "{https://nyaa.si/xmlns/nyaa}"
 
             for item in root.findall(".//item"):
@@ -441,8 +460,9 @@ class BaseProvider(ABC):
                         page_url=guid.text if guid is not None and guid.text else "",
                         uploaded_at=item.findtext("pubDate", ""),
                     ))
-        except Exception:
-            pass
+            rss_more = len(results) >= 75
+        except Exception as error:
+            record_failure(error)
         # RSS is fixed to the latest 75 uploads and ignores sort parameters.
         # A short title like Saki can be buried by a current unrelated series.
         if self.prefer_title_matches and 0 < len(query.split()) <= 2 and not any(
@@ -450,7 +470,8 @@ class BaseProvider(ABC):
         ):
             from torrent_finder.nyaa import discovery_query, popular
             results.extend(popular(discovery_query(query, results), category))
-        return results
+        from torrent_finder.search_session import PageRows
+        return PageRows(results, has_more=rss_more)
 
     def expand_queries(self, query: str) -> list[str]:
         """Return the query spellings a search should fan out over.
@@ -486,79 +507,36 @@ class BaseProvider(ABC):
         result_filter: Callable[[SearchResult], bool] | None = None,
         on_results: Callable[[list[SearchResult]], None] | None = None,
     ) -> list[SearchResult]:
-        """Search enabled engines, then safe emergency engines if all are empty."""
-        merged: list[SearchResult] = []
+        """Search with per-engine diagnostics and a resumable result session."""
+        from torrent_finder.search_session import SearchSession
+        results = SearchSession([self], [query], cli_filters, result_filter=result_filter).run(
+            on_results=on_results)
+        # Preserve the public single-search login-error contract. Interactive
+        # searches use search_many and retain a diagnostics screen when empty.
+        if not results:
+            for diagnostic in results.session.diagnostics:
+                if diagnostic.status in {"missing_login", "rejected_login", "login_error"}:
+                    raise SearchError(diagnostic.message)
+        return results
 
-        queries = self.expand_queries(query)
-        # A preset may need an engine the user left Off — e.g. the Portuguese
-        # filter needs the aggregators that actually index Brazilian releases.
-        # This is per-search only; saved engine modes are untouched.
-        active_engines = self.effective_engines
-
-        def run_engines(engines: list[SearchEngine]) -> None:
-            def run_one(engine, engine_query):
-                if self.search_control is not None:
-                    return self.search_control.run_engine(
-                        self.slug, engine.name, lambda: engine.search_fn(engine_query), self.search_slots,
-                    )
-                with self.search_slots if self.search_slots is not None else nullcontext():
-                    if self.cancel_event is not None and self.cancel_event.is_set():
-                        return []
-                    return engine.search_fn(engine_query)
-
-            tasks = [
-                (engine, engine_query)
-                for engine in engines
-                for engine_query in queries
-            ]
-            executor = concurrent.futures.ThreadPoolExecutor(
-                max_workers=min(len(tasks), _MAX_SEARCH_WORKERS)
-            )
-            try:
-                pending = {
-                    executor.submit(run_one, engine, engine_query)
-                    for engine, engine_query in tasks
-                }
-                while pending:
-                    done, pending = concurrent.futures.wait(pending, timeout=0.05,
-                                                           return_when=concurrent.futures.FIRST_COMPLETED)
-                    for future in done:
-                        try:
-                            for raw_item in future.result():
-                                item = normalize_result(raw_item)
-                                if item.info_hash:
-                                    merged.append(item)
-                        except SearchError:
-                            raise
-                        except Exception:
-                            pass
-                    if done and on_results is not None:
-                        on_results(self._filter_search_results(merged, query, cli_filters, result_filter))
-                    if self.search_control is not None and self.search_control.stopped():
-                        break
-            finally:
-                stopped = self.search_control is not None and self.search_control.stopped()
-                executor.shutdown(wait=not stopped, cancel_futures=True)
-
-        if active_engines:
-            run_engines(active_engines)
-
-        if not merged and not (self.search_control is not None and self.search_control.stopped()):
-            # A preset may already have forced an Auto engine to run above;
-            # don't ask it the same questions twice.
-            already_run = {engine.name for engine in active_engines}
-            emergency_engines = [
-                engine
-                for engine in self.engines
-                if (
-                    engine.mode == "auto"
-                    and engine.name not in already_run
-                )
-            ]
-            if emergency_engines:
-                run_engines(emergency_engines)
-
-        return self._filter_search_results(merged, query, cli_filters, result_filter)
+    def filter_with_reasons(self, rows, cli_filters=None, result_filter=None):
+        """Apply ordered filtering stages; counts describe first exclusion only."""
+        stages = [("Name rules", lambda values: [r for r in values if self.name_rules.matches(r.name)])]
+        if self.default_filters:
+            stages.append(("Provider defaults", lambda values: apply_filters(values, self.default_filters)))
+        for preset in self.active_presets:
+            stages.append(("Require " + preset.name, lambda values, p=preset: apply_filters(values, p.config)))
+        if cli_filters:
+            stages.append(("CLI filters", lambda values: apply_filters(values, cli_filters)))
+        if result_filter:
+            stages.append(("Shared rules / CLI filters", lambda values: [r for r in values if result_filter(r)]))
+        removed = []
+        for name, apply in stages:
+            kept = apply(rows)
+            if len(kept) != len(rows):
+                removed.append((name, len(rows) - len(kept)))
+            rows = kept
+        return rows, removed
 
     def _filter_search_results(self, merged, query, cli_filters, result_filter):
         from datetime import datetime, timezone
@@ -566,24 +544,7 @@ class BaseProvider(ABC):
         merged = [SearchResult.from_mapping(dict(row)) for row in merged]
         for row in merged:
             row.setdefault("fetched_at", row.get("apibay_cached_at") or fetched)
-        merged = [row for row in merged if self.name_rules.matches(row.get("name", ""))]
-        # Apply filters
-        # 1. Default provider filters
-        if self.default_filters:
-            merged = apply_filters(merged, self.default_filters)
-            
-        # 2. Active preset filters
-        for preset in self.active_presets:
-            merged = apply_filters(merged, preset.config)
-
-        # 3. CLI filters
-        if cli_filters:
-            merged = apply_filters(merged, cli_filters)
-
-        # Combined searches apply shared name rules before aliases of the
-        # same torrent collapse, just like a provider's own presets.
-        if result_filter is not None:
-            merged = [item for item in merged if result_filter(item)]
+        merged, _removed = self.filter_with_reasons(merged, cli_filters, result_filter)
 
         # Prefer the best-matching alias before hash deduplication. Sorting a
         # new list also keeps engine/cache-owned lists and rows untouched.

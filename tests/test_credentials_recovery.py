@@ -89,12 +89,14 @@ class CredentialRecoveryTests(unittest.TestCase):
                 first.close.assert_called_once()
                 second.close.assert_called_once()
 
-    def test_missing_login_is_carried_into_the_next_search_screen(self):
+    def test_missing_login_is_carried_into_empty_search_diagnostics(self):
         from torrent_finder import main as app
         provider = MadokamiProvider()
         with patch.object(sys, "argv", ["torrent", "-t", "madokami", "-q", "Saki", "--skip-warning"]), \
              patch.object(app, "get_provider", return_value=provider), \
-             patch.object(provider, "search", side_effect=SearchError("Madokami: not logged in")), \
+             patch.object(madokami, "_get_session", return_value=None), \
+             patch.object(credentials, "storage_problem", return_value=""), \
+             patch.object(app, "browse_results", return_value="back") as browse, \
              patch.object(app, "advise_limited_terminal"), patch.object(app, "clear_screen"), \
              patch.object(app, "console"), patch.object(app, "start_esc_listener"), \
              patch.object(app, "check_for_update", return_value=None), \
@@ -104,7 +106,10 @@ class CredentialRecoveryTests(unittest.TestCase):
              patch.object(app, "get_query_with_shortcut", side_effect=RuntimeError("reached prompt")):
             with self.assertRaisesRegex(RuntimeError, "reached prompt"):
                 app._main_loop()
-        self.assertIn("Madokami: not logged in", renderer.call_args.kwargs["notice"])
+        results = browse.call_args.args[1]
+        self.assertEqual(results, [])
+        self.assertEqual(results.session.diagnostics[0].status, "missing_login")
+        self.assertIn("Madokami: not logged in", results.notices[0])
 
     def test_missing_madokami_login_reaches_search_caller(self):
         with patch.object(madokami, "_get_session", return_value=None), \

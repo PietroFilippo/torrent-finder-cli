@@ -680,9 +680,13 @@ def _provider_entry(provider, cli_filters) -> str:
             clear_screen()
             return "keyword"
         try:
-            creator_outcome = creator_search_flow(
-                provider, cli_filters, choice, browse_results
-            )
+            if choice == "titles":
+                from torrent_finder.ui.titles import title_search_flow
+                creator_outcome = title_search_flow(provider, cli_filters, browse_results)
+            else:
+                creator_outcome = creator_search_flow(
+                    provider, cli_filters, choice, browse_results
+                )
         except KeyboardInterrupt:
             creator_outcome = "back"
         if creator_outcome == "next":
@@ -705,7 +709,9 @@ def _history_pick(entry):
         if prov:
             facet = next((f for f in getattr(prov, "creator_facets", []) if f.key == entry.get("facet")), None)
         return prov, facet, entry.get("name", "")
-    return prov, None, entry.get("query", "")
+    aliases = entry.get("queries")
+    return prov, None, (aliases if isinstance(aliases, list) and aliases and
+                       all(isinstance(q, str) and q.strip() for q in aliases) else entry.get("query", ""))
 
 
 def _handle_whats_next(current_provider):
@@ -1081,6 +1087,18 @@ def _main_loop(args=None) -> None:
                         update_msg = ""
                     elif action == "filter":
                         filter_menu(provider)
+                    elif action == "titles":
+                        from torrent_finder.ui.titles import title_search_flow
+                        outcome = title_search_flow(provider, cli_filters, browse_results, initial=typed)
+                        if outcome == "next":
+                            res = _handle_whats_next(current_provider)
+                            if res == "EXIT":
+                                _goodbye()
+                                return
+                            query, current_provider, _hf, _hn = res
+                            if _hf:
+                                cli_facet, pending_creator_name = _hf, _hn
+                            break
                     elif action == "save_search":
                         from torrent_finder.bookmarks import save_search
                         value = typed.strip() or get_query_with_shortcut("Bookmark search: ")
@@ -1175,7 +1193,7 @@ def _main_loop(args=None) -> None:
         if not combined and getattr(provider, "search_note", ""):
             console.print(f"[dim]{provider.search_note}[/dim]")
         if not combined:
-            console.print("[dim]Press Esc to cancel and go back.[/dim]")
+            console.print("[dim]Enter: results so far | Esc: cancel | 30s search limit.[/dim]")
 
         # Run the search on a worker thread so Esc can abort the wait instead of
         # forcing the user to sit through the engine timeouts (or Ctrl+C).
@@ -1190,31 +1208,24 @@ def _main_loop(args=None) -> None:
                         cancel_event=cancel_event, finish_event=finish_event,
                         search_result=search_result, report_progress=report_progress) -> None:
             try:
-                if getattr(provider, "is_combined", False):
-                    search_result["results"] = provider.search_many(
-                        queries, cli_filters, cancel_event,
-                        finish_event=finish_event, on_progress=report_progress,
-                    )
-                elif len(queries) == 1:
-                    search_result["results"] = provider.search(queries[0], cli_filters=cli_filters)
-                else:
-                    from torrent_finder.resolvers.types import Work
-                    from torrent_finder.creator_search import fan_out
-                    search_result["results"] = fan_out(
-                        provider, [Work(title=q) for q in queries], cli_filters,
-                        cancel_event=cancel_event,
-                    )
+                from torrent_finder.search_session import search_many
+                search_result["results"] = search_many(
+                    provider, queries, cli_filters, cancel_event=cancel_event,
+                    finish_event=finish_event, on_progress=report_progress,
+                )
             except Exception as error:
                 from torrent_finder.search_errors import SearchError
                 search_result["results"] = []
                 if isinstance(error, SearchError):
                     search_result["error"] = str(error)
+                else:
+                    search_result["error"] = "Search could not be completed. Please try again."
             finally:
                 search_result["done"] = True
 
         worker = threading.Thread(target=_run_search, daemon=True)
         worker.start()
-        stop_listener = start_esc_listener(cancel_event, finish_event=finish_event) if combined else start_esc_listener(cancel_event)
+        stop_listener = start_esc_listener(cancel_event, finish_event=finish_event)
         started = time.monotonic()
         try:
             status_text = "Contacting selected providers..." if combined else f"Searching {provider.name}..."
@@ -1245,13 +1256,13 @@ def _main_loop(args=None) -> None:
 
         raw_results = search_result.get("results")
         notices = list(getattr(raw_results, "notices", ()))
-        results = raw_results or []
+        results = raw_results if raw_results is not None else []
         provider.last_queries = queries
         if refresh_bookmark is not None:
             from torrent_finder.bookmarks import refresh
             _saved_data_action(lambda: refresh(refresh_bookmark, results))
             refresh_bookmark = None
-        if not results:
+        if not results and getattr(results, "session", None) is None:
             from rich.markup import escape
             message = search_result.get("error") or "\n".join(["No results found.", *notices])
             notice_msg = f"[warning] {escape(message)}[/warning]\n"

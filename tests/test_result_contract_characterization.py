@@ -288,15 +288,17 @@ class BaseProviderSearchContractTests(unittest.TestCase):
 
 class CreatorFanOutContractTests(unittest.TestCase):
     def test_fan_out_searches_titles_and_alt_titles_dedupes_and_tags_origin(self):
-        class RecordingProvider:
-            def rank_preferences(self, rows):
-                return rows
+        class RecordingProvider(BaseProvider):
+            name = slug = "fixture"
+            icon = ""
+            categories = []
 
-            def __init__(self):
+            def _init_engines(self):
                 self.calls = []
+                return [SearchEngine("Fixture", "", self.fetch)]
 
-            def search(self, query, cli_filters=None):
-                self.calls.append((query, cli_filters))
+            def fetch(self, query):
+                self.calls.append(query)
                 rows = {
                     "Primary": [
                         {
@@ -332,7 +334,7 @@ class CreatorFanOutContractTests(unittest.TestCase):
                 return rows[query]
 
         provider = RecordingProvider()
-        cli_filters = FilterConfig(include_keywords=["x"])
+        cli_filters = FilterConfig(min_seeds=1)
         works = [
             Work(title="Primary", alt_titles=("Alt", "Primary", "")),
             Work(title="Other"),
@@ -340,8 +342,8 @@ class CreatorFanOutContractTests(unittest.TestCase):
 
         results = fan_out(provider, works, cli_filters=cli_filters, max_workers=2)
 
-        self.assertEqual({q for q, _ in provider.calls}, {"Primary", "Alt", "Other"})
-        self.assertTrue(all(filters is cli_filters for _, filters in provider.calls))
+        self.assertEqual(set(provider.calls), {"Primary", "Alt", "Other"})
+        self.assertEqual(results.session.cli_filters, cli_filters)
         self.assertTrue(all(isinstance(r, SearchResult) for r in results))
         self.assertEqual([r.info_hash for r in results], ["h3", "h2", "h1"])
         self.assertEqual([r.from_work for r in results], ["Other", "Primary", "Primary"])

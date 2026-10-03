@@ -188,7 +188,11 @@ def history_select_prompt() -> dict | None:
                 hint = f"{display}  •  {time_str}" if time_str else display
                 if presets:
                     hint += f"  •  filters: {', '.join(presets)}"
-                items.append(SelectItem(label=label, value=entry, hint=hint))
+                aliases = entry.get("queries", [])
+                if aliases:
+                    hint += f"  •  {len(aliases)} names"
+                items.append(SelectItem(label=label, value=entry, hint=hint,
+                                        description="Replays saved names; n in results lists them." if aliases else ""))
 
             items.append(SelectItem(label="🗑  Clear history", value="clear", is_action=True))
 

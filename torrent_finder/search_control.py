@@ -1,6 +1,6 @@
-"""Cooperative deadlines for combined searches, scoped to their worker threads.
+"""Cooperative deadlines for search sessions, scoped to their worker threads.
 
-Normal searches and downloads retain their own timeouts. An already-running
+Calls outside a search session retain their own timeouts. An already-running
 request cannot be forcibly killed, but no retries start after its budget expires.
 """
 
@@ -29,22 +29,28 @@ class _RequestBudget:
 
 def search_request(send, *args, **kwargs):
     """Call a requests function with the current search's remaining time."""
+    from torrent_finder.search_diagnostics import observe_request, observe_response, record_failure, record_interruption
     budget = _request_budget.get()
-    if budget is None:
-        return send(*args, **kwargs)
-    remaining = budget.deadline - time.monotonic()
-    if budget.control.stopped() or remaining <= 0:
-        raise SearchInterrupted()
-    original = kwargs.get("timeout", 6)
-    connect, read = original if isinstance(original, tuple) else (original, original)
-    kwargs["timeout"] = (
-        min(connect or 3, 3, remaining / 2),
-        min(read or 6, 6, remaining / 2),
-    )
+    if budget is not None:
+        remaining = budget.deadline - time.monotonic()
+        if budget.control.stopped() or remaining <= 0:
+            record_interruption(remaining <= 0)
+            raise SearchInterrupted()
+        original = kwargs.get("timeout", 6)
+        connect, read = original if isinstance(original, tuple) else (original, original)
+        kwargs["timeout"] = (
+            min(connect or 3, 3, remaining / 2),
+            min(read or 6, 6, remaining / 2),
+        )
     try:
-        return send(*args, **kwargs)
-    except requests.Timeout:
-        budget.timed_out = True
+        observe_request()
+        response = send(*args, **kwargs)
+        observe_response(response)
+        return response
+    except requests.RequestException as error:
+        record_failure(error)
+        if budget is not None and isinstance(error, requests.Timeout):
+            budget.timed_out = True
         raise
 
 

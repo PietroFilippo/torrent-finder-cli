@@ -556,11 +556,12 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
                 _notice(str(results))
                 stage = "works"
                 continue
-            results = results or []
-            if not results:
+            results = results if results is not None else []
+            if not results and getattr(results, "session", None) is None:
                 _notice("No torrents found for the selected title(s).")
                 stage = "works"
                 continue
+            provider.last_queries = results.session.queries if getattr(results, "session", None) else [w.title for w in picked]
             label = f"{facet.label}: {entity.name}"
             presets = [p.name for p in getattr(provider, "active_presets", [])]
             record_creator_search(provider.slug, facet.key, entity.name, presets)

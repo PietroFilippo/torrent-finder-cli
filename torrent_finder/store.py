@@ -51,6 +51,7 @@ def _history_identity(entry: dict) -> tuple:
         "keyword",
         entry.get("provider", ""),
         (entry.get("query", "") or "").lower(),
+        tuple(q.casefold() for q in entry.get("queries", []) if isinstance(q, str)),
     )
 
 

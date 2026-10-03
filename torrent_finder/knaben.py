@@ -17,7 +17,7 @@ _MAX_RESULTS = 50
 _INFO_HASH = re.compile(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})\Z")
 
 
-def search(query: str, categories: Iterable[int]) -> list[SearchResult]:
+def search(query: str, categories: Iterable[int], *, page: int = 1) -> list[SearchResult]:
     """Return safety-filtered, hash-bearing rows for a provider-scoped query."""
     normalized_query = " ".join(query.split())
     if not normalized_query:
@@ -36,7 +36,7 @@ def search(query: str, categories: Iterable[int]) -> list[SearchResult]:
         "order_by": "seeders",
         "order_direction": "desc",
         "categories": category_ids,
-        "from": 0,
+        "from": (max(1, page) - 1) * _MAX_RESULTS,
         "size": _MAX_RESULTS,
         "hide_unsafe": True,
         "hide_xxx": True,
@@ -50,11 +50,15 @@ def search(query: str, categories: Iterable[int]) -> list[SearchResult]:
         )
         response.raise_for_status()
         payload = response.json()
-    except (requests.RequestException, ValueError):
+    except (requests.RequestException, ValueError) as error:
+        from torrent_finder.search_diagnostics import record_failure
+        record_failure(error)
         return []
 
     hits = payload.get("hits") if isinstance(payload, dict) else None
     if not isinstance(hits, list):
+        from torrent_finder.search_diagnostics import record_failure
+        record_failure(message="The source response did not contain a results list.")
         return []
 
     results: list[SearchResult] = []
@@ -100,4 +104,5 @@ def search(query: str, categories: Iterable[int]) -> list[SearchResult]:
         )
         results.append(result)
 
-    return results
+    from torrent_finder.search_session import PageRows
+    return PageRows(results, has_more=len(hits) >= _MAX_RESULTS)

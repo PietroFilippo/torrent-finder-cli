@@ -4,18 +4,14 @@ Profiles contain settings, never credentials or shared provider instances.
 Each invocation gets its own provider copies, request budget and notices.
 """
 
-from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from dataclasses import dataclass, replace
 import re
-import threading
 
 from torrent_finder.filters import FilterConfig, apply_filters
 from torrent_finder.providers.base import BaseProvider
-from torrent_finder.result_view import SORT_ORDERS, title_score
+from torrent_finder.result_view import SORT_ORDERS
 from torrent_finder.search_profiles import ProfileLibrary
 from torrent_finder.search_errors import SearchError
-from torrent_finder.search_result import SearchResult
-from torrent_finder.search_control import SearchControl
 from torrent_finder.state import apply_provider_state, provider_snapshot
 
 _REQUEST_LIMIT = 6
@@ -41,10 +37,8 @@ def result_identity(row) -> tuple:
     return (row.get("source", ""), row.get("page_url") or value or row.get("name"))
 
 
-class CombinedResults(list):
-    def __init__(self, rows=(), notices=()):
-        super().__init__(rows)
-        self.notices = tuple(notices)
+# Compatibility name for callers that inspect combined notices.
+from torrent_finder.search_session import SearchResults as CombinedResults
 
 
 @dataclass(frozen=True)
@@ -166,28 +160,17 @@ class CombinedProvider(BaseProvider):
         return self.search_many([query], cli_filters)
 
     def search_many(self, queries, cli_filters=None, cancel_event=None, *, finish_event=None,
-                    on_progress=None, timeout=None):
-        # Snapshot before starting threads: changing a menu after cancellation
-        # cannot alter an old request that is still finishing.
+                    on_progress=None, timeout=None, work_titles=None):
+        from torrent_finder.search_session import SearchSession
         session = CombinedProvider(self.templates)
         session.restore(self.snapshot())
-        queries = list(dict.fromkeys(q.strip() for q in queries if q.strip()))
         providers = [p for p in session.children if p.slug in session.selected_slugs]
         if not providers:
             raise SearchError("No providers selected. Press Ctrl+F to choose at least one.")
-        if not queries:
-            return CombinedResults()
-        control = SearchControl(SEARCH_SECONDS if timeout is None else timeout, cancel_event, finish_event)
-        slots = threading.BoundedSemaphore(_REQUEST_LIMIT)
-        for provider in providers:
-            provider.search_slots, provider.cancel_event = slots, control.cancel
-            provider.search_control = control
 
         def matches_shared_rules(row):
             if not session.name_rules.matches(row.name):
                 return False
-            # Name rules must not match source labels. Seed requirements only
-            # apply where swarm statistics exist, never to direct downloads.
             for config in (session.shared_filters, cli_filters):
                 if config is None:
                     continue
@@ -196,101 +179,10 @@ class CombinedProvider(BaseProvider):
                     return False
             return True
 
-        batches, notices = {}, {}
-        finished = set()
-        lock = threading.Lock()
-        accepting = True
-
-        def publish():
-            if on_progress is None:
-                return
-            with lock:
-                if not accepting:
-                    return
-                keys = {result_identity(row) for rows in batches.values() for row in rows}
-                progress = SearchProgress(len(finished), len(providers), len(keys),
-                                          tuple(provider_label(p) for i, p in enumerate(providers) if i not in finished))
-                # Serialize callbacks so an older count cannot replace a newer one.
-                on_progress(progress)
-
-        def update_batch(i, j, rows):
-            with lock:
-                if not accepting:
-                    return
-                batches[i, j] = rows
-            publish()
-
-        def search_provider(i, provider):
-            # One coordinator per provider prevents slow early entries from
-            # blocking unrelated providers. Engine calls still share six slots.
-            for j, query in enumerate(queries):
-                if control.stopped():
-                    return
-                try:
-                    rows = provider.search(query, result_filter=matches_shared_rules,
-                                           on_results=lambda rows, j=j: update_batch(i, j, rows))
-                    update_batch(i, j, rows)
-                except SearchError as error:
-                    with lock:
-                        if accepting:
-                            notices[i] = str(error)
-                    break
-                except Exception:
-                    with lock:
-                        if accepting:
-                            notices[i] = f"{provider_label(provider)} could not be searched. Try again later."
-                    break
-            if not control.stopped():
-                with lock:
-                    if accepting:
-                        finished.add(i)
-                publish()
-
-        publish()
-        executor = ThreadPoolExecutor(max_workers=len(providers))
-        pending = {executor.submit(search_provider, i, provider) for i, provider in enumerate(providers)}
-        try:
-            while pending and not control.stopped():
-                _, pending = wait(pending, timeout=0.05, return_when=FIRST_COMPLETED)
-        finally:
-            executor.shutdown(wait=False, cancel_futures=True)
-            with lock:
-                accepting = False
-                batches = dict(batches)
-                notices = dict(notices)
-                incomplete = [i for i in range(len(providers)) if i not in finished]
-
-        messages = [notices[i] for i in sorted(notices)]
-        labels = {p.slug: provider_label(p) for p in providers}
-        messages.extend(f"{labels[slug]}: {engine} timed out; results may be incomplete."
-                        for slug, engine in sorted(control.timeouts()))
-        for i in incomplete:
-            reason = "Stopped waiting" if control.finish.is_set() else "Search time limit reached"
-            messages.append(f"{provider_label(providers[i])}: {reason.lower()}; showing results received so far. Search this provider separately to try again.")
-
-        merged = {}
-        for (i, j), rows in sorted(batches.items()):
-            provider, query = providers[i], queries[j]
-            for raw in rows:
-                row = SearchResult.from_mapping(dict(raw))
-                key = result_identity(row)
-                if key in merged:
-                    existing = merged[key]
-                    for field, value in (("matched_providers", provider.slug), ("matched_queries", query)):
-                        if value not in existing[field]:
-                            existing[field].append(value)
-                    continue
-                row["provider_slug"] = provider.slug
-                row["provider_label"] = provider_label(provider)
-                row["matched_providers"] = [provider.slug]
-                row["matched_queries"] = [query]
-                row["preference_score"] = provider.preference_score(row)
-                if len(queries) > 1:
-                    row["from_work"] = query
-                merged[key] = row
-        # Preserve each provider's ordering among equally relevant rows. This
-        # keeps direct downloads useful even without swarm statistics.
-        ordered = sorted(merged.values(), key=lambda r: (
-            max(title_score(r.name, q) for q in queries), r.get("preference_score", 0)
-        ), reverse=True)
-        return CombinedResults(ordered, messages)
+        return SearchSession(providers, queries, combined=True, result_filter=matches_shared_rules,
+                             workers=_REQUEST_LIMIT, work_titles=work_titles,
+                             shared_summary="Shared: " + session.name_rules.summary() +
+                             f"; include {session.shared_filters.include_keywords}; exclude {session.shared_filters.exclude_keywords}"
+                             + (f"; CLI {cli_filters}" if cli_filters else "")).run(
+            cancel_event=cancel_event, finish_event=finish_event, on_progress=on_progress,
+            timeout=SEARCH_SECONDS if timeout is None else timeout)
