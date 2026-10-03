@@ -1,0 +1,5149 @@
+{
+  "schema": 1,
+  "created": "2026-10-03",
+  "baseline": "v0.7.0",
+  "rationale": "32 queries per provider: 24 stratified titles/products/artists, 7 variants, 1 synthetic negative. Fixed purposive sample, not a random catalog sample. Years on software/mobile rows identify the audit's intended era, not a claimed first-release date. Title matching is a candidate proxy, not ground truth or recall.",
+  "cases": [
+    {
+      "query": "The Matrix",
+      "intended": "The Matrix",
+      "aliases": [
+        "The Matrix"
+      ],
+      "year": 1999,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Reloaded",
+        "Revolutions",
+        "Resurrections"
+      ],
+      "id": "movies-01",
+      "provider": "movies"
+    },
+    {
+      "query": "Finding Nemo",
+      "intended": "Finding Nemo",
+      "aliases": [
+        "Finding Nemo",
+        "Procurando Nemo"
+      ],
+      "year": 2003,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-02",
+      "provider": "movies"
+    },
+    {
+      "query": "Inception",
+      "intended": "Inception",
+      "aliases": [
+        "Inception"
+      ],
+      "year": 2010,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-03",
+      "provider": "movies"
+    },
+    {
+      "query": "Dune",
+      "intended": "Dune",
+      "aliases": [
+        "Dune"
+      ],
+      "year": 2021,
+      "scenario": "ambiguous",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Part Two",
+        "Part 2",
+        "Messiah",
+        "Children of Dune",
+        "Heretics",
+        "Chapterhouse"
+      ],
+      "id": "movies-04",
+      "provider": "movies"
+    },
+    {
+      "query": "Dune Part Two",
+      "intended": "Dune Part Two",
+      "aliases": [
+        "Dune Part Two"
+      ],
+      "year": 2024,
+      "scenario": "sequel",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-05",
+      "provider": "movies"
+    },
+    {
+      "query": "Parasite",
+      "intended": "Parasite",
+      "aliases": [
+        "Parasite"
+      ],
+      "year": 2019,
+      "scenario": "non_english",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-06",
+      "provider": "movies"
+    },
+    {
+      "query": "Seven Samurai",
+      "intended": "Seven Samurai",
+      "aliases": [
+        "Seven Samurai"
+      ],
+      "year": 1954,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-07",
+      "provider": "movies"
+    },
+    {
+      "query": "Metropolis",
+      "intended": "Metropolis",
+      "aliases": [
+        "Metropolis"
+      ],
+      "year": 1927,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-08",
+      "provider": "movies"
+    },
+    {
+      "query": "Stalker",
+      "intended": "Stalker",
+      "aliases": [
+        "Stalker"
+      ],
+      "year": 1979,
+      "scenario": "non_english",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-09",
+      "provider": "movies"
+    },
+    {
+      "query": "Coherence",
+      "intended": "Coherence",
+      "aliases": [
+        "Coherence"
+      ],
+      "year": 2013,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-10",
+      "provider": "movies"
+    },
+    {
+      "query": "Primer",
+      "intended": "Primer",
+      "aliases": [
+        "Primer"
+      ],
+      "year": 2004,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-11",
+      "provider": "movies"
+    },
+    {
+      "query": "The Fall",
+      "intended": "The Fall",
+      "aliases": [
+        "The Fall"
+      ],
+      "year": 2006,
+      "scenario": "ambiguous",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-12",
+      "provider": "movies"
+    },
+    {
+      "query": "Tokyo Story",
+      "intended": "Tokyo Story",
+      "aliases": [
+        "Tokyo Story"
+      ],
+      "year": 1953,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-13",
+      "provider": "movies"
+    },
+    {
+      "query": "City of God",
+      "intended": "City of God",
+      "aliases": [
+        "City of God",
+        "Cidade de Deus"
+      ],
+      "year": 2002,
+      "scenario": "pt_br",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-14",
+      "provider": "movies"
+    },
+    {
+      "query": "Central Station",
+      "intended": "Central Station",
+      "aliases": [
+        "Central Station",
+        "Central do Brasil"
+      ],
+      "year": 1998,
+      "scenario": "pt_br",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-15",
+      "provider": "movies"
+    },
+    {
+      "query": "Tropa de Elite",
+      "intended": "Tropa de Elite",
+      "aliases": [
+        "Tropa de Elite"
+      ],
+      "year": 2007,
+      "scenario": "pt_br",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-16",
+      "provider": "movies"
+    },
+    {
+      "query": "O Auto da Compadecida",
+      "intended": "O Auto da Compadecida",
+      "aliases": [
+        "O Auto da Compadecida"
+      ],
+      "year": 2000,
+      "scenario": "pt_br",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-17",
+      "provider": "movies"
+    },
+    {
+      "query": "Spirited Away",
+      "intended": "Spirited Away",
+      "aliases": [
+        "Spirited Away",
+        "Sen to Chihiro",
+        "千と千尋の神隠し"
+      ],
+      "year": 2001,
+      "scenario": "cross_category",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-18",
+      "provider": "movies"
+    },
+    {
+      "query": "Godzilla Minus One",
+      "intended": "Godzilla Minus One",
+      "aliases": [
+        "Godzilla Minus One"
+      ],
+      "year": 2023,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-19",
+      "provider": "movies"
+    },
+    {
+      "query": "Poor Things",
+      "intended": "Poor Things",
+      "aliases": [
+        "Poor Things"
+      ],
+      "year": 2023,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-20",
+      "provider": "movies"
+    },
+    {
+      "query": "Shogun",
+      "intended": "Shogun",
+      "aliases": [
+        "Shogun"
+      ],
+      "year": 2024,
+      "scenario": "series",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-21",
+      "provider": "movies"
+    },
+    {
+      "query": "Dark",
+      "intended": "Dark",
+      "aliases": [
+        "Dark"
+      ],
+      "year": 2017,
+      "scenario": "series",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-22",
+      "provider": "movies"
+    },
+    {
+      "query": "Severance",
+      "intended": "Severance",
+      "aliases": [
+        "Severance"
+      ],
+      "year": 2022,
+      "scenario": "series",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-23",
+      "provider": "movies"
+    },
+    {
+      "query": "The Last of Us",
+      "intended": "The Last of Us",
+      "aliases": [
+        "The Last of Us"
+      ],
+      "year": 2023,
+      "scenario": "series",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-24",
+      "provider": "movies"
+    },
+    {
+      "query": "FINDING NEMO",
+      "intended": "Finding Nemo",
+      "aliases": [
+        "Finding Nemo",
+        "Procurando Nemo"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-25",
+      "provider": "movies"
+    },
+    {
+      "query": "Procurando Nemo",
+      "intended": "Finding Nemo",
+      "aliases": [
+        "Finding Nemo",
+        "Procurando Nemo"
+      ],
+      "year": null,
+      "scenario": "pt_br_alias",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-26",
+      "provider": "movies"
+    },
+    {
+      "query": "Cidade de Deus",
+      "intended": "City of God",
+      "aliases": [
+        "City of God",
+        "Cidade de Deus"
+      ],
+      "year": null,
+      "scenario": "native_alias",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-27",
+      "provider": "movies"
+    },
+    {
+      "query": "千と千尋の神隠し",
+      "intended": "Spirited Away",
+      "aliases": [
+        "Spirited Away",
+        "千と千尋の神隠し",
+        "Sen to Chihiro"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-28",
+      "provider": "movies"
+    },
+    {
+      "query": "Dune Part 2",
+      "intended": "Dune Part Two",
+      "aliases": [
+        "Dune Part Two",
+        "Dune Part 2"
+      ],
+      "year": null,
+      "scenario": "numeric_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-29",
+      "provider": "movies"
+    },
+    {
+      "query": "Finding Nemo 1080p",
+      "intended": "Finding Nemo",
+      "aliases": [
+        "Finding Nemo",
+        "Procurando Nemo"
+      ],
+      "year": null,
+      "scenario": "resolution",
+      "variant_tokens": "1080p",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-30",
+      "provider": "movies"
+    },
+    {
+      "query": "Finding Nemo pt-br",
+      "intended": "Finding Nemo",
+      "aliases": [
+        "Finding Nemo",
+        "Procurando Nemo"
+      ],
+      "year": null,
+      "scenario": "language_tags",
+      "variant_tokens": "pt br",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "movies-31",
+      "provider": "movies"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "movies-32",
+      "provider": "movies"
+    },
+    {
+      "query": "Cyberpunk 2077",
+      "intended": "Cyberpunk 2077",
+      "aliases": [
+        "Cyberpunk 2077"
+      ],
+      "year": 2020,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-01",
+      "provider": "games"
+    },
+    {
+      "query": "Elden Ring",
+      "intended": "Elden Ring",
+      "aliases": [
+        "Elden Ring"
+      ],
+      "year": 2022,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-02",
+      "provider": "games"
+    },
+    {
+      "query": "Baldur's Gate 3",
+      "intended": "Baldur's Gate 3",
+      "aliases": [
+        "Baldur's Gate 3"
+      ],
+      "year": 2023,
+      "scenario": "punctuation",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-03",
+      "provider": "games"
+    },
+    {
+      "query": "Hogwarts Legacy",
+      "intended": "Hogwarts Legacy",
+      "aliases": [
+        "Hogwarts Legacy"
+      ],
+      "year": 2023,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-04",
+      "provider": "games"
+    },
+    {
+      "query": "Starfield",
+      "intended": "Starfield",
+      "aliases": [
+        "Starfield"
+      ],
+      "year": 2023,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-05",
+      "provider": "games"
+    },
+    {
+      "query": "Hades",
+      "intended": "Hades",
+      "aliases": [
+        "Hades"
+      ],
+      "year": 2020,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-06",
+      "provider": "games"
+    },
+    {
+      "query": "Hollow Knight",
+      "intended": "Hollow Knight",
+      "aliases": [
+        "Hollow Knight"
+      ],
+      "year": 2017,
+      "scenario": "indie",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-07",
+      "provider": "games"
+    },
+    {
+      "query": "Stardew Valley",
+      "intended": "Stardew Valley",
+      "aliases": [
+        "Stardew Valley"
+      ],
+      "year": 2016,
+      "scenario": "indie",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-08",
+      "provider": "games"
+    },
+    {
+      "query": "Terraria",
+      "intended": "Terraria",
+      "aliases": [
+        "Terraria"
+      ],
+      "year": 2011,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-09",
+      "provider": "games"
+    },
+    {
+      "query": "Valheim",
+      "intended": "Valheim",
+      "aliases": [
+        "Valheim"
+      ],
+      "year": 2021,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-10",
+      "provider": "games"
+    },
+    {
+      "query": "Palworld",
+      "intended": "Palworld",
+      "aliases": [
+        "Palworld"
+      ],
+      "year": 2024,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-11",
+      "provider": "games"
+    },
+    {
+      "query": "Lethal Company",
+      "intended": "Lethal Company",
+      "aliases": [
+        "Lethal Company"
+      ],
+      "year": 2023,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-12",
+      "provider": "games"
+    },
+    {
+      "query": "It Takes Two",
+      "intended": "It Takes Two",
+      "aliases": [
+        "It Takes Two"
+      ],
+      "year": 2021,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-13",
+      "provider": "games"
+    },
+    {
+      "query": "Portal 2",
+      "intended": "Portal 2",
+      "aliases": [
+        "Portal 2"
+      ],
+      "year": 2011,
+      "scenario": "sequel",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-14",
+      "provider": "games"
+    },
+    {
+      "query": "Half-Life",
+      "intended": "Half-Life",
+      "aliases": [
+        "Half-Life"
+      ],
+      "year": 1998,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-15",
+      "provider": "games"
+    },
+    {
+      "query": "Deus Ex",
+      "intended": "Deus Ex",
+      "aliases": [
+        "Deus Ex"
+      ],
+      "year": 2000,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-16",
+      "provider": "games"
+    },
+    {
+      "query": "System Shock 2",
+      "intended": "System Shock 2",
+      "aliases": [
+        "System Shock 2"
+      ],
+      "year": 1999,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-17",
+      "provider": "games"
+    },
+    {
+      "query": "Planescape Torment",
+      "intended": "Planescape Torment",
+      "aliases": [
+        "Planescape Torment"
+      ],
+      "year": 1999,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-18",
+      "provider": "games"
+    },
+    {
+      "query": "Disco Elysium",
+      "intended": "Disco Elysium",
+      "aliases": [
+        "Disco Elysium"
+      ],
+      "year": 2019,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-19",
+      "provider": "games"
+    },
+    {
+      "query": "Outer Wilds",
+      "intended": "Outer Wilds",
+      "aliases": [
+        "Outer Wilds"
+      ],
+      "year": 2019,
+      "scenario": "near_match",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-20",
+      "provider": "games"
+    },
+    {
+      "query": "The Outer Worlds",
+      "intended": "The Outer Worlds",
+      "aliases": [
+        "The Outer Worlds"
+      ],
+      "year": 2019,
+      "scenario": "near_match",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-21",
+      "provider": "games"
+    },
+    {
+      "query": "Sea of Stars",
+      "intended": "Sea of Stars",
+      "aliases": [
+        "Sea of Stars"
+      ],
+      "year": 2023,
+      "scenario": "indie",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-22",
+      "provider": "games"
+    },
+    {
+      "query": "Prince of Persia The Lost Crown",
+      "intended": "Prince of Persia The Lost Crown",
+      "aliases": [
+        "Prince of Persia The Lost Crown"
+      ],
+      "year": 2024,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-23",
+      "provider": "games"
+    },
+    {
+      "query": "Dragon's Dogma 2",
+      "intended": "Dragon's Dogma 2",
+      "aliases": [
+        "Dragon's Dogma 2"
+      ],
+      "year": 2024,
+      "scenario": "sequel",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-24",
+      "provider": "games"
+    },
+    {
+      "query": "CYBERPUNK 2077",
+      "intended": "Cyberpunk 2077",
+      "aliases": [
+        "Cyberpunk 2077"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-25",
+      "provider": "games"
+    },
+    {
+      "query": "Baldurs Gate 3",
+      "intended": "Baldur's Gate 3",
+      "aliases": [
+        "Baldur's Gate 3",
+        "Baldurs Gate 3"
+      ],
+      "year": null,
+      "scenario": "punctuation_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-26",
+      "provider": "games"
+    },
+    {
+      "query": "バルダーズ・ゲート3",
+      "intended": "Baldur's Gate 3",
+      "aliases": [
+        "Baldur's Gate 3",
+        "バルダーズ・ゲート3"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-27",
+      "provider": "games"
+    },
+    {
+      "query": "The Witcher 3 Wild Hunt",
+      "intended": "The Witcher 3",
+      "aliases": [
+        "The Witcher 3"
+      ],
+      "year": null,
+      "scenario": "subtitle",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-28",
+      "provider": "games"
+    },
+    {
+      "query": "Cyberpunk 2077 fitgirl",
+      "intended": "Cyberpunk 2077",
+      "aliases": [
+        "Cyberpunk 2077"
+      ],
+      "year": null,
+      "scenario": "repack",
+      "variant_tokens": "fitgirl",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-29",
+      "provider": "games"
+    },
+    {
+      "query": "Stardew Valley linux",
+      "intended": "Stardew Valley",
+      "aliases": [
+        "Stardew Valley"
+      ],
+      "year": null,
+      "scenario": "platform",
+      "variant_tokens": "linux",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-30",
+      "provider": "games"
+    },
+    {
+      "query": "Portal Two",
+      "intended": "Portal 2",
+      "aliases": [
+        "Portal 2",
+        "Portal Two"
+      ],
+      "year": null,
+      "scenario": "numeric_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "games-31",
+      "provider": "games"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "games-32",
+      "provider": "games"
+    },
+    {
+      "query": "Lethal Company",
+      "intended": "Lethal Company",
+      "aliases": [
+        "Lethal Company"
+      ],
+      "year": 2023,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-01",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Palworld",
+      "intended": "Palworld",
+      "aliases": [
+        "Palworld"
+      ],
+      "year": 2024,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-02",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Valheim",
+      "intended": "Valheim",
+      "aliases": [
+        "Valheim"
+      ],
+      "year": 2021,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-03",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Phasmophobia",
+      "intended": "Phasmophobia",
+      "aliases": [
+        "Phasmophobia"
+      ],
+      "year": 2020,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-04",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Stardew Valley",
+      "intended": "Stardew Valley",
+      "aliases": [
+        "Stardew Valley"
+      ],
+      "year": 2016,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-05",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Terraria",
+      "intended": "Terraria",
+      "aliases": [
+        "Terraria"
+      ],
+      "year": 2011,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-06",
+      "provider": "online-fix"
+    },
+    {
+      "query": "It Takes Two",
+      "intended": "It Takes Two",
+      "aliases": [
+        "It Takes Two"
+      ],
+      "year": 2021,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-07",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Portal 2",
+      "intended": "Portal 2",
+      "aliases": [
+        "Portal 2"
+      ],
+      "year": 2011,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-08",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Left 4 Dead 2",
+      "intended": "Left 4 Dead 2",
+      "aliases": [
+        "Left 4 Dead 2"
+      ],
+      "year": 2009,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-09",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Don't Starve Together",
+      "intended": "Don't Starve Together",
+      "aliases": [
+        "Don't Starve Together"
+      ],
+      "year": 2016,
+      "scenario": "punctuation",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-10",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Deep Rock Galactic",
+      "intended": "Deep Rock Galactic",
+      "aliases": [
+        "Deep Rock Galactic"
+      ],
+      "year": 2020,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-11",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Risk of Rain 2",
+      "intended": "Risk of Rain 2",
+      "aliases": [
+        "Risk of Rain 2"
+      ],
+      "year": 2020,
+      "scenario": "sequel",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-12",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Raft",
+      "intended": "Raft",
+      "aliases": [
+        "Raft"
+      ],
+      "year": 2022,
+      "scenario": "survival",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-13",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Grounded",
+      "intended": "Grounded",
+      "aliases": [
+        "Grounded"
+      ],
+      "year": 2022,
+      "scenario": "survival",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-14",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Sons of the Forest",
+      "intended": "Sons of the Forest",
+      "aliases": [
+        "Sons of the Forest"
+      ],
+      "year": 2023,
+      "scenario": "survival",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-15",
+      "provider": "online-fix"
+    },
+    {
+      "query": "The Forest",
+      "intended": "The Forest",
+      "aliases": [
+        "The Forest"
+      ],
+      "year": 2018,
+      "scenario": "near_match",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Sons of the Forest"
+      ],
+      "id": "online-fix-16",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Escape the Backrooms",
+      "intended": "Escape the Backrooms",
+      "aliases": [
+        "Escape the Backrooms"
+      ],
+      "year": 2022,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-17",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Content Warning",
+      "intended": "Content Warning",
+      "aliases": [
+        "Content Warning"
+      ],
+      "year": 2024,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-18",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Enshrouded",
+      "intended": "Enshrouded",
+      "aliases": [
+        "Enshrouded"
+      ],
+      "year": 2024,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-19",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Abiotic Factor",
+      "intended": "Abiotic Factor",
+      "aliases": [
+        "Abiotic Factor"
+      ],
+      "year": 2024,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-20",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Pico Park",
+      "intended": "Pico Park",
+      "aliases": [
+        "Pico Park"
+      ],
+      "year": 2021,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-21",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Overcooked 2",
+      "intended": "Overcooked 2",
+      "aliases": [
+        "Overcooked 2"
+      ],
+      "year": 2018,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-22",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Human Fall Flat",
+      "intended": "Human Fall Flat",
+      "aliases": [
+        "Human Fall Flat"
+      ],
+      "year": 2016,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-23",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Unrailed",
+      "intended": "Unrailed",
+      "aliases": [
+        "Unrailed"
+      ],
+      "year": 2019,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-24",
+      "provider": "online-fix"
+    },
+    {
+      "query": "LETHAL COMPANY",
+      "intended": "Lethal Company",
+      "aliases": [
+        "Lethal Company"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-25",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Dont Starve Together",
+      "intended": "Don't Starve Together",
+      "aliases": [
+        "Don't Starve Together",
+        "Dont Starve Together"
+      ],
+      "year": null,
+      "scenario": "punctuation_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-26",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Overcooked! 2",
+      "intended": "Overcooked 2",
+      "aliases": [
+        "Overcooked 2",
+        "Overcooked! 2"
+      ],
+      "year": null,
+      "scenario": "punctuation",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-27",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Portal Two",
+      "intended": "Portal 2",
+      "aliases": [
+        "Portal 2",
+        "Portal Two"
+      ],
+      "year": null,
+      "scenario": "numeric_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-28",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Lethal Company pt-br",
+      "intended": "Lethal Company",
+      "aliases": [
+        "Lethal Company"
+      ],
+      "year": null,
+      "scenario": "language_tags",
+      "variant_tokens": "pt br",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-29",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Valheim dedicated server",
+      "intended": "Valheim",
+      "aliases": [
+        "Valheim"
+      ],
+      "year": null,
+      "scenario": "edition",
+      "variant_tokens": "dedicated server",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-30",
+      "provider": "online-fix"
+    },
+    {
+      "query": "人类一败涂地",
+      "intended": "Human Fall Flat",
+      "aliases": [
+        "Human Fall Flat",
+        "人类一败涂地"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "online-fix-31",
+      "provider": "online-fix"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "online-fix-32",
+      "provider": "online-fix"
+    },
+    {
+      "query": "Adobe Photoshop",
+      "intended": "Adobe Photoshop",
+      "aliases": [
+        "Adobe Photoshop"
+      ],
+      "year": 2024,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-01",
+      "provider": "software"
+    },
+    {
+      "query": "Adobe Premiere Pro",
+      "intended": "Adobe Premiere Pro",
+      "aliases": [
+        "Adobe Premiere Pro"
+      ],
+      "year": 2024,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-02",
+      "provider": "software"
+    },
+    {
+      "query": "Microsoft Office",
+      "intended": "Microsoft Office",
+      "aliases": [
+        "Microsoft Office"
+      ],
+      "year": 2021,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-03",
+      "provider": "software"
+    },
+    {
+      "query": "Autodesk AutoCAD",
+      "intended": "Autodesk AutoCAD",
+      "aliases": [
+        "Autodesk AutoCAD"
+      ],
+      "year": 2024,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-04",
+      "provider": "software"
+    },
+    {
+      "query": "Blender",
+      "intended": "Blender",
+      "aliases": [
+        "Blender"
+      ],
+      "year": 2024,
+      "scenario": "open_source",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-05",
+      "provider": "software"
+    },
+    {
+      "query": "GIMP",
+      "intended": "GIMP",
+      "aliases": [
+        "GIMP"
+      ],
+      "year": 2024,
+      "scenario": "open_source",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-06",
+      "provider": "software"
+    },
+    {
+      "query": "LibreOffice",
+      "intended": "LibreOffice",
+      "aliases": [
+        "LibreOffice"
+      ],
+      "year": 2024,
+      "scenario": "open_source",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-07",
+      "provider": "software"
+    },
+    {
+      "query": "VLC",
+      "intended": "VLC",
+      "aliases": [
+        "VLC"
+      ],
+      "year": 2024,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-08",
+      "provider": "software"
+    },
+    {
+      "query": "7-Zip",
+      "intended": "7-Zip",
+      "aliases": [
+        "7-Zip"
+      ],
+      "year": 2024,
+      "scenario": "punctuation",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-09",
+      "provider": "software"
+    },
+    {
+      "query": "WinRAR",
+      "intended": "WinRAR",
+      "aliases": [
+        "WinRAR"
+      ],
+      "year": 2024,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-10",
+      "provider": "software"
+    },
+    {
+      "query": "DaVinci Resolve",
+      "intended": "DaVinci Resolve",
+      "aliases": [
+        "DaVinci Resolve"
+      ],
+      "year": 2024,
+      "scenario": "video",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-11",
+      "provider": "software"
+    },
+    {
+      "query": "Affinity Photo",
+      "intended": "Affinity Photo",
+      "aliases": [
+        "Affinity Photo"
+      ],
+      "year": 2022,
+      "scenario": "macos",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-12",
+      "provider": "software"
+    },
+    {
+      "query": "Final Cut Pro",
+      "intended": "Final Cut Pro",
+      "aliases": [
+        "Final Cut Pro"
+      ],
+      "year": 2024,
+      "scenario": "macos",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-13",
+      "provider": "software"
+    },
+    {
+      "query": "Logic Pro",
+      "intended": "Logic Pro",
+      "aliases": [
+        "Logic Pro"
+      ],
+      "year": 2024,
+      "scenario": "macos",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-14",
+      "provider": "software"
+    },
+    {
+      "query": "Ableton Live",
+      "intended": "Ableton Live",
+      "aliases": [
+        "Ableton Live"
+      ],
+      "year": 2024,
+      "scenario": "audio",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-15",
+      "provider": "software"
+    },
+    {
+      "query": "FL Studio",
+      "intended": "FL Studio",
+      "aliases": [
+        "FL Studio"
+      ],
+      "year": 2024,
+      "scenario": "audio",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-16",
+      "provider": "software"
+    },
+    {
+      "query": "REAPER",
+      "intended": "REAPER",
+      "aliases": [
+        "REAPER"
+      ],
+      "year": 2024,
+      "scenario": "audio",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-17",
+      "provider": "software"
+    },
+    {
+      "query": "MATLAB",
+      "intended": "MATLAB",
+      "aliases": [
+        "MATLAB"
+      ],
+      "year": 2024,
+      "scenario": "technical",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-18",
+      "provider": "software"
+    },
+    {
+      "query": "Wolfram Mathematica",
+      "intended": "Wolfram Mathematica",
+      "aliases": [
+        "Wolfram Mathematica"
+      ],
+      "year": 2024,
+      "scenario": "technical",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-19",
+      "provider": "software"
+    },
+    {
+      "query": "SolidWorks",
+      "intended": "SolidWorks",
+      "aliases": [
+        "SolidWorks"
+      ],
+      "year": 2024,
+      "scenario": "technical",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-20",
+      "provider": "software"
+    },
+    {
+      "query": "SketchUp",
+      "intended": "SketchUp",
+      "aliases": [
+        "SketchUp"
+      ],
+      "year": 2024,
+      "scenario": "technical",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-21",
+      "provider": "software"
+    },
+    {
+      "query": "Adobe Photoshop CS6",
+      "intended": "Adobe Photoshop CS6",
+      "aliases": [
+        "Adobe Photoshop CS6"
+      ],
+      "year": 2012,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-22",
+      "provider": "software"
+    },
+    {
+      "query": "Microsoft Office 2007",
+      "intended": "Microsoft Office 2007",
+      "aliases": [
+        "Microsoft Office 2007"
+      ],
+      "year": 2007,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-23",
+      "provider": "software"
+    },
+    {
+      "query": "Ubuntu 24.04",
+      "intended": "Ubuntu 24.04",
+      "aliases": [
+        "Ubuntu 24.04"
+      ],
+      "year": 2024,
+      "scenario": "linux",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-24",
+      "provider": "software"
+    },
+    {
+      "query": "ADOBE PHOTOSHOP",
+      "intended": "Adobe Photoshop",
+      "aliases": [
+        "Adobe Photoshop",
+        "Photoshop"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-25",
+      "provider": "software"
+    },
+    {
+      "query": "Photoshop 2024",
+      "intended": "Adobe Photoshop",
+      "aliases": [
+        "Adobe Photoshop",
+        "Photoshop"
+      ],
+      "year": null,
+      "scenario": "edition",
+      "variant_tokens": "2024",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-26",
+      "provider": "software"
+    },
+    {
+      "query": "Photoshop portable",
+      "intended": "Adobe Photoshop",
+      "aliases": [
+        "Adobe Photoshop",
+        "Photoshop"
+      ],
+      "year": null,
+      "scenario": "portable",
+      "variant_tokens": "portable",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-27",
+      "provider": "software"
+    },
+    {
+      "query": "Photoshop macOS",
+      "intended": "Adobe Photoshop",
+      "aliases": [
+        "Adobe Photoshop",
+        "Photoshop"
+      ],
+      "year": null,
+      "scenario": "platform",
+      "variant_tokens": "macos",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-28",
+      "provider": "software"
+    },
+    {
+      "query": "Office português",
+      "intended": "Microsoft Office",
+      "aliases": [
+        "Microsoft Office",
+        "Office"
+      ],
+      "year": null,
+      "scenario": "pt_br",
+      "variant_tokens": "portugues",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-29",
+      "provider": "software"
+    },
+    {
+      "query": "Фотошоп",
+      "intended": "Photoshop",
+      "aliases": [
+        "Photoshop",
+        "Фотошоп"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-30",
+      "provider": "software"
+    },
+    {
+      "query": "7 zip",
+      "intended": "7 Zip",
+      "aliases": [
+        "7 Zip",
+        "7-Zip"
+      ],
+      "year": null,
+      "scenario": "punctuation_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "software-31",
+      "provider": "software"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "software-32",
+      "provider": "software"
+    },
+    {
+      "query": "Minecraft",
+      "intended": "Minecraft",
+      "aliases": [
+        "Minecraft"
+      ],
+      "year": 2024,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-01",
+      "provider": "mobile"
+    },
+    {
+      "query": "Stardew Valley",
+      "intended": "Stardew Valley",
+      "aliases": [
+        "Stardew Valley"
+      ],
+      "year": 2019,
+      "scenario": "game",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-02",
+      "provider": "mobile"
+    },
+    {
+      "query": "Terraria",
+      "intended": "Terraria",
+      "aliases": [
+        "Terraria"
+      ],
+      "year": 2013,
+      "scenario": "game",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-03",
+      "provider": "mobile"
+    },
+    {
+      "query": "Dead Cells",
+      "intended": "Dead Cells",
+      "aliases": [
+        "Dead Cells"
+      ],
+      "year": 2020,
+      "scenario": "game",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-04",
+      "provider": "mobile"
+    },
+    {
+      "query": "Slay the Spire",
+      "intended": "Slay the Spire",
+      "aliases": [
+        "Slay the Spire"
+      ],
+      "year": 2021,
+      "scenario": "game",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-05",
+      "provider": "mobile"
+    },
+    {
+      "query": "Monument Valley",
+      "intended": "Monument Valley",
+      "aliases": [
+        "Monument Valley"
+      ],
+      "year": 2014,
+      "scenario": "game",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Monument Valley 2"
+      ],
+      "id": "mobile-06",
+      "provider": "mobile"
+    },
+    {
+      "query": "Monument Valley 2",
+      "intended": "Monument Valley 2",
+      "aliases": [
+        "Monument Valley 2"
+      ],
+      "year": 2017,
+      "scenario": "sequel",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-07",
+      "provider": "mobile"
+    },
+    {
+      "query": "Geometry Dash",
+      "intended": "Geometry Dash",
+      "aliases": [
+        "Geometry Dash"
+      ],
+      "year": 2013,
+      "scenario": "game",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-08",
+      "provider": "mobile"
+    },
+    {
+      "query": "Plants vs Zombies",
+      "intended": "Plants vs Zombies",
+      "aliases": [
+        "Plants vs Zombies"
+      ],
+      "year": 2011,
+      "scenario": "game",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-09",
+      "provider": "mobile"
+    },
+    {
+      "query": "Mini Metro",
+      "intended": "Mini Metro",
+      "aliases": [
+        "Mini Metro"
+      ],
+      "year": 2016,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-10",
+      "provider": "mobile"
+    },
+    {
+      "query": "Bloons TD 6",
+      "intended": "Bloons TD 6",
+      "aliases": [
+        "Bloons TD 6"
+      ],
+      "year": 2018,
+      "scenario": "game",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-11",
+      "provider": "mobile"
+    },
+    {
+      "query": "Vampire Survivors",
+      "intended": "Vampire Survivors",
+      "aliases": [
+        "Vampire Survivors"
+      ],
+      "year": 2022,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-12",
+      "provider": "mobile"
+    },
+    {
+      "query": "Poweramp",
+      "intended": "Poweramp",
+      "aliases": [
+        "Poweramp"
+      ],
+      "year": 2024,
+      "scenario": "audio",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-13",
+      "provider": "mobile"
+    },
+    {
+      "query": "Tasker",
+      "intended": "Tasker",
+      "aliases": [
+        "Tasker"
+      ],
+      "year": 2024,
+      "scenario": "utility",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-14",
+      "provider": "mobile"
+    },
+    {
+      "query": "Nova Launcher",
+      "intended": "Nova Launcher",
+      "aliases": [
+        "Nova Launcher"
+      ],
+      "year": 2024,
+      "scenario": "utility",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-15",
+      "provider": "mobile"
+    },
+    {
+      "query": "Moon Reader",
+      "intended": "Moon Reader",
+      "aliases": [
+        "Moon Reader"
+      ],
+      "year": 2024,
+      "scenario": "reader",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-16",
+      "provider": "mobile"
+    },
+    {
+      "query": "Solid Explorer",
+      "intended": "Solid Explorer",
+      "aliases": [
+        "Solid Explorer"
+      ],
+      "year": 2024,
+      "scenario": "utility",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-17",
+      "provider": "mobile"
+    },
+    {
+      "query": "MX Player",
+      "intended": "MX Player",
+      "aliases": [
+        "MX Player"
+      ],
+      "year": 2024,
+      "scenario": "video",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-18",
+      "provider": "mobile"
+    },
+    {
+      "query": "VLC",
+      "intended": "VLC",
+      "aliases": [
+        "VLC"
+      ],
+      "year": 2024,
+      "scenario": "open_source",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-19",
+      "provider": "mobile"
+    },
+    {
+      "query": "OsmAnd",
+      "intended": "OsmAnd",
+      "aliases": [
+        "OsmAnd"
+      ],
+      "year": 2024,
+      "scenario": "open_source",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-20",
+      "provider": "mobile"
+    },
+    {
+      "query": "Organic Maps",
+      "intended": "Organic Maps",
+      "aliases": [
+        "Organic Maps"
+      ],
+      "year": 2024,
+      "scenario": "open_source",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-21",
+      "provider": "mobile"
+    },
+    {
+      "query": "K-9 Mail",
+      "intended": "K-9 Mail",
+      "aliases": [
+        "K-9 Mail"
+      ],
+      "year": 2024,
+      "scenario": "open_source",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-22",
+      "provider": "mobile"
+    },
+    {
+      "query": "Signal",
+      "intended": "Signal",
+      "aliases": [
+        "Signal"
+      ],
+      "year": 2024,
+      "scenario": "open_source",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-23",
+      "provider": "mobile"
+    },
+    {
+      "query": "AnkiDroid",
+      "intended": "AnkiDroid",
+      "aliases": [
+        "AnkiDroid"
+      ],
+      "year": 2024,
+      "scenario": "open_source",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-24",
+      "provider": "mobile"
+    },
+    {
+      "query": "MINECRAFT",
+      "intended": "Minecraft",
+      "aliases": [
+        "Minecraft"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-25",
+      "provider": "mobile"
+    },
+    {
+      "query": "Minecraft apk",
+      "intended": "Minecraft",
+      "aliases": [
+        "Minecraft"
+      ],
+      "year": null,
+      "scenario": "format",
+      "variant_tokens": "apk",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-26",
+      "provider": "mobile"
+    },
+    {
+      "query": "Minecraft obb",
+      "intended": "Minecraft",
+      "aliases": [
+        "Minecraft"
+      ],
+      "year": null,
+      "scenario": "format",
+      "variant_tokens": "obb",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-27",
+      "provider": "mobile"
+    },
+    {
+      "query": "Poweramp mod",
+      "intended": "Poweramp",
+      "aliases": [
+        "Poweramp"
+      ],
+      "year": null,
+      "scenario": "edition",
+      "variant_tokens": "mod",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-28",
+      "provider": "mobile"
+    },
+    {
+      "query": "Moon+ Reader",
+      "intended": "Moon Reader",
+      "aliases": [
+        "Moon Reader",
+        "Moon+ Reader"
+      ],
+      "year": null,
+      "scenario": "punctuation_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-29",
+      "provider": "mobile"
+    },
+    {
+      "query": "Minecraft português",
+      "intended": "Minecraft",
+      "aliases": [
+        "Minecraft"
+      ],
+      "year": null,
+      "scenario": "pt_br",
+      "variant_tokens": "portugues",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-30",
+      "provider": "mobile"
+    },
+    {
+      "query": "我的世界",
+      "intended": "Minecraft",
+      "aliases": [
+        "Minecraft",
+        "我的世界"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "mobile-31",
+      "provider": "mobile"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "mobile-32",
+      "provider": "mobile"
+    },
+    {
+      "query": "Adobe Photoshop",
+      "intended": "Adobe Photoshop",
+      "aliases": [
+        "Adobe Photoshop"
+      ],
+      "year": 2024,
+      "scenario": "software",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-01",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Microsoft Office",
+      "intended": "Microsoft Office",
+      "aliases": [
+        "Microsoft Office"
+      ],
+      "year": 2021,
+      "scenario": "software",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-02",
+      "provider": "rutracker"
+    },
+    {
+      "query": "AutoCAD",
+      "intended": "AutoCAD",
+      "aliases": [
+        "AutoCAD"
+      ],
+      "year": 2024,
+      "scenario": "software",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-03",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Ableton Live",
+      "intended": "Ableton Live",
+      "aliases": [
+        "Ableton Live"
+      ],
+      "year": 2024,
+      "scenario": "software",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-04",
+      "provider": "rutracker"
+    },
+    {
+      "query": "FL Studio",
+      "intended": "FL Studio",
+      "aliases": [
+        "FL Studio"
+      ],
+      "year": 2024,
+      "scenario": "software",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-05",
+      "provider": "rutracker"
+    },
+    {
+      "query": "MATLAB",
+      "intended": "MATLAB",
+      "aliases": [
+        "MATLAB"
+      ],
+      "year": 2024,
+      "scenario": "software",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-06",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Ubuntu",
+      "intended": "Ubuntu",
+      "aliases": [
+        "Ubuntu"
+      ],
+      "year": 2024,
+      "scenario": "linux",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-07",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Blender",
+      "intended": "Blender",
+      "aliases": [
+        "Blender"
+      ],
+      "year": 2024,
+      "scenario": "open_source",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-08",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Pink Floyd",
+      "intended": "Pink Floyd",
+      "aliases": [
+        "Pink Floyd"
+      ],
+      "year": 1973,
+      "scenario": "audio",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-09",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Kind of Blue",
+      "intended": "Kind of Blue",
+      "aliases": [
+        "Kind of Blue"
+      ],
+      "year": 1959,
+      "scenario": "audio",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-10",
+      "provider": "rutracker"
+    },
+    {
+      "query": "The Dark Side of the Moon",
+      "intended": "The Dark Side of the Moon",
+      "aliases": [
+        "The Dark Side of the Moon"
+      ],
+      "year": 1973,
+      "scenario": "audio",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-11",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Beethoven",
+      "intended": "Beethoven",
+      "aliases": [
+        "Beethoven"
+      ],
+      "year": 1808,
+      "scenario": "audio",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-12",
+      "provider": "rutracker"
+    },
+    {
+      "query": "The Matrix",
+      "intended": "The Matrix",
+      "aliases": [
+        "The Matrix"
+      ],
+      "year": 1999,
+      "scenario": "movies",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Reloaded",
+        "Revolutions",
+        "Resurrections"
+      ],
+      "id": "rutracker-13",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Stalker",
+      "intended": "Stalker",
+      "aliases": [
+        "Stalker"
+      ],
+      "year": 1979,
+      "scenario": "movies",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-14",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Solaris",
+      "intended": "Solaris",
+      "aliases": [
+        "Solaris"
+      ],
+      "year": 1972,
+      "scenario": "movies",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-15",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Seven Samurai",
+      "intended": "Seven Samurai",
+      "aliases": [
+        "Seven Samurai"
+      ],
+      "year": 1954,
+      "scenario": "movies",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-16",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Saki",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": 2009,
+      "scenario": "anime",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "rutracker-17",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Monster",
+      "intended": "Monster",
+      "aliases": [
+        "Monster"
+      ],
+      "year": 2004,
+      "scenario": "anime",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-18",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Berserk",
+      "intended": "Berserk",
+      "aliases": [
+        "Berserk",
+        "ベルセルク"
+      ],
+      "year": 1989,
+      "scenario": "manga",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-19",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Dune",
+      "intended": "Dune",
+      "aliases": [
+        "Dune"
+      ],
+      "year": 1965,
+      "scenario": "books",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Part Two",
+        "Part 2",
+        "Messiah",
+        "Children of Dune",
+        "Heretics",
+        "Chapterhouse"
+      ],
+      "id": "rutracker-20",
+      "provider": "rutracker"
+    },
+    {
+      "query": "The Hobbit",
+      "intended": "The Hobbit",
+      "aliases": [
+        "The Hobbit"
+      ],
+      "year": 1937,
+      "scenario": "books",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-21",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Metamorphosis",
+      "intended": "Metamorphosis",
+      "aliases": [
+        "Metamorphosis",
+        "Die Verwandlung"
+      ],
+      "year": 1915,
+      "scenario": "books",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-22",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Planescape Torment",
+      "intended": "Planescape Torment",
+      "aliases": [
+        "Planescape Torment"
+      ],
+      "year": 1999,
+      "scenario": "games",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-23",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Disco Elysium",
+      "intended": "Disco Elysium",
+      "aliases": [
+        "Disco Elysium"
+      ],
+      "year": 2019,
+      "scenario": "games",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-24",
+      "provider": "rutracker"
+    },
+    {
+      "query": "ADOBE PHOTOSHOP",
+      "intended": "Adobe Photoshop",
+      "aliases": [
+        "Adobe Photoshop",
+        "Photoshop"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-25",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Фотошоп",
+      "intended": "Photoshop",
+      "aliases": [
+        "Photoshop",
+        "Фотошоп"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-26",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Матрица",
+      "intended": "The Matrix",
+      "aliases": [
+        "The Matrix",
+        "Матрица"
+      ],
+      "year": null,
+      "scenario": "native_alias",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Reloaded",
+        "Revolutions",
+        "Resurrections"
+      ],
+      "id": "rutracker-27",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Сталкер",
+      "intended": "Stalker",
+      "aliases": [
+        "Stalker",
+        "Сталкер"
+      ],
+      "year": null,
+      "scenario": "native_alias",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-28",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Pink Floyd FLAC",
+      "intended": "Pink Floyd",
+      "aliases": [
+        "Pink Floyd"
+      ],
+      "year": null,
+      "scenario": "format",
+      "variant_tokens": "flac",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-29",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Office 2007",
+      "intended": "Office",
+      "aliases": [
+        "Office"
+      ],
+      "year": null,
+      "scenario": "old_edition",
+      "variant_tokens": "2007",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-30",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Метаморфоза",
+      "intended": "Metamorphosis",
+      "aliases": [
+        "Metamorphosis",
+        "Метаморфоза",
+        "Превращение",
+        "Die Verwandlung"
+      ],
+      "year": null,
+      "scenario": "native_alias",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "rutracker-31",
+      "provider": "rutracker"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "rutracker-32",
+      "provider": "rutracker"
+    },
+    {
+      "query": "Saki",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": 2009,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "anime-01",
+      "provider": "anime"
+    },
+    {
+      "query": "Naruto",
+      "intended": "Naruto",
+      "aliases": [
+        "Naruto"
+      ],
+      "year": 2002,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Shippuden",
+        "Boruto"
+      ],
+      "id": "anime-02",
+      "provider": "anime"
+    },
+    {
+      "query": "One Piece",
+      "intended": "One Piece",
+      "aliases": [
+        "One Piece",
+        "ワンピース"
+      ],
+      "year": 1999,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-03",
+      "provider": "anime"
+    },
+    {
+      "query": "Attack on Titan",
+      "intended": "Attack on Titan",
+      "aliases": [
+        "Attack on Titan",
+        "Shingeki no Kyojin",
+        "進撃の巨人"
+      ],
+      "year": 2013,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-04",
+      "provider": "anime"
+    },
+    {
+      "query": "Death Note",
+      "intended": "Death Note",
+      "aliases": [
+        "Death Note",
+        "デスノート"
+      ],
+      "year": 2006,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-05",
+      "provider": "anime"
+    },
+    {
+      "query": "Frieren Beyond Journey's End",
+      "intended": "Frieren Beyond Journey's End",
+      "aliases": [
+        "Frieren Beyond Journey's End",
+        "Frieren",
+        "Sousou no Frieren",
+        "葬送のフリーレン"
+      ],
+      "year": 2023,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-06",
+      "provider": "anime"
+    },
+    {
+      "query": "Dungeon Meshi",
+      "intended": "Dungeon Meshi",
+      "aliases": [
+        "Dungeon Meshi",
+        "Delicious in Dungeon",
+        "ダンジョン飯"
+      ],
+      "year": 2024,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-07",
+      "provider": "anime"
+    },
+    {
+      "query": "Oshi no Ko",
+      "intended": "Oshi no Ko",
+      "aliases": [
+        "Oshi no Ko"
+      ],
+      "year": 2023,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-08",
+      "provider": "anime"
+    },
+    {
+      "query": "Pluto",
+      "intended": "Pluto",
+      "aliases": [
+        "Pluto"
+      ],
+      "year": 2023,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-09",
+      "provider": "anime"
+    },
+    {
+      "query": "Monster",
+      "intended": "Monster",
+      "aliases": [
+        "Monster"
+      ],
+      "year": 2004,
+      "scenario": "ambiguous",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-10",
+      "provider": "anime"
+    },
+    {
+      "query": "Mushishi",
+      "intended": "Mushishi",
+      "aliases": [
+        "Mushishi"
+      ],
+      "year": 2005,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-11",
+      "provider": "anime"
+    },
+    {
+      "query": "Haibane Renmei",
+      "intended": "Haibane Renmei",
+      "aliases": [
+        "Haibane Renmei"
+      ],
+      "year": 2002,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-12",
+      "provider": "anime"
+    },
+    {
+      "query": "Texhnolyze",
+      "intended": "Texhnolyze",
+      "aliases": [
+        "Texhnolyze"
+      ],
+      "year": 2003,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-13",
+      "provider": "anime"
+    },
+    {
+      "query": "Kaiba",
+      "intended": "Kaiba",
+      "aliases": [
+        "Kaiba"
+      ],
+      "year": 2008,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-14",
+      "provider": "anime"
+    },
+    {
+      "query": "Dennou Coil",
+      "intended": "Dennou Coil",
+      "aliases": [
+        "Dennou Coil"
+      ],
+      "year": 2007,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-15",
+      "provider": "anime"
+    },
+    {
+      "query": "Serial Experiments Lain",
+      "intended": "Serial Experiments Lain",
+      "aliases": [
+        "Serial Experiments Lain"
+      ],
+      "year": 1998,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-16",
+      "provider": "anime"
+    },
+    {
+      "query": "Revolutionary Girl Utena",
+      "intended": "Revolutionary Girl Utena",
+      "aliases": [
+        "Revolutionary Girl Utena"
+      ],
+      "year": 1997,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-17",
+      "provider": "anime"
+    },
+    {
+      "query": "Neon Genesis Evangelion",
+      "intended": "Neon Genesis Evangelion",
+      "aliases": [
+        "Neon Genesis Evangelion"
+      ],
+      "year": 1995,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-18",
+      "provider": "anime"
+    },
+    {
+      "query": "Cowboy Bebop",
+      "intended": "Cowboy Bebop",
+      "aliases": [
+        "Cowboy Bebop"
+      ],
+      "year": 1998,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-19",
+      "provider": "anime"
+    },
+    {
+      "query": "Legend of the Galactic Heroes",
+      "intended": "Legend of the Galactic Heroes",
+      "aliases": [
+        "Legend of the Galactic Heroes"
+      ],
+      "year": 1988,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-20",
+      "provider": "anime"
+    },
+    {
+      "query": "Saki Achiga-hen",
+      "intended": "Saki Achiga-hen",
+      "aliases": [
+        "Saki Achiga-hen"
+      ],
+      "year": 2012,
+      "scenario": "sequel",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-21",
+      "provider": "anime"
+    },
+    {
+      "query": "Saki Zenkoku-hen",
+      "intended": "Saki Zenkoku-hen",
+      "aliases": [
+        "Saki Zenkoku-hen"
+      ],
+      "year": 2014,
+      "scenario": "sequel",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-22",
+      "provider": "anime"
+    },
+    {
+      "query": "Akagi",
+      "intended": "Akagi",
+      "aliases": [
+        "Akagi"
+      ],
+      "year": 2005,
+      "scenario": "topic_mahjong",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-23",
+      "provider": "anime"
+    },
+    {
+      "query": "Steins Gate",
+      "intended": "Steins Gate",
+      "aliases": [
+        "Steins Gate",
+        "Steins;Gate"
+      ],
+      "year": 2011,
+      "scenario": "punctuation",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-24",
+      "provider": "anime"
+    },
+    {
+      "query": "SAKI",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "anime-25",
+      "provider": "anime"
+    },
+    {
+      "query": "咲-Saki-",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "anime-26",
+      "provider": "anime"
+    },
+    {
+      "query": "Saki 720p",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": null,
+      "scenario": "resolution",
+      "variant_tokens": "720p",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "anime-27",
+      "provider": "anime"
+    },
+    {
+      "query": "Saki batch",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": null,
+      "scenario": "batch",
+      "variant_tokens": "batch",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "anime-28",
+      "provider": "anime"
+    },
+    {
+      "query": "Saki 01",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": null,
+      "scenario": "episode",
+      "variant_tokens": "01",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "anime-29",
+      "provider": "anime"
+    },
+    {
+      "query": "Sousou no Frieren",
+      "intended": "Frieren",
+      "aliases": [
+        "Frieren",
+        "Sousou no Frieren",
+        "葬送のフリーレン"
+      ],
+      "year": null,
+      "scenario": "alternate_title",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "anime-30",
+      "provider": "anime"
+    },
+    {
+      "query": "Naruto pt-br",
+      "intended": "Naruto",
+      "aliases": [
+        "Naruto",
+        "ナルト"
+      ],
+      "year": null,
+      "scenario": "language_tags",
+      "variant_tokens": "pt br",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Shippuden",
+        "Boruto"
+      ],
+      "id": "anime-31",
+      "provider": "anime"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "anime-32",
+      "provider": "anime"
+    },
+    {
+      "query": "One Piece",
+      "intended": "One Piece",
+      "aliases": [
+        "One Piece",
+        "ワンピース"
+      ],
+      "year": 1997,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-01",
+      "provider": "manga"
+    },
+    {
+      "query": "Berserk",
+      "intended": "Berserk",
+      "aliases": [
+        "Berserk",
+        "ベルセルク"
+      ],
+      "year": 1989,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-02",
+      "provider": "manga"
+    },
+    {
+      "query": "Naruto",
+      "intended": "Naruto",
+      "aliases": [
+        "Naruto"
+      ],
+      "year": 1999,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Shippuden",
+        "Boruto"
+      ],
+      "id": "manga-03",
+      "provider": "manga"
+    },
+    {
+      "query": "Death Note",
+      "intended": "Death Note",
+      "aliases": [
+        "Death Note",
+        "デスノート"
+      ],
+      "year": 2003,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-04",
+      "provider": "manga"
+    },
+    {
+      "query": "Monster",
+      "intended": "Monster",
+      "aliases": [
+        "Monster"
+      ],
+      "year": 1994,
+      "scenario": "ambiguous",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-05",
+      "provider": "manga"
+    },
+    {
+      "query": "20th Century Boys",
+      "intended": "20th Century Boys",
+      "aliases": [
+        "20th Century Boys"
+      ],
+      "year": 1999,
+      "scenario": "numeric",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-06",
+      "provider": "manga"
+    },
+    {
+      "query": "Vagabond",
+      "intended": "Vagabond",
+      "aliases": [
+        "Vagabond"
+      ],
+      "year": 1998,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-07",
+      "provider": "manga"
+    },
+    {
+      "query": "Yotsuba",
+      "intended": "Yotsuba",
+      "aliases": [
+        "Yotsuba"
+      ],
+      "year": 2003,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-08",
+      "provider": "manga"
+    },
+    {
+      "query": "Yokohama Kaidashi Kikou",
+      "intended": "Yokohama Kaidashi Kikou",
+      "aliases": [
+        "Yokohama Kaidashi Kikou"
+      ],
+      "year": 1994,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-09",
+      "provider": "manga"
+    },
+    {
+      "query": "Yokohama Shopping Log",
+      "intended": "Yokohama Shopping Log",
+      "aliases": [
+        "Yokohama Shopping Log"
+      ],
+      "year": 1994,
+      "scenario": "alternate_title",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-10",
+      "provider": "manga"
+    },
+    {
+      "query": "Witch Hat Atelier",
+      "intended": "Witch Hat Atelier",
+      "aliases": [
+        "Witch Hat Atelier",
+        "Tongari Boushi no Atelier"
+      ],
+      "year": 2016,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-11",
+      "provider": "manga"
+    },
+    {
+      "query": "Dungeon Meshi",
+      "intended": "Dungeon Meshi",
+      "aliases": [
+        "Dungeon Meshi",
+        "Delicious in Dungeon",
+        "ダンジョン飯"
+      ],
+      "year": 2014,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-12",
+      "provider": "manga"
+    },
+    {
+      "query": "Frieren",
+      "intended": "Frieren",
+      "aliases": [
+        "Frieren"
+      ],
+      "year": 2020,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-13",
+      "provider": "manga"
+    },
+    {
+      "query": "Chainsaw Man",
+      "intended": "Chainsaw Man",
+      "aliases": [
+        "Chainsaw Man"
+      ],
+      "year": 2018,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-14",
+      "provider": "manga"
+    },
+    {
+      "query": "Dandadan",
+      "intended": "Dandadan",
+      "aliases": [
+        "Dandadan"
+      ],
+      "year": 2021,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-15",
+      "provider": "manga"
+    },
+    {
+      "query": "Sakamoto Days",
+      "intended": "Sakamoto Days",
+      "aliases": [
+        "Sakamoto Days"
+      ],
+      "year": 2020,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-16",
+      "provider": "manga"
+    },
+    {
+      "query": "Akane-banashi",
+      "intended": "Akane-banashi",
+      "aliases": [
+        "Akane-banashi"
+      ],
+      "year": 2022,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-17",
+      "provider": "manga"
+    },
+    {
+      "query": "Saki",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": 2006,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "manga-18",
+      "provider": "manga"
+    },
+    {
+      "query": "Akagi",
+      "intended": "Akagi",
+      "aliases": [
+        "Akagi"
+      ],
+      "year": 1991,
+      "scenario": "topic_mahjong",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-19",
+      "provider": "manga"
+    },
+    {
+      "query": "Hikaru no Go",
+      "intended": "Hikaru no Go",
+      "aliases": [
+        "Hikaru no Go"
+      ],
+      "year": 1998,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-20",
+      "provider": "manga"
+    },
+    {
+      "query": "Rose of Versailles",
+      "intended": "Rose of Versailles",
+      "aliases": [
+        "Rose of Versailles",
+        "Versailles no Bara"
+      ],
+      "year": 1972,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-21",
+      "provider": "manga"
+    },
+    {
+      "query": "Phoenix",
+      "intended": "Phoenix",
+      "aliases": [
+        "Phoenix"
+      ],
+      "year": 1967,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-22",
+      "provider": "manga"
+    },
+    {
+      "query": "Nausicaa of the Valley of the Wind",
+      "intended": "Nausicaa of the Valley of the Wind",
+      "aliases": [
+        "Nausicaa of the Valley of the Wind"
+      ],
+      "year": 1982,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-23",
+      "provider": "manga"
+    },
+    {
+      "query": "Otoyomegatari",
+      "intended": "Otoyomegatari",
+      "aliases": [
+        "Otoyomegatari",
+        "A Bride's Story"
+      ],
+      "year": 2008,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-24",
+      "provider": "manga"
+    },
+    {
+      "query": "BERSERK",
+      "intended": "Berserk",
+      "aliases": [
+        "Berserk",
+        "ベルセルク"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-25",
+      "provider": "manga"
+    },
+    {
+      "query": "咲-Saki-",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "manga-26",
+      "provider": "manga"
+    },
+    {
+      "query": "One Piece v01",
+      "intended": "One Piece",
+      "aliases": [
+        "One Piece",
+        "ワンピース"
+      ],
+      "year": null,
+      "scenario": "volume",
+      "variant_tokens": "v01",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-27",
+      "provider": "manga"
+    },
+    {
+      "query": "Berserk complete",
+      "intended": "Berserk",
+      "aliases": [
+        "Berserk",
+        "ベルセルク"
+      ],
+      "year": null,
+      "scenario": "batch",
+      "variant_tokens": "complete",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-28",
+      "provider": "manga"
+    },
+    {
+      "query": "Twenty First Century Boys",
+      "intended": "21st Century Boys",
+      "aliases": [
+        "21st Century Boys",
+        "Twenty First Century Boys"
+      ],
+      "year": null,
+      "scenario": "numeric_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-29",
+      "provider": "manga"
+    },
+    {
+      "query": "Berserk português",
+      "intended": "Berserk",
+      "aliases": [
+        "Berserk",
+        "ベルセルク"
+      ],
+      "year": null,
+      "scenario": "pt_br",
+      "variant_tokens": "portugues",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-30",
+      "provider": "manga"
+    },
+    {
+      "query": "ダンジョン飯",
+      "intended": "Dungeon Meshi",
+      "aliases": [
+        "Dungeon Meshi",
+        "Delicious in Dungeon",
+        "ダンジョン飯"
+      ],
+      "year": null,
+      "scenario": "native_alias",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "manga-31",
+      "provider": "manga"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "manga-32",
+      "provider": "manga"
+    },
+    {
+      "query": "Pride and Prejudice",
+      "intended": "Pride and Prejudice",
+      "aliases": [
+        "Pride and Prejudice"
+      ],
+      "year": 1813,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-01",
+      "provider": "books"
+    },
+    {
+      "query": "Frankenstein",
+      "intended": "Frankenstein",
+      "aliases": [
+        "Frankenstein"
+      ],
+      "year": 1818,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-02",
+      "provider": "books"
+    },
+    {
+      "query": "Alice in Wonderland",
+      "intended": "Alice in Wonderland",
+      "aliases": [
+        "Alice in Wonderland"
+      ],
+      "year": 1865,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-03",
+      "provider": "books"
+    },
+    {
+      "query": "Dracula",
+      "intended": "Dracula",
+      "aliases": [
+        "Dracula"
+      ],
+      "year": 1897,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-04",
+      "provider": "books"
+    },
+    {
+      "query": "Metamorphosis",
+      "intended": "Metamorphosis",
+      "aliases": [
+        "Metamorphosis",
+        "Die Verwandlung"
+      ],
+      "year": 1915,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-05",
+      "provider": "books"
+    },
+    {
+      "query": "The Hobbit",
+      "intended": "The Hobbit",
+      "aliases": [
+        "The Hobbit"
+      ],
+      "year": 1937,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-06",
+      "provider": "books"
+    },
+    {
+      "query": "Nineteen Eighty-Four",
+      "intended": "Nineteen Eighty-Four",
+      "aliases": [
+        "Nineteen Eighty-Four",
+        "1984"
+      ],
+      "year": 1949,
+      "scenario": "numeric",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-07",
+      "provider": "books"
+    },
+    {
+      "query": "Dune",
+      "intended": "Dune",
+      "aliases": [
+        "Dune"
+      ],
+      "year": 1965,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Part Two",
+        "Part 2",
+        "Messiah",
+        "Children of Dune",
+        "Heretics",
+        "Chapterhouse"
+      ],
+      "id": "books-08",
+      "provider": "books"
+    },
+    {
+      "query": "The Left Hand of Darkness",
+      "intended": "The Left Hand of Darkness",
+      "aliases": [
+        "The Left Hand of Darkness"
+      ],
+      "year": 1969,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-09",
+      "provider": "books"
+    },
+    {
+      "query": "The Dispossessed",
+      "intended": "The Dispossessed",
+      "aliases": [
+        "The Dispossessed"
+      ],
+      "year": 1974,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-10",
+      "provider": "books"
+    },
+    {
+      "query": "Neuromancer",
+      "intended": "Neuromancer",
+      "aliases": [
+        "Neuromancer"
+      ],
+      "year": 1984,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-11",
+      "provider": "books"
+    },
+    {
+      "query": "The Name of the Rose",
+      "intended": "The Name of the Rose",
+      "aliases": [
+        "The Name of the Rose"
+      ],
+      "year": 1980,
+      "scenario": "non_english",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-12",
+      "provider": "books"
+    },
+    {
+      "query": "Dom Casmurro",
+      "intended": "Dom Casmurro",
+      "aliases": [
+        "Dom Casmurro"
+      ],
+      "year": 1899,
+      "scenario": "pt_br",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-13",
+      "provider": "books"
+    },
+    {
+      "query": "Memorias Postumas de Bras Cubas",
+      "intended": "Memorias Postumas de Bras Cubas",
+      "aliases": [
+        "Memorias Postumas de Bras Cubas"
+      ],
+      "year": 1881,
+      "scenario": "pt_br",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-14",
+      "provider": "books"
+    },
+    {
+      "query": "The Three-Body Problem",
+      "intended": "The Three-Body Problem",
+      "aliases": [
+        "The Three-Body Problem",
+        "Three Body Problem",
+        "三体"
+      ],
+      "year": 2008,
+      "scenario": "non_english",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-15",
+      "provider": "books"
+    },
+    {
+      "query": "The Fifth Season",
+      "intended": "The Fifth Season",
+      "aliases": [
+        "The Fifth Season"
+      ],
+      "year": 2015,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-16",
+      "provider": "books"
+    },
+    {
+      "query": "Piranesi",
+      "intended": "Piranesi",
+      "aliases": [
+        "Piranesi"
+      ],
+      "year": 2020,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-17",
+      "provider": "books"
+    },
+    {
+      "query": "Project Hail Mary",
+      "intended": "Project Hail Mary",
+      "aliases": [
+        "Project Hail Mary"
+      ],
+      "year": 2021,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-18",
+      "provider": "books"
+    },
+    {
+      "query": "Tomorrow and Tomorrow and Tomorrow",
+      "intended": "Tomorrow and Tomorrow and Tomorrow",
+      "aliases": [
+        "Tomorrow and Tomorrow and Tomorrow"
+      ],
+      "year": 2022,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-19",
+      "provider": "books"
+    },
+    {
+      "query": "Yellowface",
+      "intended": "Yellowface",
+      "aliases": [
+        "Yellowface"
+      ],
+      "year": 2023,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-20",
+      "provider": "books"
+    },
+    {
+      "query": "The Rust Programming Language",
+      "intended": "The Rust Programming Language",
+      "aliases": [
+        "The Rust Programming Language"
+      ],
+      "year": 2023,
+      "scenario": "technical",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-21",
+      "provider": "books"
+    },
+    {
+      "query": "Designing Data-Intensive Applications",
+      "intended": "Designing Data-Intensive Applications",
+      "aliases": [
+        "Designing Data-Intensive Applications"
+      ],
+      "year": 2017,
+      "scenario": "technical",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-22",
+      "provider": "books"
+    },
+    {
+      "query": "Introduction to Algorithms",
+      "intended": "Introduction to Algorithms",
+      "aliases": [
+        "Introduction to Algorithms"
+      ],
+      "year": 2022,
+      "scenario": "edition",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-23",
+      "provider": "books"
+    },
+    {
+      "query": "Structure and Interpretation of Computer Programs",
+      "intended": "Structure and Interpretation of Computer Programs",
+      "aliases": [
+        "Structure and Interpretation of Computer Programs"
+      ],
+      "year": 1996,
+      "scenario": "technical",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-24",
+      "provider": "books"
+    },
+    {
+      "query": "PRIDE AND PREJUDICE",
+      "intended": "Pride and Prejudice",
+      "aliases": [
+        "Pride and Prejudice"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-25",
+      "provider": "books"
+    },
+    {
+      "query": "1984",
+      "intended": "1984",
+      "aliases": [
+        "1984",
+        "Nineteen Eighty Four"
+      ],
+      "year": null,
+      "scenario": "numeric_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-26",
+      "provider": "books"
+    },
+    {
+      "query": "Memórias Póstumas de Brás Cubas",
+      "intended": "Memorias Postumas de Bras Cubas",
+      "aliases": [
+        "Memorias Postumas de Bras Cubas"
+      ],
+      "year": null,
+      "scenario": "accents",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-27",
+      "provider": "books"
+    },
+    {
+      "query": "Die Verwandlung",
+      "intended": "Metamorphosis",
+      "aliases": [
+        "Metamorphosis",
+        "Die Verwandlung"
+      ],
+      "year": null,
+      "scenario": "native_alias",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-28",
+      "provider": "books"
+    },
+    {
+      "query": "Pride and Prejudice epub",
+      "intended": "Pride and Prejudice",
+      "aliases": [
+        "Pride and Prejudice"
+      ],
+      "year": null,
+      "scenario": "format",
+      "variant_tokens": "epub",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-29",
+      "provider": "books"
+    },
+    {
+      "query": "Dune audiobook",
+      "intended": "Dune",
+      "aliases": [
+        "Dune"
+      ],
+      "year": null,
+      "scenario": "format",
+      "variant_tokens": "audiobook",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Part Two",
+        "Part 2",
+        "Messiah",
+        "Children of Dune",
+        "Heretics",
+        "Chapterhouse"
+      ],
+      "id": "books-30",
+      "provider": "books"
+    },
+    {
+      "query": "三体",
+      "intended": "The Three Body Problem",
+      "aliases": [
+        "The Three Body Problem",
+        "三体"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "books-31",
+      "provider": "books"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "books-32",
+      "provider": "books"
+    },
+    {
+      "query": "Cyberpunk 2077",
+      "intended": "Cyberpunk 2077",
+      "aliases": [
+        "Cyberpunk 2077"
+      ],
+      "year": 2020,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-01",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Elden Ring",
+      "intended": "Elden Ring",
+      "aliases": [
+        "Elden Ring"
+      ],
+      "year": 2022,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-02",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Baldur's Gate 3",
+      "intended": "Baldur's Gate 3",
+      "aliases": [
+        "Baldur's Gate 3"
+      ],
+      "year": 2023,
+      "scenario": "punctuation",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-03",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Hogwarts Legacy",
+      "intended": "Hogwarts Legacy",
+      "aliases": [
+        "Hogwarts Legacy"
+      ],
+      "year": 2023,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-04",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Starfield",
+      "intended": "Starfield",
+      "aliases": [
+        "Starfield"
+      ],
+      "year": 2023,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-05",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Hades",
+      "intended": "Hades",
+      "aliases": [
+        "Hades"
+      ],
+      "year": 2020,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-06",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Hollow Knight",
+      "intended": "Hollow Knight",
+      "aliases": [
+        "Hollow Knight"
+      ],
+      "year": 2017,
+      "scenario": "indie",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-07",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Stardew Valley",
+      "intended": "Stardew Valley",
+      "aliases": [
+        "Stardew Valley"
+      ],
+      "year": 2016,
+      "scenario": "indie",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-08",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Terraria",
+      "intended": "Terraria",
+      "aliases": [
+        "Terraria"
+      ],
+      "year": 2011,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-09",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Valheim",
+      "intended": "Valheim",
+      "aliases": [
+        "Valheim"
+      ],
+      "year": 2021,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-10",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Palworld",
+      "intended": "Palworld",
+      "aliases": [
+        "Palworld"
+      ],
+      "year": 2024,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-11",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Lethal Company",
+      "intended": "Lethal Company",
+      "aliases": [
+        "Lethal Company"
+      ],
+      "year": 2023,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-12",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "It Takes Two",
+      "intended": "It Takes Two",
+      "aliases": [
+        "It Takes Two"
+      ],
+      "year": 2021,
+      "scenario": "coop",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-13",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Portal 2",
+      "intended": "Portal 2",
+      "aliases": [
+        "Portal 2"
+      ],
+      "year": 2011,
+      "scenario": "sequel",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-14",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Half-Life",
+      "intended": "Half-Life",
+      "aliases": [
+        "Half-Life"
+      ],
+      "year": 1998,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-15",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Deus Ex",
+      "intended": "Deus Ex",
+      "aliases": [
+        "Deus Ex"
+      ],
+      "year": 2000,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-16",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "System Shock 2",
+      "intended": "System Shock 2",
+      "aliases": [
+        "System Shock 2"
+      ],
+      "year": 1999,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-17",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Planescape Torment",
+      "intended": "Planescape Torment",
+      "aliases": [
+        "Planescape Torment"
+      ],
+      "year": 1999,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-18",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Disco Elysium",
+      "intended": "Disco Elysium",
+      "aliases": [
+        "Disco Elysium"
+      ],
+      "year": 2019,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-19",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Outer Wilds",
+      "intended": "Outer Wilds",
+      "aliases": [
+        "Outer Wilds"
+      ],
+      "year": 2019,
+      "scenario": "near_match",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-20",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "The Outer Worlds",
+      "intended": "The Outer Worlds",
+      "aliases": [
+        "The Outer Worlds"
+      ],
+      "year": 2019,
+      "scenario": "near_match",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-21",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Sea of Stars",
+      "intended": "Sea of Stars",
+      "aliases": [
+        "Sea of Stars"
+      ],
+      "year": 2023,
+      "scenario": "indie",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-22",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Prince of Persia The Lost Crown",
+      "intended": "Prince of Persia The Lost Crown",
+      "aliases": [
+        "Prince of Persia The Lost Crown"
+      ],
+      "year": 2024,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-23",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Dragon's Dogma 2",
+      "intended": "Dragon's Dogma 2",
+      "aliases": [
+        "Dragon's Dogma 2"
+      ],
+      "year": 2024,
+      "scenario": "sequel",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-24",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "CYBERPUNK 2077",
+      "intended": "Cyberpunk 2077",
+      "aliases": [
+        "Cyberpunk 2077"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-25",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Baldurs Gate 3",
+      "intended": "Baldur's Gate 3",
+      "aliases": [
+        "Baldur's Gate 3",
+        "Baldurs Gate 3"
+      ],
+      "year": null,
+      "scenario": "punctuation_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-26",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "バルダーズ・ゲート3",
+      "intended": "Baldur's Gate 3",
+      "aliases": [
+        "Baldur's Gate 3",
+        "バルダーズ・ゲート3"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-27",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "The Witcher 3 Wild Hunt",
+      "intended": "The Witcher 3",
+      "aliases": [
+        "The Witcher 3"
+      ],
+      "year": null,
+      "scenario": "subtitle",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-28",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Cyberpunk 2077 fitgirl",
+      "intended": "Cyberpunk 2077",
+      "aliases": [
+        "Cyberpunk 2077"
+      ],
+      "year": null,
+      "scenario": "repack",
+      "variant_tokens": "fitgirl",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-29",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Stardew Valley linux",
+      "intended": "Stardew Valley",
+      "aliases": [
+        "Stardew Valley"
+      ],
+      "year": null,
+      "scenario": "platform",
+      "variant_tokens": "linux",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-30",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "Portal Two",
+      "intended": "Portal 2",
+      "aliases": [
+        "Portal 2",
+        "Portal Two"
+      ],
+      "year": null,
+      "scenario": "numeric_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "fitgirl-31",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "fitgirl-32",
+      "provider": "fitgirl"
+    },
+    {
+      "query": "One Piece",
+      "intended": "One Piece",
+      "aliases": [
+        "One Piece",
+        "ワンピース"
+      ],
+      "year": 1997,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-01",
+      "provider": "madokami"
+    },
+    {
+      "query": "Berserk",
+      "intended": "Berserk",
+      "aliases": [
+        "Berserk",
+        "ベルセルク"
+      ],
+      "year": 1989,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-02",
+      "provider": "madokami"
+    },
+    {
+      "query": "Naruto",
+      "intended": "Naruto",
+      "aliases": [
+        "Naruto"
+      ],
+      "year": 1999,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Shippuden",
+        "Boruto"
+      ],
+      "id": "madokami-03",
+      "provider": "madokami"
+    },
+    {
+      "query": "Death Note",
+      "intended": "Death Note",
+      "aliases": [
+        "Death Note",
+        "デスノート"
+      ],
+      "year": 2003,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-04",
+      "provider": "madokami"
+    },
+    {
+      "query": "Monster",
+      "intended": "Monster",
+      "aliases": [
+        "Monster"
+      ],
+      "year": 1994,
+      "scenario": "ambiguous",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-05",
+      "provider": "madokami"
+    },
+    {
+      "query": "20th Century Boys",
+      "intended": "20th Century Boys",
+      "aliases": [
+        "20th Century Boys"
+      ],
+      "year": 1999,
+      "scenario": "numeric",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-06",
+      "provider": "madokami"
+    },
+    {
+      "query": "Vagabond",
+      "intended": "Vagabond",
+      "aliases": [
+        "Vagabond"
+      ],
+      "year": 1998,
+      "scenario": "popular",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-07",
+      "provider": "madokami"
+    },
+    {
+      "query": "Yotsuba",
+      "intended": "Yotsuba",
+      "aliases": [
+        "Yotsuba"
+      ],
+      "year": 2003,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-08",
+      "provider": "madokami"
+    },
+    {
+      "query": "Yokohama Kaidashi Kikou",
+      "intended": "Yokohama Kaidashi Kikou",
+      "aliases": [
+        "Yokohama Kaidashi Kikou"
+      ],
+      "year": 1994,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-09",
+      "provider": "madokami"
+    },
+    {
+      "query": "Yokohama Shopping Log",
+      "intended": "Yokohama Shopping Log",
+      "aliases": [
+        "Yokohama Shopping Log"
+      ],
+      "year": 1994,
+      "scenario": "alternate_title",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-10",
+      "provider": "madokami"
+    },
+    {
+      "query": "Witch Hat Atelier",
+      "intended": "Witch Hat Atelier",
+      "aliases": [
+        "Witch Hat Atelier",
+        "Tongari Boushi no Atelier"
+      ],
+      "year": 2016,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-11",
+      "provider": "madokami"
+    },
+    {
+      "query": "Dungeon Meshi",
+      "intended": "Dungeon Meshi",
+      "aliases": [
+        "Dungeon Meshi",
+        "Delicious in Dungeon",
+        "ダンジョン飯"
+      ],
+      "year": 2014,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-12",
+      "provider": "madokami"
+    },
+    {
+      "query": "Frieren",
+      "intended": "Frieren",
+      "aliases": [
+        "Frieren"
+      ],
+      "year": 2020,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-13",
+      "provider": "madokami"
+    },
+    {
+      "query": "Chainsaw Man",
+      "intended": "Chainsaw Man",
+      "aliases": [
+        "Chainsaw Man"
+      ],
+      "year": 2018,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-14",
+      "provider": "madokami"
+    },
+    {
+      "query": "Dandadan",
+      "intended": "Dandadan",
+      "aliases": [
+        "Dandadan"
+      ],
+      "year": 2021,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-15",
+      "provider": "madokami"
+    },
+    {
+      "query": "Sakamoto Days",
+      "intended": "Sakamoto Days",
+      "aliases": [
+        "Sakamoto Days"
+      ],
+      "year": 2020,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-16",
+      "provider": "madokami"
+    },
+    {
+      "query": "Akane-banashi",
+      "intended": "Akane-banashi",
+      "aliases": [
+        "Akane-banashi"
+      ],
+      "year": 2022,
+      "scenario": "recent",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-17",
+      "provider": "madokami"
+    },
+    {
+      "query": "Saki",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": 2006,
+      "scenario": "short",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "madokami-18",
+      "provider": "madokami"
+    },
+    {
+      "query": "Akagi",
+      "intended": "Akagi",
+      "aliases": [
+        "Akagi"
+      ],
+      "year": 1991,
+      "scenario": "topic_mahjong",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-19",
+      "provider": "madokami"
+    },
+    {
+      "query": "Hikaru no Go",
+      "intended": "Hikaru no Go",
+      "aliases": [
+        "Hikaru no Go"
+      ],
+      "year": 1998,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-20",
+      "provider": "madokami"
+    },
+    {
+      "query": "Rose of Versailles",
+      "intended": "Rose of Versailles",
+      "aliases": [
+        "Rose of Versailles",
+        "Versailles no Bara"
+      ],
+      "year": 1972,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-21",
+      "provider": "madokami"
+    },
+    {
+      "query": "Phoenix",
+      "intended": "Phoenix",
+      "aliases": [
+        "Phoenix"
+      ],
+      "year": 1967,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-22",
+      "provider": "madokami"
+    },
+    {
+      "query": "Nausicaa of the Valley of the Wind",
+      "intended": "Nausicaa of the Valley of the Wind",
+      "aliases": [
+        "Nausicaa of the Valley of the Wind"
+      ],
+      "year": 1982,
+      "scenario": "old",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-23",
+      "provider": "madokami"
+    },
+    {
+      "query": "Otoyomegatari",
+      "intended": "Otoyomegatari",
+      "aliases": [
+        "Otoyomegatari",
+        "A Bride's Story"
+      ],
+      "year": 2008,
+      "scenario": "niche",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-24",
+      "provider": "madokami"
+    },
+    {
+      "query": "BERSERK",
+      "intended": "Berserk",
+      "aliases": [
+        "Berserk",
+        "ベルセルク"
+      ],
+      "year": null,
+      "scenario": "capitalization",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-25",
+      "provider": "madokami"
+    },
+    {
+      "query": "咲-Saki-",
+      "intended": "Saki",
+      "aliases": [
+        "Saki",
+        "咲"
+      ],
+      "year": null,
+      "scenario": "unicode",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [
+        "Achiga",
+        "Zenkoku",
+        "全国",
+        "阿知賀",
+        "Koko wa Ore",
+        "Tenkou saki"
+      ],
+      "id": "madokami-26",
+      "provider": "madokami"
+    },
+    {
+      "query": "One Piece v01",
+      "intended": "One Piece",
+      "aliases": [
+        "One Piece",
+        "ワンピース"
+      ],
+      "year": null,
+      "scenario": "volume",
+      "variant_tokens": "v01",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-27",
+      "provider": "madokami"
+    },
+    {
+      "query": "Berserk complete",
+      "intended": "Berserk",
+      "aliases": [
+        "Berserk",
+        "ベルセルク"
+      ],
+      "year": null,
+      "scenario": "batch",
+      "variant_tokens": "complete",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-28",
+      "provider": "madokami"
+    },
+    {
+      "query": "Twenty First Century Boys",
+      "intended": "21st Century Boys",
+      "aliases": [
+        "21st Century Boys",
+        "Twenty First Century Boys"
+      ],
+      "year": null,
+      "scenario": "numeric_variant",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-29",
+      "provider": "madokami"
+    },
+    {
+      "query": "Berserk português",
+      "intended": "Berserk",
+      "aliases": [
+        "Berserk",
+        "ベルセルク"
+      ],
+      "year": null,
+      "scenario": "pt_br",
+      "variant_tokens": "portugues",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-30",
+      "provider": "madokami"
+    },
+    {
+      "query": "ダンジョン飯",
+      "intended": "Dungeon Meshi",
+      "aliases": [
+        "Dungeon Meshi",
+        "Delicious in Dungeon",
+        "ダンジョン飯"
+      ],
+      "year": null,
+      "scenario": "native_alias",
+      "variant_tokens": "",
+      "expectation": "availability_unknown",
+      "exclude_phrases": [],
+      "id": "madokami-31",
+      "provider": "madokami"
+    },
+    {
+      "query": "zzqvaudit7f29nonexistent",
+      "intended": "Synthetic absent title",
+      "aliases": [],
+      "year": null,
+      "scenario": "negative_control",
+      "variant_tokens": "",
+      "expectation": "no_title_match",
+      "exclude_phrases": [],
+      "id": "madokami-32",
+      "provider": "madokami"
+    }
+  ]
+}

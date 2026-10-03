@@ -1,0 +1,41 @@
+{
+  "checked_at_utc": "2026-10-03",
+  "baseline": "v0.7.0",
+  "python": "3.11.9",
+  "os": "Windows",
+  "dependencies": {
+    "requests": "2.32.2",
+    "urllib3": "2.2.1",
+    "charset-normalizer": "3.3.2",
+    "chardet": "7.4.0.post2"
+  },
+  "tests": {
+    "command": "python -m unittest discover -s tests -v",
+    "passed": 409,
+    "failed": 0
+  },
+  "private_files_unchanged": {
+    "filter_state.json": true,
+    "subtitle_credentials.json": true,
+    "apibay_cache.json": true
+  },
+  "record_ids_unique": true,
+  "row_counts_consistent": true,
+  "archive_records": 1135,
+  "replay_cases": 352,
+  "local_filter_replays": 44,
+  "alias_pair_replays": 6,
+  "credential_value_scan_passed": true,
+  "content_downloads_or_client_launches": false,
+  "limitations": [
+    "Requests emitted a dependency-compatibility warning in the existing environment; HTTP outcomes are recorded independently.",
+    "Live source measurements are bounded and region/time dependent; blocked/rate-limited cells stay unknown."
+  ],
+  "offline_rebuild_matches": {
+    "summary.json": true,
+    "engine-results.csv": true,
+    "measurements.csv": true,
+    "measurements.jsonl.gz": true,
+    "replays.json.gz": true
+  }
+}

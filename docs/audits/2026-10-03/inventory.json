@@ -1,0 +1,424 @@
+{
+  "providers": [
+    {
+      "slug": "movies",
+      "name": "Movies & Series",
+      "engines": [
+        {
+          "name": "Apibay",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "Knaben",
+          "mode": "auto",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "Nyaa",
+          "mode": "on",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "YTS",
+          "mode": "off",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "SolidTorrents",
+          "mode": "off",
+          "pages": false,
+          "initial_page": 0
+        }
+      ],
+      "presets": [
+        "720p",
+        "1080p",
+        "4K / 2160p",
+        "With Subtitles",
+        "x265 / HEVC",
+        "HDR",
+        "Remux",
+        "Trusted Uploaders",
+        "Dublado (PT-BR)",
+        "Legendado (PT subs)"
+      ],
+      "categories": [
+        201,
+        202,
+        205,
+        207,
+        208,
+        209
+      ],
+      "knaben_categories": [
+        2000000,
+        3000000
+      ],
+      "nyaa_category": "4_1"
+    },
+    {
+      "slug": "games",
+      "name": "General",
+      "engines": [
+        {
+          "name": "Apibay",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "Online-Fix",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "FitGirl",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "Knaben",
+          "mode": "auto",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "SolidTorrents",
+          "mode": "off",
+          "pages": false,
+          "initial_page": 0
+        }
+      ],
+      "presets": [
+        "Repacks Only",
+        "Scene",
+        "ROM Only",
+        "PC Only",
+        "GOG",
+        "Online Fix",
+        "Trusted Uploaders"
+      ],
+      "categories": [
+        400,
+        401,
+        403,
+        404,
+        405,
+        406
+      ],
+      "knaben_categories": [
+        4000000,
+        7000000
+      ],
+      "nyaa_category": "1_2"
+    },
+    {
+      "slug": "online-fix",
+      "name": "Online-Fix",
+      "engines": [
+        {
+          "name": "Online-Fix",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        }
+      ],
+      "presets": [],
+      "categories": [],
+      "knaben_categories": [],
+      "nyaa_category": "1_2"
+    },
+    {
+      "slug": "fitgirl",
+      "name": "FitGirl",
+      "engines": [
+        {
+          "name": "FitGirl",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        }
+      ],
+      "presets": [],
+      "categories": [],
+      "knaben_categories": [],
+      "nyaa_category": "1_2"
+    },
+    {
+      "slug": "software",
+      "name": "Desktop",
+      "engines": [
+        {
+          "name": "Apibay",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "Knaben",
+          "mode": "auto",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "SolidTorrents",
+          "mode": "off",
+          "pages": false,
+          "initial_page": 0
+        }
+      ],
+      "presets": [
+        "Pre-activated / Cracked",
+        "Portable",
+        "Windows",
+        "macOS",
+        "Linux"
+      ],
+      "categories": [
+        300,
+        301,
+        302,
+        303,
+        399
+      ],
+      "knaben_categories": [
+        4002000,
+        4003000,
+        4004000
+      ],
+      "nyaa_category": "1_2"
+    },
+    {
+      "slug": "mobile",
+      "name": "Mobile",
+      "engines": [
+        {
+          "name": "Apibay",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "Knaben",
+          "mode": "auto",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "SolidTorrents",
+          "mode": "off",
+          "pages": false,
+          "initial_page": 0
+        }
+      ],
+      "presets": [
+        "MOD / Patched",
+        "APK only",
+        "With OBB / Data",
+        "Games",
+        "Ad-Free"
+      ],
+      "categories": [
+        306
+      ],
+      "knaben_categories": [
+        8001000
+      ],
+      "nyaa_category": "1_2"
+    },
+    {
+      "slug": "rutracker",
+      "name": "RuTracker",
+      "engines": [
+        {
+          "name": "RuTracker",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        }
+      ],
+      "presets": [],
+      "categories": [],
+      "knaben_categories": [],
+      "nyaa_category": "1_2"
+    },
+    {
+      "slug": "anime",
+      "name": "Anime",
+      "engines": [
+        {
+          "name": "Nyaa",
+          "mode": "on",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "Knaben",
+          "mode": "auto",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "Apibay",
+          "mode": "off",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "SolidTorrents",
+          "mode": "off",
+          "pages": false,
+          "initial_page": 0
+        }
+      ],
+      "presets": [
+        "PT-BR audio tags",
+        "PT-BR subtitle tags",
+        "720p",
+        "1080p",
+        "4K",
+        "Dual Audio",
+        "Subbed",
+        "Batch",
+        "Trusted Uploaders"
+      ],
+      "categories": [
+        201,
+        205,
+        207,
+        208
+      ],
+      "knaben_categories": [
+        6000000
+      ],
+      "nyaa_category": "1_2"
+    },
+    {
+      "slug": "manga",
+      "name": "General",
+      "engines": [
+        {
+          "name": "Nyaa (EN)",
+          "mode": "on",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "Nyaa (Raw)",
+          "mode": "off",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "Nyaa (Non-English)",
+          "mode": "off",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "Apibay",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "Knaben",
+          "mode": "auto",
+          "pages": true,
+          "initial_page": 1
+        }
+      ],
+      "presets": [
+        "Complete / Full",
+        "By Volume",
+        "Color",
+        "Official / Digital",
+        "Official Publishers",
+        "Exclude Light Novels"
+      ],
+      "categories": [
+        602
+      ],
+      "knaben_categories": [
+        6006000,
+        9002000
+      ],
+      "nyaa_category": "3_1"
+    },
+    {
+      "slug": "madokami",
+      "name": "Madokami",
+      "engines": [
+        {
+          "name": "Madokami",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        }
+      ],
+      "presets": [],
+      "categories": [],
+      "knaben_categories": [],
+      "nyaa_category": "1_2"
+    },
+    {
+      "slug": "books",
+      "name": "Books",
+      "engines": [
+        {
+          "name": "Libgen",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "Apibay",
+          "mode": "on",
+          "pages": false,
+          "initial_page": 0
+        },
+        {
+          "name": "Knaben",
+          "mode": "auto",
+          "pages": true,
+          "initial_page": 1
+        },
+        {
+          "name": "SolidTorrents",
+          "mode": "off",
+          "pages": false,
+          "initial_page": 0
+        }
+      ],
+      "presets": [
+        "EPUB",
+        "PDF",
+        "Kindle (MOBI/AZW3)",
+        "Audiobook",
+        "English"
+      ],
+      "categories": [
+        601,
+        102
+      ],
+      "knaben_categories": [
+        9000000
+      ],
+      "nyaa_category": "1_2"
+    }
+  ],
+  "credentials_configured": {
+    "rutracker": true,
+    "madokami": true,
+    "online_fix": false,
+    "tmdb": true,
+    "igdb": true
+  }
+}

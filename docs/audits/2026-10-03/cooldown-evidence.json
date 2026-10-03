@@ -1,0 +1,28 @@
+[
+  {
+    "evidence": "online-fix-cooldown-Valheim.html",
+    "sha256": "bc12153663776d844056cf8c43a12770210f7c8506f3823a606a1153621af1c4",
+    "query": "Valheim",
+    "http_status": 200,
+    "offline_adapter_replay_count": 1,
+    "names": [
+      "Valheim Po Seti"
+    ],
+    "cooldown_text": [],
+    "interpretation": "second search in the same session about one second after first; original app parser run offline against observed page"
+  },
+  {
+    "evidence": "online-fix-cooldown-Palworld.html",
+    "sha256": "3d6de65863c890d723bd745f150fb1536d282b14ede0178c6f2bb882ccb5c15c",
+    "query": "Palworld",
+    "http_status": 200,
+    "offline_adapter_replay_count": 1,
+    "names": [
+      "Palworld по сети"
+    ],
+    "cooldown_text": [
+      "Информация Вы сможете воспользоваться поиском через 10 секунд."
+    ],
+    "interpretation": "second search in the same session about one second after first; original app parser run offline against observed page"
+  }
+]

@@ -6,6 +6,8 @@ Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, n
 
 See the [v0.7.0 release notes](docs/releases/v0.7.0.md) for the latest release, new features, and upgrade guidance.
 
+The [October 2026 provider audit](docs/audits/2026-10-03/README.md) records measured source coverage, access failures, known search gaps, and prioritized recommendations across every provider.
+
 ## Features
 
 - **Menus and Bookmarks:** The main screen and **What's Next?** include **Quick actions** (**Tab**), with **Bookmarks / download later** (**B**) inside. **What's Next?** also offers **Main menu** and a shortcut for every option. Opening a search-specific action from a general menu asks you to choose its provider; opening quick actions from a provider's search prompt keeps that provider's scope. Expanded **i** details retain the table's dark background.

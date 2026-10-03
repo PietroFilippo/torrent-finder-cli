@@ -1,0 +1,1417 @@
+{
+  "baseline": "v0.7.0 c35280d4f7976fa1265b857c6c045d257d5ca711",
+  "case_count": 352,
+  "initial_matrix_cells": 1056,
+  "measurement_records": 1135,
+  "initial_statuses": {
+    "empty": 354,
+    "results": 473,
+    "unknown_circuit_open": 204,
+    "timeout": 19,
+    "rate_limited": 1,
+    "challenge": 5
+  },
+  "initial_measurement_types": {
+    "live": 812,
+    "not_run": 204,
+    "reused_shared_source": 40
+  },
+  "live_http_events": 2051,
+  "first_at": "2026-10-03T04:37:56.050591+00:00",
+  "last_at": "2026-10-03T05:07:41.070662+00:00",
+  "providers": {
+    "movies": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 30,
+      "all_on_title_candidate_queries": 30,
+      "all_on_no_candidate_queries": [
+        "movies-31"
+      ],
+      "all_on_unknown_queries": 29,
+      "candidate_gain_from_all_on": [],
+      "default_non_candidate_rows": 320,
+      "default_rows": 1769
+    },
+    "games": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 27,
+      "all_on_title_candidate_queries": 27,
+      "all_on_no_candidate_queries": [
+        "games-27",
+        "games-29",
+        "games-30",
+        "games-31"
+      ],
+      "all_on_unknown_queries": 30,
+      "candidate_gain_from_all_on": [],
+      "default_non_candidate_rows": 62,
+      "default_rows": 150
+    },
+    "online-fix": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 24,
+      "all_on_title_candidate_queries": 24,
+      "all_on_no_candidate_queries": [
+        "online-fix-10",
+        "online-fix-13",
+        "online-fix-26",
+        "online-fix-28",
+        "online-fix-29",
+        "online-fix-30",
+        "online-fix-31"
+      ],
+      "all_on_unknown_queries": 0,
+      "candidate_gain_from_all_on": [],
+      "default_non_candidate_rows": 1,
+      "default_rows": 30
+    },
+    "fitgirl": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 24,
+      "all_on_title_candidate_queries": 24,
+      "all_on_no_candidate_queries": [
+        "fitgirl-12",
+        "fitgirl-14",
+        "fitgirl-26",
+        "fitgirl-27",
+        "fitgirl-29",
+        "fitgirl-30",
+        "fitgirl-31"
+      ],
+      "all_on_unknown_queries": 0,
+      "candidate_gain_from_all_on": [],
+      "default_non_candidate_rows": 1,
+      "default_rows": 38
+    },
+    "software": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 26,
+      "all_on_title_candidate_queries": 26,
+      "all_on_no_candidate_queries": [
+        "software-20",
+        "software-24",
+        "software-27",
+        "software-29",
+        "software-30"
+      ],
+      "all_on_unknown_queries": 30,
+      "candidate_gain_from_all_on": [],
+      "default_non_candidate_rows": 135,
+      "default_rows": 967
+    },
+    "mobile": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 21,
+      "all_on_title_candidate_queries": 21,
+      "all_on_no_candidate_queries": [
+        "mobile-04",
+        "mobile-05",
+        "mobile-11",
+        "mobile-12",
+        "mobile-21",
+        "mobile-22",
+        "mobile-24",
+        "mobile-27",
+        "mobile-30",
+        "mobile-31"
+      ],
+      "all_on_unknown_queries": 29,
+      "candidate_gain_from_all_on": [],
+      "default_non_candidate_rows": 22,
+      "default_rows": 434
+    },
+    "rutracker": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 0,
+      "all_on_title_candidate_queries": 0,
+      "all_on_no_candidate_queries": [
+        "rutracker-01",
+        "rutracker-02",
+        "rutracker-03",
+        "rutracker-04",
+        "rutracker-05",
+        "rutracker-06",
+        "rutracker-07",
+        "rutracker-08",
+        "rutracker-09",
+        "rutracker-10",
+        "rutracker-11",
+        "rutracker-12",
+        "rutracker-13",
+        "rutracker-14",
+        "rutracker-15",
+        "rutracker-16",
+        "rutracker-17",
+        "rutracker-18",
+        "rutracker-19",
+        "rutracker-20",
+        "rutracker-21",
+        "rutracker-22",
+        "rutracker-23",
+        "rutracker-24",
+        "rutracker-25",
+        "rutracker-26",
+        "rutracker-27",
+        "rutracker-28",
+        "rutracker-29",
+        "rutracker-30",
+        "rutracker-31"
+      ],
+      "all_on_unknown_queries": 31,
+      "candidate_gain_from_all_on": [],
+      "default_non_candidate_rows": 0,
+      "default_rows": 0
+    },
+    "anime": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 31,
+      "all_on_title_candidate_queries": 31,
+      "all_on_no_candidate_queries": [],
+      "all_on_unknown_queries": 28,
+      "candidate_gain_from_all_on": [],
+      "default_non_candidate_rows": 407,
+      "default_rows": 1834
+    },
+    "manga": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 28,
+      "all_on_title_candidate_queries": 28,
+      "all_on_no_candidate_queries": [
+        "manga-10",
+        "manga-29",
+        "manga-30"
+      ],
+      "all_on_unknown_queries": 1,
+      "candidate_gain_from_all_on": [],
+      "default_non_candidate_rows": 122,
+      "default_rows": 852
+    },
+    "madokami": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 27,
+      "all_on_title_candidate_queries": 27,
+      "all_on_no_candidate_queries": [
+        "madokami-10",
+        "madokami-27",
+        "madokami-28",
+        "madokami-30"
+      ],
+      "all_on_unknown_queries": 0,
+      "candidate_gain_from_all_on": [],
+      "default_non_candidate_rows": 197,
+      "default_rows": 461
+    },
+    "books": {
+      "queries": 32,
+      "nonnegative_queries": 31,
+      "default_title_candidate_queries": 28,
+      "all_on_title_candidate_queries": 29,
+      "all_on_no_candidate_queries": [
+        "books-16",
+        "books-28"
+      ],
+      "all_on_unknown_queries": 29,
+      "candidate_gain_from_all_on": [
+        "books-19"
+      ],
+      "default_non_candidate_rows": 803,
+      "default_rows": 1976
+    }
+  },
+  "engines": [
+    {
+      "provider": "movies",
+      "engine": "Apibay",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "results": 16,
+        "empty": 12,
+        "timeout": 4
+      },
+      "candidate_queries": 15,
+      "raw_rows": 1167,
+      "kept_rows": 1167,
+      "candidate_rows": 907,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 3,
+        "max": 3
+      },
+      "paced_seconds": {
+        "min": 0.453,
+        "median": 5.945,
+        "p95": 12.109,
+        "max": 12.453
+      }
+    },
+    {
+      "provider": "movies",
+      "engine": "Knaben",
+      "default_mode": "auto",
+      "cells": 32,
+      "statuses": {
+        "results": 30,
+        "empty": 2
+      },
+      "candidate_queries": 30,
+      "raw_rows": 1312,
+      "kept_rows": 1312,
+      "candidate_rows": 1141,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 2,
+        "max": 3
+      },
+      "paced_seconds": {
+        "min": 0.719,
+        "median": 1.359,
+        "p95": 1.75,
+        "max": 1.766
+      }
+    },
+    {
+      "provider": "movies",
+      "engine": "Nyaa",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "empty": 22,
+        "results": 10
+      },
+      "candidate_queries": 9,
+      "raw_rows": 206,
+      "kept_rows": 206,
+      "candidate_rows": 164,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 3,
+        "max": 3
+      },
+      "paced_seconds": {
+        "min": 0.625,
+        "median": 1.0,
+        "p95": 1.171,
+        "max": 1.281
+      }
+    },
+    {
+      "provider": "movies",
+      "engine": "YTS",
+      "default_mode": "off",
+      "cells": 32,
+      "statuses": {
+        "results": 24,
+        "empty": 8
+      },
+      "candidate_queries": 22,
+      "raw_rows": 462,
+      "kept_rows": 462,
+      "candidate_rows": 227,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 5,
+        "max": 6
+      },
+      "paced_seconds": {
+        "min": 0.375,
+        "median": 1.0,
+        "p95": 2.11,
+        "max": 2.125
+      }
+    },
+    {
+      "provider": "movies",
+      "engine": "SolidTorrents",
+      "default_mode": "off",
+      "cells": 32,
+      "statuses": {
+        "results": 2,
+        "unknown_circuit_open": 30
+      },
+      "candidate_queries": 2,
+      "raw_rows": 40,
+      "kept_rows": 40,
+      "candidate_rows": 26,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.5,
+        "p95": 2,
+        "max": 2
+      },
+      "paced_seconds": {
+        "min": 1.859,
+        "median": 1.929,
+        "p95": 2.0,
+        "max": 2.0
+      }
+    },
+    {
+      "provider": "games",
+      "engine": "Apibay",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "empty": 27,
+        "timeout": 1,
+        "results": 4
+      },
+      "candidate_queries": 3,
+      "raw_rows": 104,
+      "kept_rows": 95,
+      "candidate_rows": 38,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 2.157,
+        "median": 8.015,
+        "p95": 10.5,
+        "max": 11.047
+      }
+    },
+    {
+      "provider": "games",
+      "engine": "Online-Fix",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "empty": 20,
+        "results": 12
+      },
+      "candidate_queries": 12,
+      "raw_rows": 13,
+      "kept_rows": 13,
+      "candidate_rows": 13,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 10.812,
+        "median": 11.0,
+        "p95": 11.219,
+        "max": 11.25
+      }
+    },
+    {
+      "provider": "games",
+      "engine": "FitGirl",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "results": 24,
+        "empty": 8
+      },
+      "candidate_queries": 24,
+      "raw_rows": 38,
+      "kept_rows": 38,
+      "candidate_rows": 37,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {}
+    },
+    {
+      "provider": "games",
+      "engine": "Knaben",
+      "default_mode": "auto",
+      "cells": 32,
+      "statuses": {
+        "results": 25,
+        "empty": 7
+      },
+      "candidate_queries": 24,
+      "raw_rows": 642,
+      "kept_rows": 595,
+      "candidate_rows": 530,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 5,
+        "max": 11
+      },
+      "paced_seconds": {
+        "min": 0.734,
+        "median": 1.03,
+        "p95": 1.531,
+        "max": 1.531
+      }
+    },
+    {
+      "provider": "games",
+      "engine": "SolidTorrents",
+      "default_mode": "off",
+      "cells": 32,
+      "statuses": {
+        "results": 1,
+        "timeout": 1,
+        "rate_limited": 1,
+        "unknown_circuit_open": 29
+      },
+      "candidate_queries": 1,
+      "raw_rows": 20,
+      "kept_rows": 20,
+      "candidate_rows": 20,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 0.75,
+        "median": 2.281,
+        "p95": 7.5,
+        "max": 7.5
+      }
+    },
+    {
+      "provider": "online-fix",
+      "engine": "Online-Fix",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "results": 24,
+        "empty": 8
+      },
+      "candidate_queries": 24,
+      "raw_rows": 30,
+      "kept_rows": 30,
+      "candidate_rows": 29,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 1,
+        "max": 2
+      },
+      "paced_seconds": {
+        "min": 10.828,
+        "median": 11.0,
+        "p95": 11.171,
+        "max": 11.219
+      }
+    },
+    {
+      "provider": "fitgirl",
+      "engine": "FitGirl",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "results": 24,
+        "empty": 8
+      },
+      "candidate_queries": 24,
+      "raw_rows": 38,
+      "kept_rows": 38,
+      "candidate_rows": 37,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 0.265,
+        "median": 2.43,
+        "p95": 3.484,
+        "max": 3.5
+      }
+    },
+    {
+      "provider": "software",
+      "engine": "Apibay",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "empty": 23,
+        "results": 8,
+        "timeout": 1
+      },
+      "candidate_queries": 8,
+      "raw_rows": 485,
+      "kept_rows": 485,
+      "candidate_rows": 412,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 3,
+        "max": 3
+      },
+      "paced_seconds": {
+        "min": 0.985,
+        "median": 5.797,
+        "p95": 10.515,
+        "max": 10.531
+      }
+    },
+    {
+      "provider": "software",
+      "engine": "Knaben",
+      "default_mode": "auto",
+      "cells": 32,
+      "statuses": {
+        "results": 26,
+        "empty": 6
+      },
+      "candidate_queries": 26,
+      "raw_rows": 679,
+      "kept_rows": 679,
+      "candidate_rows": 602,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 4,
+        "max": 23
+      },
+      "paced_seconds": {
+        "min": 0.312,
+        "median": 0.75,
+        "p95": 1.266,
+        "max": 1.5
+      }
+    },
+    {
+      "provider": "software",
+      "engine": "SolidTorrents",
+      "default_mode": "off",
+      "cells": 32,
+      "statuses": {
+        "timeout": 1,
+        "results": 1,
+        "unknown_circuit_open": 30
+      },
+      "candidate_queries": 1,
+      "raw_rows": 20,
+      "kept_rows": 20,
+      "candidate_rows": 20,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 1.86,
+        "median": 4.665,
+        "p95": 7.469,
+        "max": 7.469
+      }
+    },
+    {
+      "provider": "mobile",
+      "engine": "Apibay",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "empty": 30,
+        "results": 1,
+        "timeout": 1
+      },
+      "candidate_queries": 1,
+      "raw_rows": 4,
+      "kept_rows": 4,
+      "candidate_rows": 4,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 1.047,
+        "median": 6.0,
+        "p95": 10.047,
+        "max": 10.656
+      }
+    },
+    {
+      "provider": "mobile",
+      "engine": "Knaben",
+      "default_mode": "auto",
+      "cells": 32,
+      "statuses": {
+        "results": 21,
+        "empty": 11
+      },
+      "candidate_queries": 21,
+      "raw_rows": 437,
+      "kept_rows": 437,
+      "candidate_rows": 415,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 1,
+        "max": 6
+      },
+      "paced_seconds": {
+        "min": 0.454,
+        "median": 1.0,
+        "p95": 1.515,
+        "max": 1.531
+      }
+    },
+    {
+      "provider": "mobile",
+      "engine": "SolidTorrents",
+      "default_mode": "off",
+      "cells": 32,
+      "statuses": {
+        "results": 2,
+        "unknown_circuit_open": 30
+      },
+      "candidate_queries": 2,
+      "raw_rows": 40,
+      "kept_rows": 40,
+      "candidate_rows": 40,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 2.031,
+        "median": 2.054,
+        "p95": 2.078,
+        "max": 2.078
+      }
+    },
+    {
+      "provider": "rutracker",
+      "engine": "RuTracker",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "challenge": 5,
+        "unknown_circuit_open": 27
+      },
+      "candidate_queries": 0,
+      "raw_rows": 0,
+      "kept_rows": 0,
+      "candidate_rows": 0,
+      "first_candidate_ranks": {},
+      "paced_seconds": {
+        "min": 0.062,
+        "median": 0.985,
+        "p95": 1.015,
+        "max": 1.015
+      }
+    },
+    {
+      "provider": "anime",
+      "engine": "Nyaa",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "results": 30,
+        "empty": 2
+      },
+      "candidate_queries": 30,
+      "raw_rows": 1868,
+      "kept_rows": 1826,
+      "candidate_rows": 1419,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 1,
+        "max": 2
+      },
+      "paced_seconds": {
+        "min": 0.703,
+        "median": 1.297,
+        "p95": 2.187,
+        "max": 2.282
+      }
+    },
+    {
+      "provider": "anime",
+      "engine": "Knaben",
+      "default_mode": "auto",
+      "cells": 32,
+      "statuses": {
+        "results": 31,
+        "empty": 1
+      },
+      "candidate_queries": 28,
+      "raw_rows": 1205,
+      "kept_rows": 1205,
+      "candidate_rows": 907,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 4,
+        "max": 20
+      },
+      "paced_seconds": {
+        "min": 0.438,
+        "median": 1.25,
+        "p95": 1.531,
+        "max": 1.532
+      }
+    },
+    {
+      "provider": "anime",
+      "engine": "Apibay",
+      "default_mode": "off",
+      "cells": 32,
+      "statuses": {
+        "empty": 23,
+        "results": 9
+      },
+      "candidate_queries": 9,
+      "raw_rows": 682,
+      "kept_rows": 682,
+      "candidate_rows": 571,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 0.157,
+        "median": 5.75,
+        "p95": 8.875,
+        "max": 9.985
+      }
+    },
+    {
+      "provider": "anime",
+      "engine": "SolidTorrents",
+      "default_mode": "off",
+      "cells": 32,
+      "statuses": {
+        "results": 3,
+        "unknown_circuit_open": 29
+      },
+      "candidate_queries": 3,
+      "raw_rows": 60,
+      "kept_rows": 60,
+      "candidate_rows": 51,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 1.828,
+        "median": 2.047,
+        "p95": 2.078,
+        "max": 2.078
+      }
+    },
+    {
+      "provider": "manga",
+      "engine": "Nyaa (EN)",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "results": 26,
+        "empty": 6
+      },
+      "candidate_queries": 26,
+      "raw_rows": 847,
+      "kept_rows": 847,
+      "candidate_rows": 726,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 1,
+        "max": 3
+      },
+      "paced_seconds": {
+        "min": 0.531,
+        "median": 0.907,
+        "p95": 1.234,
+        "max": 1.235
+      }
+    },
+    {
+      "provider": "manga",
+      "engine": "Nyaa (Raw)",
+      "default_mode": "off",
+      "cells": 32,
+      "statuses": {
+        "results": 22,
+        "empty": 10
+      },
+      "candidate_queries": 22,
+      "raw_rows": 634,
+      "kept_rows": 634,
+      "candidate_rows": 564,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 1,
+        "max": 2
+      },
+      "paced_seconds": {
+        "min": 0.672,
+        "median": 1.007,
+        "p95": 1.437,
+        "max": 1.562
+      }
+    },
+    {
+      "provider": "manga",
+      "engine": "Nyaa (Non-English)",
+      "default_mode": "off",
+      "cells": 32,
+      "statuses": {
+        "results": 13,
+        "empty": 19
+      },
+      "candidate_queries": 13,
+      "raw_rows": 214,
+      "kept_rows": 214,
+      "candidate_rows": 195,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 4,
+        "max": 4
+      },
+      "paced_seconds": {
+        "min": 0.547,
+        "median": 0.969,
+        "p95": 1.157,
+        "max": 1.859
+      }
+    },
+    {
+      "provider": "manga",
+      "engine": "Apibay",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "results": 2,
+        "empty": 29,
+        "timeout": 1
+      },
+      "candidate_queries": 2,
+      "raw_rows": 2,
+      "kept_rows": 2,
+      "candidate_rows": 2,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 1.0,
+        "median": 2.945,
+        "p95": 10.0,
+        "max": 11.344
+      }
+    },
+    {
+      "provider": "manga",
+      "engine": "Knaben",
+      "default_mode": "auto",
+      "cells": 32,
+      "statuses": {
+        "results": 28,
+        "empty": 4
+      },
+      "candidate_queries": 28,
+      "raw_rows": 548,
+      "kept_rows": 548,
+      "candidate_rows": 496,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 1,
+        "max": 2
+      },
+      "paced_seconds": {
+        "min": 0.484,
+        "median": 0.992,
+        "p95": 1.516,
+        "max": 1.547
+      }
+    },
+    {
+      "provider": "madokami",
+      "engine": "Madokami",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "results": 27,
+        "empty": 5
+      },
+      "candidate_queries": 27,
+      "raw_rows": 462,
+      "kept_rows": 461,
+      "candidate_rows": 264,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 3,
+        "max": 7
+      },
+      "paced_seconds": {
+        "min": 0.313,
+        "median": 1.0,
+        "p95": 1.937,
+        "max": 1.937
+      }
+    },
+    {
+      "provider": "books",
+      "engine": "Libgen",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "results": 25,
+        "timeout": 4,
+        "empty": 3
+      },
+      "candidate_queries": 25,
+      "raw_rows": 1819,
+      "kept_rows": 1819,
+      "candidate_rows": 1120,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 11,
+        "max": 25
+      },
+      "paced_seconds": {
+        "min": 2.265,
+        "median": 3.617,
+        "p95": 11.14,
+        "max": 11.187
+      }
+    },
+    {
+      "provider": "books",
+      "engine": "Apibay",
+      "default_mode": "on",
+      "cells": 32,
+      "statuses": {
+        "results": 8,
+        "empty": 19,
+        "timeout": 5
+      },
+      "candidate_queries": 8,
+      "raw_rows": 151,
+      "kept_rows": 151,
+      "candidate_rows": 48,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1.0,
+        "p95": 2,
+        "max": 2
+      },
+      "paced_seconds": {
+        "min": 0.125,
+        "median": 8.001,
+        "p95": 11.641,
+        "max": 12.297
+      }
+    },
+    {
+      "provider": "books",
+      "engine": "Knaben",
+      "default_mode": "auto",
+      "cells": 32,
+      "statuses": {
+        "results": 19,
+        "empty": 13
+      },
+      "candidate_queries": 19,
+      "raw_rows": 202,
+      "kept_rows": 202,
+      "candidate_rows": 172,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 2,
+        "max": 2
+      },
+      "paced_seconds": {
+        "min": 0.454,
+        "median": 0.516,
+        "p95": 1.016,
+        "max": 1.484
+      }
+    },
+    {
+      "provider": "books",
+      "engine": "SolidTorrents",
+      "default_mode": "off",
+      "cells": 32,
+      "statuses": {
+        "results": 3,
+        "unknown_circuit_open": 29
+      },
+      "candidate_queries": 3,
+      "raw_rows": 51,
+      "kept_rows": 51,
+      "candidate_rows": 49,
+      "first_candidate_ranks": {
+        "min": 1,
+        "median": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "paced_seconds": {
+        "min": 1.844,
+        "median": 1.89,
+        "p95": 2.047,
+        "max": 2.047
+      }
+    }
+  ],
+  "scenario_groups": [
+    {
+      "scenario": "accents",
+      "cases": 1,
+      "default_candidates": 1,
+      "all_on_candidates": 1
+    },
+    {
+      "scenario": "alternate_title",
+      "cases": 3,
+      "default_candidates": 1,
+      "all_on_candidates": 1
+    },
+    {
+      "scenario": "ambiguous",
+      "cases": 5,
+      "default_candidates": 5,
+      "all_on_candidates": 5
+    },
+    {
+      "scenario": "anime",
+      "cases": 2,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "audio",
+      "cases": 8,
+      "default_candidates": 4,
+      "all_on_candidates": 4
+    },
+    {
+      "scenario": "batch",
+      "cases": 3,
+      "default_candidates": 2,
+      "all_on_candidates": 2
+    },
+    {
+      "scenario": "books",
+      "cases": 3,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "capitalization",
+      "cases": 11,
+      "default_candidates": 10,
+      "all_on_candidates": 10
+    },
+    {
+      "scenario": "coop",
+      "cases": 16,
+      "default_candidates": 15,
+      "all_on_candidates": 15
+    },
+    {
+      "scenario": "cross_category",
+      "cases": 1,
+      "default_candidates": 1,
+      "all_on_candidates": 1
+    },
+    {
+      "scenario": "edition",
+      "cases": 4,
+      "default_candidates": 3,
+      "all_on_candidates": 3
+    },
+    {
+      "scenario": "episode",
+      "cases": 1,
+      "default_candidates": 1,
+      "all_on_candidates": 1
+    },
+    {
+      "scenario": "format",
+      "cases": 5,
+      "default_candidates": 3,
+      "all_on_candidates": 3
+    },
+    {
+      "scenario": "game",
+      "cases": 8,
+      "default_candidates": 5,
+      "all_on_candidates": 5
+    },
+    {
+      "scenario": "games",
+      "cases": 2,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "indie",
+      "cases": 6,
+      "default_candidates": 6,
+      "all_on_candidates": 6
+    },
+    {
+      "scenario": "language_tags",
+      "cases": 3,
+      "default_candidates": 1,
+      "all_on_candidates": 1
+    },
+    {
+      "scenario": "linux",
+      "cases": 2,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "macos",
+      "cases": 3,
+      "default_candidates": 3,
+      "all_on_candidates": 3
+    },
+    {
+      "scenario": "manga",
+      "cases": 1,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "movies",
+      "cases": 4,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "native_alias",
+      "cases": 7,
+      "default_candidates": 3,
+      "all_on_candidates": 3
+    },
+    {
+      "scenario": "near_match",
+      "cases": 5,
+      "default_candidates": 5,
+      "all_on_candidates": 5
+    },
+    {
+      "scenario": "negative_control",
+      "cases": 11,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "niche",
+      "cases": 20,
+      "default_candidates": 19,
+      "all_on_candidates": 19
+    },
+    {
+      "scenario": "non_english",
+      "cases": 4,
+      "default_candidates": 4,
+      "all_on_candidates": 4
+    },
+    {
+      "scenario": "numeric",
+      "cases": 3,
+      "default_candidates": 3,
+      "all_on_candidates": 3
+    },
+    {
+      "scenario": "numeric_variant",
+      "cases": 7,
+      "default_candidates": 3,
+      "all_on_candidates": 3
+    },
+    {
+      "scenario": "old",
+      "cases": 30,
+      "default_candidates": 30,
+      "all_on_candidates": 30
+    },
+    {
+      "scenario": "old_edition",
+      "cases": 1,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "open_source",
+      "cases": 10,
+      "default_candidates": 6,
+      "all_on_candidates": 6
+    },
+    {
+      "scenario": "platform",
+      "cases": 3,
+      "default_candidates": 1,
+      "all_on_candidates": 1
+    },
+    {
+      "scenario": "popular",
+      "cases": 31,
+      "default_candidates": 31,
+      "all_on_candidates": 31
+    },
+    {
+      "scenario": "portable",
+      "cases": 1,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "pt_br",
+      "cases": 10,
+      "default_candidates": 6,
+      "all_on_candidates": 6
+    },
+    {
+      "scenario": "pt_br_alias",
+      "cases": 1,
+      "default_candidates": 1,
+      "all_on_candidates": 1
+    },
+    {
+      "scenario": "punctuation",
+      "cases": 6,
+      "default_candidates": 5,
+      "all_on_candidates": 5
+    },
+    {
+      "scenario": "punctuation_variant",
+      "cases": 5,
+      "default_candidates": 3,
+      "all_on_candidates": 3
+    },
+    {
+      "scenario": "reader",
+      "cases": 1,
+      "default_candidates": 1,
+      "all_on_candidates": 1
+    },
+    {
+      "scenario": "recent",
+      "cases": 35,
+      "default_candidates": 33,
+      "all_on_candidates": 34
+    },
+    {
+      "scenario": "repack",
+      "cases": 2,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "resolution",
+      "cases": 2,
+      "default_candidates": 2,
+      "all_on_candidates": 2
+    },
+    {
+      "scenario": "sequel",
+      "cases": 9,
+      "default_candidates": 8,
+      "all_on_candidates": 8
+    },
+    {
+      "scenario": "series",
+      "cases": 4,
+      "default_candidates": 4,
+      "all_on_candidates": 4
+    },
+    {
+      "scenario": "short",
+      "cases": 13,
+      "default_candidates": 13,
+      "all_on_candidates": 13
+    },
+    {
+      "scenario": "software",
+      "cases": 6,
+      "default_candidates": 0,
+      "all_on_candidates": 0
+    },
+    {
+      "scenario": "subtitle",
+      "cases": 2,
+      "default_candidates": 2,
+      "all_on_candidates": 2
+    },
+    {
+      "scenario": "survival",
+      "cases": 3,
+      "default_candidates": 2,
+      "all_on_candidates": 2
+    },
+    {
+      "scenario": "technical",
+      "cases": 7,
+      "default_candidates": 6,
+      "all_on_candidates": 6
+    },
+    {
+      "scenario": "topic_mahjong",
+      "cases": 3,
+      "default_candidates": 3,
+      "all_on_candidates": 3
+    },
+    {
+      "scenario": "unicode",
+      "cases": 11,
+      "default_candidates": 5,
+      "all_on_candidates": 5
+    },
+    {
+      "scenario": "utility",
+      "cases": 3,
+      "default_candidates": 3,
+      "all_on_candidates": 3
+    },
+    {
+      "scenario": "video",
+      "cases": 2,
+      "default_candidates": 2,
+      "all_on_candidates": 2
+    },
+    {
+      "scenario": "volume",
+      "cases": 2,
+      "default_candidates": 1,
+      "all_on_candidates": 1
+    }
+  ]
+}

@@ -1,0 +1,1413 @@
+{
+  "method": "Human-readable title/identity adjudication of a purposive top-rank sample; listing relevance only, payload and edition claims unverified. Bundles count as containing the requested work. Not a random precision or recall estimate. RuTracker unavailable and not scored.",
+  "rows": [
+    {
+      "measurement_id": "movies-01::Apibay::0::::0",
+      "rank": 1,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "D7A46713EAEE18C746B3254B7D1492A50FD9D6CE",
+        "leechers": 121,
+        "name": "The Matrix (1999) 1080p BrRip x264 - 1.85GB - YIFY",
+        "page_url": "https://thepiratebay.org/description.php?id=7349687",
+        "seeders": 821,
+        "size": 1992277407,
+        "source": "Apibay",
+        "uploaded_at": 1339543961
+      }
+    },
+    {
+      "measurement_id": "movies-01::Apibay::0::::0",
+      "rank": 2,
+      "label": "wrong_sequel",
+      "row": {
+        "cached": false,
+        "identity": "5F67A9966AA41C5E3CFD7C25226D49E1A656C982",
+        "leechers": 64,
+        "name": "The Matrix Reloaded (1999) 1080p BrRip x264 - 1.85GB - YIFY",
+        "page_url": "https://thepiratebay.org/description.php?id=7349692",
+        "seeders": 299,
+        "size": 1991942667,
+        "source": "Apibay",
+        "uploaded_at": 1339544123
+      }
+    },
+    {
+      "measurement_id": "movies-01::Apibay::0::::0",
+      "rank": 3,
+      "label": "includes_target_bundle",
+      "row": {
+        "cached": false,
+        "identity": "E0593A3DAB881080EFECB54BA6551D4B2D329BF1",
+        "leechers": 213,
+        "name": "The Matrix 1-4 Pack 1999-2021 REMASTERED 1080p BluRay HEVC x265 5.1 BONE",
+        "page_url": "https://thepiratebay.org/description.php?id=81783074",
+        "seeders": 280,
+        "size": 9888872569,
+        "source": "Apibay",
+        "uploaded_at": 1768246768
+      }
+    },
+    {
+      "measurement_id": "movies-01::Apibay::0::::0",
+      "rank": 4,
+      "label": "wrong_sequel",
+      "row": {
+        "cached": false,
+        "identity": "0B1FD1CC66B90232DD0298558627173D8B442153",
+        "leechers": 12,
+        "name": "The Matrix Revolutions (1999) 1080p BrRip x264 - 1.85GB - YIFY",
+        "page_url": "https://thepiratebay.org/description.php?id=7349696",
+        "seeders": 135,
+        "size": 1989953220,
+        "source": "Apibay",
+        "uploaded_at": 1339544362
+      }
+    },
+    {
+      "measurement_id": "movies-01::Apibay::0::::0",
+      "rank": 5,
+      "label": "wrong_sequel",
+      "row": {
+        "cached": false,
+        "identity": "CF109D8D0CFE46BFE7AC5378B587D27B71DD87A8",
+        "leechers": 8,
+        "name": "The Matrix Resurrections (2021) [1080p] [WEBRip]",
+        "page_url": "https://thepiratebay.org/description.php?id=55131929",
+        "seeders": 130,
+        "size": 2928347593,
+        "source": "Apibay",
+        "uploaded_at": 1640181553
+      }
+    },
+    {
+      "measurement_id": "games-01::FitGirl::0::::0",
+      "rank": 1,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "fitgirl-16443",
+        "leechers": 0,
+        "name": "Cyberpunk 2077: Ultimate Edition – v2.3 + All DLCs + Bonus Content + REDmod",
+        "page_url": "https://fitgirl-repacks.site/cyberpunk-2077/",
+        "seeders": 0,
+        "size": 59807419596,
+        "source": "FitGirl",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "online-fix-01::Online-Fix::0::::2",
+      "rank": 1,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "17365",
+        "leechers": 0,
+        "name": "Lethal Company Po Seti",
+        "page_url": "https://online-fix.me/games/survival/17365-lethal-company-po-seti.html",
+        "seeders": 0,
+        "size": 0,
+        "source": "Online-Fix",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "fitgirl-01::FitGirl::0::::0",
+      "rank": 1,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "fitgirl-16443",
+        "leechers": 0,
+        "name": "Cyberpunk 2077: Ultimate Edition – v2.3 + All DLCs + Bonus Content + REDmod",
+        "page_url": "https://fitgirl-repacks.site/cyberpunk-2077/",
+        "seeders": 0,
+        "size": 59807419596,
+        "source": "FitGirl",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "software-01::Knaben::0::::0",
+      "rank": 1,
+      "label": "different_product",
+      "row": {
+        "cached": false,
+        "identity": "b1dc7aeb01fc8d2746da9edec3649a39ee5816ca",
+        "leechers": 1013,
+        "name": "Adobe Photoshop Lightroom Classic CC 2021 v16.4.1.11 Mac Patched ...",
+        "page_url": "https://knaben.xyz/thepiratebay/description.php?id=45603504",
+        "seeders": 1527,
+        "size": 867340124,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "software-01::Knaben::0::::0",
+      "rank": 2,
+      "label": "includes_target_bundle",
+      "row": {
+        "cached": false,
+        "identity": "497e4fa54afdce819ddfe7797b2510758b3e0cbf",
+        "leechers": 488,
+        "name": "Adobe CC 2015 - Ilustrator + Indesign + Photoshop multi (Mac)",
+        "page_url": "https://knaben.xyz/thepiratebay/description.php?id=45603472",
+        "seeders": 734,
+        "size": 1449551462,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "software-01::Knaben::0::::0",
+      "rank": 3,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "49357a52300ad806e055f94497e4790aa03e9650",
+        "leechers": 481,
+        "name": "Adobe Photoshop CC 2019 v11.0.0 + Patch For Mac",
+        "page_url": "https://knaben.xyz/thepiratebay/description.php?id=45603493",
+        "seeders": 723,
+        "size": 1138166333,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "software-01::Knaben::0::::0",
+      "rank": 4,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "7e6ada5e2e49ca59cf73a756220f03bb3b073a85",
+        "leechers": 480,
+        "name": "Adobe Photoshop CC 2018 v22.7.3 Mac OS X",
+        "page_url": "https://knaben.xyz/thepiratebay/description.php?id=45603491",
+        "seeders": 721,
+        "size": 1513975971,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "software-01::Knaben::0::::0",
+      "rank": 5,
+      "label": "includes_target_bundle",
+      "row": {
+        "cached": false,
+        "identity": "a3e8c894240e7d04906cf0a9d19b7fa5b704b2d5",
+        "leechers": 472,
+        "name": "(MAC) Adobe CC 2015 16.3.11 Ilustrator Indesign Photoshop Patch",
+        "page_url": "https://knaben.xyz/thepiratebay/description.php?id=45604005",
+        "seeders": 708,
+        "size": 365229506,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "mobile-01::Knaben::0::::0",
+      "rank": 1,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "e4ba1104910132fadceab76c5efbfd4ad024e86a",
+        "leechers": 26,
+        "name": "[Android] Minecraft 1.21.72.01-1.26.20.04 [Песочница, RUS]",
+        "page_url": "https://rutracker.org/forum/viewtopic.php?t=6686449",
+        "seeders": 24,
+        "size": 12071917309,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "mobile-01::Knaben::0::::0",
+      "rank": 2,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "9816e7be08ed830b7eb2aaffd257dc0bc68e7297",
+        "leechers": 2,
+        "name": "[Android] Minecraft - Pocket Edition 1.8.0.8 [RUS] [Sandbox / Arcade / Adventure]",
+        "page_url": "https://rutracker.org/forum/viewtopic.php?t=5274276",
+        "seeders": 18,
+        "size": 87456108,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "mobile-01::Knaben::0::::0",
+      "rank": 3,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "2cb443022d7a97f02d71fb936f353ee0b834cd20",
+        "leechers": 0,
+        "name": "[Android] Minecraft Pocket Edition 0.15.0.a4 [Sandbox, Multi]",
+        "page_url": "https://rutracker.org/forum/viewtopic.php?t=5237292",
+        "seeders": 5,
+        "size": 29992083,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "mobile-01::Knaben::0::::0",
+      "rank": 4,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "ba25bbbeb9f8dbcdd80c0d7f8330d710a4b04e00",
+        "leechers": 0,
+        "name": "[Android] Minecraft Pocket Edition 0.14.1 [Sandbox, Multi]",
+        "page_url": "https://rutracker.org/forum/viewtopic.php?t=5126395",
+        "seeders": 5,
+        "size": 20014764,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "mobile-01::Knaben::0::::0",
+      "rank": 5,
+      "label": "different_product",
+      "row": {
+        "cached": false,
+        "identity": "bd3a72bba9eec4ae493ba9b7642d1e6d064269b4",
+        "leechers": 0,
+        "name": "[Android] Pixel Gun 3D (Pocket Minecraft Edition) v8.3.1 [Action, ENG]",
+        "page_url": "https://rutracker.org/forum/viewtopic.php?t=4873550",
+        "seeders": 5,
+        "size": 288329461,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "manga-01::Nyaa (EN)::0::::0",
+      "rank": 1,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "12873efd06ddd2dde985b23a6c0f044e9d0788ab",
+        "leechers": 31,
+        "name": "One Piece v001-111 + 1134-1176 (2003-2026) (Digital) (1r0n)",
+        "page_url": "https://nyaa.si/view/2084480",
+        "seeders": 74,
+        "size": 21796959027,
+        "source": "Nyaa",
+        "uploaded_at": 1773079135
+      }
+    },
+    {
+      "measurement_id": "manga-01::Nyaa (EN)::0::::0",
+      "rank": 2,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "f85860add1db2aadf2dcaa43fb9303add592604b",
+        "leechers": 1,
+        "name": "One Piece 1194",
+        "page_url": "https://nyaa.si/view/2166512",
+        "seeders": 41,
+        "size": 5872025,
+        "source": "Nyaa",
+        "uploaded_at": 1790442228
+      }
+    },
+    {
+      "measurement_id": "manga-01::Nyaa (EN)::0::::0",
+      "rank": 3,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "6b5c0ba7b5227351733a390dd3b59158b5135b66",
+        "leechers": 0,
+        "name": "One Piece 1193",
+        "page_url": "https://nyaa.si/view/2159739",
+        "seeders": 38,
+        "size": 8703180,
+        "source": "Nyaa",
+        "uploaded_at": 1789161955
+      }
+    },
+    {
+      "measurement_id": "manga-01::Nyaa (EN)::0::::0",
+      "rank": 4,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "ff650f7aaab98c6b190ac88d330201788b2eab18",
+        "leechers": 9,
+        "name": "One Piece - Digital Colored Comics+Cover Stories V1 Batch (v000-v105 & ch0035-1078)",
+        "page_url": "https://nyaa.si/view/2072831",
+        "seeders": 36,
+        "size": 38225208934,
+        "source": "Nyaa",
+        "uploaded_at": 1770241746
+      }
+    },
+    {
+      "measurement_id": "manga-01::Nyaa (EN)::0::::0",
+      "rank": 5,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "24ce1f52c2a893783c04e17ba9cab0b30d2d5fea",
+        "leechers": 0,
+        "name": "One Piece 1191",
+        "page_url": "https://nyaa.si/view/2149412",
+        "seeders": 33,
+        "size": 7759462,
+        "source": "Nyaa",
+        "uploaded_at": 1787329602
+      }
+    },
+    {
+      "measurement_id": "madokami-01::Madokami::0::::0",
+      "rank": 1,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "madokami:/Manga/O/OH/OHAN/Ohana%20Moyou%20no%20One-Piece",
+        "leechers": 0,
+        "name": "/Manga/O/OH/OHAN/Ohana Moyou no One-Piece",
+        "page_url": "https://manga.madokami.al/Manga/O/OH/OHAN/Ohana%20Moyou%20no%20One-Piece",
+        "seeders": 0,
+        "size": 0,
+        "source": "Madokami",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "madokami-01::Madokami::0::::0",
+      "rank": 2,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "madokami:/Manga/O/ON/ONE_/One%20Piece",
+        "leechers": 0,
+        "name": "/Manga/O/ON/ONE_/One Piece",
+        "page_url": "https://manga.madokami.al/Manga/O/ON/ONE_/One%20Piece",
+        "seeders": 0,
+        "size": 0,
+        "source": "Madokami",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "madokami-01::Madokami::0::::0",
+      "rank": 3,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "madokami:/Manga/S/SO/SOFT/Soft%20Shell",
+        "leechers": 0,
+        "name": "/Manga/S/SO/SOFT/Soft Shell",
+        "page_url": "https://manga.madokami.al/Manga/S/SO/SOFT/Soft%20Shell",
+        "seeders": 0,
+        "size": 0,
+        "source": "Madokami",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "madokami-01::Madokami::0::::0",
+      "rank": 4,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "madokami:/Manga/K/KI/KIMI/Kimi%20no%20Kakera",
+        "leechers": 0,
+        "name": "/Manga/K/KI/KIMI/Kimi no Kakera",
+        "page_url": "https://manga.madokami.al/Manga/K/KI/KIMI/Kimi%20no%20Kakera",
+        "seeders": 0,
+        "size": 0,
+        "source": "Madokami",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "madokami-01::Madokami::0::::0",
+      "rank": 5,
+      "label": "related_crossover",
+      "row": {
+        "cached": false,
+        "identity": "madokami:/Manga/C/CR/CROS/Cross%20Epoch",
+        "leechers": 0,
+        "name": "/Manga/C/CR/CROS/Cross Epoch",
+        "page_url": "https://manga.madokami.al/Manga/C/CR/CROS/Cross%20Epoch",
+        "seeders": 0,
+        "size": 0,
+        "source": "Madokami",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "books-01::Libgen::0::::0",
+      "rank": 1,
+      "label": "different_work_variation",
+      "row": {
+        "cached": false,
+        "identity": "libgen:3396318c97ba9cda5cce7792ccb1ccf4",
+        "leechers": 0,
+        "name": "To Match Mr. Darcy: A Modern Pride and Prejudice Novella Variation (Modern Pride & Prejudice: The Darcy and Elizabeth What If Series Book 1) 1 — Nora Jane Crawford & AR Thorne [epub, English]",
+        "page_url": "https://libgen.li/ads.php?md5=3396318c97ba9cda5cce7792ccb1ccf4",
+        "seeders": 0,
+        "size": 645120,
+        "source": "Libgen",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "books-01::Libgen::0::::0",
+      "rank": 2,
+      "label": "different_work_variation",
+      "row": {
+        "cached": false,
+        "identity": "libgen:0ebcb282d93571464bbda88e3079df07",
+        "leechers": 0,
+        "name": "Fixed Stars: A Pride & Prejudice Vagary (Primum Mobile: A Pride & Prejudice Duology Book 1) — S. E. Granger [epub, English]",
+        "page_url": "https://libgen.li/ads.php?md5=0ebcb282d93571464bbda88e3079df07",
+        "seeders": 0,
+        "size": 339968,
+        "source": "Libgen",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "books-01::Libgen::0::::0",
+      "rank": 3,
+      "label": "different_work_variation",
+      "row": {
+        "cached": false,
+        "identity": "libgen:a4327786d116373b11f61363325389fa",
+        "leechers": 0,
+        "name": "Mr. Darcy's Black Magic: A Pride and Prejudice Variation (Pride, Prejudice, and a Bit of Magic Book 4) — Burkett, Elaine [epub, English]",
+        "page_url": "https://libgen.li/ads.php?md5=a4327786d116373b11f61363325389fa",
+        "seeders": 0,
+        "size": 1048576,
+        "source": "Libgen",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "books-01::Libgen::0::::0",
+      "rank": 4,
+      "label": "different_work_variation",
+      "row": {
+        "cached": false,
+        "identity": "libgen:46790bd51c1d38f713740426809e69cb",
+        "leechers": 0,
+        "name": "Something: Regency, Romantic, Rollicking & Reflective: A Pride & Prejudice Collection 2 — Christie Capps [azw3, English]",
+        "page_url": "https://libgen.li/ads.php?md5=46790bd51c1d38f713740426809e69cb",
+        "seeders": 0,
+        "size": 450560,
+        "source": "Libgen",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "books-01::Libgen::0::::0",
+      "rank": 5,
+      "label": "different_work_variation",
+      "row": {
+        "cached": false,
+        "identity": "libgen:250409401336567faf44036fd7efe708",
+        "leechers": 0,
+        "name": "Realizing Mr. Darcy: An Older Man Younger Woman Romance ~ a Pride & Prejudice Variation Short — Penny Pleasantry [epub, English]",
+        "page_url": "https://libgen.li/ads.php?md5=250409401336567faf44036fd7efe708",
+        "seeders": 0,
+        "size": 257024,
+        "source": "Libgen",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Nyaa::0::::0",
+      "rank": 1,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "f0f373faa4d30cc0b03918b773fe9dc31a7f609e",
+        "leechers": 3,
+        "name": "[Nozomi] Saki (720p Complete BD)",
+        "page_url": "https://nyaa.si/view/320245",
+        "seeders": 39,
+        "size": 12992276070,
+        "source": "Nyaa",
+        "uploaded_at": 1338821220
+      }
+    },
+    {
+      "measurement_id": "anime-01::Nyaa::0::::0",
+      "rank": 2,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "6cef40d3402d6f8fe796fdad21b77f3c3fe2e8f7",
+        "leechers": 2,
+        "name": "[Underwater-Mahjong] Saki - 01-25 [TV]",
+        "page_url": "https://nyaa.si/view/88093",
+        "seeders": 8,
+        "size": 5583457484,
+        "source": "Nyaa",
+        "uploaded_at": 1254129900
+      }
+    },
+    {
+      "measurement_id": "anime-01::Nyaa::0::::0",
+      "rank": 3,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "312f185eef71c073b8b167232c248fc4e6c1ddf9",
+        "leechers": 0,
+        "name": "[X5-452] Saki - S1 [Webrip][1080p][x265][Opus][multisubs ar.en.es.fr.it.pt][Vostfr]",
+        "page_url": "https://nyaa.si/view/1622489",
+        "seeders": 7,
+        "size": 2254857830,
+        "source": "Nyaa",
+        "uploaded_at": 1673242854
+      }
+    },
+    {
+      "measurement_id": "anime-01::Nyaa::0::::0",
+      "rank": 4,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "8fb89001638442615cf5b2fe841a7bf88eeb4e13",
+        "leechers": 0,
+        "name": "Saki S1 + S2 [10bit BD 720p | TV 720p]",
+        "page_url": "https://nyaa.si/view/1009317",
+        "seeders": 2,
+        "size": 4617089843,
+        "source": "Nyaa",
+        "uploaded_at": 1519399999
+      }
+    },
+    {
+      "measurement_id": "anime-01::Nyaa::0::::0",
+      "rank": 5,
+      "label": "relevant",
+      "row": {
+        "cached": false,
+        "identity": "f1e85ebdc69b255c6c5026ab70826af5126e255f",
+        "leechers": 0,
+        "name": "[FreakCrSuBuS] Saki [1080][Multisub].mkv",
+        "page_url": "https://nyaa.si/view/990736",
+        "seeders": 1,
+        "size": 7945689497,
+        "source": "Nyaa",
+        "uploaded_at": 1514142577
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 1,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "41f138d7413631fe1c93437ca07e240f267278f1",
+        "leechers": 44,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 12 [1080p CR WEB-DL AVC AAC][MultiSub][191964B0]",
+        "page_url": "https://nyaa.si/view/2162939",
+        "seeders": 556,
+        "size": 935749222,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 2,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "e8f82c67aa0364578293597f6a83a7119f58e92f",
+        "leechers": 2,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 11 [1080p CR WEB-DL AVC AAC][MultiSub][BBF5B6F4]",
+        "page_url": "https://nyaa.iss.ink/view/2159515",
+        "seeders": 266,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 3,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "035571070bc26136ffea64c05808c41da2acdb3a",
+        "leechers": 52,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 05 [1080p CR WEBRip HEVC AAC][MultiSub][F843B179]",
+        "page_url": "https://nyaa.si/view/2139688",
+        "seeders": 237,
+        "size": 370671616,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 4,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "134546ad0d1ed6870d2f25b0c27fdb9c0313409f",
+        "leechers": 18,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 07 [1080p CR WEBRip HEVC AAC][MultiSub][3AC1DB45]",
+        "page_url": "https://nyaa.si/view/2146269",
+        "seeders": 220,
+        "size": 292133273,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 5,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "8517259209da23d8487eb0c8ebdfb84f4b7156e4",
+        "leechers": 21,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 08 [1080p CR WEBRip HEVC AAC][MultiSub][98E94C95]",
+        "page_url": "https://nyaa.si/view/2149471",
+        "seeders": 186,
+        "size": 278396928,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 6,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "15a25b39835232b04c49283250ecd5f10b667bae",
+        "leechers": 3,
+        "name": "[Erai-raws] Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken - 12 [1080p CR WEB-DL AVC AAC][MultiSub][31E88E53]",
+        "page_url": "https://nyaa.iss.ink/view/2164581",
+        "seeders": 176,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 7,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "47dd54fc9873fd5ec38a8bdeacb4c3a2a0edb680",
+        "leechers": 46,
+        "name": "[LoliHouse] 『你们先走我断后』，于是10年后我成为了传说 / Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita. - 10 [WebRip 1080p HEVC-10bit AAC][无中字]",
+        "page_url": "https://nyaa.si/view/2156272",
+        "seeders": 175,
+        "size": 530998886,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 8,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "6253a71d410dd1d11f4682567627efa1bce4a57f",
+        "leechers": 39,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 12 [1080p CR WEBRip HEVC AAC][MultiSub][B98AACE6]",
+        "page_url": "https://nyaa.si/view/2162992",
+        "seeders": 168,
+        "size": 370881331,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 9,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "8bc60d279ba4e8176faa7418a5fbc7686179726f",
+        "leechers": 39,
+        "name": "[LoliHouse] 『你们先走我断后』，于是10年后我成为了传说 / Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita. - 09 [WebRip 1080p HEVC-10bit AAC][无中字]",
+        "page_url": "https://nyaa.si/view/2152843",
+        "seeders": 164,
+        "size": 471649484,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 10,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "9df211a708a8367ebef0faeba0b5a904f4220bbf",
+        "leechers": 0,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 10 [1080p CR WEB-DL AVC AAC][MultiSub][2A0F13D3]",
+        "page_url": "https://nyaa.iss.ink/view/2156179",
+        "seeders": 163,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 11,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "4c24d6905d8062f266cdfebadcce87620e75052c",
+        "leechers": 28,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 11 [720p CR WEB-DL AVC AAC][MultiSub][9492AD43]",
+        "page_url": "https://nyaa.si/view/2159522",
+        "seeders": 155,
+        "size": 439563059,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 12,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "6009d65eee76f51d66d608497950511576f63e04",
+        "leechers": 59,
+        "name": "[LoliHouse] 『你们先走我断后』，于是10年后我成为了传说 / Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita. - 05 [WebRip 1080p HEVC-10bit AAC][无中字]",
+        "page_url": "https://nyaa.si/view/2139718",
+        "seeders": 154,
+        "size": 524183142,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 13,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "44c2a83e510de40b160514aa0b4d890cab09b57d",
+        "leechers": 47,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 10 [720p CR WEB-DL AVC AAC][MultiSub][DF5CBF6B]",
+        "page_url": "https://nyaa.si/view/2156182",
+        "seeders": 154,
+        "size": 460115148,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 14,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "f31d7f5984a715ce918fd8a5de2fb20a13a43f2e",
+        "leechers": 21,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 05 [720p CR WEB-DL AVC AAC][MultiSub][5553FFD1]",
+        "page_url": "https://nyaa.si/view/2139654",
+        "seeders": 150,
+        "size": 352006963,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 15,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "22dd45c5a8e7bc579194da06245f243933870882",
+        "leechers": 20,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 12 [720p CR WEB-DL AVC AAC][MultiSub][11A0F12D]",
+        "page_url": "https://nyaa.si/view/2162947",
+        "seeders": 144,
+        "size": 460220006,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 16,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "639b426f589d40b7f5b3a8c28eafa9d90f990d4c",
+        "leechers": 0,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 02 [1080p CR WEB-DL AVC AAC][MultiSub][3FEF0C65]",
+        "page_url": "https://nyaa.iss.ink/view/2130570",
+        "seeders": 141,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 17,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "fd035d7510a26657bcbd09bd7fb9195702b6fbb9",
+        "leechers": 28,
+        "name": "[LoliHouse] 『你们先走我断后』，于是10年后我成为了传说 / Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita. - 06 [WebRip 1080p HEVC-10bit AAC][无中字]",
+        "page_url": "https://nyaa.si/view/2143090",
+        "seeders": 132,
+        "size": 601148620,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 18,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "501afd2604678ffba83703de52d822cf07620f90",
+        "leechers": 0,
+        "name": "[ToonsHub] Koko wa Ore ni Makasete Saki ni Ike to Ittekara 10-nen ga Tattara Densetsu ni Natteita S01E12 1080p AMZN WEB-DL DDP2.0 H.264 (I Became a Legend After My 10 Year-Long Last Stand)",
+        "page_url": "https://nyaa.iss.ink/view/2162924",
+        "seeders": 129,
+        "size": 660183449,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 19,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "e63e269f98ecdbbe7a920c7a7802a92185efa605",
+        "leechers": 7,
+        "name": "[LoliHouse] 『你们先走我断后』，于是10年后我成为了传说 / Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita. - 12 [WebRip 1080p HEVC-10bit AAC][无中字][END]",
+        "page_url": "https://nyaa.si/view/2163116",
+        "seeders": 128,
+        "size": 523973427,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 20,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "143ade547220f85508ae169760dca1371eb7c0a0",
+        "leechers": 19,
+        "name": "[LoliHouse] 『你们先走我断后』，于是10年后我成为了传说 / Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita. - 08 [WebRip 1080p HEVC-10bit AAC][无中字]",
+        "page_url": "https://nyaa.si/view/2149452",
+        "seeders": 128,
+        "size": 407896064,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 21,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "4cfd808125f11ec72870c8fd13a55fa0aacf43a6",
+        "leechers": 3,
+        "name": "[Erai-raws] Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken - 11 [1080p CR WEB-DL AVC AAC][MultiSub][771F4C5B]",
+        "page_url": "https://nyaa.iss.ink/view/2161495",
+        "seeders": 127,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 22,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "072932c7784d30895b6cb26ee84223c454e9b461",
+        "leechers": 0,
+        "name": "[Judas] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natte Ita (I Became a Legend After My 10 Year-Long Last Stand) - S01E05 [1080p][HEVC x265 10bit][Multi-Subs] (Weekly)",
+        "page_url": "https://nyaa.iss.ink/view/2139686",
+        "seeders": 124,
+        "size": 213909504,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 23,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "4fe28a103e8b117e412c312af68f138f9b3a9df2",
+        "leechers": 14,
+        "name": "[LoliHouse] 『你们先走我断后』，于是10年后我成为了传说 / Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita. - 11 [WebRip 1080p HEVC-10bit AAC][无中字]",
+        "page_url": "https://nyaa.si/view/2159677",
+        "seeders": 117,
+        "size": 455081984,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 24,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "5550d11248ea37a1102c3da95f28efa18efc8b98",
+        "leechers": 5,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 04 [720p CR WEB-DL AVC AAC][MultiSub][9CB88B27]",
+        "page_url": "https://nyaa.iss.ink/view/2136739",
+        "seeders": 115,
+        "size": 373607628,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 25,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "97f1f97f185bf3b22326b623644cd06a66d56912",
+        "leechers": 4,
+        "name": "[Erai-raws] Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken - 10 [1080p CR WEB-DL AVC AAC][MultiSub][B6EDE38E]",
+        "page_url": "https://nyaa.iss.ink/view/2157935",
+        "seeders": 114,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 26,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "f750e38bcf02774f5f1bdef12e05bf4956a7a340",
+        "leechers": 0,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 09 [1080p CR WEB-DL AVC AAC][MultiSub][04370F09]",
+        "page_url": "https://nyaa.iss.ink/view/2152538",
+        "seeders": 114,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 27,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "9e3452bdb121816d8e9a9d12f0674cc9015b5475",
+        "leechers": 1,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 07 [1080p CR WEB-DL AVC AAC][MultiSub][0EAACD37]",
+        "page_url": "https://nyaa.iss.ink/view/2146088",
+        "seeders": 114,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 28,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "5874a95d45ee1515ecb470a31fd872fbb43dda90",
+        "leechers": 1,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 01 [1080p CR WEB-DL AVC AAC][MultiSub][88947B8C]",
+        "page_url": "https://nyaa.iss.ink/view/2128529",
+        "seeders": 113,
+        "size": 1395864371,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 29,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "2a6e603a2aa055dbb70352aa86651e93b6d8ba5e",
+        "leechers": 14,
+        "name": "[LoliHouse] 『你们先走我断后』，于是10年后我成为了传说 / Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita. - 04 [WebRip 1080p HEVC-10bit AAC][无中字]",
+        "page_url": "https://nyaa.iss.ink/view/2136909",
+        "seeders": 112,
+        "size": 516004249,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 30,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "79cf0fad99217fd67e56128043915742dca9e1f6",
+        "leechers": 14,
+        "name": "[Erai-raws] Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken - 10 [720p CR WEB-DL AVC AAC][MultiSub][350C97FB]",
+        "page_url": "https://nyaa.si/view/2157939",
+        "seeders": 111,
+        "size": 458227712,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 31,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "5e79e5ace76721bef1381f7afa8c00d5c86ed18f",
+        "leechers": 38,
+        "name": "[AsukaRaws] Koko wa Ore ni Makasete Saki ni Ike - 12 (WEB-DL 1280x720 x264 AAC)",
+        "page_url": "https://nyaa.si/view/2162960",
+        "seeders": 109,
+        "size": 290455552,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 32,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "124f798b408f52b899a75a93df07e25883f53d40",
+        "leechers": 0,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 01 [1080p CR WEBRip HEVC AAC][MultiSub][AF839049]",
+        "page_url": "https://nyaa.iss.ink/view/2128820",
+        "seeders": 108,
+        "size": 449629388,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 33,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "b36d12260606029425bb95064bf776bdfedb0e30",
+        "leechers": 33,
+        "name": "[AsukaRaws] Koko wa Ore ni Makasete Saki ni Ike - 04 (WEB-DL 1280x720 x264 AAC)",
+        "page_url": "https://nyaa.si/view/2136750",
+        "seeders": 107,
+        "size": 290560409,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 34,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "3e24b3c3bf9f621d87ec96591654135db8fbd8d0",
+        "leechers": 0,
+        "name": "[Judas] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natte Ita (I Became a Legend After My 10 Year-Long Last Stand) - S01E01 [1080p][HEVC x265 10bit][Multi-Subs] (Weekly)",
+        "page_url": "https://nyaa.iss.ink/view/2127757",
+        "seeders": 106,
+        "size": 283115520,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 35,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "dd6a78bd79a28ef01a806d9fbc69c5a5fd603622",
+        "leechers": 29,
+        "name": "[Erai-raws] Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken - 09 [720p CR WEB-DL AVC AAC][MultiSub][E821E4E8]",
+        "page_url": "https://nyaa.si/view/2154461",
+        "seeders": 105,
+        "size": 455920844,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 36,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "bd50481fdcde4d0035e4d4792b6029bcb14f96c9",
+        "leechers": 30,
+        "name": "[AsukaRaws] Koko wa Ore ni Makasete Saki ni Ike - 10 (WEB-DL 1280x720 x264 AAC)",
+        "page_url": "https://nyaa.si/view/2156192",
+        "seeders": 104,
+        "size": 290665267,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 37,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "7809f82884a195d498025ad33cef01323e0d33fc",
+        "leechers": 22,
+        "name": "[Erai-raws] Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken - 08 [720p CR WEB-DL AVC AAC][MultiSub][B57FE226]",
+        "page_url": "https://nyaa.si/view/2150914",
+        "seeders": 104,
+        "size": 462002585,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 38,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "3eec237378a6ab8c2a03edf7aaab4ba91ad6e11f",
+        "leechers": 9,
+        "name": "[LoliHouse] 『你们先走我断后』，于是10年后我成为了传说 / Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita. - 07 [WebRip 1080p HEVC-10bit AAC][无中字]",
+        "page_url": "https://nyaa.iss.ink/view/2146243",
+        "seeders": 101,
+        "size": 426770432,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 39,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "ec8f6579278abed39e741130164c2b665bddc9cf",
+        "leechers": 3,
+        "name": "Прошло десять лет с момента, как я сказал «Оставьте это на меня и уходите» и стал легендой / Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natte Ita (Natteita) [TV] [01 из XX] [RUS(int), JAP+Sub] [2026, Фэнтези, WEB-DL] [1080p]",
+        "page_url": "https://rutracker.org/forum/viewtopic.php?t=6878829",
+        "seeders": 98,
+        "size": 1489864320,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 40,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "9d64ef59ec1d1a18b9ccc1f69fb2d3120f120d77",
+        "leechers": 17,
+        "name": "[Erai-raws] Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken - 11 [720p CR WEB-DL AVC AAC][MultiSub][488A5AAA]",
+        "page_url": "https://nyaa.si/view/2161496",
+        "seeders": 97,
+        "size": 459905433,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 41,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "0e1c8c902b860633e0b35264169d80774ced8465",
+        "leechers": 1,
+        "name": "[Erai-raws] Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken - 09 [1080p CR WEB-DL AVC AAC][MultiSub][5A5A8522]",
+        "page_url": "https://nyaa.iss.ink/view/2154458",
+        "seeders": 97,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 42,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "a1631fe324b04a34a9093aa0b03e9f9826148dc6",
+        "leechers": 20,
+        "name": "[Erai-raws] Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken - 06 [720p CR WEB-DL AVC AAC][MultiSub][4A05ABEE]",
+        "page_url": "https://nyaa.si/view/2144544",
+        "seeders": 96,
+        "size": 211917209,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 43,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "636be1cbfb565bf88ee4881ae113bcad4820b001",
+        "leechers": 28,
+        "name": "[AsukaRaws] Koko wa Ore ni Makasete Saki ni Ike - 08 (WEB-DL 1280x720 x264 AAC)",
+        "page_url": "https://nyaa.si/view/2149295",
+        "seeders": 94,
+        "size": 290874982,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 44,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "163052a0cddb0d77ad7e29bfcc10c7c0926fd4d7",
+        "leechers": 0,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 06 [1080p CR WEB-DL AVC AAC][MultiSub][DC656EBF]",
+        "page_url": "https://nyaa.iss.ink/view/2142981",
+        "seeders": 94,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 45,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "a76c877f9a89f5662622f5c94f8f6f91e24215a6",
+        "leechers": 0,
+        "name": "[Erai-raws] Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita - 04 [1080p CR WEB-DL AVC AAC][MultiSub][965AF483]",
+        "page_url": "https://nyaa.iss.ink/view/2136738",
+        "seeders": 93,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 46,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "7446f785f24254e4fabf6ddce947251c002d6266",
+        "leechers": 54,
+        "name": "I Became a Legend after My 10 Year Long Last Stand S01E12 Leave the Next Ten Years and Beyond to Me Too 1080p CR WEB-DL AAC2.0 H.264-VARYG (Koko wa Ore ni Makasete Saki ni Ike to Ittekara 10-nen ga Tattara Densetsu ni Na, Multi-Subs)",
+        "page_url": "https://nyaa.si/view/2162949",
+        "seeders": 237,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 47,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "1d7dc2ec7934d591b788513acac8bd84a57d5446",
+        "leechers": 0,
+        "name": "I Became a Legend After My 10 Year Long Last Stand S01E10 SUBFRENCH 1080p CR WEB-DL AAC2.0 x264-Tsundere-Raws (VOSTFR, Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10 nen ga Tattara Densetsu ni Natteita)",
+        "page_url": "https://nyaa.iss.ink/view/2156177",
+        "seeders": 97,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 48,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "a995be44cd6fa15dec9bd6c34203ab05c1daa68e",
+        "leechers": 5,
+        "name": "[AnoZu] Oh Boy, Was I Wrong About Her S01E10 1080p CR WEB-DL AAC 2.0 H.264 | Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken",
+        "page_url": "https://nyaa.si/view/2157946",
+        "seeders": 97,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 49,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "95c1d42323f5d1fe2c1ef0a932c0bf9a7e8c672e",
+        "leechers": 4,
+        "name": "[AnoZu] Oh Boy, Was I Wrong About Her S01E09 1080p CR WEB-DL AAC 2.0 H.264 | Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken",
+        "page_url": "https://nyaa.si/view/2154463",
+        "seeders": 93,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    },
+    {
+      "measurement_id": "anime-01::Knaben::0::::0",
+      "rank": 50,
+      "label": "different_work",
+      "row": {
+        "cached": false,
+        "identity": "a6c1e791f1958c1f4205bb1bede55fe36bb878c9",
+        "leechers": 1,
+        "name": "[AnoZu] I Became a Legend After My 10 Year-Long Last Stand S01E12 1080p CR WEB-DL AAC 2.0 H.264 | Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita.",
+        "page_url": "https://nyaa.iss.ink/view/2162946",
+        "seeders": 92,
+        "size": 1503238553,
+        "source": "Knaben",
+        "uploaded_at": 0
+      }
+    }
+  ]
+}
