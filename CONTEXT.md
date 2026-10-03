@@ -34,11 +34,19 @@ group children stay in flat `PROVIDERS` with their own slugs.
 **CombinedProvider** (`slug="all"`) orchestrates a selection of concrete
 providers. It creates independent provider instances for its settings profile
 and for each search invocation; it never borrows mutable registry instances.
-Its profile lives under `settings.combined_search`: selected slugs, per-provider
-engine modes/presets, and shared name include/exclude rules. Initial settings
+Named profiles live under `settings.search_profiles`, with stable IDs, unique
+display names, an active ID, and independent combined snapshots. Each remembers
+selected slugs, per-provider engine modes/required and preferred presets,
+shared name include/exclude rules, and result order. The former
+`settings.combined_search` is read as Default until an explicit save migrates it;
+it then mirrors the active profile for older versions. Initial settings
 copy solo settings except Anime resolution presets. No fresh Anime search
 requires a resolution; explicitly saved resolution choices remain respected.
-See [ADR-0013](docs/adr/0013-combined-provider-search.md).
+The profile editor commits all nested drafts together. History replay is detached
+from named profiles; saving its settings creates a separate History search profile.
+CLI `--profile` and `--providers` select/override a session without changing saved
+settings. See [ADR-0013](docs/adr/0013-combined-provider-search.md) and
+[ADR-0015](docs/adr/0015-named-profiles-and-preset-preferences.md).
 
 Combined searches retain provider/category boundaries. Each selected provider
 has an independent coordinator, processing its titles sequentially; six engine
@@ -99,8 +107,10 @@ source rows from these annotations. Real 40-digit hex hashes deduplicate across
 providers; other identifiers are scoped by source and URL/handle. The first
 matching provider in registry order supplies the row, and all origins are kept.
 `provider_for_result` selects download capabilities and pick statistics; the
-unchanged source still selects the acquisition adapter. Title relevance orders
-the combined table, preserving provider ordering for equal scores.
+unchanged source still selects the acquisition adapter. Recommended order uses
+title relevance, then the number of preferred presets matched in the originating
+provider, preserving provider ordering for equal scores. Explicit result sorts
+override that ranking without changing acquisition indexes.
 
 ## Acquisition
 
@@ -137,11 +147,17 @@ stay session-unaware.**
 
 `FilterConfig` (`filters.py`) structures result filtering (size/seeders/
 keywords, plus optional `include_regex` and a name-only `name_predicate`).
-Applied in order: provider defaults → active presets → CLI flags.
-A `FilterPreset` is a named config the user toggles per provider; active
-presets persist under the provider's slug.
+Applied in order: provider defaults → required presets → CLI flags.
+A `FilterPreset` is a named config with an Off / Require / Prefer selection.
+`active_presets` retains required presets for compatibility; `preferred_presets`
+scores matching rows without excluding others. Old active presets remain required.
+Preferences choose the best alias before hash deduplication and break relevance
+ties in Anime/combined searches. A required language filter is never relaxed by a
+preference. Provider settings also persist `result_sort`; combined profiles have
+their own overall sort. The table's `f` refinement changes only that result view.
+See [ADR-0015](docs/adr/0015-named-profiles-and-preset-preferences.md).
 
-A preset may also shape the search itself, not just the rows it returns
+A required or preferred preset may also shape the search itself, not just the rows it returns
 (see [ADR-0011](docs/adr/0011-presets-may-shape-the-search.md)):
 `query_terms` fans one query out over extra spellings (`Toy Story` →
 `Toy Story dublado`), and `require_engines` forces named engines On for the

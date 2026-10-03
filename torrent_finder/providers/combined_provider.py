@@ -11,15 +11,13 @@ import threading
 
 from torrent_finder.filters import FilterConfig, apply_filters
 from torrent_finder.providers.base import BaseProvider
-from torrent_finder.result_view import title_score
+from torrent_finder.result_view import SORT_ORDERS, title_score
+from torrent_finder.search_profiles import ProfileLibrary
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import SearchControl
-from torrent_finder.state import (
-    apply_provider_state, load_setting, provider_snapshot, save_setting,
-)
+from torrent_finder.state import apply_provider_state, provider_snapshot
 
-_PROFILE_KEY = "combined_search"
 _REQUEST_LIMIT = 6
 SEARCH_SECONDS = 30.0
 _LABELS = {
@@ -72,6 +70,8 @@ class CombinedProvider(BaseProvider):
         self._children = None
         self.selected_slugs = set()
         self.shared_filters = FilterConfig()
+        self.profile_id = "default"
+        self.profile_name = "Default"
 
     def _init_engines(self):
         return []
@@ -79,8 +79,16 @@ class CombinedProvider(BaseProvider):
     @property
     def children(self):
         if self._children is None:
-            self.restore(load_setting(_PROFILE_KEY, {}))
+            self.use_profile(ProfileLibrary.load().current)
         return self._children
+
+    def use_profile(self, entry):
+        self.restore(entry["settings"])
+        self.profile_id, self.profile_name = entry["id"], entry["name"]
+
+    def restore_history(self, profile):
+        self.restore(profile)
+        self.profile_id, self.profile_name = None, "History search (unsaved)"
 
     def restore(self, profile):
         profile = profile if isinstance(profile, dict) else {}
@@ -102,6 +110,8 @@ class CombinedProvider(BaseProvider):
             include_keywords=list(shared.get("include_keywords", [])),
             exclude_keywords=list(shared.get("exclude_keywords", [])),
         )
+        order = profile.get("result_sort", "relevance")
+        self.result_sort = order if isinstance(order, str) and order in SORT_ORDERS else "relevance"
 
     def snapshot(self):
         children = self.children
@@ -112,20 +122,40 @@ class CombinedProvider(BaseProvider):
                 "include_keywords": list(self.shared_filters.include_keywords),
                 "exclude_keywords": list(self.shared_filters.exclude_keywords),
             },
+            "result_sort": self.result_sort,
         }
 
-    def save_profile(self):
-        from torrent_finder import store
-        save_setting(_PROFILE_KEY, self.snapshot())
-        store.flush()
+    def profile_draft(self):
+        snapshot = self.snapshot()
+        library = ProfileLibrary.load()
+        if any(entry["id"] == self.profile_id for entry in library.entries):
+            library.select(self.profile_id)
+            library.update(snapshot)
+        else:
+            name, number = "History search", 2
+            while library.find(name):
+                name, number = f"History search {number}", number + 1
+            library.create(name, snapshot)
+        return library
+
+    def save_profile(self, library=None):
+        library = library if library is not None else self.profile_draft()
+        library.update(self.snapshot())
+        library.save()
+        self.profile_id, self.profile_name = library.current["id"], library.current["name"]
 
     def summary(self):
         selected = [p for p in self.children if p.slug in self.selected_slugs]
         names = ", ".join(provider_label(p) for p in selected)
         selection = names if len(selected) <= 3 else f"{len(selected)} providers selected"
-        presets = sum(len(p.active_presets) for p in selected)
+        required = sum(len(p.active_presets) for p in selected)
+        preferred = sum(len(p.preferred_presets) for p in selected)
         shared = len(self.shared_filters.include_keywords) + len(self.shared_filters.exclude_keywords)
-        return selection or "No providers selected", f"{presets} provider presets; {shared} shared name rules"
+        return (selection or "No providers selected",
+                f"{self.profile_name} · Require: {required}; Prefer: {preferred}; {shared} name rules")
+
+    def filter_summary(self):
+        return self.summary()[1]
 
     def search(self, query, cli_filters=None):
         return self.search_many([query], cli_filters)
@@ -247,10 +277,13 @@ class CombinedProvider(BaseProvider):
                 row["provider_label"] = provider_label(provider)
                 row["matched_providers"] = [provider.slug]
                 row["matched_queries"] = [query]
+                row["preference_score"] = provider.preference_score(row)
                 if len(queries) > 1:
                     row["from_work"] = query
                 merged[key] = row
         # Preserve each provider's ordering among equally relevant rows. This
         # keeps direct downloads useful even without swarm statistics.
-        ordered = sorted(merged.values(), key=lambda r: max(title_score(r.name, q) for q in queries), reverse=True)
+        ordered = sorted(merged.values(), key=lambda r: (
+            max(title_score(r.name, q) for q in queries), r.get("preference_score", 0)
+        ), reverse=True)
         return CombinedResults(ordered, messages)

@@ -170,6 +170,8 @@ class BaseProvider(ABC):
     
     def __init__(self):
         self.active_presets: list[FilterPreset] = []
+        self.preferred_presets: list[FilterPreset] = []
+        self.result_sort = "relevance"
         self.engines: list[SearchEngine] = self._init_engines()
         self.search_slots = None
         self.cancel_event = None
@@ -199,7 +201,7 @@ class BaseProvider(ABC):
         # just "dublado" or "nacional" and return unrelated movies.
         if any(
             normalized.casefold().endswith(f" {term.strip().casefold()}")
-            for preset in self.active_presets
+            for preset in self.search_presets
             for term in preset.query_terms
             if term.strip()
         ):
@@ -456,7 +458,7 @@ class BaseProvider(ABC):
         presets can't multiply one search into a request storm.
         """
         queries = [query]
-        for preset in self.active_presets:
+        for preset in self.search_presets:
             for term in getattr(preset, "query_terms", ()):
                 candidate = f"{query} {term}".strip()
                 if candidate not in queries:
@@ -467,7 +469,7 @@ class BaseProvider(ABC):
         """Engine names active presets need forced On for this search only."""
         return {
             name
-            for preset in self.active_presets
+            for preset in self.search_presets
             for name in getattr(preset, "require_engines", ())
         }
 
@@ -575,6 +577,11 @@ class BaseProvider(ABC):
         if result_filter is not None:
             merged = [item for item in merged if result_filter(item)]
 
+        # Prefer the best-matching alias before hash deduplication. Sorting a
+        # new list also keeps engine/cache-owned lists and rows untouched.
+        if self.preferred_presets:
+            merged = sorted(merged, key=self.preference_score, reverse=True)
+
         # Indexers can give the same hash different names. Filter before
         # deduplicating so a plain title arriving first cannot hide a later
         # release name that supplies the requested language/quality tags.
@@ -585,10 +592,31 @@ class BaseProvider(ABC):
             if info_hash not in seen_hashes:
                 seen_hashes.add(info_hash)
                 unique.append(item)
-        ordered = self._sort_results(unique)
+        ordered = self.rank_preferences(self._sort_results(unique))
         if self.prefer_title_matches:
             ordered.sort(key=lambda row: title_score(row.name, query), reverse=True)
         return ordered
+
+    @property
+    def search_presets(self) -> list[FilterPreset]:
+        """Required and preferred presets can both request bounded extra queries."""
+        return self.active_presets + [p for p in self.preferred_presets if p not in self.active_presets]
+
+    def preference_score(self, row) -> int:
+        return sum(bool(apply_filters([row], p.config)) for p in self.preferred_presets
+                   if p not in self.active_presets)
+
+    def rank_preferences(self, rows):
+        """Stable ranking; unmatched rows remain eligible, requirements never relax."""
+        return sorted(rows, key=self.preference_score, reverse=True) if self.preferred_presets else rows
+
+    def filter_summary(self) -> str:
+        parts = []
+        if self.active_presets:
+            parts.append("Require: " + ", ".join(p.name for p in self.active_presets))
+        if self.preferred_presets:
+            parts.append("Prefer: " + ", ".join(p.name for p in self.preferred_presets))
+        return "; ".join(parts) or "No presets"
 
     def _sort_results(self, results: list[SearchResult]) -> list[SearchResult]:
         """Order merged results for display. Default: seeders descending.

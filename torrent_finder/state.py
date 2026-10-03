@@ -94,6 +94,12 @@ def apply_provider_state(provider, pstate: dict) -> None:
             )
     saved_preset_names = pstate.get("active_presets", [])
     provider.active_presets = [p for p in provider.presets if p.name in saved_preset_names]
+    preferred = pstate.get("preferred_presets", [])
+    provider.preferred_presets = [p for p in provider.presets
+                                 if p.name in preferred and p not in provider.active_presets]
+    from torrent_finder.result_view import SORT_ORDERS
+    order = pstate.get("result_sort", "relevance")
+    provider.result_sort = order if isinstance(order, str) and order in SORT_ORDERS else "relevance"
 
 
 def provider_snapshot(provider) -> dict:
@@ -101,9 +107,11 @@ def provider_snapshot(provider) -> dict:
         "engines": {e.name: e.enabled for e in provider.engines},
         "engine_modes": {e.name: e.mode for e in provider.engines},
         "explicitly_disabled_engines": [
-            e.name for e in provider.engines if e.mode == "off" and e.explicitly_disabled
+            e.name for e in provider.engines if e.mode == "off"
         ],
         "active_presets": [p.name for p in provider.active_presets],
+        "preferred_presets": [p.name for p in provider.preferred_presets if p not in provider.active_presets],
+        "result_sort": provider.result_sort,
     }
 
 

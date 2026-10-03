@@ -2,6 +2,8 @@
 
 from torrent_finder.providers.combined_provider import CombinedProvider, provider_label
 from torrent_finder.ui.selector import SelectItem, arrow_select
+from torrent_finder.result_view import SORT_ORDERS
+from torrent_finder.ui.result_filters import choose_result_sort
 
 
 _SHARED_HELP = {
@@ -69,7 +71,7 @@ def _configure_provider(draft):
         items = [
             SelectItem(provider_label(p), p, is_action=True,
                        hint=("included" if p.slug in draft.selected_slugs else "excluded")
-                       + " · " + (", ".join(pr.name for pr in p.active_presets) or "no presets"))
+                       + " · " + p.filter_summary())
             for p in draft.children
         ]
         items.append(SelectItem("Back", None, is_action=True))
@@ -81,41 +83,117 @@ def _configure_provider(draft):
         filter_menu(items[chosen].value, on_save=lambda: None)
 
 
+def _profile_name(library, *, rename=False):
+    from rich.text import Text
+    from torrent_finder.ui.prompts import get_query_with_shortcut
+    error = ""
+    initial = library.current["name"] if rename else ""
+    while True:
+        def render(target):
+            target.print(Text("Rename profile" if rename else "Save a copy as a new profile", style="bold cyan"))
+            target.print(Text("Use a unique name (1–60 characters). Changes stay in the draft until Save and return."))
+            if error:
+                target.print(Text(error, style="red"))
+            target.print(Text("Enter confirm • Esc cancel", style="dim"))
+        value = get_query_with_shortcut("Profile name: ", initial=initial, screen_renderer=render)
+        if not isinstance(value, str) or value == "GO_BACK":
+            return None
+        try:
+            return library.validate_name(value, library.current["id"] if rename else None)
+        except ValueError as problem:
+            error, initial = str(problem), value
+
+
+def _manage_profiles(draft, library):
+    from rich.markup import escape
+    from torrent_finder.ui.prompts import _make_banner_panel, confirm_prompt
+    library.update(draft.snapshot())
+    items = [SelectItem(entry["name"], ("select", entry["id"]),
+                        hint="current" if entry["id"] == library.current["id"] else "",
+                        description="Use this profile. Draft edits are kept until you save or cancel the settings menu.")
+             for entry in library.entries]
+    items.extend([
+        SelectItem("Save a copy as a new profile…", ("copy", None)),
+        SelectItem("Rename current profile…", ("rename", None)),
+        SelectItem("Delete current profile…", ("delete", None), enabled=len(library.entries) > 1,
+                   description="Keep at least one profile. Deletion takes effect only after Save and return."),
+        SelectItem("Back", ("back", None)),
+    ])
+    selected = arrow_select(items, title="Search profiles", banner=_make_banner_panel(),
+                            footer="Enter choose • Esc back • Changes remain a draft")
+    if selected is None:
+        return
+    action, identity = items[selected].value
+    if action == "select":
+        library.select(identity)
+    elif action in ("copy", "rename"):
+        name = _profile_name(library, rename=action == "rename")
+        if name is None:
+            return
+        if action == "copy":
+            library.create(name, draft.snapshot())
+        else:
+            library.rename(library.current["id"], name)
+    elif action == "delete":
+        if not confirm_prompt(f"Delete profile '{escape(library.current['name'])}'?", title="Delete profile"):
+            return
+        library.delete(library.current["id"])
+    else:
+        return
+    draft.use_profile(library.current)
+
+
 def combined_filter_menu(provider):
     from torrent_finder.ui.prompts import _make_banner_panel, get_query_with_shortcut
+    from rich.markup import escape
+    library = provider.profile_draft()
     draft = CombinedProvider(provider.templates)
-    draft.restore(provider.snapshot())
+    draft.use_profile(library.current)
+    error = ""
     while True:
         items = [
+            SelectItem(f"Profile: {draft.profile_name}…", "profiles", enabled=bool(draft.selected_slugs),
+                       description="Switch, copy, rename or delete a saved setup. A profile can select one or several providers. Select at least one provider first."),
             SelectItem(f"Providers: {len(draft.selected_slugs)} selected", "providers"),
             SelectItem("All providers: include name phrases…", "include_keywords",
                        hint=", ".join(draft.shared_filters.include_keywords) or "any name",
-                       description=_SHARED_HELP["include_keywords"]),
+                       description="Keep names matching any listed phrase. Enter for examples and editing. Empty allows any name."),
             SelectItem("All providers: exclude name phrases…", "exclude_keywords",
                        hint=", ".join(draft.shared_filters.exclude_keywords) or "none",
-                       description=_SHARED_HELP["exclude_keywords"]),
+                       description="Hide names matching any listed phrase, even if included. Enter for examples and editing."),
             SelectItem("Provider engines and presets…", "configure",
                        description="Each provider keeps its own settings. Resolution and language presets stay scoped to that provider."),
+            SelectItem(f"Result order: {SORT_ORDERS[draft.result_sort]}", "sort",
+                       description="Saved in this profile. Recommended uses title relevance, then preferences. Other sorts override ranking; required filters still apply."),
             SelectItem("Save and return  [w]", "save", enabled=bool(draft.selected_slugs),
                        description="Select at least one provider to save." if not draft.selected_slugs else ""),
             SelectItem("Cancel", "cancel"),
         ]
+        save_index = next(i for i, item in enumerate(items) if item.value == "save")
         chosen = arrow_select(
             items, title="Search across providers — filters", banner=_make_banner_panel(),
-            footer="Enter choose • w save • Esc cancel (discard changes)",
-            key_actions={"w": lambda *_: 4 if draft.selected_slugs else True,
-                         "W": lambda *_: 4 if draft.selected_slugs else True},
+            footer=(escape(error) + "\n" if error else "") + "Enter choose • w save all profiles • Esc discard changes",
+            key_actions={"w": lambda *_: save_index if draft.selected_slugs else True,
+                         "W": lambda *_: save_index if draft.selected_slugs else True},
         )
         if chosen is None or items[chosen].value == "cancel":
             return
         action = items[chosen].value
         if action == "providers":
             _choose_providers(draft)
+        elif action == "profiles":
+            _manage_profiles(draft, library)
+        elif action == "sort":
+            draft.result_sort = choose_result_sort(draft.result_sort)
         elif action == "configure":
             _configure_provider(draft)
         elif action == "save":
-            provider.restore(draft.snapshot())
-            provider.save_profile()
+            try:
+                draft.save_profile(library)
+            except ValueError as problem:
+                error = str(problem)
+                continue
+            provider.use_profile(library.current)
             return
         else:
             previous = ", ".join(getattr(draft.shared_filters, action))

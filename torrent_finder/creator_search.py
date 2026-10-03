@@ -10,8 +10,9 @@ search.
 
 import concurrent.futures
 
-from torrent_finder.search_result import SearchResult, normalize_result
+from torrent_finder.search_result import SearchResult
 from torrent_finder.search_errors import SearchError
+from torrent_finder.result_view import title_score
 
 
 def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6) -> list[SearchResult]:
@@ -32,8 +33,7 @@ def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6)
     if not tasks:
         return []
 
-    seen_hashes: set = set()
-    merged: list[SearchResult] = []
+    candidates: list[SearchResult] = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_work = {
@@ -50,14 +50,21 @@ def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6)
             except Exception:
                 rows = []
             for raw_row in rows:
-                r = normalize_result(raw_row)
-                h = r.info_hash.lower()
-                if h and h in seen_hashes:
-                    continue
-                if h:
-                    seen_hashes.add(h)
-                r.setdefault("from_work", work.title)
-                merged.append(r)
+                r = SearchResult.from_mapping(dict(raw_row))
+                if not r.from_work:
+                    r.from_work = work.title
+                candidates.append(r)
 
+    merged, seen_hashes = [], set()
+    for row in provider.rank_preferences(candidates):
+        identity = row.info_hash.lower()
+        if identity and identity in seen_hashes:
+            continue
+        if identity:
+            seen_hashes.add(identity)
+        merged.append(row)
     merged.sort(key=lambda x: x.seeders, reverse=True)
+    merged = provider.rank_preferences(merged)
+    if getattr(provider, "prefer_title_matches", False):
+        merged.sort(key=lambda row: max(title_score(row.name, query) for _, query in tasks), reverse=True)
     return merged

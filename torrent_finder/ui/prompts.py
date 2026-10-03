@@ -60,9 +60,10 @@ def make_search_screen_renderer(
     scope_label: str = "Engines",
 ) -> Callable[[Console], None]:
     """Return the responsive header renderer used by the search editor."""
+    from rich.markup import escape
     status = (
-        f"[dim]{scope_label}:[/dim] [cyan]{engine_names}[/cyan]   "
-        f"[dim]Filters:[/dim] [cyan]{active_filters}[/cyan]"
+        f"[dim]{scope_label}:[/dim] [cyan]{escape(engine_names)}[/cyan]   "
+        f"[dim]Filters:[/dim] [cyan]{escape(active_filters)}[/cyan]"
     )
     compact_shortcuts = (
         "[bold]Ctrl+F[/bold] [dim]filters  |  [/dim]"
@@ -521,10 +522,9 @@ def filter_menu(provider, on_save=None) -> None:
         return
     has_engines = hasattr(provider, 'engines') and provider.engines
     has_presets = bool(provider.presets)
-
-    if not has_engines and not has_presets:
-        console.print("[warning] No filters available for this provider.[/warning]")
-        return
+    from torrent_finder.result_view import SORT_ORDERS
+    from torrent_finder.ui.result_filters import choose_result_sort
+    draft_sort = provider.result_sort
 
     items = []
 
@@ -561,12 +561,17 @@ def filter_menu(provider, on_save=None) -> None:
             items.append(SelectItem(
                 label=p.name,
                 value=("preset", p),
-                toggled=p in provider.active_presets,
-                description=p.description,
+                toggle_states=("Off", "Require", "Prefer"),
+                toggle_state="Require" if p in provider.active_presets else "Prefer" if p in provider.preferred_presets else "Off",
+                description=("Require excludes others; Prefer ranks similar matches higher. "
+                             + p.description),
             ))
             preset_indices.append(len(items) - 1)
 
     # --- Action buttons ---
+    items.append(SelectItem(label=f"Result order: {SORT_ORDERS[draft_sort]}", value="sort", is_action=True,
+                            description="Saved for this provider. In a combined profile, its overall result order takes precedence."))
+    sort_idx = len(items) - 1
     items.append(SelectItem(label="Clear filters  [c]", value="clear", is_action=True))
     items.append(SelectItem(label="✅ Confirm  [w]", value="confirm", is_action=True))
     items.append(SelectItem(label="↩ Go Back", value="back", is_action=True))
@@ -583,11 +588,15 @@ def filter_menu(provider, on_save=None) -> None:
     def _toggle_set() -> set[int]:
         return set(toggle_indexes)
 
+    def _is_active(index, rows):
+        return (rows[index].toggle_state == "On" if index in engine_indices
+                else rows[index].toggle_state != "Off")
+
     def _select_all(cursor, items_list):
         for i in toggle_indexes:
             if items_list[i].enabled:
                 if items_list[i].toggle_states:
-                    items_list[i].toggle_state = "On"
+                    items_list[i].toggle_state = "On" if i in engine_indices else "Require"
                 else:
                     items_list[i].toggled = True
         return True
@@ -598,8 +607,8 @@ def filter_menu(provider, on_save=None) -> None:
                 if items_list[i].toggle_states:
                     items_list[i].toggle_state = (
                         "Off"
-                        if items_list[i].toggle_state == "On"
-                        else "On"
+                        if _is_active(i, items_list)
+                        else "On" if i in engine_indices else "Require"
                     )
                 else:
                     items_list[i].toggled = not items_list[i].toggled
@@ -608,7 +617,7 @@ def filter_menu(provider, on_save=None) -> None:
     def _clear(cursor, items_list):
         # Clear preset toggles only — leave engine toggles alone
         for pi in preset_indices:
-            items_list[pi].toggled = False
+            items_list[pi].toggle_state = "Off"
         return True
 
     def _confirm_now(cursor, items_list):
@@ -629,17 +638,12 @@ def filter_menu(provider, on_save=None) -> None:
             return _set_anchor(cursor, items_list)
         t_set = _toggle_set()
         lo, hi = sorted([anchor["idx"], cursor])
-        anchor_item = items_list[anchor["idx"]]
-        anchor_now = (
-            anchor_item.toggle_state == "On"
-            if anchor_item.toggle_states
-            else anchor_item.toggled
-        )
+        anchor_now = _is_active(anchor["idx"], items_list)
         target = not anchor_now
         for i in range(lo, hi + 1):
             if i in t_set and items_list[i].enabled:
                 if items_list[i].toggle_states:
-                    items_list[i].toggle_state = "On" if target else "Off"
+                    items_list[i].toggle_state = ("On" if i in engine_indices else "Require") if target else "Off"
                 else:
                     items_list[i].toggled = target
         items_list[anchor["idx"]].marker = ""
@@ -673,21 +677,23 @@ def filter_menu(provider, on_save=None) -> None:
     # Start cursor on first enabled item (skip header)
     start = 1 if has_engines else 0
 
-    result_idx = arrow_select(
-        items,
-        title=f"Filters — {provider.label}",
-        multi=True,
-        banner=_make_banner_panel(),
-        on_action=handle_filter_action,
-        start_index=start,
-        key_actions=key_actions,
-        footer=(
-            "↑/↓ nav  •  Space/Enter cycle  •  "
-            "[bold yellow]v[/bold yellow] anchor  •  [bold yellow]shift + v or V[/bold yellow] range  •  "
-            "[bold yellow]a[/bold yellow]ll/[bold yellow]i[/bold yellow]nvert/[bold yellow]c[/bold yellow]lear  •  "
-            "[bold green]w[/bold green] save  •  Esc cancel"
-        ),
-    )
+    while True:
+        result_idx = arrow_select(
+            items,
+            title=f"Filters — {provider.label}",
+            multi=True,
+            banner=_make_banner_panel(),
+            on_action=handle_filter_action,
+            start_index=start,
+            key_actions=key_actions,
+            footer="↑/↓ nav • Space/Enter cycle • a all • i invert • c clear • v/V range • w save • Esc cancel",
+        )
+        if result_idx != sort_idx:
+            break
+        # The selector's redraw thread must stop before another menu opens.
+        draft_sort = choose_result_sort(draft_sort)
+        items[sort_idx].label = f"Result order: {SORT_ORDERS[draft_sort]}"
+        start = sort_idx
 
     if result_idx is None:
         return
@@ -703,11 +709,15 @@ def filter_menu(provider, on_save=None) -> None:
 
         # Apply preset toggles
         provider.active_presets.clear()
+        provider.preferred_presets.clear()
         for idx in preset_indices:
             item = items[idx]
-            if item.toggled:
-                _type, preset = item.value
+            _type, preset = item.value
+            if item.toggle_state == "Require":
                 provider.active_presets.append(preset)
+            elif item.toggle_state == "Prefer":
+                provider.preferred_presets.append(preset)
+        provider.result_sort = draft_sort
 
         if on_save is not None:
             on_save()

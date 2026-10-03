@@ -1,6 +1,15 @@
 """Interactive controls for refining an already-fetched result list."""
 
 from torrent_finder.ui.selector import SelectItem, arrow_select
+from torrent_finder.result_view import SORT_ORDERS
+
+
+def choose_result_sort(order: str) -> str:
+    items = [SelectItem(label, value, hint="active" if value == order else "",
+                        description="Recommended uses title relevance where available, then preferences. Other sorts override that ranking; required filters still apply.")
+             for value, label in SORT_ORDERS.items()]
+    selected = arrow_select(items, title="Result order", footer="Enter choose • Esc keep current order")
+    return order if selected is None else items[selected].value
 
 
 def refine_results(query: str, mode: str, order: str) -> tuple[str, str, str]:
@@ -10,11 +19,8 @@ def refine_results(query: str, mode: str, order: str) -> tuple[str, str, str]:
             SelectItem("Words in name", ("match", "contains")),
             SelectItem("Exact media title (ignore release tags)", ("match", "title")),
             SelectItem("Exact full torrent filename", ("match", "filename")),
-            SelectItem("Original search order", ("sort", "relevance")),
-            SelectItem("Most seeders", ("sort", "seeds")),
-            SelectItem("Newest uploads (unknown dates last)", ("sort", "newest")),
-            SelectItem("Name A–Z", ("sort", "name")),
-            SelectItem("Largest size", ("sort", "size")),
+            *(SelectItem(label, ("sort", key), description="Changes this result list only. Other sorts override preferences; required filters still apply.")
+              for key, label in SORT_ORDERS.items()),
             SelectItem("Clear name filter", ("clear", "")),
             SelectItem("Apply and return", ("done", "")),
         ]

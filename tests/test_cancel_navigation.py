@@ -62,6 +62,7 @@ class TorrentFileCancelTests(unittest.TestCase):
     def test_ctrl_c_during_metadata_fetch_returns_to_download_menu(self):
         provider = SimpleNamespace(
             slug="movies",
+            result_sort="relevance", filter_summary=lambda: "No presets",
             supports_subtitles=True,
             supports_episode_picker=True,
             supports_streaming=True,
@@ -119,7 +120,7 @@ class TorrentFileCancelTests(unittest.TestCase):
 
 class ActiveOperationCancelTests(unittest.TestCase):
     def test_ctrl_c_during_acquisition_pick_returns_to_results(self):
-        provider = SimpleNamespace(slug="movies")
+        provider = SimpleNamespace(slug="movies", result_sort="relevance", filter_summary=lambda: "No presets")
         result = {
             "name": "Example",
             "info_hash": "a" * 40,
@@ -178,6 +179,7 @@ class ActiveOperationCancelTests(unittest.TestCase):
     def test_ctrl_c_in_download_menu_returns_to_results(self):
         provider = SimpleNamespace(
             slug="movies",
+            result_sort="relevance", filter_summary=lambda: "No presets",
             supports_subtitles=True,
             supports_episode_picker=True,
             supports_streaming=True,

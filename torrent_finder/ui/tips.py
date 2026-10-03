@@ -93,9 +93,9 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
     TipCategory(
         "Filters & Selection",
         (
-            Tip("Filter menu keybinds: a sets toggleable rows On, i inverts On/Off, c clears presets, and w saves.", ("filters", "engines", "modes", "keybinds")),
+            Tip("Filter menu keybinds: a sets engines On and presets Require; i toggles On/Off or Require/Off (Prefer becomes Off); c clears presets; w saves.", ("filters", "engines", "modes", "keybinds")),
             Tip("Episode and filter pickers share keybinds: v drops an anchor, Shift+V toggles the range.", ("selection", "keybinds", "range")),
-            Tip("In Filters & engines, Space or Enter cycles an engine through its available modes; preset and episode rows still toggle checkboxes.", ("selection", "filters", "engines", "modes", "keybinds")),
+            Tip("In Filters & engines, Space or Enter cycles engine modes or preset Off / Require / Prefer. Require excludes nonmatches; Prefer ranks similar matches higher. Episode rows still toggle checkboxes.", ("selection", "filters", "engines", "modes", "keybinds")),
             Tip("On engines run every search; Auto runs after all primary engines return zero raw rows. Off engines are skipped unless an active preset explicitly requires them. Presets never change your saved engine modes.", ("filters", "engines", "on", "auto", "off", "fallback")),
             Tip("Knaben starts on Auto for public-tracker providers. It makes one category-scoped fallback request only on a total raw miss, before local filters are applied.", ("filters", "engines", "knaben", "auto", "fallback", "categories")),
             Tip("YTS and SolidTorrents start Off because they can be unreliable or noisy; enable them manually when you want their extra coverage.", ("filters", "engines", "yts", "solidtorrents", "off", "coverage")),

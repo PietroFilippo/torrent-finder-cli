@@ -8,6 +8,8 @@ See the [v0.6.0 release notes](docs/releases/v0.6.0.md) for the latest published
 
 ## Features
 
+- **Named Search Profiles (unreleased):** Under **Search across providers → Ctrl+F → Profile**, save copies of your setup, switch profiles, rename, or delete them. Each profile keeps its selected providers, engine modes, required/preferred presets, shared name rules, and result order. A profile can select just one provider. Existing combined settings become **Default**; solo settings remain independent. All profile edits stay in a draft until **Save and return**; **Esc** discards them. From the CLI: `torrent --profile "Anime + Manga" -q "Saki"`.
+- **Prefer or Require (unreleased):** Presets cycle **Off → Require → Prefer** with Space or Enter. **Prefer 1080p** ranks matching releases higher while retaining 720p/480p; **Require 1080p** excludes other resolutions. Recommended order preserves title relevance where available, then preferences. Seed/date/name/size sorts override ranking preferences; required filters always apply. Existing enabled presets remain **Require**.
 - **Search Across Providers (unreleased):** Choose **Search across providers** to search every provider or a saved selection, such as Anime + Manga. **Ctrl+F** chooses providers, shared name rules, and each provider's own engines/presets. The combined profile is saved separately from individual searches. Results retain their provider and source, merge duplicate torrents, and offer the appropriate download/stream actions. Missing logins produce notices while other providers' results remain usable.
 - **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga, Books), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs via The Pirate Bay's Applications categories plus SolidTorrents), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and warns when no login is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`. **Games** is likewise a group: pick it and choose **General** (PC, consoles, ROMs & repacks from public trackers — The Pirate Bay's game categories plus SolidTorrents), **Online-Fix** (scrapes [online-fix.me](https://online-fix.me) for co-op/online game cracks), or **FitGirl** (searches the official [fitgirl-repacks.site](https://fitgirl-repacks.site) — the one trustworthy source for FitGirl repacks, since fake "FitGirl" uploads on public trackers are a known malware vector; no account needed, the magnet resolves from the post when you pick a result). On the CLI they're `-t game`, `-t online-fix`, and `-t fitgirl`. Online-Fix needs **no account** — both search and download are anonymous (the file host is referer-gated, not login-gated); picking a result downloads the `.torrent` into your download folder and opens it in your system torrent client, showing the archive password (`online-fix.me`) to unpack the game with. **Manga** is also a group: **General** (Nyaa Literature + Apibay Comics) or **Madokami** (the private [manga.madokami.al](https://manga.madokami.al) library — needs an account under the credentials menu; hits are **direct downloads**, no torrent client involved: picking a series folder opens a volume picker and the chosen archives are saved straight to your download folder). On the CLI: `-t manga` and `-t madokami`. **Books** searches **Libgen** (the live libgen mirror family — anonymous, **direct file downloads**: picking a result resolves the download link and streams the file straight to your download folder with a progress bar, no torrent client involved) plus The Pirate Bay's E-books and Audio books categories, with SolidTorrents' eBook category as an opt-in engine. Neither default engine needs a login. Libgen rows show the format and language (e.g. `[epub, English]`), and filter presets cover EPUB / PDF / Kindle (MOBI/AZW3) / Audiobook / English. On the CLI: `-t books` (or `-t book`).
 - **Multi-Engine Fan-Out:** Each provider queries its **On** sources in parallel and merges results, deduplicating by info hash and sorting by seeders. If they all return zero raw rows, a category-scoped **Auto** Knaben search runs. **Off** engines are skipped unless an active preset explicitly requires them for that search. Movies & Series keeps Apibay + Nyaa live-action On, Anime uses Nyaa, Manga combines Nyaa Literature + Apibay Comics, and Books pairs Libgen with Apibay E-books/Audio books. YTS and SolidTorrents remain available as manual Off-by-default options.
@@ -22,12 +24,12 @@ See the [v0.6.0 release notes](docs/releases/v0.6.0.md) for the latest published
   - **Contextual Footers:** Displays dynamic helper text explaining the trade-offs, speeds, and seeding behaviors of different download options as you highlight them.
 - **Quick-Launch Commands:** The startup provider screen includes a **Terminal command** row for choosing `torrent-finder`, `tf`, `torrent`, `find-torrent`, or `tfind`. The canonical command remains available and `torrent` is built into pip/pipx installs; the other presets create one app-owned forwarding launcher, preserve every CLI argument, refuse unrelated command collisions, and can be removed safely from the same screen.
 - **Advanced Filtering:**
-  - Toggle built-in presets (preferred resolutions, known uploaders/repackers, trusted release groups) using an interactive checklist.
-  - **Anime has no default resolution filter.** Older 480p/720p releases remain eligible. If 1080p is checked, it is a saved selection: open **Ctrl+F**, uncheck it, and save with **w**. New combined profiles also start with Anime resolution presets cleared; explicit choices made afterward persist.
+  - Set built-in presets (resolutions, known uploaders/repackers, trusted release groups) to **Require**, **Prefer**, or **Off**.
+  - **Anime has no default resolution filter.** Older 480p/720p releases remain eligible. If 1080p is set to Require, it is a saved selection: open **Ctrl+F**, cycle it to **Prefer** or **Off**, and save with **w**. The first combined profile starts without an Anime resolution requirement; explicit later choices and copied profiles retain their settings.
   - Cycle each search engine between **On** (every search), **Auto** (only after all On engines miss), and **Off** (skipped unless required by an active preset). Engines without a safe fallback role offer On/Off only.
   - Add custom include/exclude keywords to quickly find the exact release you want.
-  - **Brazilian Portuguese audio (Movies & Series):** at the search prompt, press **Ctrl+F**, toggle **Dublado (PT-BR)** with **Space**, and press **w** to save. The preset requires explicit Brazilian audio tags such as `PT-BR`, `PTBR`, `Português Brasileiro`, or `Brazilian Portuguese`; generic `dublado`, `nacional`, `Português`, uploader names, and PT-PT-only audio do not qualify. A PT-BR subtitle tag alone never qualifies the audio. **Legendado (PT subs)** is a separate preset for Portuguese subtitles; selecting both requires both kinds of tags. The presets also search with release words appended (`Toy Story` → `Toy Story pt-br`, `Toy Story dublado`; subtitles add `legendado`) and include Knaben + SolidTorrents while active, even if their saved mode is Off. The search screen shows these effective engines; clearing the preset restores the original selection. Language checks use release names rather than inspecting tracks, so genuinely Brazilian releases without a regional tag stay hidden and mistagged releases cannot be verified. "Dual Audio" alone is not Brazilian Portuguese evidence. Titles are not automatically translated: try the Portuguese release title if the English one finds nothing. SolidTorrents may report zero seeders, which puts its rows last in the default sort.
-  - **Shared keybinds with the episode picker:** `a` select all / set On • `i` invert • `c` clear presets • `w` save • `v` / `Shift+V` visual anchor + range toggle • `Space` toggles a preset or cycles an engine mode.
+  - **Brazilian Portuguese audio (Movies & Series):** at the search prompt, press **Ctrl+F**, cycle **Dublado (PT-BR)** to **Require** with **Space**, and press **w** to save. The preset requires explicit Brazilian audio tags such as `PT-BR`, `PTBR`, `Português Brasileiro`, or `Brazilian Portuguese`; generic `dublado`, `nacional`, `Português`, uploader names, and PT-PT-only audio do not qualify. A PT-BR subtitle tag alone never qualifies the audio. **Legendado (PT subs)** is a separate preset for Portuguese subtitles; requiring both requires both kinds of tags. The presets also search with release words appended (`Toy Story` → `Toy Story pt-br`, `Toy Story dublado`; subtitles add `legendado`) and include Knaben + SolidTorrents while active, even if their saved mode is Off. The search screen shows these effective engines; clearing the preset restores the original selection. Language checks use release names rather than inspecting tracks, so genuinely Brazilian releases without a regional tag stay hidden and mistagged releases cannot be verified. "Dual Audio" alone is not Brazilian Portuguese evidence. Titles are not automatically translated: try the Portuguese release title if the English one finds nothing. SolidTorrents may report zero seeders, which puts its rows last in the default sort.
+  - **Shared keybinds with the episode picker:** `a` select all / set On • `i` invert • `c` clear presets • `w` save • `v` / `Shift+V` visual anchor + range toggle • `Space` cycles a preset or engine mode.
   - **Persistent across runs:** engine modes, active filter presets, search history, usage stats, the quiet-mode flag, the chosen download folder, and the dismissed-warning state all live in `filter_state.json` in your user data folder (see [Where your data lives](#where-your-data-lives)), so configuration sticks after you close the program. Mutations are held in an in-memory cache and flushed on exit or after destructive actions (clear history, reset stats, filter-menu Confirm) — no per-event disk hit.
 - **Search History:** Press `H` on the provider screen (or `Tab` then `H` at the search prompt) to browse past searches. Filter by provider (`P`), date range (`D`, today/week/month), and sort order (`S`). Each entry shows the provider, relative timestamp, and the filter presets that were active at search time. Pick an entry to re-run the query; clear history with a confirmation modal.
 - **Usage Stats:** Press `S` on the provider screen (or `Tab` then `S` at the search prompt) to open a scrollable stats page showing session count, total runtime, searches, top queries, torrents picked, method picks vs. completions (with success rate), avg seeders of picks, and preset usage counters. Reset all stats from the same screen, guarded by a confirmation modal.
@@ -53,7 +55,7 @@ See the [v0.6.0 release notes](docs/releases/v0.6.0.md) for the latest published
 - **Network Exposure Warning:** At startup a red panel queries `ip-api.com` and shows your public IP, ISP, ASN, location, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
 - **Install-Aware Update Check:** On startup the app checks for a newer version (at most once a day, fail-silent) and shows a notice tailored to how you installed it — a pip/pipx install compares against PyPI, a git clone against `origin`, a standalone binary against the latest Release. The notice is a high-visibility black-on-yellow banner; press **U** on the provider menu (an **⬆ Install update** row also appears there) or **Tab → ⬆ Install update** at the search prompt to update in place (`pipx upgrade`/`pip -U`, `git pull`, or open the Releases page).
 - **Pagination & Navigation:** Navigate through large sets of search results cleanly, with the ability to safely go back to your previous search results after viewing download options.
-- **Refine Results:** Press **f** in the results table to match words, an exact media title (ignoring common release tags), or an exact full filename. Sort by original search order, newest upload, most seeders, name, or size. Unknown upload dates sort last. Filtering keeps only visible selections; sorting preserves the selected downloads.
+- **Refine Results:** Press **f** in the results table to match words, an exact media title (ignoring common release tags), or an exact full filename. Sort by Recommended order, newest upload, most seeders, name, or size. Unknown upload dates sort last. Filtering keeps only visible selections; sorting preserves the selected downloads.
 - **Short Anime Titles:** Anime search ranks matching titles ahead of incidental word matches. When a short title such as **Saki** is crowded out of Nyaa's recent RSS feed, one bounded catalog lookup helps recover older releases. FitGirl and Online-Fix results must match the words in the game title, avoiding matches from post bodies or neighboring links.
 
 ## Prerequisites
@@ -398,12 +400,13 @@ checks the result name, not the source label. Empty fields impose no restriction
 These rules filter returned results; they do not append words to your query.
 For a resolution restriction on Anime alone, use its provider presets—putting
 `1080p` in the shared include field also hides manga/books without that text.
-Provider presets and shared rules must both pass. History stores the combined
+Required provider presets and shared rules must both pass. History stores the combined
 profile with each query so choosing an entry restores that search's settings.
 
-The merged table prioritizes title relevance, then preserves each provider's
-ordering for ties. Press **f** for exact-title/filename filtering or a different
-sort, including newest. The provider appears in a column on wide terminals and
+The merged table prioritizes title relevance, then preferred preset matches,
+then preserves each provider's ordering for ties. Press **f** for exact-title/filename filtering or a different
+sort, including newest. Explicit sorts override preferences in that result view.
+The provider appears in a column on wide terminals and
 beside the title on narrower ones; the focused row shows its full provider and
 source. A duplicate torrent appears once. Its first matching provider supplies
 the download actions, while all matching providers and query titles are retained.
@@ -430,6 +433,31 @@ search can miss results from slow sources—search those providers individually
 to retry with their normal timeout behavior. Creator searches remain available
 through the individual providers.
 
+### Saving and switching search profiles
+
+In **Search across providers → Ctrl+F**, open the **Profile** row and choose
+**Save a copy as a new profile**. Enter a unique name, then choose providers,
+engines, presets, shared name rules, and **Result order**. A setup for one
+provider, such as PT-BR movies, uses the same menu with only that provider selected.
+**Save and return** commits all changes, including edits made before switching
+to another profile. **Esc** cancels the entire draft. Rename and delete act on
+the current profile; deletion asks for confirmation and keeps at least one profile.
+
+Existing combined settings are preserved as **Default**. Profiles remain separate
+from individual provider settings. History replay restores the historical setup
+in memory; saving it creates a separate **History search** profile that you can
+rename. CLI `--profile` and `--providers` affect only the session unless you
+explicitly save settings. Profile names are case-insensitive when selecting them.
+
+To keep lower resolutions eligible, cycle a preset to **Prefer**. **Require**
+still excludes every nonmatch, including when another preset is preferred.
+Requiring both PT-BR audio and Portuguese subtitles requires both sets of tags.
+Both Require and Prefer can invoke a preset's documented extra queries and
+engines. Preferences score returned metadata; they do not verify actual tracks.
+Choose **Result order** in settings to save a sort. Sorting with **f** in the
+results table changes that view only. A combined profile's overall order applies
+to the merged results, taking precedence over child providers' solo sort settings.
+
 ### Command Line Arguments
 
 ```bash
@@ -438,6 +466,9 @@ torrent -q "The Matrix"
 
 # Search across providers using the saved combined profile (initially all)
 torrent -t all -q "Saki"
+
+# Use a named profile; -t all is implied
+torrent --profile "Anime + Manga" -q "Saki"
 
 # Override the selected providers for this session
 torrent -t all --providers anime manga -q "Saki"
@@ -518,7 +549,7 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 
 - **Lists & Menus**: Use `Up` and `Down` arrows to navigate; `PgUp`/`PgDn` move faster and `Home`/`End` jump to the first/last choice. Compact windows show your position in the menu border.
 - **Select**: Press `Enter` to confirm a choice or open a torrent.
-- **Toggle / cycle**: In multi-select menus, press `Enter` or `Space` to toggle a checkbox. In **Filters & engines**, those keys instead cycle engine rows through their available **On / Auto / Off** modes.
+- **Toggle / cycle**: In multi-select menus, press `Enter` or `Space` to toggle a checkbox. In **Filters & engines**, those keys cycle engine **On / Auto / Off** modes or preset **Off / Require / Prefer** modes.
 - **Search prompt (multi-title)**: `Ctrl+F` jumps to filters, `Ctrl+N` commits the current title and starts another line, and `Tab` opens quick actions. `Enter` searches all entered titles at once; `Up`/`Down` recall past searches. `Esc` backs out progressively — clear the current line, then restore the last added title for editing, then leave.
 - **Results table (multi-select / batch)**: `Space` ticks a torrent, `a` selects all results in the current filtered view, `c` clears. Press `f` for name matching and sorting; hidden selections are cleared when applying a filter. With one or more ticked, `Enter` opens the batch menu (open all in client • download all with `aria2c` • copy all magnets); with nothing ticked, `Enter` opens that single torrent's download menu.
 - **Range Selection (Episode Picker)**: 
@@ -526,7 +557,7 @@ Even after dismissing, you can re-open the warning at any time from the **Select
   - `Shift + V`: Instantly mass-toggle all items between the anchor and your cursor.
   - `a` (Select All) • `i` (Invert Selection) • `c` (Clear) • `w` (Save & Continue).
 - **Configure filters from the provider screen**: Press `F` while a provider is highlighted to jump straight into its engines + filter presets menu, then return to the provider list.
-- **Filter menu keybinds**: `a` sets toggleable rows On, `i` inverts On/Off, `c` clears presets, `w` saves and confirms, `v` drops an anchor, `Shift+V` range-toggles between the anchor and cursor, and `Space` toggles a preset or cycles an engine mode. The "Clear filters" button clears preset toggles only — your engine modes are preserved.
+- **Filter menu keybinds**: `a` sets engines On and presets Require; `i` toggles engines On/Off and presets Require/Off (Prefer becomes Off); `c` clears presets; `w` saves and confirms. `v` drops an anchor, `Shift+V` toggles the range, and `Space` cycles a preset or engine mode. The "Clear filters" button clears required/preferred presets only — your engine modes are preserved.
 - **History / stats / tips / filters**: On the provider screen press `H` (history), `S` (stats), `T` (tips), or `F` (filters). At the search prompt, press `Tab` for the same quick-actions menu (then `F`/`H`/`S`/`T` or arrows) — your in-progress query is preserved. The prompt itself has no single-letter shortcuts, so queries can start with any letter.
 - **Tips browser**: Use `/` to search across categories, tip text, and tags; `C` to cycle categories; `X` to clear the search/filter; and `Esc` to go back.
 - **Cancel / Back**: Press `Esc` to safely cancel an action, close a menu, or go back to the previous screen.

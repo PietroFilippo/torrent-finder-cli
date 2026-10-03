@@ -190,6 +190,11 @@ def _build_panel(
         item.is_action and item.value != "section_header" and not items[i - 1].is_action
         for i, item in enumerate(items) if i > 0
     ) if multi and has_actions else 0
+    if always_visible_rows and (5 if compact else 12) + always_visible_rows + separators + context_lines + footer_lines >= console.size.height:
+        # Long preset help and additional actions can leave no room for a
+        # selectable row. Let the actions scroll with the list in that case.
+        main_start, main_end, main_len = 0, n, n
+        always_visible_rows = 0
     chrome = (5 if compact else 12) + always_visible_rows + separators + context_lines + footer_lines
     max_visible = max(1, console.size.height - chrome)
 

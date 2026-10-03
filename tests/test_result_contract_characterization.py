@@ -289,6 +289,9 @@ class BaseProviderSearchContractTests(unittest.TestCase):
 class CreatorFanOutContractTests(unittest.TestCase):
     def test_fan_out_searches_titles_and_alt_titles_dedupes_and_tags_origin(self):
         class RecordingProvider:
+            def rank_preferences(self, rows):
+                return rows
+
             def __init__(self):
                 self.calls = []
 

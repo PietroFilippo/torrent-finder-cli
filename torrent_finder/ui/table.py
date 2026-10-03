@@ -16,7 +16,7 @@ from rich.text import Text
 from torrent_finder.constants import RESULTS_PER_PAGE, console
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 from torrent_finder.utils import format_size, leech_style, seed_style
-from torrent_finder.result_view import result_indices, timestamp
+from torrent_finder.result_view import SORT_ORDERS, result_indices, timestamp
 from torrent_finder.ui.result_filters import refine_results
 
 
@@ -293,7 +293,8 @@ def _pick_result(picked: set[int]) -> tuple:
     return ("one", idxs[0]) if len(idxs) == 1 else ("many", idxs)
 
 
-def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
+def interactive_select(results: list[dict], note: str = "", *, initial_order: str = "relevance",
+                       search_summary: str = "") -> "tuple | None":
     """Interactive torrent results table with multi-select.
 
     Navigate with arrows; Left/Right switch pages; type a number to jump.
@@ -306,9 +307,9 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
         (batch hand-off);
       - ``None`` if cancelled (Esc).
     """
-    view_query, view_mode, view_order = "", "contains", "relevance"
-    view_indexes = result_indices(results)
-    all_results = results
+    view_query, view_mode, view_order = "", "contains", initial_order
+    view_indexes = result_indices(results, order=view_order)
+    all_results = [results[i] for i in view_indexes]
     total_all = len(all_results)
     # Provenance "From" column: only when results came from more than one searched
     # title (multi-title search); redundant for a single query.
@@ -353,7 +354,12 @@ def interactive_select(results: list[dict], note: str = "") -> "tuple | None":
 
     def framed(tbl):
         heading = Text("Torrent Search CLI", style="bold magenta") if console.size.height < 28 else banner
-        view_status = Text(f"{view_mode}: {view_query or 'all names'}  •  sort: {view_order}", style="dim", no_wrap=True, overflow="ellipsis")
+        order_label = SORT_ORDERS.get(view_order, view_order)
+        if view_order != "relevance":
+            order_label += " (overrides preferences)"
+        view_status = Text(f"Sort: {order_label} • {view_mode}: {view_query or 'all names'}"
+                           + (f" • {search_summary}" if search_summary else ""),
+                           style="dim", no_wrap=True, overflow="ellipsis")
         if note:
             return Group(heading, view_status, _note_preview(note), tbl)
         return Group(heading, view_status, tbl)

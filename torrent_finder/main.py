@@ -389,7 +389,8 @@ def _browse_results(provider, results, note: str = "") -> str:
     """
     while True:
         clear_screen()
-        choice = interactive_select(results, note=note)
+        choice = interactive_select(results, note=note, initial_order=provider.result_sort,
+                                    search_summary=provider.filter_summary())
         if choice is None:
             return "back"
 
@@ -684,7 +685,7 @@ def _history_pick(entry):
     """
     prov = get_provider(entry.get("provider", "") or "")
     if getattr(prov, "is_combined", False) and isinstance(entry.get("search_profile"), dict):
-        prov.restore(entry["search_profile"])
+        prov.restore_history(entry["search_profile"])
     if entry.get("kind") == "creator":
         facet = None
         if prov:
@@ -766,6 +767,7 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Preview the update display without installing anything")
     parser.add_argument("--providers", nargs="+", metavar="PROVIDER", choices=[p for p in provider_cli_choices() if p != "all"],
                         help="Providers for -t all (for example: --providers anime manga)")
+    parser.add_argument("--profile", metavar="NAME", help="Use a named search profile (implies -t all)")
     parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
     parser.add_argument(
         "-t", "--type", type=str, choices=provider_cli_choices(),
@@ -789,6 +791,18 @@ def _main_loop(args=None) -> None:
         preview_update(args.preview_update)
         return
     load_state(PROVIDERS)
+    if args.profile:
+        if args.type not in (None, "all"):
+            parser.error("--profile requires -t all (or omit -t)")
+        args.type = "all"
+        from torrent_finder.search_profiles import ProfileLibrary
+        try:
+            library = ProfileLibrary.load()
+        except ValueError as error:
+            parser.error(str(error))
+        profile_entry = library.find(args.profile)
+        if profile_entry is None:
+            parser.error(f"Unknown search profile {args.profile!r}. Available: " + ", ".join(p["name"] for p in library.entries))
     if args.providers and args.type != "all":
         parser.error("--providers requires -t all")
     advise_limited_terminal()
@@ -811,6 +825,8 @@ def _main_loop(args=None) -> None:
 
     session_provider = initial_provider
     current_provider = session_provider
+    if args.profile:
+        current_provider.use_profile(profile_entry)
     if args.providers:
         profile = current_provider.snapshot()
         profile["selected"] = [get_provider(name).slug for name in args.providers]
@@ -983,8 +999,7 @@ def _main_loop(args=None) -> None:
             # Build status line showing active engines and filters
             engine_names = [e.name for e in provider.effective_engines]
             engine_str = ", ".join(engine_names) if engine_names else "None"
-            active_names = [p.name for p in provider.active_presets]
-            active_name = ", ".join(active_names) if active_names else "None"
+            active_name = provider.filter_summary()
             if getattr(provider, "is_combined", False):
                 engine_str, active_name = provider.summary()
             prov_history = history_queries(provider.slug)
@@ -999,7 +1014,8 @@ def _main_loop(args=None) -> None:
             initial, pending_query = pending_query, ""
             try:
                 query = get_query_with_shortcut(
-                    f"[title] Search {provider.name}:[/title] ",
+                    "[title] Search selected providers:[/title] " if getattr(provider, "is_combined", False)
+                    else f"[title] Search {provider.name}:[/title] ",
                     initial=initial, history=prov_history, filters_shortcut=True,
                     multi=True, screen_renderer=screen_renderer,
                 )
@@ -1224,6 +1240,7 @@ def _main_loop(args=None) -> None:
         continue
 
 def main() -> None:
+    from torrent_finder.search_profiles import ProfileError
     args = _build_parser().parse_args()
     if args.preview_update:
         try:
@@ -1235,6 +1252,9 @@ def main() -> None:
     t0 = time.monotonic()
     try:
         _main_loop(args)
+    except ProfileError as error:
+        from rich.markup import escape
+        console.print(f"[warning]{escape(str(error))}[/warning]")
     except (KeyboardInterrupt, EOFError):
         # Ctrl+C / Ctrl+D from any menu (readchar raises these from readkey).
         # Caught here so every entry point — the console script, python -m,

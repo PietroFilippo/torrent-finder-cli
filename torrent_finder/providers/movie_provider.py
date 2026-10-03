@@ -77,8 +77,7 @@ class MovieProvider(BaseProvider):
             query_terms=("pt-br", "dublado"),
             require_engines=("Knaben", "SolidTorrents"),
             description=(
-                "Requires Brazilian Portuguese audio tags (PT-BR, Português Brasileiro). "
-                "Generic dublado/Português and subtitle-only tags do not qualify. "
+                "Explicit PT-BR audio tags only; generic Portuguese/subtitles do not qualify. "
                 "Also searches pt-br/dublado with Knaben + SolidTorrents, even if saved Off."
             ),
         ),

@@ -472,7 +472,7 @@ class LanguageSearchRegressionTests(unittest.TestCase):
             for item in items:
                 if item.label == "Dublado (PT-BR)":
                     self.assertIn("Knaben + SolidTorrents", item.description)
-                    item.toggled = True
+                    item.toggle_state = "Require"
             return next(i for i, item in enumerate(items) if item.value == "confirm")
 
         with (

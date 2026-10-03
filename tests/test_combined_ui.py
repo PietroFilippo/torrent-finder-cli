@@ -8,7 +8,8 @@ from rich.cells import cell_len
 from rich.console import Console, Group
 from rich.text import Text
 
-from torrent_finder import main
+from torrent_finder import main, store
+from torrent_finder.search_profiles import ProfileLibrary
 from torrent_finder.acquisition import PickOutcome
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.manga_provider import MangaProvider
@@ -40,14 +41,15 @@ class CombinedUITests(unittest.TestCase):
                 def choose_preset(items, **kwargs):
                     for item in items:
                         if isinstance(item.value, tuple) and item.value[0] == "preset" and item.value[1].name == "1080p":
-                            item.toggled = True
+                            item.toggle_state = "Require"
                     return next(i for i, item in enumerate(items) if item.value == "confirm")
 
                 with patch.object(combined, "arrow_select", side_effect=choose), \
                      patch.object(prompts, "arrow_select", side_effect=choose_preset), \
                      patch.object(prompts, "get_query_with_shortcut", return_value="batch, dual audio"), \
                      patch("torrent_finder.state.save_state") as solo_save, \
-                     patch.object(provider, "save_profile") as save:
+                     patch.object(store, "_cache", {}), patch.object(store, "_dirty", False), \
+                     patch.object(ProfileLibrary, "save") as save:
                     prompts.filter_menu(provider)
                 solo_save.assert_not_called()
                 self.assertEqual(anime.active_presets, [])

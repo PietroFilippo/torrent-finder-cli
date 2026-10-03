@@ -6,6 +6,15 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
 
+SORT_ORDERS = {
+    "relevance": "Recommended",
+    "seeds": "Most seeders",
+    "newest": "Newest uploads (unknown dates last)",
+    "name": "Name A–Z",
+    "size": "Largest size",
+}
+
+
 def words(text: str) -> tuple[str, ...]:
     folded = unicodedata.normalize("NFKD", text).casefold()
     return tuple(re.findall(r"[^\W_]+", "".join(c for c in folded if not unicodedata.combining(c))))
