@@ -273,7 +273,9 @@ def build_table(
         )
 
         if is_selected:
-            row_style = "bold reverse"
+            # Reverse fills every cell to the expanded row's full height.
+            # Details keep the normal background; the arrow still marks focus.
+            row_style = "bold" if expanded else "bold reverse"
             number = f">> {global_index}"
             seed_text = str(seeds)
             leech_text = str(leeches)

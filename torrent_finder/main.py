@@ -348,6 +348,11 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
     )
     while True:
         action = batch_download_menu(len(idxs), copyable)
+        if action == "qbittorrent":
+            from torrent_finder.ui.qbittorrent import send_results
+            if send_results([results[i] for i in idxs if 0 <= i < len(results)]):
+                return "next"
+            continue
         if action == "open":
             # Guard against an accidental flood (e.g. 'a' select-all then Enter):
             # a decline returns to the menu rather than dropping to what's next.
@@ -429,6 +434,20 @@ def _browse_results(provider, results, note: str = "") -> str:
         selected_provider = provider_for_result(selected, provider)
         record_torrent_picked(selected_provider.slug, int(selected.get("seeders", 0) or 0))
 
+        from torrent_finder.qbittorrent import configured
+        if configured() and acquisition.for_result(selected).style == "torrent-file-handoff":
+            from torrent_finder.ui.selector import SelectItem, arrow_select
+            options = [SelectItem("Send to qBittorrent WebUI", "qbittorrent"),
+                       SelectItem("Open with default client", "default"), SelectItem("Back", None)]
+            picked = arrow_select(options, title="Torrent client", footer="Enter select • Esc back")
+            if picked is None or options[picked].value is None:
+                continue
+            if options[picked].value == "qbittorrent":
+                from torrent_finder.ui.qbittorrent import send_results
+                if send_results([selected]):
+                    return "next"
+                continue
+
         # Acquisition seam: magnet styles hand back a magnet and fall through
         # to the download-method menu; handoff / direct-download styles finish
         # (or abort) the whole acquisition inside ``pick``. "back" means
@@ -467,6 +486,12 @@ def _browse_results(provider, results, note: str = "") -> str:
 
             if method in _METHOD_TRACK:
                 record_method_pick(_METHOD_TRACK[method])
+
+            if method == "qbittorrent":
+                from torrent_finder.ui.qbittorrent import send_results
+                if send_results([selected], magnet=session.magnet):
+                    return "next"
+                continue
 
             if method == "set_subs":
                 from torrent_finder.ui.prompts import subtitle_source_prompt
@@ -683,6 +708,9 @@ def _provider_entry(provider, cli_filters) -> str:
             if choice == "titles":
                 from torrent_finder.ui.titles import title_search_flow
                 creator_outcome = title_search_flow(provider, cli_filters, browse_results)
+            elif choice == "discover":
+                from torrent_finder.ui.discovery import discovery_flow
+                creator_outcome = discovery_flow(provider, cli_filters, browse_results)
             else:
                 creator_outcome = creator_search_flow(
                     provider, cli_filters, choice, browse_results
@@ -714,7 +742,120 @@ def _history_pick(entry):
                        all(isinstance(q, str) and q.strip() for q in aliases) else entry.get("query", ""))
 
 
-def _handle_whats_next(current_provider):
+def _bookmarks_flow(cli_filters=None):
+    """One bookmark journey shared by the main, next and provider menus."""
+    from torrent_finder import bookmarks
+    from torrent_finder.ui.bookmarks import bookmark_menu
+    from torrent_finder.ui.creator import _run_cancellable, _notice
+    from torrent_finder.search_session import search_many
+    from torrent_finder.search_errors import SearchError
+    while True:
+        chosen = _saved_data_action(bookmark_menu)
+        if not chosen:
+            return
+        operation, entry = chosen
+        if operation == "compare":
+            from torrent_finder.providers.combined_provider import CombinedProvider
+            provider = CombinedProvider(get_provider("all").templates)
+            provider.filter_summary = lambda: "Saved bookmarks; metadata may be stale"
+            browse_results(provider, [dict(e["result"], fetched_at=e["fetched_at"]) for e in entry])
+            continue
+        provider = _saved_data_action(lambda: bookmarks.search_provider(entry))
+        if provider is None:
+            continue
+        if operation == "open" and entry["kind"] == "result":
+            browse_results(provider, [dict(entry["result"], fetched_at=entry["fetched_at"])],
+                           note="Saved listing; current availability is unverified. i: metadata details")
+            continue
+        cancel = threading.Event()
+        cancelled, results = _run_cancellable(
+            lambda: search_many(provider, entry["queries"], cli_filters, cancel_event=cancel),
+            "Searching saved names…", cancel=cancel)
+        if cancelled:
+            continue
+        if results is None or isinstance(results, SearchError):
+            _notice("Saved search failed. Try again later.")
+            continue
+        provider.last_queries = entry["queries"]
+        if operation == "refresh":
+            _saved_data_action(lambda: bookmarks.refresh(entry["id"], results))
+        from torrent_finder.state import add_history_entry
+        presets = [p.name for p in provider.active_presets]
+        extra = {"search_profile": provider.snapshot()} if getattr(provider, "is_combined", False) else {}
+        for query in entry["queries"]:
+            add_history_entry(query, provider.slug, presets, **extra)
+            record_search(provider.slug, query, presets)
+        browse_results(provider, results)
+
+
+def _quick_actions_flow(provider=None, cli_filters=None, typed="", on_update=None):
+    """Provider-bound actions stay scoped; global actions choose their scope."""
+    from torrent_finder.ui.prompts import quick_actions_menu, action_provider_prompt
+    while True:
+        action = quick_actions_menu(update_available=bool(on_update), provider=provider)
+        scope = provider
+        if action in {"filter", "titles", "discover", "save_search"} and scope is None:
+            scope = action_provider_prompt({"filter": "Filters", "titles": "Alternate titles",
+                                           "discover": "Topic discovery", "save_search": "Save search"}[action])
+            if scope is None:
+                continue
+        if action == "update" and on_update:
+            on_update()
+            on_update = None
+        elif action == "filter":
+            filter_menu(scope)
+        elif action in {"titles", "discover"}:
+            if action == "titles":
+                from torrent_finder.ui.titles import title_search_flow
+                outcome = title_search_flow(scope, cli_filters, browse_results, initial=typed)
+            else:
+                from torrent_finder.ui.discovery import discovery_flow
+                outcome = discovery_flow(scope, cli_filters, browse_results, initial=typed)
+            if outcome == "next":
+                return _handle_whats_next(scope, cli_filters, on_update)
+        elif action == "save_search":
+            from torrent_finder.bookmarks import save_search
+            from torrent_finder.ui.creator import _notice
+            value = typed.strip() or get_query_with_shortcut("Bookmark search: ")
+            if isinstance(value, str) and value and value != "GO_BACK":
+                if _saved_data_action(lambda: save_search(scope, value)):
+                    _notice("Search bookmarked.")
+        elif action == "bookmarks":
+            _bookmarks_flow(cli_filters)
+        elif action == "qbittorrent":
+            from torrent_finder.ui.qbittorrent import client_menu
+            client_menu()
+        elif action == "backup":
+            from torrent_finder.ui.backup import backup_menu
+            if backup_menu():
+                from torrent_finder.state import reload_state
+                from torrent_finder.search_profiles import ProfileLibrary
+                reload_state(PROVIDERS)
+                current_profile = ProfileLibrary.load().current
+                get_provider("all").use_profile(current_profile)
+                if provider is not None:
+                    if getattr(provider, "is_combined", False):
+                        provider.use_profile(current_profile)
+                    else:
+                        reload_state([provider])
+        elif action == "history":
+            from torrent_finder.ui.history import history_select_prompt
+            pick = history_select_prompt()
+            if pick:
+                prov, facet, val = _history_pick(pick)
+                if prov is not None:
+                    return (None, prov, facet, val) if facet else (val, prov, None, None)
+        elif action == "stats":
+            from torrent_finder.ui.stats import stats_page
+            stats_page()
+        elif action == "tips":
+            from torrent_finder.ui.tips_page import tips_page
+            tips_page()
+        else:
+            return None
+
+
+def _handle_whats_next(current_provider, cli_filters=None, on_update=None):
     """Show the post-action "What's next?" menu.
 
     Returns ``(query, provider, facet, name)`` to keep looping, or ``"EXIT"`` to
@@ -742,8 +883,14 @@ def _handle_whats_next(current_provider):
         if choice == "search":
             clear_screen()
             return (None, current_provider, None, None)
-        if choice == "provider":
+        if choice in {"provider", "main"}:
             return (None, None, None, None)
+        if choice == "bookmarks":
+            _bookmarks_flow(cli_filters)
+        if choice == "actions":
+            outcome = _quick_actions_flow(cli_filters=cli_filters, on_update=on_update)
+            if outcome is not None:
+                return outcome
 
 
 def _run_update_flow(info: dict) -> None:
@@ -896,6 +1043,12 @@ def _main_loop(args=None) -> None:
         # digits (bold → bright black) on the yellow banner.
         console.print(update_msg + "\n", highlight=False)
 
+    def run_pending_update():
+        nonlocal update_info, update_msg
+        if update_info:
+            _run_update_flow(update_info)
+        update_info, update_msg = None, ""
+
     # One-line status (e.g. "No results", "cancelled") carried to the next
     # prompt render so it shows on the freshly-cleared screen instead of
     # stacking another search header below the old one.
@@ -904,7 +1057,6 @@ def _main_loop(args=None) -> None:
     # In-progress query preserved across a Tab quick-action excursion, so popping
     # into Filters/Stats/Tips and back doesn't lose what was typed.
     pending_query = ""
-    refresh_bookmark = None
 
     # When set, the next provider selection re-opens this group's submenu (so
     # backing out of a group child returns to its source list, not the top list).
@@ -936,7 +1088,7 @@ def _main_loop(args=None) -> None:
             except KeyboardInterrupt:
                 creator_outcome = "back"
             if creator_outcome == "next":
-                res = _handle_whats_next(current_provider)
+                res = _handle_whats_next(current_provider, cli_filters, run_pending_update if update_info else None)
                 if res == "EXIT":
                     _goodbye()
                     break
@@ -974,6 +1126,17 @@ def _main_loop(args=None) -> None:
                 update_info = None   # consumed → drop the notice + menu row
                 update_msg = ""
                 continue
+            if result == "__bookmarks__":
+                _bookmarks_flow(cli_filters)
+                continue
+            if result == "__actions__":
+                outcome = _quick_actions_flow(cli_filters=cli_filters, on_update=run_pending_update if update_info else None)
+                if outcome == "EXIT":
+                    _goodbye()
+                    return
+                if outcome is not None:
+                    query, current_provider, cli_facet, pending_creator_name = outcome
+                continue
             # History selection returns ("history", entry) — keyword or creator.
             if isinstance(result, tuple) and result[0] == "history":
                 prov, facet, val = _history_pick(result[1])
@@ -1003,7 +1166,7 @@ def _main_loop(args=None) -> None:
                 current_provider = None
                 continue
             if nxt == "next":
-                res = _handle_whats_next(current_provider)
+                res = _handle_whats_next(current_provider, cli_filters, run_pending_update if update_info else None)
                 if res == "EXIT":
                     _goodbye()
                     break
@@ -1077,89 +1240,16 @@ def _main_loop(args=None) -> None:
             # to this menu); only Esc in the menu itself drops to the prompt.
             if isinstance(query, tuple) and query and query[0] == "ACTIONS":
                 typed = query[1]
-                from torrent_finder.ui.prompts import quick_actions_menu
                 query = None
-                while True:
-                    action = quick_actions_menu(update_available=bool(update_info))
-                    if action == "update":
-                        _run_update_flow(update_info)
-                        update_info = None   # consumed → drop the notice + entry
-                        update_msg = ""
-                    elif action == "filter":
-                        filter_menu(provider)
-                    elif action == "titles":
-                        from torrent_finder.ui.titles import title_search_flow
-                        outcome = title_search_flow(provider, cli_filters, browse_results, initial=typed)
-                        if outcome == "next":
-                            res = _handle_whats_next(current_provider)
-                            if res == "EXIT":
-                                _goodbye()
-                                return
-                            query, current_provider, _hf, _hn = res
-                            if _hf:
-                                cli_facet, pending_creator_name = _hf, _hn
-                            break
-                    elif action == "save_search":
-                        from torrent_finder.bookmarks import save_search
-                        value = typed.strip() or get_query_with_shortcut("Bookmark search: ")
-                        if isinstance(value, str) and value and value != "GO_BACK":
-                            if _saved_data_action(lambda: save_search(provider, value)):
-                                notice_msg = "[success]Search bookmarked. Tab → Bookmarks to run it later.[/success]"
-                    elif action == "bookmarks":
-                        from torrent_finder.ui.bookmarks import bookmark_menu
-                        from torrent_finder.bookmarks import search_provider
-                        chosen = _saved_data_action(bookmark_menu)
-                        if chosen:
-                            operation, entry = chosen
-                            if operation == "compare":
-                                from torrent_finder.providers.combined_provider import CombinedProvider
-                                saved_provider = CombinedProvider(get_provider("all").templates)
-                                saved_provider.filter_summary = lambda: "Saved bookmarks; metadata may be stale"
-                                rows = [dict(e["result"], fetched_at=e["fetched_at"]) for e in entry]
-                                browse_results(saved_provider, rows)
-                                continue
-                            saved_provider = _saved_data_action(lambda: search_provider(entry))
-                            if saved_provider is None:
-                                continue
-                            if operation == "open" and entry["kind"] == "result":
-                                row = dict(entry["result"], fetched_at=entry["fetched_at"])
-                                browse_results(saved_provider, [row], note="Saved listing; current availability is unverified. i: metadata details")
-                            else:
-                                current_provider = saved_provider
-                                query = entry["queries"]
-                                refresh_bookmark = entry["id"] if operation == "refresh" else None
-                                break
-                    elif action == "backup":
-                        from torrent_finder.ui.backup import backup_menu
-                        if backup_menu():
-                            from torrent_finder.state import reload_state
-                            reload_state(PROVIDERS)
-                            from torrent_finder.search_profiles import ProfileLibrary
-                            combined_provider = get_provider("all")
-                            combined_provider.use_profile(ProfileLibrary.load().current)
-                            current_provider = get_provider(provider.slug)
-                            provider = current_provider
-                    elif action == "history":
-                        from torrent_finder.ui.history import history_select_prompt
-                        pick = history_select_prompt()
-                        if pick:
-                            prov, facet, val = _history_pick(pick)
-                            if prov is not None:
-                                current_provider = prov
-                                if facet:  # creator entry → by-creator one-shot
-                                    cli_facet, pending_creator_name = facet, val
-                                else:
-                                    query = val
-                                break  # leave the menu and run it
-                    elif action == "stats":
-                        from torrent_finder.ui.stats import stats_page
-                        stats_page()
-                    elif action == "tips":
-                        from torrent_finder.ui.tips_page import tips_page
-                        tips_page()
-                    else:  # Back / Esc in the menu → return to the search prompt
-                        break
-                if not query:
+                outcome = _quick_actions_flow(provider, cli_filters, typed, run_pending_update if update_info else None)
+                if outcome == "EXIT":
+                    _goodbye()
+                    return
+                if outcome is not None:
+                    query, current_provider, _hf, _hn = outcome
+                    if _hf:
+                        cli_facet, pending_creator_name = _hf, _hn
+                else:
                     pending_query = typed
                 clear_screen()
                 continue
@@ -1248,7 +1338,6 @@ def _main_loop(args=None) -> None:
             stop_listener.set()
 
         if cancel_event.is_set():
-            refresh_bookmark = None
             notice_msg = "[warning] Search cancelled — returning to the prompt.[/warning]\n"
             clear_screen()
             query = None
@@ -1258,10 +1347,6 @@ def _main_loop(args=None) -> None:
         notices = list(getattr(raw_results, "notices", ()))
         results = raw_results if raw_results is not None else []
         provider.last_queries = queries
-        if refresh_bookmark is not None:
-            from torrent_finder.bookmarks import refresh
-            _saved_data_action(lambda: refresh(refresh_bookmark, results))
-            refresh_bookmark = None
         if not results and getattr(results, "session", None) is None:
             from rich.markup import escape
             message = search_result.get("error") or "\n".join(["No results found.", *notices])
@@ -1302,7 +1387,7 @@ def _main_loop(args=None) -> None:
             clear_screen()
             continue
 
-        res = _handle_whats_next(current_provider)
+        res = _handle_whats_next(current_provider, cli_filters, run_pending_update if update_info else None)
         if res == "EXIT":
             _goodbye()
             break

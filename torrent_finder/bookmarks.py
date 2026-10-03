@@ -52,7 +52,7 @@ def save_results(provider, results):
                       "saved_at": now(), "fetched_at": value.get("fetched_at") or now(),
                       "result": value, **context(provider, queries)})
     _save(saved)
-    return "Bookmarked. Tab → Bookmarks from the search prompt to review."
+    return "Bookmarked. Open Bookmarks from the main menu or quick actions to review."
 
 
 def save_search(provider, query):

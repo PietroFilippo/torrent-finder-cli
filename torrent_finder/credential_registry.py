@@ -184,7 +184,22 @@ def _verify_igdb(values: Mapping[str, str | None]) -> VerificationResult:
     )
 
 
+def _verify_qbittorrent(values: Mapping[str, str | None]) -> VerificationResult:
+    from torrent_finder.qbittorrent import verify
+    return verify(values)
+
+
 CREDENTIAL_REGISTRY: tuple[CredentialSpec, ...] = (
+    CredentialSpec(
+        id="qbittorrent", category="Torrent client", icon="⬇", name="qBittorrent WebUI",
+        fields=(CredentialField("QBITTORRENT_URL", "WebUI URL (e.g. http://127.0.0.1:8080)"),
+                CredentialField("QBITTORRENT_USERNAME", "WebUI username (optional for trusted access)", required=False),
+                CredentialField("QBITTORRENT_PASSWORD", "WebUI password", secret=True, required=False)),
+        verifier=_verify_qbittorrent,
+        howto=("Enable WebUI in qBittorrent's settings and enter its address here.",
+               "For a remote client, use its configured HTTPS endpoint. Save paths belong to that computer."),
+        tip="This app does not change WebUI exposure or authentication settings.",
+    ),
     CredentialSpec(
         id="opensubtitles",
         category="Subtitles",

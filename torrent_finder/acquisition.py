@@ -75,6 +75,13 @@ class MagnetDirect:
         info_hash = result.get("info_hash") or ""
         return build_magnet(info_hash, result.get("name", "Unknown")) if info_hash else None
 
+    def client_payload(self, result):
+        from torrent_finder.qbittorrent import magnet_payload, ClientError
+        magnet = self.magnet(result)
+        if not magnet:
+            raise ClientError("The source could not resolve a magnet for this result.")
+        return magnet_payload(magnet)
+
     def pick(self, result) -> PickOutcome:
         # Single pick builds the magnet unconditionally (even from an empty
         # hash) — the download-method menu is still useful for its info rows.
@@ -155,6 +162,17 @@ class OnlineFixAcquisition:
 
     def magnet(self, result) -> str | None:
         return None
+
+    def client_payload(self, result):
+        import tempfile
+        from pathlib import Path
+        from torrent_finder import online_fix
+        from torrent_finder.qbittorrent import torrent_payload, ClientError
+        with tempfile.TemporaryDirectory(prefix="torrent-finder-") as directory:
+            path = online_fix.fetch_torrent_for(result.get("page_url") or result.get("of_post_url") or "", directory)
+            if not path or Path(path).stat().st_size > 8 * 1024 * 1024:
+                raise ClientError("Could not obtain Online-Fix torrent metadata. Open its listing manually.")
+            return torrent_payload(Path(path).read_bytes())
 
     def pick(self, result) -> PickOutcome:
         from torrent_finder import online_fix

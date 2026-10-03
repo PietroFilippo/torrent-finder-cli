@@ -24,6 +24,7 @@ class CredentialRegistryTests(unittest.TestCase):
         self.assertEqual(
             tuple(spec.id for spec in CREDENTIAL_REGISTRY),
             (
+                "qbittorrent",
                 "opensubtitles",
                 "addic7ed",
                 "jimaku",

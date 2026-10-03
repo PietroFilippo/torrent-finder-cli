@@ -346,7 +346,9 @@ class SearchSessionTests(unittest.TestCase):
             session.run("retry", timeout=0.06)
             self.assertEqual(calls, ["Example"])
             self.assertGreater(session.diagnostics[0].seconds, 0)
-            self.assertIsNone(session.diagnostics[0].requests)
+            # The waiting worker may report zero requests before the coordinator
+            # reaches its deadline; otherwise the abandoned attempt is unknown.
+            self.assertIn(session.diagnostics[0].requests, (0, None))
         finally:
             release.set()
 

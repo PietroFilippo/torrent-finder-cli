@@ -230,6 +230,36 @@ in keyword history's optional `queries` field and survives settings transfer;
 ordinary keyword entries with the same display title remain distinct. Creator
 fan-out also bounds aliases per Work to six and preserves their title provenance.
 
+`resolvers/topics.py` maps a keyword phrase to explicit catalog vocabulary, then
+retrieves matching `TitleMatch` works. AniList term descriptions can match a phrase
+whose words differ from the label (time travel → Time Manipulation). The picker
+requires the user to choose the catalog term. AniList tags require 60% relevance;
+all chosen genres/tags are checked on returned rows too. TMDB movie/TV discovery
+uses genre/keyword IDs; IGDB combines genre/theme/mode/keyword IDs with AND.
+Open Library uses a single subject. Failed or malformed responses are errors,
+not empty matches. Software purpose discovery is unsupported.
+
+`ui/discovery.py` bounds a journey to three catalog pages, three selected works,
+two names per work, and an explicit release-query review. Combined searches clone
+the profile and intersect its selected providers with catalog compatibility;
+the original selection is unchanged. The review names the effective providers.
+Searches use the existing session executor and persist exact queries in history.
+See [ADR-0018](docs/adr/0018-client-handoff-and-topic-discovery.md).
+
+## Torrent client
+
+`qbittorrent.py` implements optional WebUI API v2 authentication, duplicate
+checks, additions and read-only client progress. URL/login values belong to the
+credential registry and separate credential transfer. Each explicit flow owns a
+cookie session, uses eight-second requests, validates the endpoint response and
+does not follow redirects or automatically retry mutations. Acquisition adapters
+expose `client_payload` for magnets or torrent files; direct downloads have none.
+Torrent identities hash the original bencoded info bytes. An acknowledgement
+without client confirmation stays pending, and ambiguous failures advise checking
+the client. Existing torrents are never moved or recategorized. The UI sends full
+torrents after destination review and shows timestamped client snapshots with R
+to refresh. Client API progress is separate from method-completion statistics.
+
 ## Store
 
 `NameRules` (`name_rules.py`) is the portable, name-only user rule contract:
@@ -275,6 +305,14 @@ the selector and confirmation flow. See
 [ADR-0007](docs/adr/0007-managed-terminal-command-presets.md).
 
 ## Terminal Layout
+
+Main and What's Next menus expose bookmarks and general quick actions.
+`main._quick_actions_flow` receives an optional provider: search-specific actions
+choose a scope only when it is absent. A provider-bound entry keeps that scope.
+`_bookmarks_flow` shares reopening, saved searches, comparison and refresh across
+these entry points. Expanded result rows retain the normal background and use
+the arrow/bold style for focus. Short menus omit long random tips to preserve
+room for their choices.
 
 A viewport is the terminal's current width and height, which may change while
 an interactive screen is open. `ui/layout.py` owns terminal-cell-aware
