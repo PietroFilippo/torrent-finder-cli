@@ -7,6 +7,7 @@ Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, n
 See the [v0.7.0 release notes](docs/releases/v0.7.0.md) for the latest release, new features, and upgrade guidance.
 
 The [October 2026 provider audit](docs/audits/2026-10-03/README.md) records measured source coverage, access failures, known search gaps, and prioritized recommendations across every provider.
+The separate [provider reference](docs/PROVIDER_REFERENCE.md) details each provider's tested sources, behavior, limitations, and recommendations.
 
 ## Features
 

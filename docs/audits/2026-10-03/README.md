@@ -7,6 +7,9 @@ and manga defaults. F-Droid is the strongest measured optional addition, for a
 limited part of Mobile. No new provider, product behavior, or release was added
 by this research. The decisions and follow-up work are preserved below.
 
+The separate [tested provider reference](../../PROVIDER_REFERENCE.md) describes
+each provider's sources, settings, observed behavior, limitations and follow-up.
+
 ## Evidence and scope
 
 - 352 queries: 32 for each of all 11 individual providers. Each has 24 titles,
