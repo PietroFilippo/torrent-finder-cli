@@ -306,13 +306,21 @@ the selector and confirmation flow. See
 
 ## Terminal Layout
 
-Main and What's Next menus expose bookmarks and general quick actions.
+Main and What's Next menus expose general quick actions, which contain bookmarks.
 `main._quick_actions_flow` receives an optional provider: search-specific actions
 choose a scope only when it is absent. A provider-bound entry keeps that scope.
 `_bookmarks_flow` shares reopening, saved searches, comparison and refresh across
 these entry points. Expanded result rows retain the normal background and use
 the arrow/bold style for focus. Short menus omit long random tips to preserve
-room for their choices.
+room for their choices. What's Next has unique case-insensitive letter shortcuts
+and Tab for quick actions; its footer responds to viewport changes.
+
+`ui.prompts.download_complete_prompt` offers Continue or Back after actions from
+the download menu. Back (including Esc/Ctrl+C) returns to the same `TorrentSession`
+or batch selection; it never repeats a handoff. Summary text stays in the selector
+context so compact layouts retain it. `_batch_handoff` and `_batch_aria2` return
+the navigation choice to `_batch_flow`. Failed downloads keep their error output
+until acknowledged, then return to download options.
 
 A viewport is the terminal's current width and height, which may change while
 an interactive screen is open. `ui/layout.py` owns terminal-cell-aware

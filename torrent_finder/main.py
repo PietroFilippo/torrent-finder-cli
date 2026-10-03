@@ -42,6 +42,7 @@ from torrent_finder.stats import (
 from torrent_finder.torrent_session import TorrentSession
 from torrent_finder.ui.prompts import (
     clear_screen,
+    download_complete_prompt,
     download_method_prompt,
     episode_select_prompt,
     filter_menu,
@@ -154,7 +155,7 @@ def _copy_to_clipboard(text: str) -> bool:
         return False
 
 
-def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
+def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
     """Hand every checkbox-selected torrent to the system client at once.
 
     A results list can mix acquisition styles (magnet, torrent-file handoff,
@@ -162,7 +163,6 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
     the outcomes aggregate into one summary. Esc stops the run between items
     (and mid-transfer for direct downloads).
     """
-    from rich.panel import Panel
     from torrent_finder.constants import get_download_dir
 
     n = len(idxs)
@@ -238,13 +238,7 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> None:
         lines.append(f"[warning] Couldn't open {len(failed)}:[/warning] {shown}")
         for u in manual_urls[:6]:
             lines.append(f"[dim]Grab manually: {u}[/dim]")
-    console.print(Panel(
-        "\n".join(lines),
-        title="🧲 Batch download", border_style="bright_blue", padding=(1, 2),
-    ))
-    console.print("[dim]Press any key to continue...[/dim]")
-    readchar.readkey()
-    clear_screen()
+    return download_complete_prompt("Batch handoff finished", summary="\n".join(lines))
 
 
 def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
@@ -286,7 +280,7 @@ def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
     clear_screen()
 
 
-def _batch_aria2(provider, results: list, idxs: list[int]) -> None:
+def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
     """Download every selected torrent that has a magnet with one aria2c process.
 
     The client-free batch path (parallel, single process). Online-Fix and
@@ -314,7 +308,7 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> None:
         console.print("[dim]Press any key to continue...[/dim]")
         readchar.readkey()
         clear_screen()
-        return
+        return "back"
 
     if skipped:
         console.print(
@@ -327,17 +321,20 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> None:
         record_method_complete("aria")
         for r in picked:
             record_torrent_picked(provider_for_result(r, provider).slug, int(r.get("seeders", 0) or 0))
-    console.print("[dim]Press any key to continue...[/dim]")
-    readchar.readkey()
-    clear_screen()
+    if not ok:
+        console.print("[dim]Press any key to return to download options...[/dim]")
+        readchar.readkey()
+        return "back"
+    return download_complete_prompt("Batch download finished",
+                                    summary=f"{len(picked)} torrent(s) downloaded; {skipped} skipped (no magnet).")
 
 
 def _batch_flow(provider, results: list, idxs: list[int]) -> str:
     """Drive the reduced batch-download menu for a multi-torrent selection.
 
-    Loops the menu so Copy stays put; returns "next" when the user opened or
-    cancelled (caller shows what's next), or "back" to re-show the results table
-    (Back / Esc).
+    Copy and Back after a completed action retain this selection. Returns
+    "next" when the user continues or cancels (caller shows what's next), or
+    "back" to re-show the results table (Back / Esc in the download menu).
     """
     from torrent_finder.ui.prompts import batch_download_menu
 
@@ -350,7 +347,8 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
         action = batch_download_menu(len(idxs), copyable)
         if action == "qbittorrent":
             from torrent_finder.ui.qbittorrent import send_results
-            if send_results([results[i] for i in idxs if 0 <= i < len(results)]):
+            if (send_results([results[i] for i in idxs if 0 <= i < len(results)])
+                    and download_complete_prompt("qBittorrent handoff finished") == "next"):
                 return "next"
             continue
         if action == "open":
@@ -364,11 +362,13 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
                 ):
                     clear_screen()
                     continue
-            _batch_handoff(provider, results, idxs)
-            return "next"
+            if _batch_handoff(provider, results, idxs) == "next":
+                return "next"
+            continue
         if action == "aria":
-            _batch_aria2(provider, results, idxs)
-            return "next"
+            if _batch_aria2(provider, results, idxs) == "next":
+                return "next"
+            continue
         if action == "copy":
             _batch_copy_magnets(provider, results, idxs)
             continue
@@ -401,8 +401,8 @@ def _browse_results(provider, results, note: str = "") -> str:
     screen), or ``"next"`` if a download action completed (caller shows "what's
     next?"). On the download menu, Esc / "↩ Go back to results" step back to the
     results table; "✕ Cancel" means "done with this torrent" → returns ``"next"``
-    (what's next), as do completed actions (magnet sent, download finished,
-    Online-Fix handoff).
+    (what's next). Completed download-menu actions offer Continue or Back to
+    the same session; standalone acquisitions handle their own completion.
     """
     while True:
         clear_screen()
@@ -437,15 +437,17 @@ def _browse_results(provider, results, note: str = "") -> str:
         from torrent_finder.qbittorrent import configured
         if configured() and acquisition.for_result(selected).style == "torrent-file-handoff":
             from torrent_finder.ui.selector import SelectItem, arrow_select
-            options = [SelectItem("Send to qBittorrent WebUI", "qbittorrent"),
-                       SelectItem("Open with default client", "default"), SelectItem("Back", None)]
-            picked = arrow_select(options, title="Torrent client", footer="Enter select • Esc back")
-            if picked is None or options[picked].value is None:
-                continue
-            if options[picked].value == "qbittorrent":
+            options = [SelectItem("🧲 Send to qBittorrent WebUI", "qbittorrent"),
+                       SelectItem("🧲 Open with default client", "default"), SelectItem("↩ Back", None)]
+            while True:
+                picked = arrow_select(options, title="Torrent client", footer="Enter select • Esc back")
+                if picked is None or options[picked].value != "qbittorrent":
+                    break
                 from torrent_finder.ui.qbittorrent import send_results
-                if send_results([selected]):
+                if (send_results([selected])
+                        and download_complete_prompt("qBittorrent handoff finished") == "next"):
                     return "next"
+            if picked is None or options[picked].value is None:
                 continue
 
         # Acquisition seam: magnet styles hand back a magnet and fall through
@@ -489,7 +491,8 @@ def _browse_results(provider, results, note: str = "") -> str:
 
             if method == "qbittorrent":
                 from torrent_finder.ui.qbittorrent import send_results
-                if send_results([selected], magnet=session.magnet):
+                if (send_results([selected], magnet=session.magnet)
+                        and download_complete_prompt("qBittorrent handoff finished") == "next"):
                     return "next"
                 continue
 
@@ -562,9 +565,13 @@ def _browse_results(provider, results, note: str = "") -> str:
                 open_magnet(session.magnet)
                 record_magnet_dispatch()
                 console.print("[success] Magnet link sent to torrent client![/success]\n")
-                console.print("[dim]Press any key to continue...[/dim]")
-                readchar.readkey()
-                return "next"
+                summary = (
+                    "[warning]File selection must be set in your torrent client.[/warning]\n"
+                    "Uncheck unwanted files in its Add torrent dialog or Content/Files tab."
+                ) if session.selected_files else ""
+                if download_complete_prompt("Magnet link sent to torrent client", summary=summary) == "next":
+                    return "next"
+                continue
             elif method == "stream_p":
                 clear_screen()
                 stream_with_peerflix(session)
@@ -582,31 +589,37 @@ def _browse_results(provider, results, note: str = "") -> str:
                 ok = download_with_aria2(session.magnet, session.download_indexes)
                 if ok:
                     record_method_complete("aria")
-                console.print("\n[dim]Press any key to continue...[/dim]")
-                readchar.readkey()
                 if not ok:
+                    console.print("\n[dim]Press any key to return to download options...[/dim]")
+                    readchar.readkey()
                     continue
-                return "next"
+                if download_complete_prompt("Download finished") == "next":
+                    return "next"
+                continue
             elif method == "p":
                 clear_screen()
                 ok = download_with_peerflix(session.magnet, session.download_indexes)
                 if ok:
                     record_method_complete("peerflix_download")
-                console.print("\n[dim]Press any key to continue...[/dim]")
-                readchar.readkey()
                 if not ok:
+                    console.print("\n[dim]Press any key to return to download options...[/dim]")
+                    readchar.readkey()
                     continue
-                return "next"
+                if download_complete_prompt("Download finished") == "next":
+                    return "next"
+                continue
             elif method == "d":
                 clear_screen()
                 ok = download_with_webtorrent(session.magnet, session.download_indexes)
                 if ok:
                     record_method_complete("webtorrent_download")
-                console.print("\n[dim]Press any key to continue...[/dim]")
-                readchar.readkey()
                 if not ok:
+                    console.print("\n[dim]Press any key to return to download options...[/dim]")
+                    readchar.readkey()
                     continue
-                return "next"
+                if download_complete_prompt("Download finished") == "next":
+                    return "next"
+                continue
             elif method == "s":
                 import os as _os
                 from torrent_finder.jimaku import is_subtitle_file
@@ -885,8 +898,6 @@ def _handle_whats_next(current_provider, cli_filters=None, on_update=None):
             return (None, current_provider, None, None)
         if choice in {"provider", "main"}:
             return (None, None, None, None)
-        if choice == "bookmarks":
-            _bookmarks_flow(cli_filters)
         if choice == "actions":
             outcome = _quick_actions_flow(cli_filters=cli_filters, on_update=on_update)
             if outcome is not None:
@@ -1125,9 +1136,6 @@ def _main_loop(args=None) -> None:
                 _run_update_flow(update_info)
                 update_info = None   # consumed → drop the notice + menu row
                 update_msg = ""
-                continue
-            if result == "__bookmarks__":
-                _bookmarks_flow(cli_filters)
                 continue
             if result == "__actions__":
                 outcome = _quick_actions_flow(cli_filters=cli_filters, on_update=run_pending_update if update_info else None)

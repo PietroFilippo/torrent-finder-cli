@@ -5,22 +5,77 @@ from unittest.mock import Mock, patch
 
 from rich.console import Console
 from torrent_finder import main
-from torrent_finder.ui import prompts, table
+from torrent_finder.ui import prompts, selector, table
 
 
 class GlobalActionsTests(unittest.TestCase):
-    def test_main_menu_exposes_bookmarks_and_quick_actions(self):
-        for action in ("__bookmarks__", "__actions__"):
-            def select(items, **kwargs):
-                return next(i for i, item in enumerate(items) if item.value == action)
-            with patch.object(prompts, "arrow_select", side_effect=select):
-                self.assertEqual(prompts.provider_select_prompt(), action)
+    def test_main_menu_exposes_quick_actions_without_duplicate_bookmarks(self):
+        def select(items, **kwargs):
+            self.assertNotIn("__bookmarks__", [item.value for item in items])
+            self.assertNotIn("b", kwargs["hotkeys"])
+            self.assertNotIn("B", kwargs["hotkeys"])
+            return next(i for i, item in enumerate(items) if item.value == "__actions__")
+        with patch.object(prompts, "arrow_select", side_effect=select):
+            self.assertEqual(prompts.provider_select_prompt(), "__actions__")
 
     def test_whats_next_exposes_requested_destinations(self):
-        for action in ("main", "bookmarks", "actions"):
-            with patch.object(prompts, "arrow_select", side_effect=lambda items, **kw:
-                              next(i for i, item in enumerate(items) if item.value == action)):
+        for action in ("main", "actions"):
+            def select(items, **kwargs):
+                self.assertNotIn("bookmarks", [item.value for item in items])
+                return next(i for i, item in enumerate(items) if item.value == action)
+            with patch.object(prompts, "arrow_select", side_effect=select):
                 self.assertEqual(prompts.search_again_prompt(), action)
+
+    def test_whats_next_hotkeys_route_through_the_real_selector(self):
+        for key, action in (("r", "search"), ("p", "provider"), ("m", "main"),
+                            ("\t", "actions"), ("q", "exit")):
+            for pressed in {key, key.upper()}:
+                with self.subTest(key=pressed), \
+                     patch.object(selector, "console", Console(file=io.StringIO(), width=80, height=30)), \
+                     patch.object(selector.sys, "stdout", io.StringIO()), \
+                     patch.object(selector.readchar, "readkey", return_value=pressed):
+                    self.assertEqual(prompts.search_again_prompt(), action)
+
+    def test_whats_next_local_hotkeys_open_their_pages_and_return(self):
+        targets = (("h", "torrent_finder.ui.history.history_select_prompt"),
+                   ("s", "torrent_finder.ui.stats.stats_page"),
+                   ("t", "torrent_finder.ui.tips_page.tips_page"),
+                   ("c", "torrent_finder.ui.prompts.credentials_menu"))
+        for key, target in targets:
+            for pressed in (key, key.upper()):
+                with self.subTest(key=pressed), patch(target, return_value=None) as page, \
+                     patch.object(selector, "console", Console(file=io.StringIO(), width=40, height=16)), \
+                     patch.object(selector.sys, "stdout", io.StringIO()), \
+                     patch.object(selector.readchar, "readkey", side_effect=[pressed, "r"]):
+                    self.assertEqual(prompts.search_again_prompt(), "search")
+                    page.assert_called_once()
+
+    def test_whats_next_history_shortcut_can_replay_an_entry(self):
+        entry = {"provider": "anime", "query": "Saki"}
+        with patch("torrent_finder.ui.history.history_select_prompt", return_value=entry), \
+             patch.object(selector, "console", Console(file=io.StringIO(), width=80, height=30)), \
+             patch.object(selector.sys, "stdout", io.StringIO()), \
+             patch.object(selector.readchar, "readkey", return_value="h"):
+            self.assertEqual(prompts.search_again_prompt(), ("history", entry))
+
+    def test_whats_next_resize_drops_long_tip_and_keeps_choices_visible(self):
+        output = io.StringIO()
+        terminal = Console(file=output, width=100, height=32, color_system=None)
+
+        def resize_and_render(items, **kwargs):
+            terminal.width, terminal.height = 40, 16
+            terminal.print(selector._build_panel(items, 0, kwargs["title"], False,
+                                                 footer=kwargs["footer"]()))
+            return None
+
+        with patch.object(prompts, "console", terminal), patch.object(selector, "console", terminal), \
+             patch("torrent_finder.ui.tips.random_tip", return_value="Long tip " * 30), \
+             patch.object(prompts, "arrow_select", side_effect=resize_and_render):
+            prompts.search_again_prompt()
+        rendered = output.getvalue()
+        self.assertNotIn("Long tip", rendered)
+        self.assertIn("Usage Stats", rendered)
+        self.assertLessEqual(len(rendered.splitlines()), 15)
 
     def test_main_option_clears_provider(self):
         with patch.object(main, "search_again_prompt", return_value="main"):
@@ -64,7 +119,8 @@ class GlobalActionsTests(unittest.TestCase):
         self.assertEqual(flow.call_args.args, ())
 
     def test_bookmarks_return_to_whats_next(self):
-        with patch.object(main, "search_again_prompt", side_effect=["bookmarks", "search"]), \
+        with patch.object(main, "search_again_prompt", side_effect=["actions", "search"]), \
+             patch.object(prompts, "quick_actions_menu", side_effect=["bookmarks", None]), \
              patch.object(main, "_bookmarks_flow") as bookmarks, patch.object(main, "clear_screen"):
             self.assertEqual(main._handle_whats_next("current"), (None, "current", None, None))
         bookmarks.assert_called_once()

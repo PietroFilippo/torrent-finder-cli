@@ -11,9 +11,12 @@ opening search-specific actions.
 
 ## Decision
 
-Share bookmark and quick-action journeys between the main menu, What's Next,
-and the provider prompt. Passing a provider binds search-specific actions to it;
-otherwise the action first selects its scope. Keep main-menu navigation explicit.
+Share quick-action journeys between the main menu, What's Next, and the provider
+prompt, keeping bookmarks inside Quick actions. Passing a provider binds
+search-specific actions to it; otherwise the action first selects its scope.
+Keep main-menu navigation explicit and give each What's Next option a distinct
+shortcut. After download-menu actions, offer Continue or Back to the same torrent
+session or batch selection without submitting again.
 
 Add optional qBittorrent WebUI API v2 credentials through the existing registry.
 Use the acquisition seam to prepare magnets and Online-Fix torrent metadata.

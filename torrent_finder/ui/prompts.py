@@ -480,13 +480,13 @@ def quick_actions_menu(update_available: bool = False, provider=None) -> "str | 
         items.append(SelectItem(label="⬆ Install update", value="update", is_action=True, hint="U"))
     base = [
         ("🔍 Filters & engines", "filter", "F"),
-        ("Alternate-title search", "titles", "A"),
-        ("Discover by topic / genre", "discover", "D"),
+        ("🔤 Alternate-title search", "titles", "A"),
+        ("🧭 Discover by topic / genre", "discover", "D"),
         ("🕑 Search history", "history", "H"),
-        ("Bookmarks / download later", "bookmarks", "B"),
-        ("Bookmark current search", "save_search", "L"),
-        ("Settings backup / import", "backup", "E"),
-        ("qBittorrent connection / progress", "qbittorrent", "Q"),
+        ("🔖 Bookmarks / download later", "bookmarks", "B"),
+        ("📌 Bookmark current search", "save_search", "L"),
+        ("💾 Settings backup / import", "backup", "E"),
+        ("🧲 qBittorrent connection / progress", "qbittorrent", "Q"),
         ("📊 Usage stats", "stats", "S"),
         ("💡 Tips & shortcuts", "tips", "T"),
     ]
@@ -526,7 +526,7 @@ def action_provider_prompt(action):
     from torrent_finder.providers.combined_provider import provider_label
     items = [SelectItem(f"{p.icon} {provider_label(p)}", value=p,
                         description=getattr(p, "search_note", "")) for p in PROVIDERS]
-    items.append(SelectItem("Back", value=None, is_action=True))
+    items.append(SelectItem("↩ Back", value=None, is_action=True))
     index = arrow_select(items, title=f"{action} · choose provider", banner=_make_banner_panel(),
                          footer="All / selected providers uses its current profile. Esc back.")
     return None if index is None else items[index].value
@@ -1376,7 +1376,7 @@ def download_method_prompt(
     ))
     from torrent_finder.qbittorrent import configured
     if configured():
-        items.append(SelectItem("Send to qBittorrent WebUI", "qbittorrent",
+        items.append(SelectItem("🧲 Send to qBittorrent WebUI", "qbittorrent",
                                 description="Choose client folder/category and view real progress. Adds the full torrent; manage file selection in qBittorrent."))
     items.append(SelectItem(
         label="⬇  aria2c",
@@ -1604,7 +1604,7 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
 
     from torrent_finder.qbittorrent import configured
     if configured():
-        items.insert(1, SelectItem("Send selection to qBittorrent WebUI", "qbittorrent",
+        items.insert(1, SelectItem("🧲 Send selection to qBittorrent WebUI", "qbittorrent",
                                    description="Magnets and Online-Fix torrent files. Direct downloads are skipped."))
     idx = arrow_select(
         items,
@@ -1848,8 +1848,7 @@ def provider_select_prompt(
             provider_items
             + [separator]
             + ([update_item] if update_available else [])
-            + [SelectItem("Bookmarks / download later", value="__bookmarks__", hint="B", is_action=True),
-               SelectItem("Quick actions", value="__actions__", hint="Tab", is_action=True),
+            + [SelectItem("⚡ Quick actions", value="__actions__", hint="Tab", is_action=True),
                tips_item, info_item, creds_item, command_item, dir_item]
         )
 
@@ -1866,7 +1865,7 @@ def provider_select_prompt(
                 "[bold yellow]F[/bold yellow] filters  •  "
                 "[bold yellow]H[/bold yellow] history  •  "
                 "[bold yellow]S[/bold yellow] stats  •  "
-                "[bold yellow]T[/bold yellow] tips  •  B bookmarks • Tab actions • Esc cancel"
+                "[bold yellow]T[/bold yellow] tips  •  Tab actions • Esc cancel"
                 + (f"\n\n   {tip_line}" if tip_line else "")
             ),
             banner=_make_banner_panel(),
@@ -1878,7 +1877,7 @@ def provider_select_prompt(
                 "s": "stats",
                 "T": "tips",
                 "t": "tips",
-                "b": "bookmarks", "B": "bookmarks", "\t": "actions",
+                "\t": "actions",
                 **({"U": "update", "u": "update"} if update_available else {}),
             },
             key_actions={"F": _handle_f, "f": _handle_f},
@@ -1896,8 +1895,8 @@ def provider_select_prompt(
         # H/S hotkeys — open history / stats
         if isinstance(result, tuple) and result[0] == "hotkey":
             _, action, cursor = result
-            if action in {"bookmarks", "actions"}:
-                return "__" + action + "__"
+            if action == "actions":
+                return "__actions__"
             if action == "history":
                 from torrent_finder.ui.history import history_select_prompt
                 pick = history_select_prompt()
@@ -1959,6 +1958,19 @@ def provider_select_prompt(
         return items[result].value
 
 
+def download_complete_prompt(message: str = "Download action finished", *, summary: str = "") -> str:
+    """Leave a completed action or revisit its choices without repeating it."""
+    items = [
+        SelectItem("➡ Continue to What's Next", value="next", description=summary),
+        SelectItem("↩ Back to download options", value="back",
+                   description=(summary + "\n" if summary else "")
+                   + "Keep this selection. Returning does not repeat the download or handoff."),
+    ]
+    index = arrow_select(items, title=message, banner=_make_banner_panel(),
+                         footer="↑/↓ select • Enter confirm • Esc back to download options")
+    return "back" if index is None else items[index].value
+
+
 def search_again_prompt() -> str | tuple | None:
     """Prompt the user for what to do next after a download.
 
@@ -1969,18 +1981,24 @@ def search_again_prompt() -> str | tuple | None:
         - ``'exit'`` when the Exit row is chosen.
         - ``None`` when Esc or Ctrl+C cancels the menu.
     """
-    items = [
-        SelectItem(label="🔍 Search Again", value="search"),
-        SelectItem(label="🔄 Change Provider", value="provider"),
-        SelectItem(label="Main menu", value="main"),
-        SelectItem(label="Bookmarks / download later", value="bookmarks"),
-        SelectItem(label="Quick actions", value="actions"),
-        SelectItem(label="📜 Search History", value="history"),
-        SelectItem(label="📊 Usage Stats", value="stats"),
-        SelectItem(label="💡 Tips & shortcuts", value="tips"),
-        SelectItem(label="🔑 Credentials", value="credentials"),
-        SelectItem(label="👋 Exit", value="exit"),
+    choices = [
+        ("🔍 Search Again", "search", "R"),
+        ("🔄 Change Provider", "provider", "P"),
+        ("🏠 Main menu", "main", "M"),
+        ("⚡ Quick actions", "actions", "Tab"),
+        ("📜 Search History", "history", "H"),
+        ("📊 Usage Stats", "stats", "S"),
+        ("💡 Tips & shortcuts", "tips", "T"),
+        ("🔑 Credentials", "credentials", "C"),
+        ("👋 Exit", "exit", "Q"),
     ]
+    items = [SelectItem(label=label, value=value, hint=key) for label, value, key in choices]
+    hotkeys = {}
+    for _label, value, key in choices:
+        if key == "Tab":
+            hotkeys["\t"] = value
+        else:
+            hotkeys[key] = hotkeys[key.lower()] = value
 
     from torrent_finder.ui.tips import random_tip
 
@@ -1988,19 +2006,27 @@ def search_again_prompt() -> str | tuple | None:
     while True:
         # Fresh tip per menu entry, fixed across the render loop.
         tip_line = random_tip() if console.size.height >= 24 and console.size.width >= 60 else ""
+
+        def footer():
+            if console.size.height < 24 or console.size.width < 60:
+                return "↑/↓ Enter • Esc exit\nR/P/M/Tab/H/S/T/C/Q jump"
+            return ("↑/↓ navigate • Enter select • R/P/M/Tab/H/S/T/C/Q jump • Esc request exit"
+                    + (f"\n\n   {tip_line}" if tip_line else ""))
+
         idx = arrow_select(
             items,
             title="What's Next?",
             banner=_make_banner_panel(),
             start_index=start,
-            footer=(
-                "↑/↓ navigate  •  Enter select  •  Esc request exit"
-                + (f"\n\n   {tip_line}" if tip_line else "")
-            ),
+            hotkeys=hotkeys,
+            footer=footer,
         )
 
         if idx is None:
             return None
+
+        if isinstance(idx, tuple) and idx[0] == "hotkey":
+            idx = next(i for i, item in enumerate(items) if item.value == idx[1])
 
         selected = items[idx].value
 
