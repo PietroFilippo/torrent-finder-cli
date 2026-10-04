@@ -194,6 +194,7 @@ def get_query_with_shortcut(
     filters_shortcut: bool = False,
     multi: bool = False,
     screen_renderer: Callable[[Console], None] | None = None,
+    propagate_interrupt: bool = False,
 ) -> "str | tuple | list | None":
     """Read a search query with inline editing.
 
@@ -206,7 +207,9 @@ def get_query_with_shortcut(
     string and Esc leaves immediately, exactly as before.
 
     Returns the typed text, "GO_BACK" on Esc, or ``("ACTIONS", typed)`` when Tab
-    is pressed. With ``filters_shortcut=True``, Ctrl+F returns
+    is pressed. Ctrl+C cancels the field like Esc, returning "GO_BACK", so a
+    nested editor never exits the app. Only ``propagate_interrupt=True`` (the
+    main search prompt and its quit guard) raises ``KeyboardInterrupt`` instead. With ``filters_shortcut=True``, Ctrl+F returns
     ``("FILTERS", typed)``. ``history`` enables Up/Down search recall.
 
     When ``screen_renderer`` is provided, the editor owns an alternate-screen
@@ -458,6 +461,12 @@ def get_query_with_shortcut(
                 buffer.insert(pos, key)
                 pos += 1
                 repaint(prev_col, prev_len)
+    except KeyboardInterrupt:  # typed Ctrl+C (raised above) or one raised by readkey
+        if propagate_interrupt:
+            raise
+        if screen_renderer is None:
+            print()
+        return "GO_BACK"
     finally:
         if screen_renderer is not None:
             stop_event.set()

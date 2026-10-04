@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 from torrent_finder.constants import console
-from torrent_finder.providers import PROVIDERS
+from torrent_finder.providers import PROVIDERS, display_name_for, icon_for
 from torrent_finder.state import clear_history, load_history
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.ui.prompts import _make_banner_panel, confirm_prompt
@@ -32,24 +32,9 @@ def _relative_time(iso_ts: str) -> str:
     return f"{months}mo ago"
 
 
-def _provider_icon(slug_or_name: str) -> str:
-    """Emoji icon for a provider, identified by either slug (entry field) or name (filter label)."""
-    for p in PROVIDERS:
-        if p.slug == slug_or_name or p.name == slug_or_name:
-            return p.icon
-    return "🔍"
-
-
-def _provider_display(slug: str) -> str:
-    """Current display name for a stored slug; falls back to the slug for unknown providers."""
-    for p in PROVIDERS:
-        if p.slug == slug:
-            return p.name
-    return slug
-
-
-# Map filter-dropdown display names to slugs for entry comparison.
-_NAME_TO_SLUG = {p.name: p.slug for p in PROVIDERS}
+def _option_label(provider: str | None) -> str:
+    """The provider filter as shown: "All" or the qualified label (Games · General)."""
+    return "All" if provider is None else display_name_for(provider)
 
 
 def _parse_ts(iso_ts: str) -> datetime | None:
@@ -68,8 +53,9 @@ def _parse_ts(iso_ts: str) -> datetime | None:
 
 # Filter definitions
 
-# Provider filter: cycle through All → each provider name → All
-_PROVIDER_OPTIONS = ["All"] + [p.name for p in PROVIDERS]
+# Provider filter: cycle through All (None) → each provider slug → All. Slugs,
+# not names: Games and Manga both have a provider named "General".
+_PROVIDER_OPTIONS = [None] + [p.slug for p in PROVIDERS]
 
 # Date range filter
 _DATE_OPTIONS = ["All time", "Today", "This week", "This month"]
@@ -81,11 +67,10 @@ _SORT_OPTIONS = ["Newest first", "Oldest first"]
 _TYPE_OPTIONS = ["All", "Keyword", "By-creator"]
 
 
-def _filter_by_provider(entries: list[dict], provider: str) -> list[dict]:
-    if provider == "All":
+def _filter_by_provider(entries: list[dict], provider: str | None) -> list[dict]:
+    if provider is None:
         return entries
-    slug = _NAME_TO_SLUG.get(provider, provider)
-    return [e for e in entries if e.get("provider") == slug]
+    return [e for e in entries if e.get("provider") == provider]
 
 
 def _filter_by_type(entries: list[dict], type_filter: str) -> list[dict]:
@@ -187,8 +172,8 @@ def history_select_prompt() -> dict | None:
                 prov = entry.get("provider", "")
                 ts = entry.get("timestamp", "")
                 presets = entry.get("presets", [])
-                icon = _provider_icon(prov)
-                display = _provider_display(prov)
+                icon = icon_for(prov)
+                display = display_name_for(prov)
                 time_str = _relative_time(ts)
                 label = f"{icon}  {query}"
                 hint = f"{display}  •  {time_str}" if time_str else display
@@ -209,8 +194,8 @@ def history_select_prompt() -> dict | None:
     def _title():
         prov_filter, date_filter, sort_order, type_filter = _current_filters()
         tags = []
-        if prov_filter != "All":
-            tags.append(f"{_provider_icon(prov_filter)} {prov_filter}")
+        if prov_filter is not None:
+            tags.append(f"{icon_for(prov_filter)} {_option_label(prov_filter)}")
         if type_filter != "All":
             tags.append(type_filter)
         if date_filter != "All time":
@@ -227,7 +212,7 @@ def history_select_prompt() -> dict | None:
         return (
             (notice + "\n" if notice else "")
             + "↑/↓ navigate  •  Enter re-run  •  Esc back\n"
-            f"[bold]Filters:[/bold]  [bold yellow]P[/bold yellow] provider: [cyan]{prov_filter}[/cyan]  •  "
+            f"[bold]Filters:[/bold]  [bold yellow]P[/bold yellow] provider: [cyan]{_option_label(prov_filter)}[/cyan]  •  "
             f"[bold yellow]T[/bold yellow] type: [cyan]{type_filter}[/cyan]  •  "
             f"[bold yellow]D[/bold yellow] date: [cyan]{date_filter}[/cyan]  •  "
             f"[bold yellow]S[/bold yellow] sort: [cyan]{sort_order}[/cyan]"

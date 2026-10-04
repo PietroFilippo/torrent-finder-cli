@@ -126,7 +126,10 @@ class MagnetLazyResolve(MagnetDirect):
             readchar.readkey()
             return PickOutcome("back")
         # Persist the real hash so everything downstream of the pick (session,
-        # info screen, re-picks) sees it instead of the placeholder.
+        # info screen, re-picks) sees it instead of the placeholder. The
+        # placeholder stays as the listing's identity (see result_identity), so
+        # bookmarks and selections still recognise the same listing.
+        result.setdefault("listing_hash", result.get("info_hash", ""))
         result["info_hash"] = real_hash
         return PickOutcome("menu", build_magnet(real_hash, result.get("name", "Unknown")))
 

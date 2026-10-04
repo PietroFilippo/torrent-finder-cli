@@ -8,7 +8,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from uuid import uuid4
 from torrent_finder import store
-from torrent_finder.providers.combined_provider import result_identity
+from torrent_finder.providers.combined_provider import provider_label, result_identity
 from torrent_finder.state import provider_snapshot
 
 
@@ -53,7 +53,7 @@ def save_results(provider, results):
     for row in results:
         value = deepcopy(dict(row))
         value.setdefault("provider_slug", provider.slug)
-        value.setdefault("provider_label", provider.name)
+        value.setdefault("provider_label", provider_label(provider))
         queries = (row.get("matched_queries") or ([row["from_work"]] if row.get("from_work") else None)
                    or getattr(provider, "last_queries", None) or [row.get("name", "")])
         new.append({"id": uuid4().hex, "kind": "result", "name": value["name"],
@@ -63,8 +63,14 @@ def save_results(provider, results):
     def edit(saved):
         for entry in new:
             identity = result_identity(entry["result"])
-            if not any(e.get("kind") == "result" and result_identity(e["result"]) == identity for e in saved):
+            existing = next((e for e in saved
+                             if e.get("kind") == "result" and result_identity(e["result"]) == identity), None)
+            if existing is None:
                 saved.append(entry)
+            elif "listing_hash" in entry["result"] and "listing_hash" not in existing["result"]:
+                # Saved again after picking it: keep the hash resolved since.
+                for key in ("listing_hash", "info_hash"):
+                    existing["result"][key] = entry["result"][key]
     _change(edit)
     return "Bookmarked. Open Bookmarks from the main menu or quick actions to review."
 
@@ -116,9 +122,12 @@ def refresh(identity, results):
         entry["refresh_status"] = "Listing found" if match is not None else "Not returned by this search; saved listing retained"
         if match is not None:
             refreshed = deepcopy(dict(match))
-            for key in ("provider_slug", "provider_label"):
+            for key in ("provider_slug", "provider_label", "listing_hash"):
                 if key in entry["result"]:
                     refreshed.setdefault(key, entry["result"][key])
+            if "listing_hash" in refreshed and refreshed["listing_hash"] == refreshed.get("info_hash"):
+                # A fresh listing is unresolved again; keep the hash resolved earlier.
+                refreshed["info_hash"] = entry["result"]["info_hash"]
             entry["result"] = refreshed
             entry["name"] = match["name"]
             entry["fetched_at"] = match.get("fetched_at") or checked

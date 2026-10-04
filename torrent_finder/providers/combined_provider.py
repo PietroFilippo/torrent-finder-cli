@@ -30,8 +30,13 @@ def provider_label(provider) -> str:
 
 
 def result_identity(row) -> tuple:
-    """Only genuine torrent hashes share identity across different sources."""
-    value = row.get("info_hash", "")
+    """Only genuine torrent hashes share identity across different sources.
+
+    A listing whose real hash was resolved on demand (RuTracker, FitGirl) keeps
+    the identity it was listed with (``listing_hash``): saving it before and
+    after picking it is one bookmark, and a refresh still finds the listing.
+    """
+    value = row.get("listing_hash") or row.get("info_hash", "")
     if re.fullmatch(r"[0-9a-fA-F]{40}", value):
         return ("torrent", value.lower())
     return (row.get("source", ""), row.get("page_url") or value or row.get("name"))

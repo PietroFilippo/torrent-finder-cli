@@ -1247,7 +1247,7 @@ def _main_loop(args=None) -> None:
                     "[title] Search selected providers:[/title] " if getattr(provider, "is_combined", False)
                     else f"[title] Search {provider.name}:[/title] ",
                     initial=initial, history=prov_history, filters_shortcut=True,
-                    multi=True, screen_renderer=screen_renderer,
+                    multi=True, screen_renderer=screen_renderer, propagate_interrupt=True,
                 )
             except (EOFError, KeyboardInterrupt):
                 # Ctrl+C at the search prompt: route to the provider menu with

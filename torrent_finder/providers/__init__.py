@@ -14,7 +14,7 @@ from torrent_finder.providers.movie_provider import MovieProvider
 from torrent_finder.providers.online_fix_provider import OnlineFixProvider
 from torrent_finder.providers.rutracker_provider import RuTrackerProvider
 from torrent_finder.providers.software_provider import SoftwareProvider
-from torrent_finder.providers.combined_provider import CombinedProvider
+from torrent_finder.providers.combined_provider import CombinedProvider, provider_label
 
 # Singleton provider instances. Named so the display menu can nest some of them
 # under a group without changing the flat registry below.
@@ -176,10 +176,11 @@ def get_provider_by_slug(slug: str):
 
 
 def display_name_for(slug: str) -> str:
-    """Return the current display name for a provider slug, or the slug itself
-    when unknown (orphaned history rows, removed providers)."""
+    """Return the qualified display label for a provider slug (e.g. "Games ·
+    General" vs "Manga · General"), or the slug itself when unknown (orphaned
+    history rows, removed providers)."""
     p = get_provider_by_slug(slug)
-    return p.name if p else slug
+    return provider_label(p) if p else slug
 
 
 def icon_for(slug: str) -> str:
