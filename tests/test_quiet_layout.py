@@ -432,3 +432,25 @@ class ResultsTinyAndLongDetailsTests(unittest.TestCase):
                             lines = plain_lines(frame, width, height)
                         self.assertLessEqual(len(lines), height)
                         self.assertIn("Esc back", "\n".join(lines))
+
+
+class SignInFitTests(unittest.TestCase):
+    def test_every_sign_in_form_fits_with_the_focused_field_and_keys(self):
+        from torrent_finder.credential_registry import CREDENTIAL_REGISTRY
+        from torrent_finder.ui import credentials as credentials_ui
+        for meta in CREDENTIAL_REGISTRY:
+            for width, height in ((40, 12), (50, 16), (80, 24)):
+                frames = []
+                keys = ["\t"] * (len(meta.fields) + 1) + ["\x03"]
+                screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
+                with patch.object(credentials_ui, "console", screen), \
+                     patch.object(credentials_ui, "_render", lambda banner, frame, **kw: frames.append(frame)), \
+                     patch.object(credentials_ui.readchar, "readkey", side_effect=keys), \
+                     patch.object(credentials_ui.sys, "stdout", io.StringIO()):
+                    credentials_ui._credentials_form(meta, {})
+                for focus, frame in enumerate(frames):
+                    with self.subTest(form=meta.id, width=width, height=height, focus=focus):
+                        lines = plain_lines(frame, width, height)
+                        self.assertLessEqual(len(lines), height)
+                        self.assertIn(theme.CURSOR, "\n".join(lines))
+                        self.assertIn("Esc cancel", "\n".join(lines))

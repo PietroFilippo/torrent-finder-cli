@@ -64,11 +64,17 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
         return row
 
     def _panel() -> Group:
-        """The sign-in frame; the how-to steps shorten first in a small window."""
+        """The sign-in frame, fitted to the window.
+
+        In a small window the how-to steps shorten first, then the blank lines,
+        the notes and the header's second line go; as a last resort the fields
+        scroll around the focused one. The focused field and the keys stay.
+        """
         width, height = console.size.width, console.size.height
         compact = height < 20
         parsed = theme.parse_footer(footer)
-        top = theme.header_lines(f"Credentials › {meta.name} — sign in", "", width)
+        title = f"Credentials › {meta.name} — sign in"
+        top = theme.header_lines(title, "", width)
         guide: list[Text] = []
         if meta.howto:
             guide.append(Text(theme.MARGIN + "HOW TO GET THIS", style=theme.SECTION))
@@ -78,22 +84,44 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
                 tip = Text("Tip  ", style=theme.ACCENT)
                 tip.append(meta.tip, style=theme.MUTED)
                 guide.extend(theme.wrap_block(tip, width, console))
-            guide.append(Text(""))
-        rows = [_row(_field_text(field, focus == index), focus == index) for index, field in enumerate(fields)]
-        rows.append(Text(""))
-        rows += [_row("Save", focus == save_row), _row("Cancel", focus == cancel_row)]
-        bottom = [Text("")]
-        bottom += theme.wrap_block(Text(" · ".join(notes), style=theme.MUTED), width, console)
+        selectable = [_row(_field_text(field, focus == index), focus == index) for index, field in enumerate(fields)]
+        selectable += [_row("Save", focus == save_row), _row("Cancel", focus == cancel_row)]
+        prose = theme.wrap_block(Text(" · ".join(notes), style=theme.MUTED), width, console)
         for line in parsed.context:
-            bottom += theme.wrap_block(line, width, console)
-        if not compact:
-            bottom.append(Text(""))
-        bottom += theme.wrap_keys(parsed.keys, width)
-        spacer = [] if compact else [Text("")]
-        room = height - len(top) - len(spacer) - len(rows) - len(bottom)
-        if len(guide) > max(0, room):
-            guide = guide[:max(0, room - 1)] + ([Text(theme.MARGIN + "…", style=theme.MUTED)] if room > 0 else [])
-        return Group(*top, *spacer, *guide, *rows, *bottom)
+            prose += theme.wrap_block(line, width, console)
+        keys_lines = theme.wrap_keys(parsed.keys, width)
+        # Blank lines: after the header, after the guide, before Save, before the notes, before the keys.
+        gaps = [not compact, True, True, True, not compact]
+
+        def size(with_guide: bool = True) -> int:
+            return (len(top) + (len(guide) if with_guide else 0) + len(selectable) + len(prose)
+                    + len(keys_lines) + sum(gaps[:1]) + (gaps[1] and bool(guide) and with_guide)
+                    + sum(gaps[2:]))
+
+        if size() > height:
+            room = height - size(with_guide=False) - gaps[1]
+            guide = [] if room <= 0 else guide[:room - 1] + [Text(theme.MARGIN + "…", style=theme.MUTED)] \
+                if room < len(guide) else guide
+        if size() > height:
+            gaps = [False] * 5
+        if size() > height:
+            prose = []
+        if size() > height and len(top) > 1:
+            top = [theme.header(title, "", width)]
+        first = 0
+        if size() > height:  # scroll the fields around the focused one
+            visible = max(1, height - len(top) - len(keys_lines))
+            first = min(max(0, focus - visible // 2), max(0, len(selectable) - visible))
+            selectable = selectable[first:first + visible]
+            guide = []
+
+        blank = Text("")
+        fields_part = selectable[:max(0, n - first)]
+        actions_part = selectable[max(0, n - first):]
+        lines = list(top) + ([blank] if gaps[0] else []) + guide + ([blank] if gaps[1] and guide else [])
+        lines += fields_part + ([blank] if gaps[2] and fields_part and actions_part else []) + actions_part
+        lines += ([blank] if gaps[3] and prose else []) + prose + ([blank] if gaps[4] else []) + keys_lines
+        return Group(*lines)
 
     sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
     sys.stdout.flush()
