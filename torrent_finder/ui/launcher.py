@@ -3,6 +3,8 @@
 import os
 import sys
 
+from rich.markup import escape
+
 from torrent_finder.launcher_alias import (
     COMMAND_CHOICES,
     DEFAULT_COMMAND,
@@ -70,10 +72,10 @@ def terminal_command_prompt() -> None:
         try:
             updated = set_terminal_command(selected)
         except LauncherConflict as exc:
-            notice = f"[warning]Not changed:[/warning] {exc}"
+            notice = f"[warning]Not changed:[/warning] {escape(str(exc))}"
             continue
         except LauncherError as exc:
-            notice = f"[error]Could not install command:[/error] {exc}"
+            notice = f"[error]Could not install command:[/error] {escape(str(exc))}"
             continue
 
         if selected == DEFAULT_COMMAND:
@@ -93,7 +95,7 @@ def terminal_command_prompt() -> None:
 
             add_path = confirm_prompt(
                 "[bold]Add the launcher folder to your Windows user PATH?[/bold]\n\n"
-                f"{directory}\n\n"
+                f"{escape(directory)}\n\n"
                 "This affects new terminals only and does not require administrator access."
             )
             if add_path and ensure_launcher_dir_on_path(directory):
@@ -104,12 +106,12 @@ def terminal_command_prompt() -> None:
             else:
                 notice = (
                     f"[warning]{selected} was created but is not on PATH.[/warning] "
-                    f"Add {directory} to PATH to use it."
+                    f"Add {escape(directory)} to PATH to use it."
                 )
         else:
             notice = (
                 f"[warning]{selected} was created but is not on PATH.[/warning] "
-                f"Add {directory} to PATH in your shell profile."
+                f"Add {escape(directory)} to PATH in your shell profile."
             )
 
 

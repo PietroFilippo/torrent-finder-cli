@@ -89,7 +89,7 @@ def _pick_entity(entities, facet):
     """
     if len(entities) == 1:
         return entities[0]
-    items = [SelectItem(label=e.name, value=e, description=e.detail) for e in entities]
+    items = [SelectItem(label=e.name, value=e, description=escape(e.detail)) for e in entities]
     items.append(SelectItem(label="Back", value="__back__", is_action=True))
     idx = arrow_select(
         items,
@@ -129,7 +129,7 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
             any_partial = True
             hint = f"{w.subtitle}  ◐ {note}" if w.subtitle else f"◐ {note}"
             description = (
-                f"◐ {entity.name} directed only specific episodes: {note}. "
+                f"◐ {escape(entity.name)} directed only specific episodes: {escape(note)}. "
                 "The torrent search still covers the whole title."
             )
         items.append(SelectItem(
