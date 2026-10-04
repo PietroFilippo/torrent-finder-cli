@@ -160,3 +160,42 @@ class CredentialFormTests(unittest.TestCase):
         lines = plain_lines(frames[-1], 50, 16)
         self.assertLessEqual(len(lines), 16)
         self.assertIn("Esc cancel", "\n".join(lines))
+
+
+class SecurityWarningTests(unittest.TestCase):
+    INFO = {"query": "203.0.113.7", "isp": "Example ISP", "org": "Example Org",
+            "as": "AS64500 Example", "country": "Brazil"}
+
+    def frames(self, width, height, keys, force=False):
+        from torrent_finder import security
+        frames = []
+        screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
+        with patch.object(security, "console", screen), \
+             patch.object(security, "_fetch_network_info", return_value=self.INFO), \
+             patch.object(security, "_render", lambda banner, frame, **kw: frames.append(frame)), \
+             patch.object(security, "load_setting", return_value=False), \
+             patch.dict(security.os.environ, {"TORRENT_SKIP_WARNING": ""}), \
+             patch.object(security, "save_setting") as save, \
+             patch.object(security.readchar, "readkey", side_effect=keys), \
+             patch.object(security.sys, "stdout", io.StringIO()):
+            result = security.show_security_warning(force=force)
+        return result, frames, save
+
+    def test_warning_fits_small_windows_and_keeps_the_essentials(self):
+        for width, height in ((50, 16), (80, 24)):
+            with self.subTest(width=width, height=height):
+                result, frames, _ = self.frames(width, height, ["\r"])
+                lines = plain_lines(frames[-1], width, height)
+                output = "\n".join(lines)
+                self.assertTrue(result)
+                self.assertLessEqual(len(lines), height)
+                for text in ("203.0.113.7", "Example ISP", "no VPN detected", "public", "Esc abort",
+                             "don't show again"):
+                    self.assertIn(text, output.replace("\n  ", " "))
+
+    def test_keys_keep_their_meaning(self):
+        self.assertFalse(self.frames(80, 24, ["\x1b"])[0])
+        self.assertFalse(self.frames(80, 24, [KeyboardInterrupt()])[0])
+        result, _, save = self.frames(80, 24, ["d"])
+        self.assertTrue(result)
+        save.assert_called_once()

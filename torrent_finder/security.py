@@ -1,14 +1,17 @@
 """Network exposure warning shown at startup."""
 
 import os
+import sys
 
 import readchar
 import requests
-from rich.panel import Panel
+from rich.console import Group
 from rich.text import Text
 
 from torrent_finder.constants import console
 from torrent_finder.state import load_setting, save_setting
+from torrent_finder.ui import theme
+from torrent_finder.ui.selector import _render
 
 DISMISSED_KEY = "security_warning_dismissed"
 
@@ -63,10 +66,12 @@ def show_security_warning(force: bool = False) -> bool:
         if load_setting(DISMISSED_KEY, False):
             return True
 
-    with console.status("[bold cyan]Fetching network info...[/bold cyan]", spinner="dots"):
+    with console.status("[accent]Fetching network info…[/accent]", spinner="dots", spinner_style=theme.ACCENT):
         info = _fetch_network_info()
 
-    body = Text()
+    # (label, value) rows; rows marked optional give way first in a short window.
+    rows: list[tuple[str, str, bool]] = []
+    verdict: Text | None = None
     if info:
         ip = info.get("query", "unknown")
         isp = info.get("isp", "") or info.get("org", "") or "unknown"
@@ -79,77 +84,92 @@ def show_security_warning(force: bool = False) -> bool:
         is_hosting = bool(info.get("hosting"))
         is_mobile = bool(info.get("mobile"))
 
-        body.append("Public IP:  ", style="dim")
-        body.append(f"{ip}\n", style="bold white")
-        body.append("ISP:        ", style="dim")
-        body.append(f"{isp}\n", style="bold white")
+        rows.append(("Public IP", ip, False))
+        rows.append(("ISP", isp, False))
         if org and org != isp:
-            body.append("Org:        ", style="dim")
-            body.append(f"{org}\n", style="bold white")
+            rows.append(("Org", org, True))
         if asname:
-            body.append("ASN:        ", style="dim")
-            body.append(f"{asname}\n", style="bold white")
+            rows.append(("ASN", asname, True))
         if loc:
-            body.append("Location:   ", style="dim")
-            body.append(f"{loc}\n", style="bold white")
-        body.append("\n")
+            rows.append(("Location", loc, True))
 
         # Trust API flags first, fall back to keyword heuristic.
         if is_proxy:
-            body.append("✓ Proxy/VPN flagged by network database.\n", style="bold green")
+            verdict = Text("✓ Proxy/VPN flagged by network database.", style=f"bold {theme.GOOD}")
         elif is_hosting:
-            body.append(
-                "✓ Hosting/datacenter IP — likely a VPN exit (not a residential ISP).\n",
-                style="bold green",
-            )
+            verdict = Text("✓ Hosting/datacenter IP — likely a VPN exit (not a residential ISP).",
+                           style=f"bold {theme.GOOD}")
         elif _looks_like_vpn(f"{isp} {org} {asname}"):
-            body.append("✓ VPN provider name detected in network org.\n", style="bold green")
+            verdict = Text("✓ VPN provider name detected in network org.", style=f"bold {theme.GOOD}")
         elif is_mobile:
-            body.append(
-                "⚠  Mobile carrier IP — no VPN. Carrier and peers see this IP.\n",
-                style="bold red",
-            )
+            verdict = Text("! Mobile carrier IP — no VPN. Carrier and peers see this IP.",
+                           style=f"bold {theme.BAD}")
         else:
-            body.append(
-                "⚠  Residential ISP IP — no VPN detected. Your real IP is visible.\n",
-                style="bold red",
-            )
+            verdict = Text("! Residential ISP IP — no VPN detected. Your real IP is visible.",
+                           style=f"bold {theme.BAD}")
     else:
-        body.append("Could not fetch public IP info (offline?).\n", style="dim")
+        verdict = Text("Could not fetch public IP info (offline?).", style=theme.MUTED)
 
-    body.append("\n")
-    body.append(
-        "Any download or stream joins a public BitTorrent swarm.\n"
-        "Every peer and tracker in that swarm sees this IP address.\n"
-        "Seed counts and names are not safety signals — content is not verified.\n",
-        style="white",
+    warning = Text(
+        "Any download or stream joins a public BitTorrent swarm. "
+        "Every peer and tracker in that swarm sees this IP address. "
+        "Seed counts and names are not safety signals — content is not verified."
     )
-    body.append("\n")
-    body.append(" Enter ", style="bold yellow on grey23")
-    body.append(" continue     ", style="dim")
-    if not force:
-        body.append(" D ", style="bold yellow on grey23")
-        body.append(" don't show again     ", style="dim")
-    body.append(" Esc ", style="bold yellow on grey23")
-    body.append(" abort", style="dim")
+    keys = "Enter continue  •  " + ("D don't show again  •  " if not force else "") + "Esc abort"
 
-    panel = Panel(
-        body,
-        title="[bold red]⚠  Network Exposure Warning[/bold red]",
-        border_style="red",
-        padding=(1, 2),
-    )
-    console.print(panel)
+    def frame():
+        width, height = console.size.width, console.size.height
+        top = theme.header_lines("Network exposure warning", "", width)
+        bottom = [Text("")] + theme.wrap_keys(theme.parse_footer(keys).keys, width)
+        middle_parts = [
+            theme.wrap_block(verdict, width, console),
+            theme.wrap_block(warning, width, console),
+        ]
+        label_width = max((len(label) for label, _, _ in rows), default=0) + 2
+        detail = [(Text(theme.MARGIN + label.ljust(label_width), style=theme.MUTED).append(value, style="bold"),
+                   optional) for label, value, optional in rows]
+        spaced = height >= 20
 
-    while True:
-        key = readchar.readkey()
-        if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
-            return True
-        if not force and key in ("d", "D"):
-            save_setting(DISMISSED_KEY, True)
-            console.print("[dim]Warning dismissed. Re-open via the provider menu.[/dim]")
-            return True
-        if key == readchar.key.ESC:
-            return False
-        if key in (readchar.key.CTRL_C, "\x03"):
-            return False
+        def assemble(include_optional: bool, spacing: bool) -> list[Text]:
+            lines = list(top)
+            if spacing:
+                lines.append(Text(""))
+            lines += [line for line, optional in detail if include_optional or not optional]
+            for part in middle_parts:
+                if spacing or lines[-1].plain.strip():
+                    lines.append(Text(""))
+                lines += part
+            return lines + bottom
+
+        lines = assemble(True, spaced)
+        if len(lines) > height:
+            lines = assemble(False, spaced)
+        if len(lines) > height:
+            lines = assemble(False, False)
+        return Group(*[line.copy() for line in lines])
+
+    dismissed = False
+    sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
+    sys.stdout.flush()
+    try:
+        while True:
+            _render(None, frame())
+            try:
+                key = readchar.readkey()
+            except KeyboardInterrupt:
+                return False
+            if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
+                return True
+            if not force and key in ("d", "D"):
+                save_setting(DISMISSED_KEY, True)
+                dismissed = True
+                return True
+            if key == readchar.key.ESC:
+                return False
+            if key in (readchar.key.CTRL_C, "\x03"):
+                return False
+    finally:
+        sys.stdout.write("\033[?25h\033[?1049l")
+        sys.stdout.flush()
+        if dismissed:
+            console.print("[muted]Warning dismissed. Re-open via the provider menu.[/muted]")
