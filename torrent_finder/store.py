@@ -47,6 +47,10 @@ _atexit_registered: bool = False
 _save_scheduled: bool = False
 _mutex = threading.RLock()
 
+# Distinct searches kept in history: months of heavy use. Combined-search
+# profiles are stored once (see state.compact_history), so this stays well
+# under 1 MB.
+HISTORY_LIMIT = 2000
 LOCK_TIMEOUT = 5.0         # explicit saves wait this long for another window
 _FLUSH_LOCK_TIMEOUT = 3.0  # exit never hangs longer than this
 # Best-effort changes are saved this long after the first unsaved one, so a
@@ -156,7 +160,7 @@ def _merge_history(copies: list[tuple[float, dict]]) -> list[dict]:
             continue
         seen.add(identity)
         merged.append(entry)
-    return merged[:50]
+    return merged[:HISTORY_LIMIT]
 
 
 def _merge_stat_value(current, incoming, key: str):

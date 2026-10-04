@@ -7,6 +7,8 @@ and raise when saving fails; other changes are saved with the session.
 """
 
 from copy import deepcopy
+import hashlib
+import json
 
 from torrent_finder import store
 
@@ -160,15 +162,73 @@ def save_setting(key: str, value) -> None:
 # Search history
 # ---------------------------------------------------------------------------
 
-_HISTORY_MAX = 50
+# Combined searches carry a profile snapshot (several KB). The saved file keeps
+# each distinct snapshot once under this key; entries refer to it by id.
+_HISTORY_PROFILES = "history_profiles"
+
+
+def _profile_id(profile: dict) -> str:
+    text = json.dumps(profile, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
+
+
+def compact_history(data: dict) -> None:
+    """Store each history entry's combined-search profile once, by reference.
+
+    Entries keep ``search_profile_id``; ``history_profiles`` holds only the
+    snapshots still referenced. Idempotent, so history operations apply it after
+    every change (and imports after merging full-form entries).
+    """
+    history = data.get("history")
+    if not isinstance(history, list):
+        return
+    stored = data.get(_HISTORY_PROFILES)
+    stored = stored if isinstance(stored, dict) else {}
+    kept = {}
+    for entry in history:
+        if not isinstance(entry, dict):
+            continue
+        profile = entry.pop("search_profile", None)
+        if isinstance(profile, dict):
+            entry["search_profile_id"] = identity = _profile_id(profile)
+            kept[identity] = profile
+        elif entry.get("search_profile_id") in stored:
+            kept[entry["search_profile_id"]] = stored[entry["search_profile_id"]]
+    if kept:
+        data[_HISTORY_PROFILES] = kept
+    else:
+        data.pop(_HISTORY_PROFILES, None)
+
+
+def _saved_history() -> list[dict]:
+    """History as stored: combined searches refer to their profile by id."""
+    history = store.read().get("history", [])
+    return history if isinstance(history, list) else []
 
 
 def load_history() -> list[dict]:
     """Return the saved search history (newest first).
 
-    Each entry is ``{"query": str, "provider": str, "timestamp": str}``.
+    Each entry is ``{"query": str, "provider": str, "timestamp": str}``; a
+    combined search also has its ``search_profile``, expanded from the shared
+    copy kept in the saved file.
     """
-    return store.read().get("history", [])
+    data = store.read()
+    profiles = data.get(_HISTORY_PROFILES)
+    history = data.get("history", [])
+    if not isinstance(history, list):
+        return []
+    if not isinstance(profiles, dict):
+        return history
+    expanded = []
+    for entry in history:
+        if isinstance(entry, dict) and "search_profile_id" in entry:
+            profile = profiles.get(entry["search_profile_id"])
+            entry = {key: value for key, value in entry.items() if key != "search_profile_id"}
+            if isinstance(profile, dict):
+                entry["search_profile"] = deepcopy(profile)
+        expanded.append(entry)
+    return expanded
 
 
 def add_history_entry(
@@ -220,7 +280,8 @@ def add_history_entry(
     def change(data):
         history = data.get("history")
         history = [e for e in history if isinstance(e, dict) and not replaces(e)] if isinstance(history, list) else []
-        data["history"] = [deepcopy(entry), *history][:_HISTORY_MAX]
+        data["history"] = [deepcopy(entry), *history][:store.HISTORY_LIMIT]
+        compact_history(data)
     store.update(change)
 
 
@@ -232,7 +293,7 @@ def history_queries(provider_slug: str) -> list[str]:
     """
     return [
         e.get("query", "")
-        for e in load_history()
+        for e in _saved_history()
         if e.get("provider") == provider_slug and e.get("query")
     ]
 
@@ -244,7 +305,7 @@ def creator_history(provider_slug: str, facet_key: str) -> list[str]:
     """
     return [
         e.get("name", "")
-        for e in load_history()
+        for e in _saved_history()
         if e.get("kind") == "creator"
         and e.get("provider") == provider_slug
         and e.get("facet") == facet_key
@@ -260,4 +321,5 @@ def clear_history() -> None:
     """
     def change(data):
         data["history"] = []
+        data.pop(_HISTORY_PROFILES, None)
     store.commit(change)

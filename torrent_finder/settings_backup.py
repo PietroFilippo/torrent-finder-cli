@@ -10,6 +10,7 @@ from torrent_finder import store
 from torrent_finder.name_rules import NameRules
 from torrent_finder.result_view import SORT_ORDERS
 from torrent_finder.search_profiles import ProfileLibrary
+from torrent_finder.state import compact_history, load_history
 
 PREFERENCES = {"download_dir", "hide_stream_output", "search_profiles", "combined_search"}
 
@@ -119,7 +120,7 @@ def export_settings(path, *, history=False):
     data = {"providers": deepcopy(current.get("providers", {})),
             "settings": {k: deepcopy(v) for k, v in current.get("settings", {}).items() if k in PREFERENCES}}
     if history:
-        data["history"] = deepcopy(current.get("history", []))
+        data["history"] = load_history()  # full form: backups stay self-contained
     validate_payload(data)
     _export(path, {"format": "torrent-finder-settings", "version": 1, "data": data})
 
@@ -234,7 +235,9 @@ def _apply_import(result, data, mode):
                 "Credentials are separate and will not change."]
     if "history" in incoming:
         result["history"] = (store._merge_history([(0, {"history": result.get("history", [])}),
-                                                  (1, {"history": incoming["history"]})]) if mode == "merge" else incoming["history"][:50])
+                                                  (1, {"history": incoming["history"]})]) if mode == "merge"
+                             else incoming["history"][:store.HISTORY_LIMIT])
+        compact_history(result)
         changes.append(f"History: {len(result['history'])} entries after {mode}")
     else:
         changes.append("History: unchanged (not included)")
