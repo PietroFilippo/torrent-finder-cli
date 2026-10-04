@@ -225,3 +225,39 @@ class ConfirmPromptTests(unittest.TestCase):
         self.assertIn("Clear history", lines[0])
         self.assertIn("Y confirm", output)
         self.assertIn("Esc cancel", output)
+
+
+class HintColumnTests(unittest.TestCase):
+    def frame(self, items):
+        screen = Console(file=io.StringIO(), width=100, height=30, color_system=None)
+        with patch.object(selector, "console", screen):
+            return plain_lines(selector._build_panel(items, 0, "Menu", False), 100, 30)
+
+    def test_hints_line_up_within_a_run_of_hinted_rows_only(self):
+        lines = self.frame([
+            SelectItem("Search again", hint="R"), SelectItem("Change provider", hint="P"),
+            SelectItem("No hint here"),
+            SelectItem("Quick actions", hint="Tab"),
+            SelectItem("Another plain row"),
+        ])
+        again = next(line for line in lines if "Search again" in line)
+        change = next(line for line in lines if "Change provider" in line)
+        self.assertEqual(again.index("R"), change.index("P"))
+        quick = next(line for line in lines if "Quick actions" in line)
+        self.assertIn("Quick actions  Tab", quick)
+
+
+class DownloadMenuHeaderTests(unittest.TestCase):
+    def test_download_menu_names_the_picked_torrent(self):
+        captured = {}
+        def capture(items, **kwargs):
+            captured.update(kwargs)
+            return None
+        torrent = {"name": "Big Buck Bunny [1080p]", "size": 885_700_000, "seeders": 12}
+        with patch.object(prompts, "arrow_select", side_effect=capture):
+            prompts.download_method_prompt(magnet="magnet:?xt=urn:btih:" + "ab" * 20, torrent=torrent,
+                                           show_episode_picker=True, selected_indexes=[1, 2])
+        title = Text.from_markup(captured["title"]).plain
+        self.assertIn("Big Buck Bunny [1080p]", title)
+        self.assertIn("2 episode(s) selected [1-2]", title)
+        self.assertIn("12 seeds", captured["status"])

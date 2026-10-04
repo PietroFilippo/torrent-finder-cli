@@ -562,6 +562,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                 page_url=session.result.get("page_url") or None,
                 info_source=session.result.get("source") or None,
                 focus=last_method,
+                torrent=session.result,
             )
             last_method = method
 

@@ -130,7 +130,7 @@ def make_search_screen_renderer(
         if not in_header and height >= 12:
             _print_lines(target, Text.from_markup(status, style=theme.MUTED))
         if notice:
-            _print_lines(target, Text.from_markup(notice.strip()))
+            _print_lines(target, theme.strip_text(Text.from_markup(notice)))
         if height >= 12 and (notice or not in_header):
             target.print()
 
@@ -1272,6 +1272,8 @@ def confirm_prompt(message: str, title: str = "Confirm") -> bool:
     lines += theme.wrap_block(Text.from_markup(message), width, console)
     lines.append(Text(""))
     lines += theme.wrap_block(Text("Any other key cancels too.", style=theme.MUTED), width, console)
+    if console.size.height >= 12:
+        lines.append(Text(""))
     lines += theme.wrap_keys(theme.parse_footer("Y confirm  •  Esc cancel").keys, width)
     sys.stdout.write("\033[?1049h\033[?25l\033[H\033[2J")
     sys.stdout.flush()
@@ -1372,6 +1374,7 @@ def download_method_prompt(
     page_url: str | None = None,
     info_source: str | None = None,
     focus: str | None = None,
+    torrent: dict | None = None,
 ) -> str | None:
     """
     Prompt the user to choose a download method.
@@ -1660,14 +1663,23 @@ def download_method_prompt(
             return True  # Stay in menu — arrow_select redraws in place, no flicker
         return False
 
-    title = "Download Method"
+    # The header names the picked torrent; its size and seeds sit on the right.
+    title = "Download"
+    status = ""
+    if torrent:
+        from torrent_finder.utils import format_size
+        title += f" › {escape(str(torrent.get('name') or 'Unknown'))}"
+        size = int(torrent.get("size", 0) or 0)
+        seeds = int(torrent.get("seeders", 0) or 0)
+        status = " · ".join(part for part in (format_size(size) if size else "", f"{seeds} seeds") if part)
     if has_selection:
         from torrent_finder.torrent_meta import compact_ranges
-        title = f"Download Method — {n_sel} episode(s) selected [{compact_ranges(selected_indexes)}]"
+        title += f" › {n_sel} episode(s) selected [{compact_ranges(selected_indexes)}]"
 
     idx = arrow_select(
         items,
         title=title,
+        status=status,
         banner=_make_banner_panel(),
         on_action=handle_download_action,
         # Return to the option chosen last time, else "Open in client" (the primary action).

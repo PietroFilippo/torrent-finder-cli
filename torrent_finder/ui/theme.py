@@ -127,7 +127,7 @@ def header_lines(title: str | Text = "", status: str | Text = "", width: int = 8
     else:
         floor = len(MARGIN) + len(APP_NAME) + len(CRUMB)
         cut = _cut_index(left.plain, usable, floor)
-        first, rest = left[:cut], _strip(left[cut:])
+        first, rest = left[:cut], strip_text(left[cut:])
     first.no_wrap, first.overflow = True, "ellipsis"
     if cell_len(first.plain) > usable:
         first.truncate(usable, overflow="ellipsis")
@@ -203,7 +203,8 @@ def key_segment(key: str, action: str) -> Text:
     return segment
 
 
-def _strip(text: Text) -> Text:
+def strip_text(text: Text) -> Text:
+    """*text* without leading or trailing whitespace, styles kept."""
     plain = text.plain
     start = len(plain) - len(plain.lstrip())
     end = len(plain.rstrip())
@@ -216,7 +217,7 @@ def _split(line: Text) -> list[Text]:
         pieces.append(line[position:match.start()])
         position = match.end()
     pieces.append(line[position:])
-    return [piece for piece in (_strip(p) for p in pieces) if piece.plain]
+    return [piece for piece in (strip_text(p) for p in pieces) if piece.plain]
 
 
 def parse_footer(footer: str | Text | None) -> Footer:

@@ -2,7 +2,7 @@
 
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 import readchar
@@ -131,25 +131,42 @@ def _prefix_width(item: "SelectItem", multi: bool, badge_width: int) -> int:
 @dataclass(frozen=True)
 class _Geometry:
     badge_width: int
-    hint_column: int | None  # common label width when inline hints line up
+    # Item index -> common label width, for rows whose inline hints line up.
+    hint_columns: dict = field(default_factory=dict)
 
 
 def _geometry(items: list["SelectItem"], multi: bool) -> _Geometry:
+    """Line hints up within each run of consecutive rows that show one inline.
+
+    A lone hinted row keeps its hint beside the label instead of joining a
+    column set by unrelated rows further down the menu.
+    """
     badge_width = _badge_width(items) if multi else 1
-    hinted = [item for item in items if _inline_hint(item) and not _is_section_header(item)]
-    column = None
-    if len(hinted) >= 2:
-        label_width = max(cell_len(item.label) for item in hinted)
-        hint_width = max(cell_len(item.hint) for item in hinted)
-        prefix = max(_prefix_width(item, multi, badge_width) for item in hinted)
-        if prefix + label_width + 2 + hint_width <= _inner_width():
-            column = label_width
-    return _Geometry(badge_width, column)
+    columns: dict[int, int] = {}
+    run: list[int] = []
+
+    def close_run() -> None:
+        if len(run) >= 2:
+            hinted = [items[i] for i in run]
+            label_width = max(cell_len(item.label) for item in hinted)
+            hint_width = max(cell_len(item.hint) for item in hinted)
+            prefix = max(_prefix_width(item, multi, badge_width) for item in hinted)
+            if prefix + label_width + 2 + hint_width <= _inner_width():
+                columns.update((i, label_width) for i in run)
+        run.clear()
+
+    for index, item in enumerate(items):
+        if _inline_hint(item) and not _is_section_header(item):
+            run.append(index)
+        else:
+            close_run()
+    close_run()
+    return _Geometry(badge_width, columns)
 
 
 def _label_avail_width(item: "SelectItem", multi: bool, geometry: _Geometry | None = None) -> int:
     """Return terminal cells available for an item's one-line label."""
-    geometry = geometry or _Geometry(1, None)
+    geometry = geometry or _Geometry(1)
     available = _inner_width() - _prefix_width(item, multi, geometry.badge_width)
     if _inline_hint(item):
         available -= cell_len(item.hint) + 2
@@ -186,7 +203,7 @@ def _default_footer(multi: bool) -> str:
     return "↑/↓ navigate  •  Enter select  •  Esc cancel"
 
 
-def _row(item: "SelectItem", is_cursor: bool, multi: bool, geometry: _Geometry, tick: int) -> Text:
+def _row(item: "SelectItem", index: int, is_cursor: bool, multi: bool, geometry: _Geometry, tick: int) -> Text:
     """One selectable row: margin, cursor bar, state, marker, label, inline hint."""
     row = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
     row.append(theme.CURSOR if is_cursor else " ", style=theme.ACCENT)
@@ -216,8 +233,9 @@ def _row(item: "SelectItem", is_cursor: bool, multi: bool, geometry: _Geometry, 
     )
     row.append(label, style=style)
     if _inline_hint(item):
-        if geometry.hint_column is not None:
-            row.append(" " * max(0, min(geometry.hint_column, available) - cell_len(label)))
+        column = geometry.hint_columns.get(index)
+        if column is not None:
+            row.append(" " * max(0, min(column, available) - cell_len(label)))
         row.append(f"  {item.hint}", style=theme.MUTED)
     return row
 
@@ -346,7 +364,7 @@ def _build_panel(
             label = theme.section_label(item.label)
             lines.append(Text(theme.MARGIN + ellipsize_cells(label, inner_width), style=theme.SECTION))
             continue
-        lines.append(_row(item, i == cursor, multi, geometry, tick))
+        lines.append(_row(item, i, i == cursor, multi, geometry, tick))
 
     lines.append(Text(""))
     for block in item_blocks + parsed.context:
