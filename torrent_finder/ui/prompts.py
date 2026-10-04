@@ -610,7 +610,9 @@ def filter_menu(provider, on_save=None) -> None:
     if provider.slug == "manga":
         for idx in engine_indices:
             if items[idx].value[1].name.startswith("Nyaa"):
-                items[idx].description = "EN = English-translated; Raw = untranslated; Non-English = other translations, including Portuguese. Other engines do not enforce these scopes."
+                items[idx].description = ("EN = English-translated; Raw = untranslated; Non-English = other translations, "
+                                          "including Portuguese. Other engines do not enforce these scopes. Language "
+                                          "presets below turn the matching one on for their searches.")
     items.append(SelectItem(label=f"Result order: {SORT_ORDERS[draft_sort]}", value="sort", is_action=True,
                             description="Saved for this provider. In a combined profile, its overall result order takes precedence."))
     sort_idx = len(items) - 1
@@ -824,7 +826,7 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
             label=label,
             value=("file", f),
             toggled=(f.index in pre_set),
-            hint=format_size(f.size_bytes),
+            hint=format_size(f.size_bytes) if f.size_bytes else "",  # unknown, not "0 B"
         ))
         file_item_indexes.append(len(items) - 1)
 

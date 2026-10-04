@@ -175,6 +175,9 @@ class BaseProvider(ABC):
     nyaa_title_discovery: bool = False
     # Look up the requested work's authors for plain searches (Books).
     looks_up_authors: bool = False
+    # When a search finds nothing matching the title, search the work's other
+    # names from its catalog too (General Manga, see lookup_aliases).
+    looks_up_aliases: bool = False
 
     # Optional one-line caveat shown when this provider is selected/searched
     # (e.g. Mobile noting it's Android-only). Empty = no note.
@@ -596,6 +599,15 @@ class BaseProvider(ABC):
     def lookup_authors(self, query: str) -> tuple:
         """The requested work's authors for a plain search, or () (see looks_up_authors)."""
         return ()
+
+    def lookup_aliases(self, query: str) -> tuple:
+        """Other names of the work *query* names, or () (see looks_up_aliases)."""
+        return ()
+
+    def typed_preset(self, query: str):
+        """A preset the query asks for by a word typed after the title (Manga:
+        "Berserk português" → Portuguese), applied to this search only; or None."""
+        return None
 
     def preference_score(self, row) -> int:
         return sum(bool(apply_filters([row], p.config)) for p in self.preferred_presets

@@ -411,6 +411,23 @@ working behavior. A Knaben-first latency trial may be useful given APIBay's
 small observed query contribution, but adding more general manga sources is not
 currently supported by a measured unique target.
 
+**Status (2026-10-04): alias retry and language presets implemented; ordering unchanged.**
+- When the sources answer but no row matches the typed title, AniList's titles
+  for the work are searched too. This costs one AniList request and searches at
+  most two other names, and only applies when AniList lists the typed text as a
+  title or synonym. A notice names the extra search.
+- Live: `Yokohama Shopping Log` now returns 12 rows through `Yokohama Kaidashi
+  Kikou` in about 8 seconds. `Attack on Titan` maps to `Shingeki no Kyojin`.
+  `Twenty First Century Boys` has no AniList match and stays empty.
+- Language presets (Portuguese, Spanish, French, Italian, Raw) rank or require
+  tagged names. Each searches the matching Nyaa category (Non-English or Raw)
+  even when that engine is saved Off.
+- A language typed after the title (`Berserk português`) applies its preset to
+  that search and also searches the title alone. A notice says how many results
+  carry the tag. Live, Nyaa's Non-English Berserk releases were Italian,
+  Spanish, French and Arabic, and none was Portuguese; the notice says so.
+- Result ordering is otherwise unchanged (seeders first), as is paging.
+
 ## Madokami
 
 **Scope:** authenticated direct-download manga library. Search results can be
@@ -436,6 +453,23 @@ Berserk directory rows. Directory discovery does not establish chapter completen
 distinction clear. Improve work disambiguation if needed; use directory browsing
 for file-level questions. Do not treat every literal chapter-filter empty as a
 broken source or automatically expand to unrelated catalogs.
+
+**Status (2026-10-04): names, ranking and folder browsing implemented.**
+- Rows are named from the library path rather than shown as the raw path:
+  `One Piece [series folder]`, `One Piece › One Piece [Viz] [folder]`,
+  `Berserk › Berserk v01.cbz [file]`. Areas outside the main index are named:
+  `[Raws · series folder]`, `[Doujinshi · …]`, `[Oneshots · …]`, `[Novels · …]`.
+- The series named exactly as searched, and everything inside it, ranks first.
+  Spin-offs and other areas follow, then titles merely containing the words.
+  Matches found only through other names or authors (One Piece finding *Soft
+  Shell*) come last but stay listed. Replaying the audit, *Ohana Moyou no
+  One-Piece* drops from first place to below every One Piece row.
+- A picked series folder used to end at "No files at this level" when it held
+  only release folders, as One Piece and Yokohama Kaidashi Kikou do. Folders now
+  open in place: step into a release folder, pick its files, and Esc goes up one
+  level. Each folder is listed at most once per pick.
+- Folder listings carry file sizes into the picker. The listing's "Back" link
+  is no longer offered as a sub-folder.
 
 ## Books
 

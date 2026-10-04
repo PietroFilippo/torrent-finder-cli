@@ -78,6 +78,28 @@ def _with_names(work, names):
     return replace(work, title=names[0], alt_titles=tuple(names[1:40]))
 
 
+def known_aliases(key, query, limit=2):
+    """Other names of the work a query names exactly, for a search that found
+    nothing under the typed name: "Yokohama Shopping Log" → ("Yokohama Kaidashi
+    Kikou",). AniList (anime/manga) only.
+
+    One request. A work counts only when one of AniList's first matches lists the
+    query as a title or synonym; its romaji and English titles are returned (Latin
+    script, not the query itself). () when nothing qualifies or AniList fails.
+    """
+    from torrent_finder.result_view import same_title
+    data = anilist._post(_MEDIA_SEARCH, {"search": query, "type": key.upper(), "page": 1})
+    nodes = ((data or {}).get("Page") or {}).get("media") or []
+    for node in nodes[:5]:
+        title = node.get("title") or {}
+        names = [title.get("romaji"), title.get("english"), title.get("native"), *(node.get("synonyms") or [])]
+        if any(isinstance(name, str) and same_title(name, query) for name in names):
+            other = [name for name in (title.get("romaji"), title.get("english"))
+                     if isinstance(name, str) and re.search(r"[A-Za-z]", name) and not same_title(name, query)]
+            return tuple(distinct_names(other))[:limit]
+    return ()
+
+
 def search_titles(catalog, query, page=1):
     """One user-requested page; unavailable catalogs are never an empty match."""
     if page < 1 or page > MAX_CATALOG_PAGES:

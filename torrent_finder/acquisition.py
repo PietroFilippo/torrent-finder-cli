@@ -239,8 +239,9 @@ class MadokamiAcquisition:
     """Madokami: direct-download library — no magnet, no ``.torrent``.
 
     A file hit streams straight to the download folder; a directory hit (a
-    series) lists its contents in the file picker first, then each checked
-    file downloads in turn (Esc aborts mid-file). Login required.
+    series) opens as a folder: sub-folders can be browsed into, and files are
+    chosen in the file picker. Each checked file then downloads in turn (Esc
+    aborts mid-file). Login required.
     """
 
     style = "direct-download"
@@ -254,8 +255,6 @@ class MadokamiAcquisition:
         from torrent_finder import madokami
         from torrent_finder.constants import get_download_dir
         from torrent_finder.credentials import madokami_config
-        from torrent_finder.torrent_meta import TorrentFile
-        from torrent_finder.ui.prompts import episode_select_prompt
         from torrent_finder.utils import start_esc_listener
         from rich.panel import Panel
 
@@ -277,41 +276,9 @@ class MadokamiAcquisition:
         if madokami.is_file_path(path):
             dl_paths = [path]
         else:
-            # A directory hit — usually a series folder of volume archives. List it
-            # and let the user pick which files to pull.
-            with console.status("[bold cyan]Listing the Madokami folder…[/bold cyan]", spinner="dots"):
-                children = madokami.list_directory(path)
-            if children is None:
-                console.print(Panel(
-                    f"[bold]{escape(name)}[/bold]\n\n"
-                    "[warning]Couldn't list the folder[/warning] (login rejected or site layout changed).\n"
-                    f"[cyan]Open it in your browser instead:[/cyan]\n{escape(page_url)}",
-                    title="📕 Madokami", border_style="yellow", padding=(1, 2),
-                ))
-                console.print("[dim]Press any key to continue...[/dim]")
-                readchar.readkey()
+            dl_paths = self._choose_files(path)
+            if not dl_paths:  # Esc / Back out of the picked folder → back to results
                 return PickOutcome("back")
-            files = [c for c in children if not c["is_dir"]]
-            subdirs = [c for c in children if c["is_dir"]]
-            if not files:
-                hint = (f"It holds {len(subdirs)} subfolder(s) — " if subdirs else "")
-                console.print(Panel(
-                    f"[bold]{escape(name)}[/bold]\n\n"
-                    f"[warning]No files at this level.[/warning] {hint}"
-                    f"[cyan]browse it directly:[/cyan]\n{escape(page_url)}",
-                    title="📕 Madokami", border_style="yellow", padding=(1, 2),
-                ))
-                console.print("[dim]Press any key to continue...[/dim]")
-                readchar.readkey()
-                return PickOutcome("back")
-            picker_files = [
-                TorrentFile(index=i + 1, name=f["name"], size_bytes=0)
-                for i, f in enumerate(files)
-            ]
-            picked = episode_select_prompt(picker_files)
-            if not picked:  # Esc / cancelled / confirmed empty → back to results
-                return PickOutcome("back")
-            dl_paths = [files[i - 1]["path"] for i in picked if 1 <= i <= len(files)]
 
         from torrent_finder.ui.prompts import download_dir_ready
         if not download_dir_ready():
@@ -390,6 +357,90 @@ class MadokamiAcquisition:
         console.print("[dim]Press any key to continue...[/dim]")
         readchar.readkey()
         return PickOutcome("next" if saved else "back")
+
+    def _choose_files(self, path) -> list[str]:
+        """Browse from a picked folder to the files to download; [] when the user
+        backs out of it.
+
+        Series folders often hold only release folders ("!Deluxe Edition
+        (Digital)"), so folders open in place. Esc or Back goes up one level, and
+        from the picked folder back to the results. Each folder is listed at most
+        once per pick: Madokami asks for gentle usage.
+        """
+        from torrent_finder import madokami
+        from torrent_finder.ui.selector import SelectItem, arrow_select
+
+        listings, cursors, trail = {}, {}, []
+        current = path
+        while True:
+            if current not in listings:
+                with console.status("[bold cyan]Listing the Madokami folder…[/bold cyan]", spinner="dots"):
+                    listings[current] = madokami.list_directory(current)
+            children = listings[current]
+            here = " › ".join(madokami.describe(current)[0])
+            files = [c for c in children or () if not c["is_dir"]]
+            folders = [c for c in children or () if c["is_dir"]]
+            if children is None or not folders:
+                if children is None:
+                    del listings[current]  # visiting it again asks again
+                    self._notice(here, "[warning]Couldn't list the folder[/warning] (login rejected or "
+                                       "site layout changed).", current)
+                elif not files:
+                    self._notice(here, "[warning]This folder is empty.[/warning]", current)
+                else:
+                    picked = self._pick_files(files)
+                    if picked:
+                        return picked
+                if not trail:
+                    return []
+                current = trail.pop()
+                continue
+            items = []
+            if files:
+                items.append(SelectItem(f"📄 Choose from the {len(files)} file(s) here", "files",
+                                        description="Volumes or chapters stored directly in this folder."))
+            items += [SelectItem(f"📁 {folder['name']}", folder["path"], description="Open this folder.")
+                      for folder in folders]
+            items.append(SelectItem("↩ Back", "back", is_action=True))
+            choice = arrow_select(items, title=f"📕 {escape(here)}", start_index=cursors.get(current, 0),
+                                  footer="Enter open • Esc back")
+            if choice is None or items[choice].value == "back":
+                if not trail:
+                    return []
+                current = trail.pop()
+                continue
+            cursors[current] = choice
+            if items[choice].value == "files":
+                picked = self._pick_files(files)
+                if picked:
+                    return picked
+                continue
+            trail.append(current)
+            current = items[choice].value
+
+    @staticmethod
+    def _pick_files(files) -> list[str]:
+        """The checked files' paths from the file picker; [] when cancelled."""
+        from torrent_finder.torrent_meta import TorrentFile
+        from torrent_finder.ui.prompts import episode_select_prompt
+
+        picker_files = [TorrentFile(index=i + 1, name=f["name"], size_bytes=f.get("size", 0))
+                        for i, f in enumerate(files)]
+        picked = episode_select_prompt(picker_files) or []
+        return [files[i - 1]["path"] for i in picked if 1 <= i <= len(files)]
+
+    @staticmethod
+    def _notice(here, message, path):
+        from torrent_finder import madokami
+        from rich.panel import Panel
+
+        console.print(Panel(
+            f"[bold]{escape(here)}[/bold]\n\n{message}\n"
+            f"[cyan]Open it in your browser instead:[/cyan]\n{escape(madokami._BASE + path)}",
+            title="📕 Madokami", border_style="yellow", padding=(1, 2),
+        ))
+        console.print("[dim]Press any key to continue...[/dim]")
+        readchar.readkey()
 
     def batch_item(self, result, *, download_dir, cancel_event, set_status) -> BatchItemOutcome:
         # Direct download, not a client handoff. Only file hits can be batched

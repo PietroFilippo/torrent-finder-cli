@@ -25,9 +25,20 @@ class MadokamiProvider(BaseProvider):
     supports_subtitles = False
     supports_streaming = False
     supports_episode_picker = False
+    # The search also matches other names and authors; the series named as
+    # searched comes first, before its spin-offs and those looser matches.
+    prefer_title_matches = True
 
     def _init_engines(self) -> list[SearchEngine]:
         return [SearchEngine("Madokami", "📕", self._search_madokami, enabled=True)]
 
     def _search_madokami(self, query: str) -> list[SearchResult]:
         return madokami.search(query)
+
+    def title_relevance(self, row, query: str, authors: tuple = ()) -> int:
+        path = row.get("mdk_path") or ""
+        return madokami.title_relevance(path, query) if path else super().title_relevance(row, query)
+
+    def _sort_results(self, results: list[SearchResult]) -> list[SearchResult]:
+        """A series folder before the folders and files inside it."""
+        return sorted(results, key=lambda row: len(madokami.describe(row.get("mdk_path") or "")[0]))

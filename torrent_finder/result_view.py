@@ -231,6 +231,11 @@ def _compact_words(text: str) -> tuple[str, ...]:
     return words(re.sub(r"['’`´]", "", text))
 
 
+def same_title(first: str, second: str) -> bool:
+    """Equal titles, ignoring case, accents, punctuation and apostrophes."""
+    return bool(_compact_words(first)) and _compact_words(first) == _compact_words(second)
+
+
 def matches_name(name: str, query: str, mode: str = "contains") -> bool:
     if not query.strip():
         return True

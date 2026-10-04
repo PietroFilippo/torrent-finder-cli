@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import threading
 import time
 
+from torrent_finder.filters import apply_filters
 from torrent_finder.search_control import SearchControl, SearchInterrupted
 from torrent_finder.search_diagnostics import ACCESS_STATUSES, Diagnostic, RequestTrace
 from torrent_finder.search_errors import SearchError
@@ -66,20 +67,29 @@ class SearchSession:
         self._slots = threading.BoundedSemaphore(workers)
         self.tasks = []
         self.groups = []
+        # Other names searched because a title found nothing: alias -> typed query.
+        self.alias_of = {}
+        self.notes = []
         self._busy = threading.Lock()
         # Interleave providers before queries so a slow first provider doesn't
         # own the entire queue. On engines always precede their Auto fallbacks.
         for query in self.queries:
             for provider in self.providers:
-                group = len(self.groups)
-                self.groups.append((provider, query))
-                active = {e.name for e in provider.effective_engines}
-                for engine in provider.engines:
-                    status = "pending" if engine.name in active else "auto" if engine.mode == "auto" else "off"
-                    for expanded in provider.expand_queries(query):
-                        self.tasks.append(_Task(group, engine, expanded, engine.initial_page,
-                                                Diagnostic(provider_label(provider), engine.name, expanded,
-                                                           engine.initial_page, status)))
+                self._add_group(provider, query)
+
+    def _add_group(self, provider, query):
+        from torrent_finder.providers.combined_provider import provider_label
+        group = len(self.groups)
+        self.groups.append((provider, query))
+        typed = provider.typed_preset(query)
+        active = {e.name for e in provider.effective_engines} | set(typed.require_engines if typed else ())
+        for engine in provider.engines:
+            status = "pending" if engine.name in active else "auto" if engine.mode == "auto" else "off"
+            for expanded in provider.expand_queries(query):
+                self.tasks.append(_Task(group, engine, expanded, engine.initial_page,
+                                        Diagnostic(provider_label(provider), engine.name, expanded,
+                                                   engine.initial_page, status)))
+        return group
 
     @property
     def diagnostics(self):
@@ -263,6 +273,13 @@ class SearchSession:
         ordered = list(merged.values())
         if not self.combined and self.providers:
             ordered = self.providers[0].rank_preferences(self.providers[0]._sort_results(ordered))
+        typed = {p.slug: [t for t in (p.typed_preset(q) for q in self.queries) if t] for p in self.providers}
+
+        def typed_hits(row):
+            """Presets typed after the title ("Berserk português") that the row matches."""
+            presets = typed.get(row.get("provider_slug") or self.providers[0].slug, ())
+            return sum(bool(apply_filters([row], preset.config)) for preset in presets)
+
         if self.queries and self.providers and (self.combined or self.providers[0].prefer_title_matches):
             relevance = {p.slug: p.title_relevance for p in self.providers}
             fallback = (self.providers[0].title_relevance if not self.combined
@@ -271,11 +288,21 @@ class SearchSession:
             # title first ("Finding Nemo pt-br"), then preferred presets.
             ordered.sort(key=lambda r: (max(relevance.get(r.get("provider_slug"), fallback)(
                                                 r, q, self.work_authors.get(q, ())) for q in self.queries),
-                                        max(release_tag_hits(r.name, q) for q in self.queries),
+                                        max(release_tag_hits(r.name, q) for q in self.queries) + typed_hits(r),
                                         r.get("preference_score", 0)), reverse=True)
+        elif any(typed.values()):
+            ordered.sort(key=typed_hits, reverse=True)
         notices = list(dict.fromkeys(d.message if d.status in ACCESS_STATUSES
                                     else f"{d.provider} / {d.engine}: {d.message}"
                                     for d in self.diagnostics if d.retryable or d.status in ACCESS_STATUSES))
+        notices += self.notes
+        for presets in typed.values():
+            for preset in presets:
+                count = sum(bool(apply_filters([row], preset.config)) for row in ordered)
+                notices.append(f"{count} result(s) carry a {preset.name} tag and are listed first; the title "
+                               "alone was searched too." if count else
+                               f"No result carries a {preset.name} tag; the title alone was searched too, "
+                               "so other releases are shown.")
         if not ordered:  # source advice only when nothing at all was found
             notices += list(dict.fromkeys(d.hint for d in self.diagnostics if d.hint))
         return SearchResults(ordered, notices, session=self)
@@ -342,7 +369,18 @@ class SearchSession:
                     return position
                 selected.sort(key=fair_order)
                 pending = {executor.submit(self._execute, t, control, slots): t for t in selected}
-            while pending and not control.stopped():
+            alias_round = action == "initial" and any(p.looks_up_aliases for p in self.providers)
+            while not control.stopped():
+                if not pending:
+                    if not alias_round:
+                        break
+                    alias_round = False  # one round: aliases are not looked up again
+                    for task in self._alias_tasks(control):
+                        pending[executor.submit(self._execute, task, control, slots)] = task
+                    if not pending:
+                        break
+                    publish()
+                    continue
                 done, _ = wait(pending, timeout=0.05, return_when=FIRST_COMPLETED)
                 for future in done:
                     self._commit(pending.pop(future), future.result())
@@ -366,6 +404,55 @@ class SearchSession:
             author_lookup.join(timeout=_AUTHOR_LOOKUP_WAIT)  # usually already done: it ran alongside
         publish()
         return self.snapshot()
+
+    def _alias_tasks(self, control):
+        """Searches for other names of titles that found nothing matching.
+
+        For providers that look up aliases (General Manga): when a title's
+        sources answered but no row matches it, the catalog's names for the work
+        are searched too ("Yokohama Shopping Log" → "Yokohama Kaidashi Kikou").
+        At most three titles are looked up, with one catalog request each.
+        """
+        wanted = []
+        for group, (provider, query) in enumerate(list(self.groups)):
+            if not provider.looks_up_aliases or query in self.alias_of:
+                continue
+            tasks = [t for t in self.tasks if t.group == group]
+            if not any(t.diagnostic.status in {"results", "empty", "filtered"} for t in tasks):
+                continue  # the sources failed; other names would not help
+            if any(provider.title_relevance(row, query) >= 1 for t in tasks for row in t.rows):
+                continue
+            wanted.append((provider, query))
+        wanted = wanted[:3]
+        if not wanted:
+            return []
+        found = {}
+
+        def look_up():
+            for provider, query in wanted:
+                try:
+                    found[provider.slug, query] = tuple(provider.lookup_aliases(query))
+                except Exception:
+                    continue  # the search simply ends without other names
+
+        thread = threading.Thread(target=look_up, daemon=True)
+        thread.start()
+        while thread.is_alive() and not control.stopped():
+            thread.join(0.05)
+        if control.stopped():
+            return []
+        added = []
+        for provider, query in wanted:
+            aliases = [a for a in found.get((provider.slug, query), ()) if a not in self.queries]
+            for alias in aliases:
+                self.queries.append(alias)
+                self.alias_of[alias] = query
+                group = self._add_group(provider, alias)
+                added += [t for t in self.tasks if t.group == group and t.diagnostic.status == "pending"]
+            if aliases:
+                self.notes.append(f"Nothing matched “{query}”, so its catalog title was searched too: "
+                                  + ", ".join(f"“{alias}”" for alias in aliases) + ".")
+        return added
 
     def _start_author_lookup(self):
         """Find the requested work's authors for plain queries (Books), in parallel

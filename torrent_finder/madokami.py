@@ -34,6 +34,7 @@ from urllib.parse import unquote, urlsplit
 import requests
 
 from torrent_finder.direct_download import Cancelled, save_response
+from torrent_finder.result_view import title_score
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
 
@@ -47,6 +48,14 @@ _session_lock = threading.Lock()
 
 _ANCHOR_RE = re.compile(r'<a\s+[^>]*href="([^"]+)"[^>]*>(.*?)</a>', re.S)
 _TAG_RE = re.compile(r"<[^>]+>")
+# A folder listing is a table: name link, then size ("48.2M", "-" for folders).
+_ROW_RE = re.compile(r"<tr\b.*?</tr>", re.S)
+_CELL_RE = re.compile(r"<td\b[^>]*>(.*?)</td>", re.S)
+_SIZE_RE = re.compile(r"([\d.]+)\s*([KMGT]?)i?B?\Z", re.I)
+
+# Areas outside the main A-Z manga index that hold a grouping folder of their
+# own before the series: /Manga/_Autouploads/AutoUploaded from …/<series>.
+_GROUPED_AREAS = {"_Autouploads": 2}
 
 # Archive/file extensions Madokami serves — anything else is a directory.
 _FILE_EXTS = (".zip", ".cbz", ".rar", ".cbr", ".7z", ".epub", ".pdf", ".mobi")
@@ -83,6 +92,73 @@ def _get_session() -> requests.Session | None:
 def is_file_path(path: str) -> bool:
     """True when a library path points at an archive file (vs. a directory)."""
     return unquote(path).lower().endswith(_FILE_EXTS)
+
+
+def _is_index(levels) -> bool:
+    """The A-Z index folders before a series: "O", "ON", "ONE_"."""
+    first, second, third = levels
+    return (len(first), len(second), len(third)) == (1, 2, 4) and not any(
+        ch.islower() for ch in first + second + third
+    ) and second.startswith(first) and third.startswith(second.rstrip("_"))
+
+
+def describe(path: str) -> tuple[tuple[str, ...], str]:
+    """A library path as (folders from the series down, area).
+
+    "/Manga/O/ON/ONE_/One Piece/!One Piece [Viz]" → (("One Piece", "One Piece
+    [Viz]"), ""). The area names anything outside the main manga index:
+    "Raws", "Novels", "Doujinshi", "Oneshots", "Autouploads". Madokami's "!"
+    prefix (sorts a folder first) is dropped.
+    """
+    parts = [unquote(part) for part in path.strip("/").split("/") if part]
+    if not parts:
+        return (), ""
+    section, rest = parts[0], parts[1:]
+    area = "" if section == "Manga" else section
+    if len(rest) >= 3 and _is_index(rest[:3]):
+        rest = rest[3:]
+    elif rest and (rest[0].startswith("_") or rest[0] == "Oneshots"):
+        area = rest[0].lstrip("_")
+        rest = rest[_GROUPED_AREAS.get(rest[0], 1):]
+    chain = tuple(part.lstrip("!").strip() or part for part in rest) or (parts[-1],)
+    return chain, area
+
+
+def display_name(path: str) -> str:
+    """A result name that says what a pick opens:
+    "One Piece [series folder]", "One Piece › One Piece [Viz] [folder]",
+    "Berserk › Berserk v01.cbz [file]", "One Piece x Toriko [Oneshots · series folder]"."""
+    chain, area = describe(path)
+    shown = chain if len(chain) <= 3 else (chain[0], "…", chain[-2], chain[-1])
+    kind = "file" if is_file_path(path) else "series folder" if len(chain) == 1 else "folder"
+    return f"{' › '.join(shown)} [{' · '.join(filter(None, (area, kind)))}]"
+
+
+def title_relevance(path: str, query: str) -> int:
+    """How well a library path matches the searched title (0-3, like title_score).
+
+    The series named exactly as searched, and everything inside it, rank first;
+    a series whose title only starts with or contains the query comes after.
+    Madokami also finds series through their other names and authors (One
+    Piece finds "Soft Shell"); those rows rank last but stay listed.
+    """
+    chain, area = describe(path)
+    if not chain:
+        return 0
+    series = title_score(chain[0], query)
+    if series == 3 and not area:
+        return 3
+    own = title_score(chain[-1], query) if len(chain) > 1 else series
+    return min(2, max(series, own))
+
+
+def _size_bytes(text: str) -> int:
+    """Bytes from a listing size such as "48.2M"; 0 when unknown ("-")."""
+    match = _SIZE_RE.match(text.strip())
+    if not match:
+        return 0
+    power = " KMGT".index((match.group(2) or " ").upper())
+    return int(float(match.group(1)) * 1024 ** power)
 
 
 def _content_paths(html: str) -> list[tuple[str, str]]:
@@ -138,9 +214,9 @@ def search(query: str) -> list[SearchResult]:
         return []
 
     results: list[SearchResult] = []
-    for path, label in _content_paths(html):
+    for path, _label in _content_paths(html):
         results.append(SearchResult(
-            name=label,
+            name=display_name(path),
             info_hash=f"madokami:{path}",  # placeholder; no torrent exists
             seeders=0,                   # no swarm - direct downloads
             leechers=0,
@@ -153,9 +229,9 @@ def search(query: str) -> list[SearchResult]:
 
 
 def list_directory(path: str) -> list[dict] | None:
-    """List a library directory. Returns ``{name, path, is_dir}`` dicts for its
-    children (files first, page order otherwise preserved), or None on error /
-    missing credentials.
+    """List a library directory. Returns ``{name, path, is_dir, size}`` dicts for
+    its children (files first, page order otherwise preserved; ``size`` in bytes,
+    0 when unknown), or None on error / missing credentials.
 
     Only direct children are returned — anchors whose decoded path nests under
     ``path``. No recursion: Madokami asks for gentle usage, and one level is
@@ -172,17 +248,32 @@ def list_directory(path: str) -> list[dict] | None:
         return None
 
     base = unquote(path).rstrip("/") + "/"
+    sizes = _listing_sizes(r.text)
     children: list[dict] = []
     for child, label in _content_paths(r.text):
-        if not unquote(child).startswith(base):
-            continue
+        if not unquote(child).startswith(base) or child.rsplit("/", 1)[-1] == "..":
+            continue  # outside this folder, or the "Back" link to the parent
+        is_dir = not is_file_path(child)
         children.append({
-            "name": label,
+            "name": label.rstrip("/").lstrip("!") if is_dir else label,
             "path": child,
-            "is_dir": not is_file_path(child),
+            "is_dir": is_dir,
+            "size": 0 if is_dir else sizes.get(child, 0),
         })
     children.sort(key=lambda c: c["is_dir"])  # files first, stable within
     return children
+
+
+def _listing_sizes(html: str) -> dict[str, int]:
+    """Each listed path's size in bytes, from the listing table's size column."""
+    sizes = {}
+    for row in _ROW_RE.findall(html):
+        cells = _CELL_RE.findall(row)
+        link = _ANCHOR_RE.search(cells[0]) if len(cells) >= 2 else None
+        if link:
+            path = unescape(link.group(1)).split("?")[0].rstrip("/")
+            sizes[path] = _size_bytes(_strip_tags(cells[1]))
+    return sizes
 
 
 def download_file(path: str, dest_dir: str, cancel_event=None, progress_cb=None) -> str | None:

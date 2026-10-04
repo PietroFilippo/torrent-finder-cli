@@ -73,6 +73,32 @@ def has_portuguese_subtitles(name: str) -> bool:
     return bool(re.search(r"\b(?:legendad[oa]|leg)\b", text) or subs)
 
 
+# Language tags in manga release names: words, and short codes in brackets
+# ("[es]", "(ITA)"). Codes alone would also match ordinary words.
+_MANGA_LANGUAGES = {
+    "portuguese": (r"portugues(?:e)?|pt br|ptbr|brazilian|brasileir[oa]", ""),
+    "spanish": (r"espanol|spanish|castellano|latino", r"es|esp|spa"),
+    "french": (r"francais|french|vf", r"fr|fre"),
+    "italian": (r"italiano|italian|ita", r"it"),
+}
+_KANA = re.compile(r"[\u3040-\u30ff]")
+
+
+def manga_language_tag(language: str):
+    """A name check for one of ``_MANGA_LANGUAGES`` (for presets)."""
+    words, codes = _MANGA_LANGUAGES[language]
+    pattern = re.compile(rf"\b(?:{words})\b" + (rf"|[\[(](?:{codes})[\])]" if codes else ""))
+
+    def tagged(name: str) -> bool:
+        return bool(pattern.search(_normalize(name)))
+    return tagged
+
+
+def is_raw_release(name: str) -> bool:
+    """Japanese kana in the name, or a raw tag: untranslated manga."""
+    return bool(_KANA.search(name) or re.search(r"\braws?\b", _normalize(name)))
+
+
 def has_brazilian_subtitles(name: str) -> bool:
     """An explicit Brazilian subtitle tag; generic Portuguese is insufficient."""
     text = _normalize(name)
