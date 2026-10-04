@@ -600,7 +600,12 @@ class BaseProvider(ABC):
                 unique.append(item)
         ordered = self.rank_preferences(self._sort_results(unique))
         if self.prefer_title_matches:
-            ordered.sort(key=lambda row: self.title_relevance(row, query), reverse=True)
+            def relevance(row):
+                try:
+                    return self.title_relevance(row, query)
+                except Exception:
+                    return 0  # ranked last; the search session notes the failure
+            ordered.sort(key=relevance, reverse=True)
         return ordered
 
     @property

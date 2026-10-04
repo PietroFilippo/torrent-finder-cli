@@ -101,6 +101,44 @@ class MagnetDirect:
         return BatchItemOutcome(ok=True)
 
 
+def _wait_with_esc(message: str, work, *args):
+    """Run a lookup under a spinner that Esc cancels; ``(result, cancelled)``.
+
+    A lookup can wait on slow servers (Libgen tries three mirrors, 25 s each),
+    and Esc should leave it like it leaves the download itself. A cancelled
+    lookup finishes in the background and its result is ignored; *work* gets
+    the cancel event as ``cancel_event`` when it accepts one, so it can stop
+    early and never write files after a cancel.
+    """
+    import inspect
+    from torrent_finder.utils import start_esc_listener
+
+    cancel = threading.Event()
+    box: dict = {}
+    kwargs = {"cancel_event": cancel} if "cancel_event" in inspect.signature(work).parameters else {}
+
+    def run() -> None:
+        try:
+            box["value"] = work(*args, **kwargs)
+        except Exception as error:  # re-raised below, in the caller's thread
+            box["error"] = error
+
+    worker = threading.Thread(target=run, daemon=True)
+    stop_listener = start_esc_listener(cancel)
+    try:
+        with console.status(f"[bold cyan]{message}[/bold cyan] [dim]Esc to cancel[/dim]", spinner="dots"):
+            worker.start()
+            while worker.is_alive() and not cancel.is_set():
+                worker.join(0.1)
+    finally:
+        stop_listener.set()
+    if worker.is_alive():
+        return None, True
+    if "error" in box:
+        raise box["error"]
+    return box.get("value"), False
+
+
 class MagnetLazyResolve(MagnetDirect):
     """The real hash lives on the topic/post page — resolve on demand.
 
@@ -121,8 +159,9 @@ class MagnetLazyResolve(MagnetDirect):
         return build_magnet(real_hash, result.get("name", "Unknown")) if real_hash else None
 
     def pick(self, result) -> PickOutcome:
-        with console.status(f"[bold cyan]Fetching magnet from {self.label}…[/bold cyan]", spinner="dots"):
-            real_hash = self._resolve(result)
+        real_hash, cancelled = _wait_with_esc(f"Fetching magnet from {self.label}…", self._resolve, result)
+        if cancelled:
+            return PickOutcome("back")
         if not real_hash:
             console.print(f"[error] {self.error_text}[/error]")
             console.print("[dim]Press any key to continue...[/dim]")
@@ -193,9 +232,10 @@ class OnlineFixAcquisition:
 
         name = result.get("name", "Unknown")
         page_url = result.get("page_url") or result.get("of_post_url") or ""
-        with console.status("[bold cyan]Fetching .torrent from online-fix.me…[/bold cyan]", spinner="dots"):
-            path = online_fix.fetch_torrent_for(page_url, get_download_dir())
-
+        path, cancelled = _wait_with_esc("Fetching .torrent from online-fix.me…",
+                                         online_fix.fetch_torrent_for, page_url, get_download_dir())
+        if cancelled:
+            return PickOutcome("back")
         if not path:
             console.print(Panel(
                 f"[bold]{escape(name)}[/bold]\n\n"
@@ -374,8 +414,13 @@ class MadokamiAcquisition:
         current = path
         while True:
             if current not in listings:
-                with console.status("[bold cyan]Listing the Madokami folder…[/bold cyan]", spinner="dots"):
-                    listings[current] = madokami.list_directory(current)
+                listing, cancelled = _wait_with_esc("Listing the Madokami folder…", madokami.list_directory, current)
+                if cancelled:  # Esc: up one level, or back to the results
+                    if not trail:
+                        return []
+                    current = trail.pop()
+                    continue
+                listings[current] = listing
             children = listings[current]
             here = " › ".join(madokami.describe(current)[0])
             files = [c for c in children or () if not c["is_dir"]]
@@ -464,7 +509,7 @@ class MadokamiAcquisition:
             cancel_event=cancel_event, progress_cb=_on_progress,
         ):
             return BatchItemOutcome(ok=True, saved_direct=True)
-        return BatchItemOutcome(ok=False)
+        return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
 
 
 class LibgenAcquisition:
@@ -501,8 +546,9 @@ class LibgenAcquisition:
         if not download_dir_ready():
             return PickOutcome("back")
 
-        with console.status("[bold cyan]Resolving the download link from Libgen…[/bold cyan]", spinner="dots"):
-            url = libgen.resolve_download_url(md5)
+        url, cancelled = _wait_with_esc("Resolving the download link from Libgen…", libgen.resolve_download_url, md5)
+        if cancelled:
+            return PickOutcome("back")
         if not url:
             console.print(Panel(
                 f"[bold]{escape(name)}[/bold]\n\n"
@@ -566,7 +612,7 @@ class LibgenAcquisition:
         from torrent_finder import libgen
 
         md5 = result.get("lg_md5") or ""
-        url = libgen.resolve_download_url(md5)
+        url = libgen.resolve_download_url(md5, cancel_event=cancel_event)
         if not url:
             return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
 
@@ -617,8 +663,9 @@ class FDroidAcquisition:
         if not download_dir_ready():
             return PickOutcome("back")
 
-        with console.status("[bold cyan]Finding the current version on F-Droid…[/bold cyan]", spinner="dots"):
-            apk = fdroid.suggested_apk(package)
+        apk, cancelled = _wait_with_esc("Finding the current version on F-Droid…", fdroid.suggested_apk, package)
+        if cancelled:
+            return PickOutcome("back")
         if not apk:
             console.print(Panel(
                 f"[bold]{escape(name)}[/bold]\n\n"

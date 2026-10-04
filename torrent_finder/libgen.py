@@ -144,15 +144,18 @@ def search(query: str) -> list[SearchResult]:
     return []
 
 
-def resolve_download_url(md5: str) -> str | None:
+def resolve_download_url(md5: str, cancel_event=None) -> str | None:
     """Resolve a file md5 to its keyed ``get.php`` URL, trying each mirror.
 
     The returned URL redirects to the serving CDN; ``requests`` follows it.
-    None when every mirror fails or the page layout changed.
+    None when every mirror fails, the page layout changed, or *cancel_event*
+    is set (checked before each mirror).
     """
     if not md5:
         return None
     for mirror in _MIRRORS:
+        if cancel_event is not None and cancel_event.is_set():
+            return None
         try:
             r = requests.get(
                 f"{mirror}/ads.php", params={"md5": md5}, headers=_UA, timeout=25

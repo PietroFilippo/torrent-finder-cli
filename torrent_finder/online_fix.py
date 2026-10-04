@@ -344,26 +344,27 @@ def resolve_torrent(post_url: str) -> str | None:
     return _torrent_url_in_dir(_absolutize(unescape(m.group(1))))
 
 
-def download_torrent_file(torrent_url: str, dest_dir: str, filename: str) -> str | None:
+def download_torrent_file(torrent_url: str, dest_dir: str, filename: str, cancel_event=None) -> str | None:
     """Save a ``.torrent`` into ``dest_dir``; the saved path or None. The uploads
     host is referer-gated (not login-gated), so every request carries the site
     referer; no session/login required. An existing file is kept (the new one
     is numbered) and a failed transfer leaves nothing behind."""
-    from torrent_finder.direct_download import save_response
-    if not torrent_url:
+    from torrent_finder.direct_download import Cancelled, save_response
+    if not torrent_url or (cancel_event is not None and cancel_event.is_set()):
         return None
     try:
         with _anon_http().get(torrent_url, headers=_REFERER, timeout=30, stream=True) as resp:
             resp.raise_for_status()
-            return save_response(resp, dest_dir, filename)
-    except (requests.RequestException, OSError):
+            return save_response(resp, dest_dir, filename, cancel_event)
+    except (Cancelled, requests.RequestException, OSError):
         return None
 
 
-def fetch_torrent_for(post_url: str, dest_dir: str) -> str | None:
+def fetch_torrent_for(post_url: str, dest_dir: str, cancel_event=None) -> str | None:
     """Resolve and download a post's ``.torrent`` into ``dest_dir``; return the
     saved file path, or None. This is the 'hand to the system client' entry point
-    used by main.py — resolve the URL, then stream the file to disk.
+    used by main.py — resolve the URL, then stream the file to disk. Nothing is
+    saved once *cancel_event* is set.
     """
     turl = resolve_torrent(post_url)
     if not turl:
@@ -375,7 +376,7 @@ def fetch_torrent_for(post_url: str, dest_dir: str) -> str | None:
         os.makedirs(dest_dir, exist_ok=True)
     except OSError:
         return None
-    return download_torrent_file(turl, dest_dir, fname)
+    return download_torrent_file(turl, dest_dir, fname, cancel_event)
 
 
 def test_credentials(username: str, password: str) -> tuple[bool | None, str]:

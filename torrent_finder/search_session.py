@@ -145,8 +145,8 @@ class SearchSession:
             provider, query = self.groups[group]
             if provider.prefer_title_matches and provider.auto_needs_relevant_rows:
                 authors = self.work_authors.get(self.alias_of.get(query, query), ())
-                answered = any(provider.title_relevance(row, query, authors) >= provider.relevant_title_score
-                               for t in primary for row in t.rows)
+                answered = any(self._score(provider.title_relevance, row, query, authors)
+                               >= provider.relevant_title_score for t in primary for row in t.rows)
                 reason = "On engines returned rows matching the title; Auto was not needed."
             else:
                 answered = any(t.rows for t in primary)
@@ -198,13 +198,19 @@ class SearchSession:
                 status, message = "timeout", "Source request timed out."
             except Exception:
                 status, message = trace.failures[-1] if trace.failures else ("error", "Source search failed; try again later.")
-        kept, removed = provider.filter_with_reasons(rows, self.cli_filters, self.result_filter)
+        try:
+            kept, removed = provider.filter_with_reasons(rows, self.cli_filters, self.result_filter)
+        except Exception:  # only the diagnostic counts depend on it; snapshot() filters the rows
+            kept, removed = rows, []
         if rows and not kept and status == "results":
             status = "filtered"
         hint = ""
         if not rows and status == "empty":
             message = "No matching rows returned by this search; source coverage is not established."
-            hint = task.engine.empty_hint(task.query) if task.engine.empty_hint else ""
+            try:
+                hint = task.engine.empty_hint(task.query) if task.engine.empty_hint else ""
+            except Exception:
+                hint = ""  # advice is optional
         descriptions = [provider.filter_summary()]
         for label, config in (("Defaults", provider.default_filters), ("CLI", self.cli_filters)):
             if config:
@@ -247,7 +253,13 @@ class SearchSession:
             # Rows found under another spelling belong to the title that was typed.
             origin = self.alias_of.get(query, query)
             candidates = [r for t in self.tasks if t.group == group for r in t.rows]
-            rows = provider._filter_search_results(candidates, query, self.cli_filters, self.result_filter)
+            try:
+                rows = provider._filter_search_results(candidates, query, self.cli_filters, self.result_filter)
+            except Exception:
+                # Unfiltered rows could break the user's filters; hide only this group's.
+                self._note(f"{provider_label(provider)}: results could not be filtered (an internal error), "
+                           "so they are hidden.")
+                rows = []
             for raw in rows:
                 row = SearchResult.from_mapping(dict(raw))
                 key = result_identity(row)
@@ -291,8 +303,8 @@ class SearchSession:
                         else lambda row, query, authors=(): title_score(row.name, query))
             # Equally good titles: releases carrying the tags typed with the
             # title first ("Finding Nemo pt-br"), then preferred presets.
-            ordered.sort(key=lambda r: (max(relevance.get(r.get("provider_slug"), fallback)(
-                                                r, q, self.work_authors.get(self.alias_of.get(q, q), ()))
+            ordered.sort(key=lambda r: (max(self._score(relevance.get(r.get("provider_slug"), fallback),
+                                                        r, q, self.work_authors.get(self.alias_of.get(q, q), ()))
                                             for q in self.queries),
                                         max(release_tag_hits(r.name, q) for q in self.queries) + typed_hits(r),
                                         r.get("preference_score", 0)), reverse=True)
@@ -412,6 +424,19 @@ class SearchSession:
         publish()
         return self.snapshot()
 
+    def _note(self, note: str) -> None:
+        if note not in self.notes:
+            self.notes.append(note)
+
+    def _score(self, scorer, row, query, authors=()) -> int:
+        """A row's title relevance. A scoring bug ranks the row last (with a
+        note) instead of ending the whole search and losing every result."""
+        try:
+            return scorer(row, query, authors)
+        except Exception:
+            self._note("Some results could not be ranked (an internal error); they are listed last.")
+            return 0
+
     def _other_spelling_tasks(self, control):
         """Searches for other spellings of titles that found nothing matching.
 
@@ -430,8 +455,8 @@ class SearchSession:
             if not any(t.diagnostic.status in {"results", "empty", "filtered"} for t in tasks):
                 continue  # the sources failed; other spellings would not help
             spelling = digit_spelling(query)
-            if any(provider.title_relevance(row, wanted_title) >= 1 for wanted_title in filter(None, (query, spelling))
-                   for t in tasks for row in t.rows):
+            if any(self._score(provider.title_relevance, row, wanted_title) >= 1
+                   for wanted_title in filter(None, (query, spelling)) for t in tasks for row in t.rows):
                 continue  # found already, possibly under the digits
             if spelling or provider.looks_up_aliases:
                 wanted.append((provider, query, spelling))
