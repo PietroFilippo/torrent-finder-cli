@@ -21,6 +21,7 @@ download page, and the chosen file. No crawling.
 import os
 import re
 from html import unescape
+from urllib.parse import unquote
 
 import requests
 
@@ -40,6 +41,8 @@ _TITLE_RE = re.compile(r'href="edition\.php[^"]*"[^>]*>(.*?)</a>', re.S)
 _GET_LINK_RE = re.compile(r'href="(get\.php\?md5=[a-fA-F0-9]{32}[^"]*)"')
 _TAG_RE = re.compile(r"<[^>]+>")
 _FILENAME_RE = re.compile(r'filename="?([^";]+)"?', re.I)
+# RFC 5987: filename*=UTF-8''Name%20with%20spaces.epub
+_FILENAME_STAR_RE = re.compile(r"filename\*\s*=\s*([\w-]+)'[^']*'([^;\s]+)", re.I)
 
 # Result-table column order on the .li family (9 cells per row).
 _COL_AUTHOR, _COL_LANG, _COL_SIZE, _COL_EXT = 1, 4, 6, 7
@@ -161,6 +164,27 @@ def resolve_download_url(md5: str) -> str | None:
     return None
 
 
+def _disposition_name(header: str) -> str:
+    """The file name a Content-Disposition header gives, or "".
+
+    Prefers the RFC 5987 ``filename*`` form. A plain ``filename`` arrives
+    decoded as Latin-1 by the HTTP library, so UTF-8 names are re-decoded."""
+    star = _FILENAME_STAR_RE.search(header or "")
+    if star:
+        try:
+            return unquote(star.group(2), encoding=star.group(1), errors="strict")
+        except (LookupError, UnicodeDecodeError):
+            pass
+    plain = _FILENAME_RE.search(header or "")
+    if not plain:
+        return ""
+    name = unescape(plain.group(1)).strip()
+    try:
+        return name.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return name
+
+
 def _safe_filename(name: str) -> str:
     return re.sub(r'[\\/:*?"<>|]+', "_", name).strip() or "libgen-download"
 
@@ -185,11 +209,7 @@ def download_file(url: str, dest_dir: str, fallback_name: str,
         with requests.get(url, headers=_UA, timeout=60, stream=True) as resp:
             if resp.status_code != 200:
                 return None
-            fname = ""
-            disposition = resp.headers.get("Content-Disposition", "")
-            m = _FILENAME_RE.search(disposition)
-            if m:
-                fname = os.path.basename(unescape(m.group(1)).strip())
+            fname = os.path.basename(_disposition_name(resp.headers.get("Content-Disposition", "")))
             return save_response(resp, dest_dir, _safe_filename(fname or fallback_name),
                                  cancel_event, progress_cb)
     except (Cancelled, requests.RequestException, OSError):

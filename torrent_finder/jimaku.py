@@ -74,17 +74,15 @@ def _list_files(entry_id: int, key: str) -> list[dict]:
 
 
 def _download(url: str, name: str, key: str) -> Optional[str]:
+    """Save one subtitle file; an existing file of that name is kept (the new one
+    is numbered) and a failed transfer leaves nothing behind."""
+    from torrent_finder.direct_download import save_response
     dl_dir = get_download_dir()
-    dest = os.path.join(dl_dir, name)
     try:
         os.makedirs(dl_dir, exist_ok=True)
         with requests.get(url, headers=_headers(key), timeout=30, stream=True) as resp:
             resp.raise_for_status()
-            with open(dest, "wb") as fh:
-                for chunk in resp.iter_content(chunk_size=8192):
-                    if chunk:
-                        fh.write(chunk)
-        return dest
+            return save_response(resp, dl_dir, name or "subtitle.srt")
     except Exception as e:
         console.print(f"[error]Jimaku download failed: {escape(str(e))}[/error]")
         return None

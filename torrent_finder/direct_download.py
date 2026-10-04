@@ -1,4 +1,5 @@
-"""File writing shared by the direct-download sources (Madokami, Libgen).
+"""File writing shared by the direct-download sources (Madokami, Libgen,
+F-Droid, Online-Fix and Jimaku).
 
 A transfer streams into a temporary ``.part`` sibling and appears under its
 final name only once complete. Cancelling (Esc), a network or disk error, or
@@ -6,9 +7,13 @@ Ctrl+C removes just that temporary file, so an interrupted download never looks
 finished and never touches an existing file. When the name is already taken
 the new file is saved as ``Name (1).ext``: two different books can share a
 filename, and replacing one would silently lose it.
+
+Names come from servers, so ``safe_filename`` reduces each to one ordinary
+file name inside the download folder before anything is written.
 """
 
 import os
+import re
 import tempfile
 import time
 
@@ -19,6 +24,30 @@ class Cancelled(Exception):
 
 # Windows: antivirus briefly holds a file that was just closed.
 _RETRY_DELAYS = (0.05, 0.1, 0.2, 0.4, 0.8)
+# Characters Windows refuses in names (":" would also open a hidden stream),
+# plus control characters.
+_UNSAFE_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_RESERVED = re.compile(r"(?:con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\..*)?", re.I)
+# Room for " (999)" and the temporary ".part" suffix within 255 characters.
+_MAX_NAME = 180
+
+
+def safe_filename(name: str, fallback: str = "download") -> str:
+    """One ordinary file name from a server-provided name: only its last path
+    part (either slash), Windows-invalid characters replaced, no trailing dots
+    or spaces, no reserved device names, at most ``_MAX_NAME`` characters with
+    the extension kept. *fallback* when nothing usable remains."""
+    name = re.split(r"[/\\]", str(name or ""))[-1]
+    name = _UNSAFE_CHARS.sub("_", name).strip().rstrip(". ")
+    if not name or set(name) <= {"."}:
+        name = fallback
+    if _RESERVED.fullmatch(name):
+        name = "_" + name
+    if len(name) > _MAX_NAME:
+        root, extension = os.path.splitext(name)
+        extension = extension if len(extension) <= 16 else ""
+        name = root[:_MAX_NAME - len(extension)].rstrip(". ") + extension
+    return name
 
 
 def save_response(resp, dest_dir: str, filename: str, cancel_event=None, progress_cb=None) -> str:
@@ -26,14 +55,18 @@ def save_response(resp, dest_dir: str, filename: str, cancel_event=None, progres
 
     ``cancel_event`` is checked between chunks and ``progress_cb(bytes_done,
     total_or_None)`` runs per chunk, the total coming from Content-Length when
-    the server sends one. Raises ``Cancelled`` or the underlying error.
+    the server sends one. *filename* is made safe first (``safe_filename``).
+    Raises ``Cancelled`` or the underlying error.
     """
+    filename = safe_filename(filename)
+    dest = os.path.join(dest_dir, filename)
+    if os.path.dirname(os.path.abspath(dest)) != os.path.abspath(dest_dir):
+        raise OSError(f"Refusing to save outside the download folder: {filename}")
     try:
         total = int(resp.headers.get("Content-Length", "")) or None
     except ValueError:
         total = None
-    # Keep room for the random suffix within the 255-character name limit.
-    fd, temporary = tempfile.mkstemp(prefix=filename[:200] + ".", suffix=".part", dir=dest_dir)
+    fd, temporary = tempfile.mkstemp(prefix=filename + ".", suffix=".part", dir=dest_dir)
     try:
         with os.fdopen(fd, "wb") as fh:
             done = 0
@@ -47,7 +80,7 @@ def save_response(resp, dest_dir: str, filename: str, cancel_event=None, progres
                     done += len(chunk)
                     if progress_cb:
                         progress_cb(done, total)
-        return _promote(temporary, os.path.join(dest_dir, filename))
+        return _promote(temporary, dest)
     except BaseException:
         try:
             os.remove(temporary)

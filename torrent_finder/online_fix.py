@@ -31,7 +31,7 @@ import threading
 import time
 from contextlib import contextmanager
 from html import unescape
-from urllib.parse import urljoin, unquote
+from urllib.parse import unquote, urljoin, urlsplit
 
 import requests
 
@@ -344,22 +344,20 @@ def resolve_torrent(post_url: str) -> str | None:
     return _torrent_url_in_dir(_absolutize(unescape(m.group(1))))
 
 
-def download_torrent_file(torrent_url: str, dest_path) -> bool:
-    """Stream a ``.torrent`` to ``dest_path``. Returns True on success. The uploads
+def download_torrent_file(torrent_url: str, dest_dir: str, filename: str) -> str | None:
+    """Save a ``.torrent`` into ``dest_dir``; the saved path or None. The uploads
     host is referer-gated (not login-gated), so every request carries the site
-    referer; no session/login required."""
+    referer; no session/login required. An existing file is kept (the new one
+    is numbered) and a failed transfer leaves nothing behind."""
+    from torrent_finder.direct_download import save_response
     if not torrent_url:
-        return False
+        return None
     try:
         with _anon_http().get(torrent_url, headers=_REFERER, timeout=30, stream=True) as resp:
             resp.raise_for_status()
-            with open(dest_path, "wb") as fh:
-                for chunk in resp.iter_content(chunk_size=8192):
-                    if chunk:
-                        fh.write(chunk)
+            return save_response(resp, dest_dir, filename)
     except (requests.RequestException, OSError):
-        return False
-    return True
+        return None
 
 
 def fetch_torrent_for(post_url: str, dest_dir: str) -> str | None:
@@ -370,15 +368,14 @@ def fetch_torrent_for(post_url: str, dest_dir: str) -> str | None:
     turl = resolve_torrent(post_url)
     if not turl:
         return None
-    fname = unquote(turl.rsplit("/", 1)[-1]) or "online-fix.torrent"
+    fname = unquote(urlsplit(turl).path.rsplit("/", 1)[-1]) or "online-fix.torrent"
     if not fname.lower().endswith(".torrent"):
         fname += ".torrent"
     try:
         os.makedirs(dest_dir, exist_ok=True)
     except OSError:
         return None
-    dest = os.path.join(dest_dir, fname)
-    return dest if download_torrent_file(turl, dest) else None
+    return download_torrent_file(turl, dest_dir, fname)
 
 
 def test_credentials(username: str, password: str) -> tuple[bool | None, str]:
