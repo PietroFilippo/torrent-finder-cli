@@ -653,6 +653,17 @@ class BlueScaleTests(unittest.TestCase):
         plain = theme.header("Settings", "", 80)
         self.assertNotIn(theme.SUBJECT, style_of(plain, "Settings"))
 
+        # Resolved styles: the subject is sky and not bold; a title's own markup still wins.
+        screen = Console(file=io.StringIO(), width=80, color_system="truecolor", force_terminal=True)
+        line = theme.header("Screen › plain › [bold red]loud[/bold red]", "", 80)
+        subject = line.get_style_at_offset(screen, line.plain.index("plain"))
+        self.assertEqual((subject.bold, str(subject.color.name).lower()), (False, theme.SKY.lower()))
+        loud = line.get_style_at_offset(screen, line.plain.index("loud"))
+        self.assertEqual((loud.bold, loud.color.name), (True, "red"))
+        name = line.get_style_at_offset(screen, line.plain.index("Screen"))
+        self.assertTrue(name.bold)
+        self.assertIsNone(name.color)
+
         from torrent_finder.utils import leech_style
         self.assertEqual(leech_style(0), theme.MUTED)
 

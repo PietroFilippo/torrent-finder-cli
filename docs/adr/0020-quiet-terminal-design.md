@@ -52,7 +52,10 @@ drew their own panels and did not follow the menus' conventions.
   / yellow / red stay the terminal's named colours for good / warn / bad.
   Content, descriptions and key actions keep the terminal's normal text colour;
   the screen name is bold. Terminals without true colour get the nearest named
-  colour. Theme names (`accent`, `muted`, `sky`, `key`, `success`, `warning`,
+  colour. The shades are chosen for dark backgrounds; on a light theme the sky
+  headings lose contrast (the accent, keys and content still follow the
+  terminal), which is the accepted trade-off for a palette that looks the
+  same everywhere. Theme names (`accent`, `muted`, `sky`, `key`, `success`, `warning`,
   `error`, …) are registered in `constants.custom_theme`, including Rich's
   spinner and progress-bar styles; consoles that render app markup must use
   that theme, and frames the app writes to the terminal itself (selector,

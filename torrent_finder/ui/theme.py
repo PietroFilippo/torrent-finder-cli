@@ -104,13 +104,13 @@ def _title_text(title: str | Text) -> Text:
     name.
     """
     crumb = _as_text(title)
-    styled = Text(style=SCREEN)  # base style; the title's own markup still wins
-    styled.append_text(crumb)
+    styled = Text(crumb.plain, style=SCREEN)
     first = crumb.plain.find(CRUMB)
     if first >= 0:
         styled.stylize(SUBJECT, first + len(CRUMB))
         for match in re.finditer(re.escape(CRUMB), crumb.plain):
             styled.stylize(f"not bold {MUTED}", match.start(), match.end())
+    styled.spans.extend(crumb.spans)  # last wins: the title's own markup beats these defaults
     return styled
 
 
