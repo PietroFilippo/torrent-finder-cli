@@ -1,6 +1,10 @@
 # ADR-0010: Knaben and explicit engine modes
 
-Status: accepted (2026-07-18)
+Status: accepted (2026-07-18). Amended in v0.8.0: Books and Mobile also run Auto when no
+raw row is relevant enough (`auto_needs_relevant_rows`, `relevant_title_score`);
+Knaben is On by default for Desktop and Mobile (Mobile's Auto engine is APIBay);
+the client uses Knaben's v2 GET API with the `dead` flag; only 40-character
+hashes are accepted; Off engines run only when a preset requires them.
 
 ## Context
 

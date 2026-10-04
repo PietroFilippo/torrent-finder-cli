@@ -74,13 +74,17 @@ to ADR-0013's original coordinator scheduling.
 A search backend inside a provider (`SearchEngine` in `providers/base.py`):
 Apibay, Knaben, Nyaa (per-category), or a site-specific scraper. A
 provider fans a query out to all On engines concurrently, filters release
-variants before merging on `info_hash`, and sorts by seeders. This preserves
+variants before merging on `info_hash`, and orders by title relevance for
+providers that set `prefer_title_matches` (Movies & Series, Anime, Books,
+Desktop, Mobile, Madokami), otherwise by seeders. This preserves
 language tags when indexers give the same hash different names. Engines are mode-configurable per
 provider; the mode persists under the provider's slug.
 
 Modes are explicit: **On** participates in every fan-out, **Auto** runs only
-when all On engines produced zero raw rows before filtering, and **Off** is
-not contacted unless an active preset explicitly requires it for that search.
+when all On engines produced zero raw rows before filtering (or, for providers
+with `auto_needs_relevant_rows`, when no raw row reaches `relevant_title_score`:
+Books 3, Mobile 2), and **Off** is not contacted unless an active preset, or a
+preset word typed after the title, requires it for that search.
 An Auto engine also runs when there are no primary engines. APIBay
 additionally keeps a bounded
 last-known-good result set per normalized provider/query. Live search always
@@ -89,9 +93,11 @@ and carry presentation-only cache provenance. See
 [ADR-0009](docs/adr/0009-apibay-last-known-good-and-emergency-engines.md)
 and [ADR-0010](docs/adr/0010-knaben-and-explicit-engine-modes.md).
 
-Knaben is the default Auto engine for public-tracker providers. Each provider
-maps to Knaben's normalized categories; the adapter makes one bounded request,
-asks the service to hide unsafe/XXX rows, accepts only valid info hashes, and
+Knaben is the default Auto engine for Movies & Series, Games, Anime, Manga and
+Books, and On for Desktop and Mobile (where APIBay is Auto). Each provider
+maps to Knaben's normalized categories; the adapter makes one bounded v2 GET
+request (unsafe/XXX rows stay hidden by v2's defaults; zero-seed rows are kept
+with `dead`), accepts only valid 40-character info hashes, and
 keeps the originating tracker as result provenance. `SearchEngine.page_fn` and
 `initial_page` opt into deeper retrieval. Nyaa's RSS covers catalog page 1;
 subsequent requests use chronological catalog pages. Knaben pages by 50 source
@@ -104,8 +110,9 @@ then reapplies the current refinement and ordering.
 `search_diagnostics.py` scopes request evidence to each engine worker through a
 context variable. Transport errors swallowed by legacy adapters still appear
 as search failures. Diagnostics distinguish results, empty/filtered responses,
-missing or rejected login, other login errors, source errors, timeouts, skipped
-Auto engines and Off engines. Counts describe normalized rows before dedup and
+missing or rejected login, other login errors, access blocked by an anti-bot
+check (`blocked`, not retryable), source errors, timeouts, skipped Auto engines
+and Off engines. Counts describe normalized rows before dedup and
 first exclusion at each ordered filter stage. A response with rows plus failed
 requests remains retryable; earlier rows are retained. Generic errors never
 include request URLs, headers or credential values. Credential configuration
@@ -195,7 +202,8 @@ A `FilterPreset` is a named config with an Off / Require / Prefer selection.
 `active_presets` retains required presets for compatibility; `preferred_presets`
 scores matching rows without excluding others. Old active presets remain required.
 Preferences choose the best alias before hash deduplication and break relevance
-ties in Anime/combined searches. A required language filter is never relaxed by a
+ties in relevance-ranked providers and combined searches, after rows carrying
+tags typed with the title. A required language filter is never relaxed by a
 preference. Provider settings also persist `result_sort`; combined profiles have
 their own overall sort. The table's `f` refinement changes only that result view.
 See [ADR-0015](docs/adr/0015-named-profiles-and-preset-preferences.md).
@@ -223,7 +231,9 @@ tags alone do not qualify. Tags remain a heuristic, not proof of track contents.
 The table's `f` menu filters fetched rows and sorts them without changing their
 acquisition identity. `uploaded_at` is a UTC epoch timestamp (0 = unknown),
 provided by sources with an upload/publication date; last-seen is not upload time.
-Anime prefers exact/prefix title matches. `nyaa.py` supplements short queries
+Relevance-ranked providers prefer exact, then prefix title matches, each with
+its own scorer (e.g. sequels below the original film, a program above add-ons
+containing its name). `nyaa.py` supplements short queries
 with one popular-catalog page when RSS contains no exact title, optionally
 excluding dominant unrelated title prefixes. Original RSS rows are retained.
 FitGirl and Online-Fix require query words in their parsed title.

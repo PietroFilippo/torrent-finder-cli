@@ -1,6 +1,8 @@
 # Named search profiles and explicit preset preferences
 
-Status: Accepted (2026-10-02)
+Status: Accepted (2026-10-02). Amended in v0.8.0: title relevance now leads in Movies &
+Series, Anime, Books, Desktop, Mobile, Madokami and combined search; rows
+carrying tags typed with the title come before preferred-preset matches.
 
 ## Context
 

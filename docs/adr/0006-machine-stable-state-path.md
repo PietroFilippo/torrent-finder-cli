@@ -1,6 +1,7 @@
 # ADR-0006: Machine-stable state path
 
-Status: accepted (2026-07-15)
+Status: accepted (2026-07-15). Amended in v0.8.0: history is capped at 2,000 entries
+(`store.HISTORY_LIMIT`), including legacy merges.
 
 ## Context
 

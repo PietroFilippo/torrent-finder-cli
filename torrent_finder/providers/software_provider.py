@@ -1,9 +1,8 @@
-"""Software / programs torrent provider — Apibay + SolidTorrents.
+"""Desktop software provider — Apibay and Knaben, SolidTorrents opt-in.
 
-Desktop software only for now (Windows / macOS / Linux). Mobile app categories
-(iOS 305, Android 306) are intentionally parked — to add mobile support later,
-put them in ``categories`` and drop the android/ios excludes in
-``default_filters`` below.
+Windows / macOS / Linux programs. Android apps have their own provider
+(``mobile_provider.py``); iOS (305) is not covered. The default filters keep
+mobile listings out unless they name a desktop platform.
 """
 
 import re

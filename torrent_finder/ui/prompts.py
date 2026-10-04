@@ -1632,7 +1632,8 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
             ),
             description=(
                 "Download every selected torrent with one aria2c process — parallel and "
-                "no torrent client needed. Online-Fix / Madokami entries have no magnet and are skipped."
+                "no torrent client needed. Online-Fix / Madokami / Libgen / F-Droid entries have no magnet "
+                "and are skipped."
             ),
         ),
         SelectItem(
@@ -1642,7 +1643,7 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
             enabled=copyable > 0,
             hint=("" if copyable > 0 else "no magnet links in this selection"),
             description=(
-                "Copy the magnets to your clipboard. Online-Fix / Madokami entries have "
+                "Copy the magnets to your clipboard. Online-Fix / Madokami / Libgen / F-Droid entries have "
                 "no magnet and are skipped; RuTracker / FitGirl links are resolved on demand."
             ),
         ),
@@ -1894,7 +1895,7 @@ def provider_select_prompt(
             is_action=True,
             description=(
                 f"Current: {get_download_dir()}\nThe default folder for aria2c / webtorrent / "
-                "peerflix downloads, subtitle saves, and Online-Fix / Madokami / Libgen files."
+                "peerflix downloads, subtitle saves, and Online-Fix / Madokami / Libgen / F-Droid files."
             ),
         )
         items = (

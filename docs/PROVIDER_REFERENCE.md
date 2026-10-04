@@ -1,14 +1,15 @@
 # Provider reference — tested October 3, 2026
 
-This document describes **each provider as tested in v0.7.0**: its sources,
+This document describes **each provider as tested in v0.7.0**, with dated
+**Status** notes for the changes released in v0.8.0: its sources,
 default settings, observed results, useful search patterns, limitations and
 recommended changes. It is a dated evidence-based reference, not a promise of
 permanent source availability. The [full audit](audits/2026-10-03/README.md)
 contains the raw evidence, methodology and reproduction instructions.
 
-The findings below have been recorded; the proposed product changes have not
-been implemented. The original local backlog and temporary agent pointer remain
-deleted.
+Changes implemented since the audit are recorded in dated **Status** notes under
+each provider. Tables show the defaults that were tested; a note follows where a
+default has changed.
 
 ## Reading the results
 
@@ -17,7 +18,8 @@ is one of the sources searched by that provider. Several providers reuse the
 same engine; those are not independent catalogs.
 
 - **On:** searched normally. **Auto:** fallback when the active primary engines
-  return no raw rows. **Off:** available but disabled by default. Required
+  return no raw rows (Books and Mobile also when no raw row matches the title;
+  see their Status notes). **Off:** available but disabled by default. Required
   presets can affect which engines run for a particular search.
 - Each provider received 32 queries: 24 titles/products/artists, seven variants
   and one synthetic negative. Counts below use the **31 nonnegative queries**;
@@ -153,8 +155,9 @@ game indexes are not a demonstrated priority.
   `dodi`, `online-fix`, `linux`, `pc`, …) before searching. The general indexes
   still receive them, because torrent names there often contain those words.
 - Live after the change: `Cyberpunk 2077 fitgirl` and `Stardew Valley linux`
-  return their FitGirl posts. `Portal Two` still finds nothing: FitGirl has no
-  Portal 2 post, and the existing Apibay number-word retry is unchanged.
+  return their FitGirl posts. `Portal Two` still finds nothing on FitGirl,
+  which has no Portal 2 post. Since the session's digit retry, General Games
+  also searches `Portal 2` in every engine when nothing matches.
 - FitGirl searches from both game providers are shared: a concurrent identical
   search waits for the first, and the same title within 30 seconds reuses its
   rows. A failed search is not reused. Online-Fix already worked this way.
@@ -211,9 +214,11 @@ Evidence: [cooldown replay](audits/2026-10-03/cooldown-evidence.json) and
   rows instead of a second request.
 - A live zero-result search confirmed that empty searches still render the
   search form, so they stay "no results".
-- The shorter-title fallback and deeper retrieval remain open. With a 10-second
-  spacing and a 12-second engine budget, each extra automatic search would need
-  its own retry.
+- There is still no automatic shorter-title retry: with a 10-second spacing
+  and a 12-second engine budget, each extra automatic search would need its own
+  retry. When a multi-word search finds nothing, the app suggests one
+  distinctive word instead (e.g. `Starve` for Don't Starve Together). Deeper
+  retrieval remains open.
 
 ## FitGirl
 
@@ -270,6 +275,8 @@ system/platform terms, editions, portable variants and other-language spellings.
 | Knaben | Auto | 26 |
 | SolidTorrents | Off | 1 observed; 30 cells skipped |
 
+Current defaults (v0.8.0): APIBay On, Knaben **On**, SolidTorrents Off.
+
 **What worked:** defaults yielded **26/31** candidate queries. Knaben was the
 major source of observed title breadth. Knaben exposes paging; the other two
 engines do not expose it in the app.
@@ -316,6 +323,9 @@ Portuguese and native-script queries.
 | APIBay | On | 1 |
 | Knaben | Auto | 21 |
 | SolidTorrents | Off | 2 observed; 30 cells skipped |
+
+Current defaults (v0.8.0): Knaben **On**, APIBay **Auto**, SolidTorrents Off,
+F-Droid Off.
 
 **What worked:** defaults produced **21/31** candidate queries, largely through
 Knaben, which exposes paging. Minecraft returned Android listings, although one
@@ -579,15 +589,15 @@ approximate matches and useful editions while improving ranking.
   and ignores format words ("epub", "audiobook").
 - Books rank by it, and Libgen still leads among equally good matches. Nothing
   is filtered out.
-- Knaben (Auto) now also runs when the On engines returned rows but none
-  matches the title.
+- Knaben (Auto) now also runs when the On engines returned rows but none is
+  the requested book itself (score 3, tightened in the final review below).
 - Replaying the audit's rows: Austen's original editions now lead "Pride and
   Prejudice", ahead of "Variation" spin-offs. For "Tomorrow and Tomorrow and
   Tomorrow", Libgen's 16 rows score 0 and Apibay was empty, so Knaben runs, and
   its first row is Zevin's novel.
 - Known limits: same-title different books ("The Name of the Rosé") and works
-  named after the original can tie with it. Other providers keep the raw-row
-  Auto rule.
+  named after the original can tie with it. Other providers except Mobile
+  keep the raw-row Auto rule.
 
 **Status (2026-10-04): author-aware ranking (P13).**
 - When the requested work's author is known, an exact title by that author
@@ -614,8 +624,8 @@ incremental value does not justify prioritizing a general integration.
 ## Shared engine maintenance and implementation priorities
 
 **APIBay:** its 224 initial cells generated 1,292 HTTP observations through
-requests/retries/fallbacks. This supports testing source order in Software,
-Mobile and Manga, not removing the engine. Audit latency includes deliberate
+requests/retries/fallbacks. This supported testing source order in Software,
+Mobile and Manga (done for Desktop and Mobile in v0.8.0), not removing the engine. Audit latency includes deliberate
 pacing and must not be sold as normal UI performance.
 
 **SolidTorrents:** across its 192 initial provider cells, 12 returned results,
@@ -666,21 +676,22 @@ found and fixed these:
   (`Android Studio … Windows`, `[Android + iOS]`).
 - Author matching accepts either name order and ignores "Jr.".
 
-Suggested order, subject to a subsequent implementation request:
+The audit's suggested order, and where it stands after v0.8.0:
 
-1. **Needed:** Online-Fix error/result parsing and shared pacing; clearer blocked
+1. **Done:** Online-Fix error/result parsing and shared pacing; clearer blocked
    access/rate-limit diagnostics, with bounded retries and partial results.
-2. **Worth improving:** Online-Fix known-title discovery and Books/work relevance
-   plus the Auto-fallback tradeoff.
-3. **Maintenance evaluation:** Knaben v2 compatibility.
-4. **Optional trials/addition:** Knaben-first for selected categories; F-Droid
-   for the three demonstrated Android app gaps.
+2. **Done:** Books/work relevance and the Auto-fallback tradeoff. Online-Fix
+   known-title discovery is partly done (query cleanup, a one-word suggestion);
+   automatic shorter-title and deeper searches remain open.
+3. **Done:** Knaben v2 migration.
+4. **Done for Desktop and Mobile:** Knaben-first and the optional F-Droid
+   engine. A Knaben-first trial for Manga remains open.
 5. **Lower priority:** Gutenberg if a direct classics route is desired. Defer
    general Internet Archive and broad indexer additions without unique evidence.
 
 ## Evidence, sources and update guidance
 
-Use [inventory.json](audits/2026-10-03/inventory.json) for exact factory modes and
+Use [inventory.json](audits/2026-10-03/inventory.json) for the v0.7.0 factory modes and
 category IDs, [engine-results.csv](audits/2026-10-03/engine-results.csv) for engine
 counts/timings, [cases.json](audits/2026-10-03/cases.json) for all query strings,
 and [manual-relevance.json](audits/2026-10-03/manual-relevance.json) for the 88

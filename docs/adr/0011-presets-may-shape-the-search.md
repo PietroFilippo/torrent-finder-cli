@@ -33,8 +33,8 @@ almost always empty.
 - `query_terms` — extra spellings the search fans out over. One
   `Toy Story` search becomes `Toy Story`, `Toy Story pt-br`,
   `Toy Story dublado`. Total queries per search are capped
-  (`_MAX_QUERY_EXPANSIONS`), and worker count is bounded
-  (`_MAX_SEARCH_WORKERS`), so stacking presets cannot amplify one search into
+  (`_MAX_QUERY_EXPANSIONS`), and worker count is bounded (the search
+  session's worker limit), so stacking presets cannot amplify one search into
   a request storm.
 - `require_engines` — engines forced On for the duration of one search, by
   `SearchEngine.name`. This does not write `engine.enabled` and does not

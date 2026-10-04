@@ -35,8 +35,8 @@ _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.
 _session: requests.Session | None = None
 _session_credentials: tuple[str, str] | None = None
 _session_lock = threading.Lock()
-# Login outcomes that repeating can't fix: Cloudflare's check is not retried for
-# a few minutes, rejected credentials / a captcha not until they change.
+# Login outcomes that repeating can't fix: Cloudflare's check and a captcha are
+# not retried for a few minutes, rejected credentials not until they change.
 _BLOCK_BACKOFF = 300.0
 _blocked_until = 0.0  # Cloudflare's check or a captcha: no login attempt before this
 _blocked_reason = "blocked"

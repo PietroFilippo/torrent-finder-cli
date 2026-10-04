@@ -1,8 +1,8 @@
 """Online-Fix.me search client — login + HTML scrape (no official API).
 
 online-fix.me hosts "online fixes" — co-op / multiplayer cracks (Steam emulators
-like Goldberg / OnlineFix) bundled with games. Like RuTracker it needs a login to
-reach downloads, and it never exposes a public magnet: games are distributed as
+like Goldberg / OnlineFix) bundled with games. Unlike RuTracker it needs no login
+(see below), and it never exposes a public magnet: games are distributed as
 **.torrent files on online-fix's own (private) tracker**, plus password-protected
 multi-part archives (the archive password is always ``online-fix.me``).
 

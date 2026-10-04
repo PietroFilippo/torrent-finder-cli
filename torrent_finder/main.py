@@ -1323,8 +1323,8 @@ def _main_loop(args=None) -> None:
             continue
 
         # Search the provider. Multiple titles fan out across the same engines
-        # and merge (dedupe by hash, sort by seeders), reusing the by-creator
-        # search path.
+        # and merge (dedupe by hash, ranked like a single search), reusing the
+        # by-creator search path.
         shown = ", ".join(queries)
         combined = getattr(provider, "is_combined", False)
         if combined:

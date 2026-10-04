@@ -43,7 +43,8 @@ are treated conservatively as explicit.
 
 ADR-0010 later replaced this hidden enabled/disabled distinction with the
 user-visible **On / Auto / Off** model. The trigger described here is retained
-as Auto behavior, while Off is now guaranteed never to make a request.
+as Auto behavior, while Off makes no request unless an active preset requires
+the engine for that search (see ADR-0011).
 
 ## Consequences
 

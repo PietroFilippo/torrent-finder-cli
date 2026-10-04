@@ -24,7 +24,8 @@ Filtering uses the existing ordered stages and reports first-exclusion counts.
 Required filters are never relaxed by retry or pagination. Successful engine
 requests are not repeated during targeted retry; failed requests can retain
 partial rows. Auto still means zero raw On-engine rows, rather than zero rows
-after local filters. Configured credentials and verified login remain distinct;
+after local filters (v0.8.0: Books and Mobile also count raw rows that do not
+match the title as a miss). Configured credentials and verified login remain distinct;
 the existing registry and verification UI own credentials.
 
 `SearchEngine.page_fn` opts a source into pagination. Nyaa starts at catalog
