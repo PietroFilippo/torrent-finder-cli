@@ -13,7 +13,7 @@ def choose_result_sort(order: str) -> str:
 
 
 def refine_results(query: str, mode: str, order: str) -> tuple[str, str, str]:
-    from torrent_finder.ui.prompts import get_query_with_shortcut
+    from torrent_finder.ui.prompts import PROMPT, get_query_with_shortcut, input_screen
     while True:
         items = [
             SelectItem("Words in name", ("match", "contains")),
@@ -39,6 +39,8 @@ def refine_results(query: str, mode: str, order: str) -> tuple[str, str, str]:
         elif action == "done":
             return query, mode, order
         else:
-            entered = get_query_with_shortcut("Filter name: ", initial=query)
+            entered = get_query_with_shortcut(PROMPT, initial=query, screen_renderer=input_screen(
+                f"Refine results › {items[selected].label}",
+                "Matches the names of the fetched results; empty shows every name."))
             if isinstance(entered, str) and entered != "GO_BACK":
                 query, mode = entered.strip(), value

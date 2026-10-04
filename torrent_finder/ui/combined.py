@@ -21,14 +21,15 @@ _SHARED_HELP = {
 
 
 def _shared_filter_screen(action):
-    from rich.text import Text
-    def render(target):
-        target.print(Text("Name filters for all selected providers", style="bold cyan"))
-        target.print(Text(_SHARED_HELP[action]))
-        target.print(Text("These filter returned names; they do not add words to your search. "
-                          "Provider presets still apply. For Anime-only 1080p, use Provider engines and presets.", style="dim"))
-        target.print(Text("Enter saves this draft field • Esc cancels", style="dim"))
-    return render
+    from rich.markup import escape
+    from torrent_finder.ui.prompts import input_screen
+    return input_screen(
+        "Name filters for all selected providers",
+        escape(_SHARED_HELP[action]),
+        "These filter returned names; they do not add words to your search. "
+        "Provider presets still apply. For Anime-only 1080p, use Provider engines and presets.",
+        keys="Enter save this draft field  •  Esc cancel",
+    )
 
 
 def _choose_providers(draft):
@@ -84,18 +85,17 @@ def _configure_provider(draft):
 
 
 def _profile_name(library, *, rename=False):
-    from rich.text import Text
-    from torrent_finder.ui.prompts import get_query_with_shortcut
+    from rich.markup import escape
+    from torrent_finder.ui.prompts import PROMPT, get_query_with_shortcut, input_screen
     error = ""
     initial = library.current["name"] if rename else ""
     while True:
-        def render(target):
-            target.print(Text("Rename profile" if rename else "Save a copy as a new profile", style="bold cyan"))
-            target.print(Text("Use a unique name (1–60 characters). Changes stay in the draft until Save and return."))
-            if error:
-                target.print(Text(error, style="red"))
-            target.print(Text("Enter confirm • Esc cancel", style="dim"))
-        value = get_query_with_shortcut("Profile name: ", initial=initial, screen_renderer=render)
+        render = input_screen(
+            "Rename profile" if rename else "Save a copy as a new profile",
+            "Use a unique name (1–60 characters). Changes stay in the draft until Save and return.",
+            f"[bad]{escape(error)}[/bad]" if error else "",
+        )
+        value = get_query_with_shortcut(PROMPT, initial=initial, screen_renderer=render)
         if not isinstance(value, str) or value == "GO_BACK":
             return None
         try:
@@ -144,7 +144,7 @@ def _manage_profiles(draft, library):
 
 
 def combined_filter_menu(provider):
-    from torrent_finder.ui.prompts import _make_banner_panel, get_query_with_shortcut
+    from torrent_finder.ui.prompts import PROMPT, _make_banner_panel, get_query_with_shortcut
     from rich.markup import escape
     library = provider.profile_draft()
     draft = CombinedProvider(provider.templates)
@@ -203,7 +203,7 @@ def combined_filter_menu(provider):
             return
         else:
             previous = ", ".join(getattr(draft.shared_filters, action))
-            value = get_query_with_shortcut("Name phrases (comma separated; empty clears): ", initial=previous,
+            value = get_query_with_shortcut(PROMPT, initial=previous,
                                             screen_renderer=_shared_filter_screen(action))
             if isinstance(value, str) and value != "GO_BACK":
                 setattr(draft.shared_filters, action, [v.strip() for v in value.split(",") if v.strip()])

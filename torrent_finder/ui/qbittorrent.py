@@ -9,7 +9,7 @@ from torrent_finder import acquisition
 from torrent_finder.constants import console
 from torrent_finder.qbittorrent import Client, ClientError, configured
 from torrent_finder.ui.creator import _notice, _run_cancellable
-from torrent_finder.ui.prompts import get_query_with_shortcut
+from torrent_finder.ui.prompts import PROMPT, get_query_with_shortcut, input_screen
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.ui.search_diagnostics import read_details
 from torrent_finder.utils import format_size, start_esc_listener
@@ -115,7 +115,8 @@ def send_results(results, *, magnet=None):
                 return False
             action = items[index].value
             if action == "folder":
-                value = get_query_with_shortcut("Client folder (blank = default): ", initial=save_path)
+                value = get_query_with_shortcut(PROMPT, initial=save_path, screen_renderer=input_screen(
+                    "Client folder", "Blank uses qBittorrent's default folder."))
                 if isinstance(value, str) and value != "GO_BACK":
                     save_path = value.strip()
             elif action == "category":

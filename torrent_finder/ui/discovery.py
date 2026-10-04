@@ -8,7 +8,7 @@ from torrent_finder.search_errors import SearchError
 from torrent_finder.search_session import search_many
 from torrent_finder.ui.creator import _run_cancellable
 from torrent_finder.ui.layout import ellipsize_cells
-from torrent_finder.ui.prompts import get_query_with_shortcut, _make_banner_panel
+from torrent_finder.ui.prompts import PROMPT, _make_banner_panel, get_query_with_shortcut, input_screen
 from torrent_finder.ui.search_diagnostics import read_details
 from torrent_finder.ui.selector import SelectItem, arrow_select
 
@@ -43,7 +43,8 @@ def _choose_topics(catalog, selected, initial=""):
         if action != "add":
             selected.remove(action)
             continue
-        phrase = get_query_with_shortcut("Find topic (one phrase): ", initial=initial)
+        phrase = get_query_with_shortcut(PROMPT, initial=initial, screen_renderer=input_screen(
+            f"{catalog.label} › find topic", "One phrase; you choose the catalog term next."))
         initial = ""
         if not isinstance(phrase, str) or phrase in {"GO_BACK", ""}:
             continue

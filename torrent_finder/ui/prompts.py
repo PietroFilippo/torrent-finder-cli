@@ -80,7 +80,8 @@ def input_screen(
     """
 
     def render(target: Console) -> None:
-        target.print(theme.header(title, status, target.size.width))
+        for line in theme.header_lines(title, status, target.size.width):
+            target.print(line)
         if target.size.height >= 12:
             target.print()
         for line in lines:
@@ -123,7 +124,8 @@ def make_search_screen_renderer(
         width, height = target.size.width, target.size.height
         status_plain = Text.from_markup(status).plain
         in_header = cell_len(theme.APP_NAME) + cell_len(title) + cell_len(status_plain) + 12 <= width
-        target.print(theme.header(title, status if in_header else "", width))
+        for line in theme.header_lines(title, status if in_header else "", width):
+            target.print(line)
         if height >= 14:
             target.print()
         if not in_header and height >= 12:
@@ -1103,10 +1105,11 @@ def subtitle_source_prompt(current: dict | None = None) -> dict:
     if chosen == "back" or chosen == "__none__":
         return current
     if chosen == "__type__":
-        try:
-            path = console.input("[info]Path to subtitle file: [/info]").strip().strip('"').strip("'")
-        except (EOFError, KeyboardInterrupt):
+        path = get_query_with_shortcut(PROMPT, screen_renderer=input_screen(
+            "External subtitle file", "Path to a .srt, .ass, .ssa, .vtt, .sub or .idx file."))
+        if not isinstance(path, str) or path == "GO_BACK":
             return current
+        path = path.strip().strip('"').strip("'")
         if not path:
             return current
         if not os.path.exists(path):
@@ -1239,10 +1242,11 @@ def download_dir_prompt() -> None:
         return
 
     if chosen == "__type__":
-        try:
-            path = console.input("[info]Path to save downloads: [/info]").strip().strip('"').strip("'")
-        except (EOFError, KeyboardInterrupt):
+        path = get_query_with_shortcut(PROMPT, screen_renderer=input_screen(
+            "Download folder", "Folder to save downloads in; it is created if missing."))
+        if not isinstance(path, str) or path == "GO_BACK":
             return
+        path = path.strip().strip('"').strip("'")
         if not path:
             return
         path = os.path.abspath(os.path.expanduser(path))

@@ -6,7 +6,7 @@ from torrent_finder.ui.selector import SelectItem, arrow_select
 
 
 def backup_menu():
-    from torrent_finder.ui.prompts import get_query_with_shortcut, confirm_prompt
+    from torrent_finder.ui.prompts import PROMPT, confirm_prompt, get_query_with_shortcut, input_screen
     from torrent_finder import credentials
     message, restored = "", False
     while True:
@@ -22,7 +22,16 @@ def backup_menu():
         if pick is None or options[pick].value == "back":
             return restored
         action = options[pick].value
-        path = get_query_with_shortcut("Local JSON file path: ")
+        titles = {"export": "Export settings", "export_history": "Export settings with history",
+                  "import": "Import settings", "export_credentials": "Export credentials",
+                  "import_credentials": "Import credentials"}
+        help_lines = ["Local JSON file path."]
+        if action.startswith("export"):
+            help_lines.append("Choose a new file name; existing files are never overwritten.")
+        elif action == "import":
+            help_lines.append("A preview comes before anything changes.")
+        path = get_query_with_shortcut(PROMPT, screen_renderer=input_screen(titles.get(action, "Settings backup"),
+                                                                             *help_lines))
         if not isinstance(path, str) or path == "GO_BACK" or not path.strip():
             continue
         path = path.strip().strip('"')

@@ -10,7 +10,7 @@ from torrent_finder.resolvers.types import Work
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_session import search_many
 from torrent_finder.ui.creator import _notice, _run_cancellable
-from torrent_finder.ui.prompts import _make_banner_panel, get_query_with_shortcut, clear_screen
+from torrent_finder.ui.prompts import PROMPT, _make_banner_panel, clear_screen, get_query_with_shortcut, input_screen
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.ui.layout import ellipsize_cells
 
@@ -40,7 +40,8 @@ def pick_names(match):
         if index is None or items[index].value == "back":
             return None
         if items[index].value == "add":
-            value = get_query_with_shortcut("Additional title: ")
+            value = get_query_with_shortcut(PROMPT, screen_renderer=input_screen(
+                "Additional title", "Another name to search together with the others."))
             if isinstance(value, str) and value not in {"", "GO_BACK"}:
                 names = distinct_names([*names, value])
                 if len(selected) < MAX_ALIASES:
@@ -69,7 +70,7 @@ def title_search_flow(provider, cli_filters, browse_fn, initial=""):
         if catalog != "manual" and catalog.missing_credentials():
             _notice("Configure " + ", ".join(catalog.missing_credentials()) + " in Credentials.")
             continue
-        query = get_query_with_shortcut("Identify title: ", initial=initial)
+        query = get_query_with_shortcut(PROMPT, initial=initial, screen_renderer=input_screen("Identify title"))
         initial = ""
         if not isinstance(query, str) or query == "GO_BACK" or not query.strip():
             continue

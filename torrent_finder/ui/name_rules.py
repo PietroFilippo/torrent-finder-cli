@@ -5,8 +5,7 @@ from torrent_finder.ui.selector import SelectItem, arrow_select
 
 
 def edit_name_rules(rules):
-    from torrent_finder.ui.prompts import get_query_with_shortcut
-    from rich.text import Text
+    from torrent_finder.ui.prompts import PROMPT, get_query_with_shortcut, input_screen
     draft = NameRules.restore(rules.snapshot())
     labels = {"all_words": "All words", "any_words": "Any word", "phrase": "Exact phrase", "exclude_words": "Exclude words"}
     explanation = ("Release names only. Case, accents and punctuation are normalized. "
@@ -22,10 +21,8 @@ def edit_name_rules(rules):
         key = items[pick].value
         if key == "apply":
             return draft
-        def render(target):
-            target.print(Text(labels[key], style="bold cyan"))
-            target.print(Text(explanation))
-            target.print(Text("Empty clears this rule. Enter apply • Esc cancel", style="dim"))
-        value = get_query_with_shortcut(labels[key] + ": ", initial=getattr(draft, key), screen_renderer=render)
+        render = input_screen(f"Release-name rules › {labels[key]}", explanation, "Empty clears this rule.",
+                              keys="Enter apply  •  Esc cancel")
+        value = get_query_with_shortcut(PROMPT, initial=getattr(draft, key), screen_renderer=render)
         if isinstance(value, str) and value != "GO_BACK":
             setattr(draft, key, value.strip())

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from rich.markup import escape
 
-from torrent_finder.constants import console
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.ui.tips import TIP_CATEGORIES, Tip, TipCategory, find_tips
 
@@ -180,11 +179,12 @@ def tips_page() -> None:
         action = items[result].value
 
         if action == "search":
-            try:
-                query = console.input("[info]Search tips: [/info]").strip()
-            except (EOFError, KeyboardInterrupt):
-                return
-            state["query"] = query
+            from torrent_finder.ui.prompts import PROMPT, get_query_with_shortcut, input_screen
+            query = get_query_with_shortcut(PROMPT, initial=state["query"], screen_renderer=input_screen(
+                "Search tips", "Matches categories, tip text and tags; empty clears the search."))
+            if not isinstance(query, str) or query == "GO_BACK":
+                continue
+            state["query"] = query.strip()
             state["start"] = 0
             continue
 

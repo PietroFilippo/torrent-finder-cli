@@ -20,7 +20,8 @@ from torrent_finder.creator_search import fan_out
 from torrent_finder.search_errors import SearchError
 from torrent_finder.state import add_history_entry, creator_history
 from torrent_finder.stats import record_creator_search
-from torrent_finder.ui.prompts import _make_banner_panel, clear_screen, filter_menu, get_query_with_shortcut
+from torrent_finder.ui.prompts import (PROMPT, _make_banner_panel, filter_menu,
+                                      get_query_with_shortcut, input_screen)
 from torrent_finder.ui import theme
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.utils import start_esc_listener
@@ -350,20 +351,17 @@ def _name_input(provider, facet):
     """
     typed = ""
     while True:
-        clear_screen()
-        console.print(f"[title]Search {provider.name} by {facet.label}[/title]")
-        if facet.note:
-            console.print(f"[dim]{facet.note}[/dim]")
         hist = creator_history(provider.slug, facet.key)
-        nav = "  •  [/dim][bold]↑/↓[/bold] [dim]past searches" if hist else ""
-        console.print(
-            "[dim]Type a name and press Enter  •  [/dim][bold]Ctrl+F[/bold] [dim]filters"
-            f"{nav}  •  [/dim][bold]Esc[/bold] [dim]back[/dim]"
+        nav = "  •  ↑/↓ past searches" if hist else ""
+        render = input_screen(
+            f"{provider.name} › search by {facet.label.lower()}",
+            f"Type a {facet.label.lower()} name and press Enter.",
+            escape(facet.note) if facet.note else "",
+            keys=f"Enter search  •  Ctrl+F filters{nav}  •  Esc back",
         )
         try:
             name = get_query_with_shortcut(
-                f"[info]{facet.label} name:[/info] ",
-                initial=typed, history=hist, filters_shortcut=True,
+                PROMPT, initial=typed, history=hist, filters_shortcut=True, screen_renderer=render,
             )
         except (EOFError, KeyboardInterrupt):
             return None

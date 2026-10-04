@@ -87,7 +87,7 @@ class SubtitlePathTests(unittest.TestCase):
         current = {"mode": "auto", "path": None}
         with patch.object(prompts, "arrow_select", side_effect=choose), \
              patch.object(prompts, "_make_banner_panel", return_value=None), \
-             patch.object(prompts.console, "input", return_value="C:/missing/[subs].srt"), \
+             patch.object(prompts, "get_query_with_shortcut", return_value="C:/missing/[subs].srt"), \
              patch.object(prompts.console, "print") as printed, \
              patch.object(prompts.readchar, "readkey"):
             self.assertEqual(prompts.subtitle_source_prompt(current), current)

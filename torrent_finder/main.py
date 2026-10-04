@@ -48,6 +48,7 @@ from torrent_finder.ui.prompts import (
     filter_menu,
     get_query_with_shortcut,
     PROMPT,
+    input_screen,
     make_search_screen_renderer,
     print_banner,
     provider_select_prompt,
@@ -912,7 +913,10 @@ def _quick_actions_flow(provider=None, cli_filters=None, typed="", on_update=Non
         elif action == "save_search":
             from torrent_finder.bookmarks import save_search
             from torrent_finder.ui.creator import _notice
-            value = typed.strip() or get_query_with_shortcut("Bookmark search: ")
+            value = typed.strip() or get_query_with_shortcut(
+                PROMPT, screen_renderer=input_screen(
+                    "Bookmark current search", "Saves this query with the provider's current settings.",
+                    keys="Enter save  •  Esc cancel"))
             if isinstance(value, str) and value and value != "GO_BACK":
                 if _saved_data_action(lambda: save_search(scope, value)):
                     _notice("Search bookmarked.")

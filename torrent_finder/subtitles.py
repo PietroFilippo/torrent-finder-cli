@@ -116,7 +116,7 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
 
     # Prompt for one or more languages.
     while True:
-        raw = console.input("[info]Language code(s) [default: eng]: [/info]").strip()
+        raw = console.input("[accent]›[/accent] Language code(s) [muted]\\[default: eng][/muted]: ").strip()
         if not raw:
             languages, unknown = [Language("eng")], []
             break
