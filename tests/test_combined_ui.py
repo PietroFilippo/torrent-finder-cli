@@ -14,7 +14,7 @@ from torrent_finder.acquisition import PickOutcome
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.manga_provider import MangaProvider
 from torrent_finder.providers.combined_provider import CombinedProvider, CombinedResults
-from torrent_finder.ui import combined, prompts, table
+from torrent_finder.ui import combined, prompts, search_progress, table
 from isolation import isolate_store
 
 
@@ -95,6 +95,7 @@ class CombinedUITests(unittest.TestCase):
         warning.assert_not_called()
 
     def test_cli_search_surfaces_partial_failures_and_saves_its_profile(self):
+        frames = io.StringIO()
         provider = CombinedProvider([AnimeProvider(), MangaProvider()])
         provider.restore({})
         results = CombinedResults([dict(name="Saki", source="Nyaa", provider_slug="anime")],
@@ -111,14 +112,16 @@ class CombinedUITests(unittest.TestCase):
              patch("torrent_finder.state.add_history_entry") as history, \
              patch.object(main, "browse_results", return_value="next") as browse, \
              patch.object(main, "_handle_whats_next", return_value="EXIT"), \
+             patch.object(search_progress.sys, "stdout", frames), \
              patch.object(main, "_goodbye"):
             main._main_loop()
         self.assertEqual(search.call_args.args[0], ["Saki"])
         self.assertEqual(browse.call_args.kwargs["note"], "Madokami: not logged in")
         self.assertEqual(history.call_args.kwargs["search_profile"], provider.snapshot())
         output = "\n".join(str(call.args[0]) for call in console.print.call_args_list)
+        output += Text.from_ansi(frames.getvalue()).plain  # the progress screen's frames
         self.assertIn("Searching 2 providers for:", output)
-        self.assertIn("Press Enter to view results so far", output)
+        self.assertIn("Enter view results so far", output)
         self.assertNotIn("Searching Search across providers", output)
         self.assertNotIn("Ctrl+F", output)
 

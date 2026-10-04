@@ -54,6 +54,7 @@ from torrent_finder.ui.prompts import (
     search_again_prompt,
 )
 from torrent_finder.terminal_check import advise_limited_terminal
+from torrent_finder.ui.search_progress import REDRAW_S as SEARCH_REDRAW_S, ProgressScreen, progress_frame
 from torrent_finder.ui.table import interactive_select
 from torrent_finder.ui.update_progress import UpdateDisplay, preview_update
 from torrent_finder.updates import (
@@ -1368,16 +1369,13 @@ def _main_loop(args=None) -> None:
         if combined:
             # CLI -q can reach this screen before the lazy profile is loaded.
             count = sum(p.slug in provider.selected_slugs for p in provider.children)
-            console.print(f"[info]Searching {count} provider{'s' if count != 1 else ''} for:[/info] "
-                          f"[highlight]{escape(shown)}[/highlight]")
-            console.print("[dim]Results appear when the search finishes or after 30 seconds.[/dim]")
-            console.print("[dim]Press Enter to view results so far, or Esc to cancel.[/dim]")
+            intro = (f"Searching {count} provider{'s' if count != 1 else ''} for: "
+                     f"[highlight]{escape(shown)}[/highlight]")
+            notes = ["Results appear when the search finishes or after 30 seconds."]
         else:
-            console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{escape(shown)}[/highlight]...")
-        if not combined and getattr(provider, "search_note", ""):
-            console.print(f"[dim]{provider.search_note}[/dim]")
-        if not combined:
-            console.print("[dim]Enter: results so far | Esc: cancel | 30s search limit.[/dim]")
+            intro = f"Searching {escape(provider.name)} for: [highlight]{escape(shown)}[/highlight]"
+            notes = [escape(provider.search_note)] if getattr(provider, "search_note", "") else []
+            notes.append("30 s search limit; Enter shows the results received so far.")
 
         # Run the search on a worker thread so Esc can abort the wait instead of
         # forcing the user to sit through the engine timeouts (or Ctrl+C).
@@ -1411,20 +1409,19 @@ def _main_loop(args=None) -> None:
         worker.start()
         stop_listener = start_esc_listener(cancel_event, finish_event=finish_event)
         started = time.monotonic()
+        waiting_label = "Contacting selected providers…" if combined else f"Searching {provider.name}…"
+        title = f"{provider.name} › {shown}"
         try:
-            status_text = "Contacting selected providers..." if combined else f"Searching {provider.name}..."
-            with console.status(f"[bold cyan]{status_text}[/bold cyan]", spinner="dots") as status:
-                while not search_result.get("done") and not cancel_event.is_set():
-                    progress = search_result.get("progress")
-                    if progress is not None:
-                        pending = ", ".join(progress.waiting[:2])
-                        if len(progress.waiting) > 2:
-                            pending += f" +{len(progress.waiting) - 2} more"
-                        status.update(
-                            f"[bold cyan]{progress.completed}/{progress.total} providers finished · "
-                            f"{progress.results} results ready · {int(time.monotonic() - started)}s[/bold cyan]"
-                            + (f"\n[dim]Waiting: {pending}[/dim]" if pending else "")
-                        )
+            with ProgressScreen() as screen:
+                drawn_at = 0.0
+                while True:
+                    now = time.monotonic()
+                    if now - drawn_at >= SEARCH_REDRAW_S:
+                        screen.draw(progress_frame(title, intro, notes, search_result.get("progress"),
+                                                   now - started, waiting_label, now))
+                        drawn_at = now
+                    if search_result.get("done") or cancel_event.is_set():
+                        break
                     time.sleep(0.05)
         except KeyboardInterrupt:
             cancel_event.set()
