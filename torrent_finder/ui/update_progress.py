@@ -11,10 +11,11 @@ import time
 import readchar
 from rich.console import Console, Group
 from rich.live import Live
-from rich.panel import Panel
 from rich.padding import Padding
 from rich.progress_bar import ProgressBar
 from rich.text import Text
+
+from torrent_finder.ui import theme
 
 
 @dataclass(frozen=True)
@@ -38,25 +39,32 @@ _FINISHED = {"succeeded", "failed", "opened"}
 
 
 def update_panel(view: UpdateView, elapsed: float, width: int = 72):
-    """One shared renderer for real updates, terminal previews, and visual QA."""
+    """One shared renderer for real updates, terminal previews, and visual QA.
+
+    Quiet layout: the header line carries the version change, then the stage
+    in its colour, an activity bar, the elapsed time and the detail text.
+    """
+    width = max(24, width)
     done = view.stage in _FINISHED
-    color = "green" if view.stage == "succeeded" else "red" if view.stage == "failed" else "cyan"
-    parts = []
+    color = theme.GOOD if view.stage == "succeeded" else theme.BAD if view.stage == "failed" else theme.ACCENT
+    versions = ""
     if view.current or view.latest:
         versions = f"{view.current or 'Installed version'} → {view.latest or 'Latest version'}"
-        parts.extend([Text(versions, style="dim"), Text("")])
+    parts: list = list(theme.header_lines("Update", versions, width))
     parts.extend([
-        Text(_HEADINGS.get(view.stage, "Updating"), style=f"bold {color}"),
+        Text(""),
+        Text(theme.MARGIN + _HEADINGS.get(view.stage, "Updating"), style=f"bold {color}"),
         Text(""),
         Padding(ProgressBar(total=100 if done else None, completed=100 if view.stage == "succeeded" else 0,
-                    pulse=not done, animation_time=elapsed, style="bright_black",
-                    pulse_style="cyan", finished_style="green"), (0, 0)),
-        Text(f"Elapsed {int(elapsed) // 60:02d}:{int(elapsed) % 60:02d}", style="dim"),
+                            width=theme.inner_width(width), pulse=not done, animation_time=elapsed,
+                            style=theme.MUTED, pulse_style=theme.ACCENT, finished_style=theme.GOOD),
+                (0, 0, 0, len(theme.MARGIN))),
+        Text(theme.MARGIN + f"Elapsed {int(elapsed) // 60:02d}:{int(elapsed) % 60:02d}", style=theme.MUTED),
         Text(""),
-        Text(view.detail),
     ])
-    return Panel(Group(*parts), title="Torrent Finder · Update", title_align="left",
-                 border_style=color, padding=(1, 2), width=max(24, width))
+    for line in view.detail.splitlines() or [""]:
+        parts.append(Text(theme.MARGIN + line, overflow="fold"))
+    return Group(*parts)
 
 
 class UpdateDisplay:
@@ -73,7 +81,8 @@ class UpdateDisplay:
         elapsed = (self.finished_at or time.monotonic()) - self.started
         panel = update_panel(self.view, elapsed, min(72, self.console.size.width))
         if self.preview:
-            return Group(Text("PREVIEW · No update will be installed", style="bold yellow"), panel)
+            return Group(Text(theme.MARGIN + "PREVIEW · No update will be installed", style=f"bold {theme.WARN}"),
+                         panel)
         return panel
 
     def update(self, stage, detail=""):
@@ -126,7 +135,7 @@ def preview_update(outcome="success", *, console=None, pause=True):
             if index + 1 < len(stages):
                 time.sleep(stages[index + 1] - stage_time)
         if pause:
-            display.console.print("Press any key to close the preview.")
+            display.console.print(Text(theme.MARGIN + "Press any key to close the preview.", style=theme.MUTED))
             try:
                 readchar.readkey()
             except (KeyboardInterrupt, EOFError):
@@ -172,7 +181,7 @@ def watch_update(status: Path, job_id: str, *, console=None, pause=True):
                 break
             time.sleep(0.15)
         if pause:
-            display.console.print("Press any key to close this window.")
+            display.console.print(Text(theme.MARGIN + "Press any key to close this window.", style=theme.MUTED))
             try:
                 readchar.readkey()
             except (KeyboardInterrupt, EOFError):
