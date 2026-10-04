@@ -120,7 +120,7 @@ def show_security_warning(force: bool = False) -> bool:
     def frame():
         width, height = console.size.width, console.size.height
         top = theme.header_lines("Network exposure warning", "", width)
-        bottom = [Text("")] + theme.wrap_keys(theme.parse_footer(keys).keys, width)
+        keys_lines = theme.wrap_keys(theme.parse_footer(keys).keys, width)
         middle_parts = [
             theme.wrap_block(verdict, width, console),
             theme.wrap_block(warning, width, console),
@@ -130,22 +130,24 @@ def show_security_warning(force: bool = False) -> bool:
                    optional) for label, value, optional in rows]
         spaced = height >= 20
 
-        def assemble(include_optional: bool, spacing: bool) -> list[Text]:
-            lines = list(top)
-            if spacing:
-                lines.append(Text(""))
+        def assemble(include_optional: bool, spacing: bool, header: list[Text]) -> list[Text]:
+            blank = [Text("")] if spacing else []
+            lines = list(header) + blank
             lines += [line for line, optional in detail if include_optional or not optional]
             for part in middle_parts:
-                if spacing or lines[-1].plain.strip():
-                    lines.append(Text(""))
-                lines += part
-            return lines + bottom
+                lines += blank + part
+            return lines + blank + keys_lines
 
-        lines = assemble(True, spaced)
+        # The warning text and keys always show. In a short window the optional
+        # Org / ASN / Location rows go first, then the spacing, then the
+        # header's second line.
+        lines = assemble(True, spaced, top)
         if len(lines) > height:
-            lines = assemble(False, spaced)
+            lines = assemble(False, spaced, top)
         if len(lines) > height:
-            lines = assemble(False, False)
+            lines = assemble(False, False, top)
+        if len(lines) > height and len(top) > 1:
+            lines = assemble(False, False, [theme.header("Network exposure warning", "", width)])
         return Group(*[line.copy() for line in lines])
 
     dismissed = False

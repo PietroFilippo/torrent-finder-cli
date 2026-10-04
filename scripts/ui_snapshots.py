@@ -3,6 +3,7 @@
     python scripts/ui_snapshots.py capture before      # writes %TEMP%/tf-ui-snapshots/before/
     python scripts/ui_snapshots.py capture after
     python scripts/ui_snapshots.py compare before after
+    python scripts/ui_snapshots.py check after        # overflow only, every size
 
 Each scenario opens a real screen with every key press answered by Ctrl+C, so
 a screen draws its first frame and then backs out. Frames are recorded at a
@@ -38,7 +39,7 @@ import readchar  # noqa: E402
 
 from torrent_finder.constants import console  # noqa: E402
 
-SIZES = [(50, 16), (80, 24), (120, 40)]
+SIZES = [(40, 12), (50, 16), (80, 24), (120, 40)]
 OUT = Path(tempfile.gettempdir()) / "tf-ui-snapshots"
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[=>78]")
 HOME = re.compile(r"\x1b\[H|\x1b\[1;1H")
@@ -283,7 +284,7 @@ def capture(label: str) -> None:
                     status = f"error: {type(error).__name__}: {error}"
             frames = _frames(buffer.getvalue())
             path = out_dir / f"{name}@{width}x{height}.txt"
-            separator = "\n\n" + "=" * 20 + " next frame " + "=" * 20 + "\n\n"
+            separator = "\n\n" + SEPARATOR + "\n\n"
             path.write_text(separator.join(frames), encoding="utf-8")
             report.append(f"{name:<32} {width}x{height}  frames={len(frames)}  {status}")
     (out_dir / "_report.log").write_text("\n".join(report), encoding="utf-8")
@@ -293,6 +294,42 @@ def capture(label: str) -> None:
 
 def _words(text: str) -> set[str]:
     return {w.casefold() for w in WORD.findall(text)}
+
+
+SEPARATOR = "=" * 20 + " next frame " + "=" * 20
+
+
+def _overflow(text: str, width: int, height: int) -> list[str]:
+    """Frames of a capture that are taller or wider than their terminal."""
+    from rich.cells import cell_len
+    problems = []
+    for i, frame in enumerate(text.split(SEPARATOR)):
+        lines = frame.strip("\n").split("\n")
+        if len(lines) > height:
+            problems.append(f"frame {i}: {len(lines)} rows > {height}")
+        wide = [cell_len(line) for line in lines if cell_len(line) > width]
+        if wide:
+            problems.append(f"frame {i}: {max(wide)} cols > {width}")
+    return problems
+
+
+def _size(name: str) -> tuple[int, int]:
+    match = re.search(r"@(\d+)x(\d+)", name)
+    return int(match.group(1)), int(match.group(2))
+
+
+def check(label: str) -> int:
+    """Report every frame in one capture that overflows its terminal."""
+    problems = 0
+    for path in sorted((OUT / label).glob("*.txt")):
+        found = _overflow(path.read_text(encoding="utf-8"), *_size(path.name))
+        if found:
+            problems += 1
+            print(f"--- {path.name}")
+            for line in found:
+                print("    " + line)
+    print(f"\n{problems} capture(s) overflow")
+    return problems
 
 
 def compare(before: str, after: str) -> int:
@@ -307,17 +344,7 @@ def compare(before: str, after: str) -> int:
         old_text = path.read_text(encoding="utf-8")
         new_text = other.read_text(encoding="utf-8")
         gone = sorted(_words(old_text) - _words(new_text) - EXPECTED_GONE)
-        size = re.search(r"@(\d+)x(\d+)", path.name)
-        width, height = int(size.group(1)), int(size.group(2))
-        overflow = []
-        for i, frame in enumerate(new_text.split("=" * 20 + " next frame " + "=" * 20)):
-            lines = frame.strip("\n").split("\n")
-            from rich.cells import cell_len
-            if len(lines) > height:
-                overflow.append(f"frame {i}: {len(lines)} rows > {height}")
-            wide = [cell_len(line) for line in lines if cell_len(line) > width]
-            if wide:
-                overflow.append(f"frame {i}: {max(wide)} cols > {width}")
+        overflow = _overflow(new_text, *_size(path.name))
         if gone or overflow:
             problems += 1
             print(f"--- {path.name}")
@@ -334,6 +361,8 @@ def main() -> None:
         capture(sys.argv[2])
     elif len(sys.argv) >= 4 and sys.argv[1] == "compare":
         compare(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) >= 3 and sys.argv[1] == "check":
+        check(sys.argv[2])
     else:
         print(__doc__)
 
