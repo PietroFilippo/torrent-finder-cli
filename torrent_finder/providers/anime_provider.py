@@ -18,6 +18,9 @@ class AnimeProvider(BaseProvider):
                        "1_4": "Raw", "1_0": "All Anime (including music videos)"}
     prefer_title_matches = True
     nyaa_title_discovery = True
+    # A title that matches nothing is retried under AniList's names, like Manga.
+    looks_up_aliases = True
+    alias_catalog = "anime"
 
     supports_subtitles = True
     supports_episode_picker = True

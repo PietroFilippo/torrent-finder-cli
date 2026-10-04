@@ -136,7 +136,10 @@ Combined rows additionally carry `provider_slug`, `provider_label`,
 `matched_providers`, and `matched_queries` in `extra`. Copies protect cached
 source rows from these annotations. Real 40-digit hex hashes deduplicate across
 providers; other identifiers are scoped by source and URL/handle. The first
-matching provider in registry order supplies the row, and all origins are kept.
+matching provider in registry order supplies the row, and all origins are kept;
+providers marked `broad` come last (Movies & Series, whose Knaben TV category
+includes anime, and General Games, which also searches FitGirl and Online-Fix),
+so a release found by a more specific provider is credited to it.
 `provider_for_result` selects download capabilities and pick statistics; the
 unchanged source still selects the acquisition adapter. Recommended order uses
 title relevance, then the number of preferred presets matched in the originating

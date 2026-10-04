@@ -58,6 +58,7 @@ class MovieProvider(BaseProvider):
     nyaa_category = "4_1"  # Live Action - English-translated (J-dramas, Asian films/TV)
     # Rank the requested film above sequels, remakes and franchise bundles.
     prefer_title_matches = True
+    broad = True  # Knaben's TV category includes anime
 
     supports_subtitles = True
     supports_episode_picker = True

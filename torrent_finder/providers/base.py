@@ -183,6 +183,10 @@ class BaseProvider(ABC):
     # the AniList catalog ("manga"); providers sharing one share its lookups.
     looks_up_aliases: bool = False
     alias_catalog: str = ""
+    # Its categories also cover other providers' (Movies & Series sees anime
+    # through Knaben's TV category). In a combined search, a release found by a
+    # more specific provider too is credited to that one.
+    broad: bool = False
     # Words typed after a title that ask for one of this provider's presets for
     # that search ("Berserk português", "Photoshop mac"): preset name -> words,
     # lowercase and without accents. See typed_split.

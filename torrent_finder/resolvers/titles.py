@@ -78,26 +78,56 @@ def _with_names(work, names):
     return replace(work, title=names[0], alt_titles=tuple(names[1:40]))
 
 
-def known_aliases(key, query, limit=2):
-    """Other names of the work a query names exactly, for a search that found
-    nothing under the typed name: "Yokohama Shopping Log" → ("Yokohama Kaidashi
-    Kikou",). AniList (anime/manga) only.
+# Honorific suffixes keep their hyphen in release names ("Kaguya-sama").
+_JOINED_HYPHEN = re.compile(r"(?<=[A-Za-z])-(?!(?:sama|kun|chan|san|senpai|sempai|sensei|dono|tan|tachi)\b)"
+                            r"(?=[A-Za-z])", re.I)
 
-    One request. A work counts only when one of AniList's first matches lists the
-    query as a title or synonym; its romaji and English titles are returned (Latin
-    script, not the query itself). () when nothing qualifies or AniList fails.
+
+def known_aliases(key, query, limit=3):
+    """Other names of the work a query names, for a search that found nothing
+    under the typed name: "Yokohama Shopping Log" → ("Yokohama Kaidashi Kikou",),
+    "Mahjong Hishoden: Naki no Ryuu" → ("Mahjong Hishouden Naki no Ryuu",
+    "Naki no Ryuu"). AniList (anime/manga) only.
+
+    Up to three requests: the query as typed, with long vowels written short,
+    then without the words that may hide a long vowel (AniList matches its own
+    spelling only: "Yusha" doesn't find "Yuusha"). A work counts when one of the
+    first matches lists the query as a title or synonym (ignoring long vowels
+    and hyphens), or when the top match's title starts with the query (at least
+    two words). () when nothing qualifies or AniList fails.
     """
-    from torrent_finder.result_view import same_title
-    data = anilist._post(_MEDIA_SEARCH, {"search": query, "type": key.upper(), "page": 1})
-    nodes = ((data or {}).get("Page") or {}).get("media") or []
-    for node in nodes[:5]:
-        title = node.get("title") or {}
-        names = [title.get("romaji"), title.get("english"), title.get("native"), *(node.get("synonyms") or [])]
-        if any(isinstance(name, str) and same_title(name, query) for name in names):
-            other = [name for name in (title.get("romaji"), title.get("english"))
-                     if isinstance(name, str) and re.search(r"[A-Za-z]", name) and not same_title(name, query)]
-            return tuple(distinct_names(other))[:limit]
+    from torrent_finder.result_view import reduced_title, same_title, short_vowel_spelling, title_starts_with
+    for search in dict.fromkeys(filter(None, (query, short_vowel_spelling(query), reduced_title(query)))):
+        data = anilist._post(_MEDIA_SEARCH, {"search": search, "type": key.upper(), "page": 1})
+        nodes = ((data or {}).get("Page") or {}).get("media") or []
+        for index, node in enumerate(nodes):  # one page; names must match exactly
+            title = node.get("title") or {}
+            names = [name for name in (title.get("romaji"), title.get("english"), title.get("native"),
+                                       *(node.get("synonyms") or [])) if isinstance(name, str)]
+            exact = any(same_title(name, query) for name in names)
+            prefix = index == 0 and any(isinstance(name, str) and title_starts_with(name, query)
+                                        for name in (title.get("romaji"), title.get("english")))
+            if exact or prefix:
+                return _alias_names(title, node.get("synonyms") or [], query, limit)
     return ()
+
+
+def _alias_names(title, synonyms, query, limit):
+    """Search names for a matched work: the romaji title as releases write it
+    ("Hishou-den" → "Hishouden"), the English title, and synonyms that are part
+    of the romaji title, the short names people use ("Naki no Ryuu")."""
+    from torrent_finder.result_view import contains_title, same_spelling, words
+    romaji = _JOINED_HYPHEN.sub("", title.get("romaji") or "")
+    candidates = [romaji, title.get("english") or ""]
+    candidates += [synonym for synonym in synonyms if isinstance(synonym, str) and len(words(synonym)) >= 2
+                   and romaji and contains_title(romaji, synonym)]
+    names = []
+    for name in candidates:
+        # Another spelling of the typed name counts: "Hishouden" for "Hishoden".
+        if (name and re.search(r"[A-Za-z]", name) and not same_spelling(name, query)
+                and not any(same_spelling(name, kept) for kept in names)):
+            names.append(name)
+    return tuple(names[:limit])
 
 
 def search_titles(catalog, query, page=1):

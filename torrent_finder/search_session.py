@@ -16,12 +16,15 @@ from torrent_finder.search_control import SearchControl, SearchInterrupted
 from torrent_finder.search_diagnostics import ACCESS_STATUSES, Diagnostic, RequestTrace
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_result import SearchResult, normalize_result
-from torrent_finder.result_view import digit_spelling, release_tag_hits, title_score
+from torrent_finder.result_view import digit_spelling, release_tag_hits, short_vowel_spelling, title_score
 import requests
 
 # Once the searches finish, wait at most this long for the Books author lookup.
 _AUTHOR_LOOKUP_WAIT = 1.5
 MAX_PAGE = 10
+# Other spellings searched for one title that found nothing (digits, short
+# vowels, catalog names): each runs the provider's engines once.
+_MAX_OTHER_SPELLINGS = 4
 MAX_PAGE_TASKS = 24
 
 
@@ -248,7 +251,9 @@ class SearchSession:
         from torrent_finder.providers.combined_provider import provider_label, result_identity
         merged = {}
         provider_order = {p.slug: i for i, p in enumerate(self.providers)}
-        groups = sorted(enumerate(self.groups), key=lambda item: (provider_order[item[1][0].slug], item[0]))
+        # Specific providers first: a release a broad one found too is credited to them.
+        groups = sorted(enumerate(self.groups),
+                        key=lambda item: (item[1][0].broad, provider_order[item[1][0].slug], item[0]))
         for group, (provider, query) in groups:
             # Rows found under another spelling belong to the title that was typed.
             origin = self.alias_of.get(query, query)
@@ -440,12 +445,14 @@ class SearchSession:
     def _other_spelling_tasks(self, control):
         """Searches for other spellings of titles that found nothing matching.
 
-        When a title's sources answered but no row matches it: its spelled-out
-        numbers in digits, for every provider ("Twenty First Century Boys" →
-        "21st Century Boys"), and the catalog's names for the work, for
-        providers that look up aliases ("Yokohama Shopping Log" → "Yokohama
-        Kaidashi Kikou"). One round. At most three titles are looked up, one
-        catalog request each, shared by providers using the same catalog.
+        When a title's sources answered but no row matches it, for every
+        provider: its spelled-out numbers in digits ("Twenty First Century Boys"
+        → "21st Century Boys"), its romanized long vowels written short
+        ("Mahjong Hishouden" → "Mahjong Hishoden"), and the catalog's names for
+        the work ("Yokohama Shopping Log" → "Yokohama Kaidashi Kikou"). Names
+        come from providers that look up aliases and serve every provider of a
+        combined search, since they name the work, not a release. One round. At
+        most three titles are looked up, once per catalog.
         """
         wanted = []
         for group, (provider, query) in enumerate(list(self.groups)):
@@ -454,14 +461,13 @@ class SearchSession:
             tasks = [t for t in self.tasks if t.group == group]
             if not any(t.diagnostic.status in {"results", "empty", "filtered"} for t in tasks):
                 continue  # the sources failed; other spellings would not help
-            spelling = digit_spelling(query)
+            spellings = [s for s in dict.fromkeys((digit_spelling(query), short_vowel_spelling(query))) if s]
             if any(self._score(provider.title_relevance, row, wanted_title) >= 1
-                   for wanted_title in filter(None, (query, spelling)) for t in tasks for row in t.rows):
-                continue  # found already, possibly under the digits
-            if spelling or provider.looks_up_aliases:
-                wanted.append((provider, query, spelling))
+                   for wanted_title in (query, *spellings) for t in tasks for row in t.rows):
+                continue  # found already, possibly under another spelling
+            wanted.append((provider, query, spellings))
         lookups = {}
-        for provider, query, _spelling in wanted:
+        for provider, query, _spellings in wanted:
             title = provider.typed_split(query)[0]  # "Berserk português": the catalog knows "Berserk"
             if provider.looks_up_aliases and len(lookups) < 3:
                 lookups.setdefault((provider.alias_catalog or provider.slug, title), provider)
@@ -481,15 +487,18 @@ class SearchSession:
                 thread.join(0.05)
         if control.stopped():
             return []
+        by_title = {}  # typed title -> names from every catalog that knew the work
+        for (_catalog, title), aliases in found.items():
+            known = by_title.setdefault(title, [])
+            known += [alias for alias in aliases if alias not in known]
         added = []
         searched = {(p.slug, q) for p, q in self.groups}
-        for provider, query, spelling in wanted:
+        for provider, query, spellings in wanted:
             title = provider.typed_split(query)[0]
             typed_word = query[len(title):].strip()  # kept, so the typed preset still applies
-            aliases = [f"{alias} {typed_word}".strip()
-                       for alias in found.get((provider.alias_catalog or provider.slug, title), ())]
-            names = [name for name in dict.fromkeys(filter(None, (spelling, *aliases)))
-                     if (provider.slug, name) not in searched]
+            aliases = [f"{alias} {typed_word}".strip() for alias in by_title.get(title, ())]
+            names = [name for name in dict.fromkeys((*spellings, *aliases))
+                     if (provider.slug, name) not in searched][:_MAX_OTHER_SPELLINGS]
             for name in names:
                 if name not in self.queries:
                     self.queries.append(name)
@@ -497,10 +506,12 @@ class SearchSession:
                 searched.add((provider.slug, name))
                 group = self._add_group(provider, name)
                 added += [t for t in self.tasks if t.group == group and t.diagnostic.status == "pending"]
-            catalog_names = [alias for alias in aliases if alias in names]
-            for note, shown in ((f"Nothing matched “{query}”, so “{spelling}” was searched too.", spelling in names),
-                                (f"Nothing matched “{query}”, so its catalog title was searched too: "
-                                 + ", ".join(f"“{alias}”" for alias in catalog_names) + ".", bool(catalog_names))):
+            catalog_names = [alias for alias in aliases if alias in names and alias not in spellings]
+            notes = [(f"Nothing matched “{query}”, so “{spelling}” was searched too.", spelling in names)
+                     for spelling in spellings]
+            notes.append((f"Nothing matched “{query}”, so its catalog title was searched too: "
+                          + ", ".join(f"“{alias}”" for alias in catalog_names) + ".", bool(catalog_names)))
+            for note, shown in notes:
                 if shown and note not in self.notes:
                     self.notes.append(note)
         # Groups whose engines are all Auto start now: they have no On engine to wait for.

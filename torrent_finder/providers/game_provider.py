@@ -14,6 +14,7 @@ class GameProvider(BaseProvider):
     cli_aliases = ("game",)
     icon = "🎮"
     search_note = "PC, consoles, ROMs & repacks from public trackers and specialist sources."
+    broad = True  # also searches FitGirl and Online-Fix, which have their own providers
     categories = [400, 401, 403, 404, 405, 406]  # All, PC, PSX, Xbox, Wii, Handheld
     # APIBay's unscoped query cache can return false empty sentinels. Retry
     # once with all game categories in a single comma-separated request.

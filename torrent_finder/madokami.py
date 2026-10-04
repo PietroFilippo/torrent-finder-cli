@@ -208,19 +208,14 @@ def search(query: str) -> list[SearchResult]:
     if session is None:
         from torrent_finder.search_errors import login_required
         raise login_required("Madokami")
-    try:
-        r = search_request(session.get, f"{_BASE}/search", params={"q": query}, timeout=30)
-        if r.status_code in (401, 403):
-            from torrent_finder.search_errors import SearchError
-            raise SearchError("Madokami rejected the login. Check your saved credentials in Credentials.")
-        if r.status_code != 200:
-            return []
-        html = r.text
-    except requests.RequestException:
-        return []
-
+    paths = _search_paths(session, query)
+    # The site's search misses names typed with punctuation: "Mahjong Hishoden:
+    # Naki no Ryuu" finds nothing, the same name without ":" finds the series.
+    plain = " ".join(re.sub(r"[^\w\s'-]", " ", query).split())
+    if not paths and plain and plain != query:
+        paths = _search_paths(session, plain)
     results: list[SearchResult] = []
-    for path, _label in _content_paths(html):
+    for path in paths:
         results.append(SearchResult(
             name=display_name(path),
             info_hash=f"madokami:{path}",  # placeholder; no torrent exists
@@ -232,6 +227,20 @@ def search(query: str) -> list[SearchResult]:
             handle={"mdk_path": path},                 # handle for listing/downloading
         ))
     return results
+
+
+def _search_paths(session, query: str) -> list[str]:
+    """Library paths one search page lists; [] on network failure."""
+    try:
+        r = search_request(session.get, f"{_BASE}/search", params={"q": query}, timeout=30)
+        if r.status_code in (401, 403):
+            from torrent_finder.search_errors import SearchError
+            raise SearchError("Madokami rejected the login. Check your saved credentials in Credentials.")
+        if r.status_code != 200:
+            return []
+    except requests.RequestException:
+        return []
+    return [path for path, _label in _content_paths(r.text)]
 
 
 def list_directory(path: str) -> list[dict] | None:

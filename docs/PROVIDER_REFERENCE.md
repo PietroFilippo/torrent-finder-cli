@@ -445,6 +445,16 @@ not proof of a specified language track or usable peers.
 alternate names, explicit category selection and Load more. This audit provides
 no reason for a blanket expansion or a change of Anime's primary engine.
 
+**Status (2026-10-04): AniList name retry implemented; engines unchanged.**
+- A title matching nothing is retried under AniList's names, as in General
+  Manga below. Live, `Mahjong Hishoden: Naki no Ryuu` (a user report: no
+  Anime rows) now finds `[Orphan] Mahjong Hishouden Naki no Ryuu` through
+  AniList's romaji, and `Tate no Yusha no Nariagari` finds the `Yuusha`
+  releases (106 rows).
+- In a search across providers, Movies & Series also lists anime, because
+  Knaben's TV category includes it. A release both find is now listed under
+  Anime; before, it showed as Movies & Series.
+
 ## General Manga
 
 **Scope:** manga listings across translated, raw and non-English source views.
@@ -481,7 +491,7 @@ currently supported by a measured unique target.
 - When the sources answer but no row matches the typed title, AniList's titles
   for the work are searched too. This costs one AniList request and searches at
   most two other names, and only applies when AniList lists the typed text as a
-  title or synonym. A notice names the extra search.
+  title or synonym. A notice names the extra search. (Revised below.)
 - Live: `Yokohama Shopping Log` now returns 12 rows through `Yokohama Kaidashi
   Kikou` in about 8 seconds. `Attack on Titan` maps to `Shingeki no Kyojin`.
   `Twenty First Century Boys` has no AniList match and stays empty.
@@ -499,6 +509,31 @@ currently supported by a measured unique target.
   MangaUpdates and Kitsu were compared on 16 alternate titles; Jikan's API was
   down), but Nyaa has both under digits. Live, they now return 6 and 12 rows. AniList
   resolved all 11 ordinary English/romaji swaps, so no catalog was added.
+- Romanized long vowels (a user report, later the same day): `Mahjong
+  Hishoden: Naki no Ryuu` found nothing in any manga or anime provider. Sources
+  list one spelling only: Madokami has `Hishoden`, Nyaa and Knaben
+  `Hishouden`; `Shingeki no Kyoujin` returns nothing while `Kyojin` works, and
+  `Tate no Yusha`, `Shumatsu no Valkyrie` and `Shojo Shumatsu Ryoko` return
+  nothing in their short spellings. Now:
+  - A long vowel typed in a romanized word (`ou`, `oo`, `uu`) is also searched
+    short, in every provider, like the digit spelling.
+  - The AniList match ignores long vowels and hyphens (`Hishou-den`), and a
+    two-word-or-longer prefix of the top match's title counts (`Mahjong
+    Hishoden`), unless it only names a franchise before a subtitle
+    (`Koukaku Kidoutai: Stand Alone Complex`). AniList finds only its own
+    spelling, so up to three requests are made: as typed, with short vowels,
+    and without the words that may hide a long vowel (`Tate Nariagari`).
+  - The names searched are the romaji title as releases write it (`Hishouden`,
+    honorific hyphens kept), the English title, and synonyms the romaji
+    contains: `Naki no Ryuu`, the name MangaDex uses. At most four other names
+    are searched per title.
+  - In a search across providers these names serve every selected provider.
+  - Live, the reported search now returns four rows (two Anime, one Madokami
+    folder, one Movies & Series), `Mahjong Hishoden` alone returns four
+    too, and `Shingeki no Kyoujin` on Madokami returns 100.
+  - Still empty: `Shumatsu no Valkyrie` as manga, because AniList's manga
+    search doesn't list that spelling, and `Shojo Shumatsu Ryoko`, whose every
+    word may hide a long vowel.
 
 ## Madokami
 
@@ -545,7 +580,10 @@ broken source or automatically expand to unrelated catalogs.
 - A title matching nothing is retried under AniList's names, like General
   Manga. Live, `Yokohama Shopping Log` (empty in the audit) now finds the
   `Yokohama Kaidashi Kikou` series folder. A combined search with General
-  Manga makes one AniList request for both.
+  Manga makes one AniList lookup for both.
+- The site search finds nothing when the query has punctuation such as `:`
+  (`Mahjong Hishoden: Naki no Ryuu` was empty; without the colon it finds the
+  series folder). An empty search is retried once without it.
 
 ## Books
 

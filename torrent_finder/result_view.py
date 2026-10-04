@@ -406,9 +406,82 @@ def digit_spelling(query: str) -> "str | None":
     return "".join(out).strip() if changed else None
 
 
+# Hepburn syllables: a word made only of them is romanized Japanese.
+_ROMAJI_WORD = re.compile(r"(?:(?:ky|gy|sh|ch|ny|hy|by|py|my|ry|ts|j|[kgsztdnhbpmyrwf])?[aiueo]|n)+")
+
+
+def _long_vowel_word(word: str) -> bool:
+    """A romanized word whose ou/oo/uu is most likely a long vowel: "Hishouden",
+    "Kyoujin", "Ryuu", "Shoujo"; not English words such as "house" or "you"."""
+    low = word.casefold()
+    return (bool(_ROMAJI_WORD.fullmatch(low)) and re.search(r"ou|oo|uu", low) is not None
+            and (len(low) >= 6 or (len(low) >= 4 and low.endswith(("ou", "uu")))))
+
+
+def _shorten(word: str) -> str:
+    return re.sub(r"(?i)(o)[ou]|(u)u", lambda m: m.group(1) or m.group(2), word) if _long_vowel_word(word) else word
+
+
+def short_vowel_spelling(query: str) -> "str | None":
+    """The query with romanized long vowels written short ("Shingeki no Kyoujin"
+    → "Shingeki no Kyojin", "Mahjong Hishouden" → "Mahjong Hishoden"). Sources
+    use either spelling and match only their own. None when nothing changes."""
+    spelled = re.sub(r"[A-Za-z]+", lambda m: _shorten(m.group(0)), query)
+    return spelled if spelled != query else None
+
+
+def _spelling_words(text: str) -> tuple[str, ...]:
+    """Words as spelled, apostrophes ignored and hyphens inside words joined."""
+    return _compact_words(re.sub(r"(?<=[^\W\d_])-(?=[^\W\d_])", "", text))
+
+
+def _name_words(text: str) -> tuple[str, ...]:
+    """Words for comparing names across spellings: apostrophes ignored, hyphens
+    inside words joined ("Hishou-den"), romanized long vowels written short."""
+    return tuple(_shorten(word) for word in _spelling_words(text))
+
+
+def same_spelling(first: str, second: str) -> bool:
+    """Equal as searched: case, accents, punctuation, apostrophes and hyphens
+    inside words aside, but "Hishouden" and "Hishoden" differ (a source finds
+    only one of them)."""
+    return bool(_spelling_words(first)) and _spelling_words(first) == _spelling_words(second)
+
+
 def same_title(first: str, second: str) -> bool:
-    """Equal titles, ignoring case, accents, punctuation and apostrophes."""
-    return bool(_compact_words(first)) and _compact_words(first) == _compact_words(second)
+    """Equal titles, ignoring case, accents, punctuation, apostrophes, hyphens
+    inside words and romanized long vowels ("Mahjong Hishouden: Naki no Ryuu" =
+    "Mahjong Hishou-den Naki no Ryuu" = "Mahjong Hishoden Naki no Ryuu")."""
+    words_first = _name_words(first)
+    return bool(words_first) and words_first == _name_words(second)
+
+
+def title_starts_with(title: str, query: str) -> bool:
+    """*title* begins with the words of *query* (at least two) and goes on
+    before any subtitle, compared like ``same_title``: "Mahjong Hishoden" starts
+    "Mahjong Hishoden Naki no Ryuu". A franchise name before a subtitle doesn't
+    count: "Koukaku Kidoutai" names more than "Koukaku Kidoutai: Stand Alone …"."""
+    head = re.split(r"\s*:\s*|\s+[-–—]\s+", title, maxsplit=1)[0]
+    wanted, have = _name_words(query), _name_words(head)
+    return len(wanted) >= 2 and len(have) > len(wanted) and have[:len(wanted)] == wanted
+
+
+def contains_title(title: str, part: str) -> bool:
+    """*part* is a run of consecutive words of *title*, compared like ``same_title``."""
+    wanted, have = _name_words(part), _name_words(title)
+    return bool(wanted) and any(have[i:i + len(wanted)] == wanted for i in range(len(have) - len(wanted) + 1))
+
+
+def reduced_title(query: str) -> "str | None":
+    """The query without the romanized words that may hide a long vowel, and
+    without particles ("Tate no Yusha no Nariagari" → "Tate Nariagari"), for a
+    catalog search when the full spelling found nothing. None when too little
+    or nothing would be removed."""
+    kept = [word for word in query.split()
+            if not (_ROMAJI_WORD.fullmatch(word.casefold().strip(".,:;!?")) and
+                    (len(word.strip(".,:;!?")) <= 2 or re.search(r"[ou]", word, re.I)))]
+    reduced = " ".join(kept)
+    return reduced if reduced != query and len(re.sub(r"\W", "", reduced)) >= 4 else None
 
 
 def matches_name(name: str, query: str, mode: str = "contains") -> bool:
