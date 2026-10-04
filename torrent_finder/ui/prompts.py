@@ -1074,7 +1074,7 @@ def download_dir_ready() -> bool:
             return True
         except OSError as error:
             reason = error.strerror or str(error)
-        items = [SelectItem("Choose another download folder", "choose"), SelectItem("Back", "back")]
+        items = [SelectItem("Choose another folder", "choose"), SelectItem("Back", "back")]
         pick = arrow_select(
             items,
             title="Download folder unavailable",
