@@ -128,6 +128,16 @@ def _wrapped_line_count(text: Text, width: int) -> int:
     return max(1, len(text.wrap(console, max(1, width), overflow="fold")))
 
 
+def _clip_lines(blocks: list[Text], limit: int, width: int) -> Text:
+    """The first *limit* wrapped lines of *blocks*, ending in "…" when cut."""
+    lines = [line for block in blocks for line in block.wrap(console, max(1, width), overflow="fold")]
+    kept = lines[:limit]
+    if len(lines) > limit and kept:
+        kept[-1].truncate(max(1, width - 1))
+        kept[-1].append("…")
+    return Text("\n").join(kept)
+
+
 def _build_panel(
     items: list[SelectItem],
     cursor: int,
@@ -196,6 +206,14 @@ def _build_panel(
         main_start, main_end, main_len = 0, n, n
         always_visible_rows = 0
     chrome = (5 if compact else 12) + always_visible_rows + separators + context_lines + footer_lines
+    # A small window: shorten the focused row's help (e.g. a long folder path)
+    # so a selectable row and the footer's controls still fit on screen.
+    missing = chrome + 1 - console.size.height
+    if missing > 0 and context_lines > 1:
+        keep = max(1, context_lines - missing)
+        context_blocks = [_clip_lines(context_blocks, keep, inner_width)]
+        chrome -= context_lines - keep
+        context_lines = keep
     max_visible = max(1, console.size.height - chrome)
 
     win_start_rel, win_end_rel = _compute_window(

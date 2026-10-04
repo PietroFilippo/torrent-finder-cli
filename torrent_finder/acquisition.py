@@ -94,7 +94,10 @@ class MagnetDirect:
         if not magnet:
             return BatchItemOutcome(ok=False)
         from torrent_finder.downloader import open_magnet
-        open_magnet(magnet)
+        try:
+            open_magnet(magnet)
+        except OSError:
+            return BatchItemOutcome(ok=False)  # counted with the batch's failures
         return BatchItemOutcome(ok=True)
 
 

@@ -1888,8 +1888,8 @@ def provider_select_prompt(
             value="__download_dir__",
             is_action=True,
             description=(
-                "Set the default folder for aria2c / webtorrent / peerflix downloads, "
-                f"subtitle saves, and Online-Fix / Madokami files.\nCurrent: {get_download_dir()}"
+                f"Current: {get_download_dir()}\nThe default folder for aria2c / webtorrent / "
+                "peerflix downloads, subtitle saves, and Online-Fix / Madokami / Libgen files."
             ),
         )
         items = (
@@ -1902,20 +1902,26 @@ def provider_select_prompt(
 
         # Fresh tip each time we enter the selector — but NOT on every render
         # (that would re-roll on every keypress and make the footer jitter).
-        tip_line = random_tip() if console.size.height >= 24 and console.size.width >= 60 else ""
+        tip_line = random_tip()
+
+        def footer(notice=notice, tip_line=tip_line):
+            # Re-evaluated on every render: resizing the open menu switches
+            # between the full footer (with the tip) and a compact one.
+            if console.size.height < 24 or console.size.width < 60:
+                return ((notice + "\n" if notice else "")
+                        + "↑/↓ Enter • Tab actions • Esc\nF filters • H history • S stats")
+            return ((notice + "\n" if notice else "")
+                    + "↑/↓ navigate  •  Enter select  •  "
+                    "[bold yellow]F[/bold yellow] filters  •  "
+                    "[bold yellow]H[/bold yellow] history  •  "
+                    "[bold yellow]S[/bold yellow] stats  •  "
+                    "[bold yellow]T[/bold yellow] tips  •  Tab actions • Esc cancel"
+                    + (f"\n\n   {tip_line}" if tip_line else ""))
 
         result = arrow_select(
             items,
             title="Select Provider",
-            footer=(
-                (notice + "\n" if notice else "")
-                + "↑/↓ navigate  •  Enter select  •  "
-                "[bold yellow]F[/bold yellow] filters  •  "
-                "[bold yellow]H[/bold yellow] history  •  "
-                "[bold yellow]S[/bold yellow] stats  •  "
-                "[bold yellow]T[/bold yellow] tips  •  Tab actions • Esc cancel"
-                + (f"\n\n   {tip_line}" if tip_line else "")
-            ),
+            footer=footer,
             banner=_make_banner_panel(),
             start_index=start,
             hotkeys={
@@ -2052,8 +2058,9 @@ def search_again_prompt() -> str | tuple | None:
 
     start = 0
     while True:
-        # Fresh tip per menu entry, fixed across the render loop.
-        tip_line = random_tip() if console.size.height >= 24 and console.size.width >= 60 else ""
+        # Fresh tip per menu entry, fixed across the render loop; shown only
+        # while the window is large (the footer is re-evaluated on resize).
+        tip_line = random_tip()
 
         def footer():
             if console.size.height < 24 or console.size.width < 60:

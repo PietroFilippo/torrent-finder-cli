@@ -234,10 +234,10 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
     elif saved_direct and saved_direct == sent:
         lines = [f"[success]✓ {sent} of {n} saved to your download folder.[/success]"]
     elif saved_direct:
-        lines = [f"[success]✓ {sent} of {n} done — {sent - saved_direct} to your torrent client, "
-                 f"{saved_direct} saved directly (Madokami).[/success]"]
+        lines = [f"[success]✓ {sent} of {n} done — {sent - saved_direct} handed to your torrent client, "
+                 f"{saved_direct} saved directly.[/success]"]
     else:
-        lines = [f"[success]✓ {sent} of {n} sent to your torrent client.[/success]"]
+        lines = [f"[success]✓ {sent} of {n} handed to your torrent client.[/success]"]
     if ofix_pw:
         lines.append(f"[cyan]Online-Fix archive password:[/cyan] {ofix_pw}")
     if failed:
@@ -592,14 +592,23 @@ def _browse_results(provider, results, note: str = "") -> str:
                         "[dim]When the client's 'Add new torrent' dialog appears, uncheck the files you don't want.[/dim]\n"
                         "[dim]If your client skipped the dialog, pause the torrent and deselect unwanted files in its Content/Files tab.[/dim]"
                     )
-                open_magnet(session.magnet)
+                try:
+                    open_magnet(session.magnet)
+                except OSError as error:
+                    from rich.markup import escape
+                    console.print(f"[error] Couldn't open the magnet link: {escape(error.strerror or str(error))}[/error]")
+                    console.print("[dim]Is a torrent client set to open magnet links? You can also use "
+                                  "Copy magnet link and add it in your client.[/dim]\n")
+                    console.print("[dim]Press any key to return to download options...[/dim]")
+                    readchar.readkey()
+                    continue
                 record_magnet_dispatch()
-                console.print("[success] Magnet link sent to torrent client![/success]\n")
+                console.print("[success] Magnet link handed to your torrent client.[/success]\n")
                 summary = (
                     "[warning]File selection must be set in your torrent client.[/warning]\n"
                     "Uncheck unwanted files in its Add torrent dialog or Content/Files tab."
                 ) if session.selected_files else ""
-                if download_complete_prompt("Magnet link sent to torrent client", summary=summary) == "next":
+                if download_complete_prompt("Magnet link handed to torrent client", summary=summary) == "next":
                     return "next"
                 continue
             elif method in ("stream_p", "stream_w"):

@@ -15,7 +15,10 @@ def bookmark_menu():
         items.append(SelectItem("Back", None))
         if any(e["kind"] == "result" for e in saved):
             items.insert(len(items) - 1, SelectItem("Compare saved results in one table", "compare"))
-        pick = arrow_select(items, title=f"Bookmarks / download later ({len(saved)})", footer="Enter review • Esc back")
+        footer = "Enter review • Esc back" if saved else (
+            "No bookmarks yet. In search results, b saves a listing; Quick actions → "
+            "Bookmark current search saves a search.\nEsc back")
+        pick = arrow_select(items, title=f"Bookmarks / download later ({len(saved)})", footer=footer)
         if pick is None or items[pick].value is None:
             return None
         entry = items[pick].value

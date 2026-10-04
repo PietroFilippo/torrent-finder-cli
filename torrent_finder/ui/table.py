@@ -122,7 +122,8 @@ def _table_caption(
         caption.append("i close • [/] scroll details • b bookmark • Esc back", style="dim")
         return caption
     if console.size.width < 52:
-        caption.append("↑/↓ move • Space pick • Enter open\ni details • b save • f refine\n", style="dim")
+        enter = f"Enter download {len(picked)}" if picked else "Enter open"  # what Enter really does
+        caption.append(f"↑/↓ move • Space pick • i details\n{enter} • b save • f refine\n", style="dim")
         caption.append("←/→ page • Esc back" if total_pages > 1 else "Esc back • a all • c clear", style="dim")
         return caption
     if any(item.get("apibay_cached_at") for item in results):

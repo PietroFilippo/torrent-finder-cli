@@ -27,7 +27,9 @@ class TorrentSession:
         # "unknown" until a fetch completes; "unavailable" after one found no
         # metadata (timeout, no peers), which a later explicit fetch retries.
         self.files_meta_status = "unknown"
-        self._sub_paths: dict[int, list[str]] | None = None
+        # In-torrent subtitle files fetched so far (file index → local copy),
+        # reused by later streams of this torrent.
+        self._sub_files: dict[int, str] = {}
 
     # ---- Setters ----
 
@@ -36,7 +38,6 @@ class TorrentSession:
 
     def set_sub_choice(self, choice: dict | None) -> None:
         self.sub_choice = choice
-        self._sub_paths = None
 
     # ---- Metadata (fetched explicitly, kept once found) ----
 
@@ -63,7 +64,6 @@ class TorrentSession:
         self.files_meta_status = "ok" if result is not None else "unavailable"
         if result is not None:
             self._files_meta = result
-            self._sub_paths = None  # auto subtitles can be matched now
         return result
 
     @property
@@ -118,13 +118,18 @@ class TorrentSession:
     def download_indexes(self) -> list[int] | None:
         return list(self.selected_files) if self.selected_files else None
 
-    # ---- Lazy subs (cached; invalidated by set_sub_choice) ----
+    # ---- Subtitles for the episodes being streamed ----
 
     @property
     def sub_paths(self) -> dict[int, list[str]]:
-        if self._sub_paths is None:
-            from torrent_finder.downloader import _resolve_subs_for_session
-            self._sub_paths = _resolve_subs_for_session(
-                self.magnet, self.files_meta, self.file_list, self.sub_choice
-            )
-        return self._sub_paths
+        """``{video_index: [subtitle paths]}`` for the episodes this stream plays.
+
+        Auto-detected in-torrent subtitles are fetched only for those episodes,
+        all before playback starts (so n/b never waits for subtitles), and kept
+        for later streams, which fetch only what they don't have yet.
+        """
+        from torrent_finder.downloader import _resolve_subs_for_session
+        return _resolve_subs_for_session(
+            self.magnet, self.files_meta, self.file_list, self.sub_choice,
+            targets=self.stream_indexes or None, fetched=self._sub_files,
+        )

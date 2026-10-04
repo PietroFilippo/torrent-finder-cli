@@ -379,18 +379,19 @@ def detect_torrent_client() -> str:
 
 
 def open_magnet(magnet_link: str) -> None:
-    """Open a magnet link with the system default handler (qBittorrent, etc.)."""
+    """Hand a magnet link to the system's default handler (qBittorrent, etc.).
+
+    Raises ``OSError`` when the system can't open it, e.g. no app is set to
+    handle magnet links. Success means the system accepted the link, not that
+    the client added the torrent.
+    """
     system = platform.system()
-    try:
-        if system == "Windows":
-            os.startfile(magnet_link)
-        elif system == "Darwin":
-            subprocess.Popen(["open", magnet_link])
-        else:
-            subprocess.Popen(["xdg-open", magnet_link])
-    except Exception as e:
-        console.print(f"[error] Failed to open magnet link: {e}[/error]")
-        console.print(f"[info]Magnet link:[/info] {magnet_link}")
+    if system == "Windows":
+        os.startfile(magnet_link)  # type: ignore[attr-defined]
+    elif system == "Darwin":
+        subprocess.Popen(["open", magnet_link])
+    else:
+        subprocess.Popen(["xdg-open", magnet_link])
 
 
 def open_torrent_file(path: str) -> bool:
@@ -987,6 +988,8 @@ def _resolve_subs_for_session(
     files_meta,
     file_list: list,
     sub_choice: dict | None,
+    targets: list[int] | None = None,
+    fetched: dict[int, str] | None = None,
 ) -> dict[int, list[str]]:
     """Return ``{video_file_index: [local_sub_paths]}`` for the current session.
 
@@ -997,7 +1000,10 @@ def _resolve_subs_for_session(
         or the legacy single ``sub_choice["path"]``.
       * ``"auto"`` (default) — scan ``file_list`` for sub files paired with each
         video (by basename / language tag / sibling-folder + ep number),
-        batch-fetch them with aria2c, and map by video index.
+        batch-fetch them with aria2c, and map by video index. Only the videos
+        in ``targets`` (all when None) are covered, in one batch before playback,
+        and ``fetched`` (subtitle file index → local path) is reused and filled
+        in, so a later stream only downloads subtitles it doesn't have yet.
 
     Empty dict means "no subtitles to attach"; callers should pass ``None``
     as the ``sub_paths`` arg to ``_run_stream`` in that case.
@@ -1029,9 +1035,12 @@ def _resolve_subs_for_session(
     # auto-detect from torrent
     if not file_list:
         return {}
+    wanted = None if targets is None else set(targets)
     per_video: dict[int, list[int]] = {}
     needed: set[int] = set()
     for f in _vids(file_list):
+        if wanted is not None and f.index not in wanted:
+            continue
         matches = match_subtitles_for(f.name, file_list)
         if matches:
             ids = [m.index for m in matches]
@@ -1040,23 +1049,24 @@ def _resolve_subs_for_session(
     if not needed:
         return {}
 
-    console.print(
-        f"[info]Found {len(needed)} subtitle file(s) inside torrent — fetching via aria2c…[/info]"
-    )
-    with console.status("[bold cyan]Downloading subtitles…[/bold cyan]", spinner="dots"):
-        local = _fetch_torrent_subs(magnet_link, files_meta, sorted(needed))
-
-    if not local:
+    local = fetched if fetched is not None else {}
+    missing = sorted(i for i in needed if not os.path.exists(local.get(i, "")))
+    if missing:
         console.print(
-            "[warning] Could not fetch in-torrent subtitles — streaming without subs.[/warning]"
+            f"[info]Found {len(missing)} subtitle file(s) inside torrent — fetching via aria2c…[/info]"
         )
-        return {}
+        with console.status("[bold cyan]Downloading subtitles…[/bold cyan]", spinner="dots"):
+            local.update(_fetch_torrent_subs(magnet_link, files_meta, missing))
 
     result: dict[int, list[str]] = {}
     for vid_idx, sub_ids in per_video.items():
         paths = [local[i] for i in sub_ids if i in local]
         if paths:
             result[vid_idx] = paths
+    if not result:
+        console.print(
+            "[warning] Could not fetch in-torrent subtitles — streaming without subs.[/warning]"
+        )
     return result
 
 
