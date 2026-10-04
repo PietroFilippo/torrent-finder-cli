@@ -143,26 +143,44 @@ def make_search_screen_renderer(
     return render
 
 
-def _emit_query_frame(
-    target: Console,
-    screen_renderer: Callable[[Console], None],
-    prompt_str: str,
-    committed: list[str],
-    current_text: str,
-    with_footer: bool = True,
-) -> None:
-    screen_renderer(target)
-    for title in committed:
-        line = Text.from_markup(theme.MARGIN + prompt_str)
-        line.append(title)
-        target.print(line)
-    line = Text.from_markup(theme.MARGIN + prompt_str)
-    line.append(current_text)
-    target.print(line, end="")
-    render_footer = getattr(screen_renderer, "footer", None)
-    if with_footer and render_footer is not None:
-        target.print()
-        render_footer(target)
+def _capture_lines(render: Callable[[Console], None], width: int, height: int) -> list[str]:
+    """Run *render* against an off-screen console; return its ANSI lines."""
+    buffer = io.StringIO()
+    target = Console(file=buffer, width=max(1, width), height=max(1, height), theme=custom_theme,
+                     force_terminal=True, color_system="standard")
+    render(target)
+    lines = buffer.getvalue().split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
+def _fold(line: Text, width: int) -> tuple[list[Text], list[int]]:
+    """Cut *line* into rows of *width* cells at character boundaries.
+
+    Returns the rows and the character offset each row starts at. Folding by
+    characters (not words) keeps the cursor arithmetic exact for any text.
+    """
+    plain = line.plain
+    rows, starts = [], []
+    start, cells = 0, 0
+    for index, char in enumerate(plain):
+        char_cells = cell_len(char)
+        if cells + char_cells > width and index > start:
+            rows.append(line[start:index])
+            starts.append(start)
+            start, cells = index, 0
+        cells += char_cells
+    rows.append(line[start:])
+    starts.append(start)
+    return rows, starts
+
+
+def _ansi(row: Text, width: int) -> str:
+    buffer = io.StringIO()
+    Console(file=buffer, width=max(1, width), theme=custom_theme, force_terminal=True,
+            color_system="standard").print(row, no_wrap=True, overflow="crop", end="")
+    return buffer.getvalue()
 
 
 def _render_query_frame(
@@ -174,53 +192,59 @@ def _render_query_frame(
     width: int,
     height: int,
 ) -> tuple[str, int, int]:
-    """Pre-render one complete search frame and its absolute cursor position."""
-    content_buffer = io.StringIO()
-    frame_console = Console(
-        file=content_buffer,
-        width=max(1, width),
-        height=max(1, height),
-        theme=custom_theme,
-        force_terminal=True,
-        color_system="standard",
-    )
-    _emit_query_frame(
-        frame_console,
-        screen_renderer,
-        prompt_str,
-        committed,
-        "".join(buffer),
-    )
+    """Pre-render one complete text-field frame and its absolute cursor position.
 
-    cursor_buffer = io.StringIO()
-    cursor_console = Console(
-        file=cursor_buffer,
-        width=max(1, width),
-        height=max(1, height),
-        theme=custom_theme,
-        force_terminal=False,
-        color_system=None,
-    )
-    _emit_query_frame(
-        cursor_console,
-        screen_renderer,
-        prompt_str,
-        committed,
-        "".join(buffer[:pos]),
-        with_footer=False,
-    )
-    before_cursor = cursor_buffer.getvalue()
-    lines = before_cursor.split("\n")
-    cursor_row = len(lines)
-    cursor_col = cell_len(lines[-1]) + 1
-    if cursor_col > width:
-        cursor_row += 1
-        cursor_col = 1
+    The frame never exceeds *height*: when it would, help lines above the field
+    go first (the header line stays), then the oldest queued titles, then key
+    lines. The row being edited always stays on screen, and the cursor is
+    computed on the same character-folded rows that are drawn.
+    """
+    width, height = max(1, width), max(1, height)
+    top = _capture_lines(screen_renderer, width, height)
+    render_footer = getattr(screen_renderer, "footer", None)
+    footer = _capture_lines(render_footer, width, height) if render_footer is not None else []
 
+    prompt = Text.from_markup(theme.MARGIN + prompt_str)
+    queued: list[Text] = []
+    for title in committed:
+        line = prompt.copy()
+        line.append(title)
+        queued.extend(_fold(line, width)[0])
+    field = prompt.copy()
+    field.append("".join(buffer))
+    rows, starts = _fold(field, width)
+    cursor_index = len(prompt.plain) + pos
+    cursor_row = max(k for k, start in enumerate(starts) if start <= cursor_index)
+    cursor_col = cell_len(field.plain[starts[cursor_row]:cursor_index])
+    if cursor_col >= width:  # the cursor sits just past a full row
+        cursor_row, cursor_col = cursor_row + 1, 0
+        if cursor_row == len(rows):
+            rows.append(Text(""))
+
+    def total() -> int:
+        return len(top) + len(queued) + len(rows) + len(footer)
+
+    if total() > height:
+        top = top[:max(1, height - (len(queued) + len(rows) + len(footer)))]
+    if total() > height:  # keep the newest queued titles
+        room = height - len(top) - len(rows) - len(footer)
+        queued = queued[-room:] if room > 0 else []
+    if total() > height:  # keep the key lines, losing the spacer above them first
+        room = height - len(top) - len(queued) - len(rows)
+        footer = footer[-room:] if room > 0 else []
+    first_row = 0
+    if total() > height:  # the text itself is taller than the window
+        visible = max(1, height - len(top))
+        first_row = min(max(0, cursor_row - visible + 1), max(0, len(rows) - visible))
+        rows = rows[first_row:first_row + visible]
+        top = top[:max(0, height - len(rows))]
+
+    lines = top + [_ansi(row, width) for row in queued + rows] + footer
+    row_number = len(top) + len(queued) + (cursor_row - first_row) + 1
     return (
-        content_buffer.getvalue().rstrip("\n"),
-        max(1, min(height, cursor_row)),
-        max(1, min(width, cursor_col)),
+        "\n".join(lines),
+        max(1, min(height, row_number)),
+        max(1, min(width, cursor_col + 1)),
     )
 
 

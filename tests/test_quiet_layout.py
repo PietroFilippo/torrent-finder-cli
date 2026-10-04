@@ -364,3 +364,40 @@ class ResultsBudgetTests(unittest.TestCase):
                         lines = plain_lines(frame, width, height)
                     self.assertLessEqual(len(lines), height)
                     self.assertIn("Esc back", "\n".join(lines))
+
+
+class TextFieldFrameTests(unittest.TestCase):
+    def frame(self, renderer, committed, text, pos, width, height):
+        content, row, col = prompts._render_query_frame(renderer, prompts.PROMPT, committed, list(text), pos,
+                                                        width, height)
+        lines = Text.from_ansi(content).plain.split("\n")
+        self.assertLessEqual(len(lines), height)
+        self.assertTrue(all(cell_len(line) <= width for line in lines))
+        return lines, row, col
+
+    def assert_cursor_after(self, lines, row, col, before):
+        """The cell left of the cursor shows the character typed before it."""
+        line = lines[row - 1]
+        self.assertGreaterEqual(len(line), col - 1)
+        self.assertEqual(line[col - 2], before)
+
+    def test_queued_titles_never_push_the_field_off_a_small_window(self):
+        renderer = prompts.make_search_screen_renderer("Apibay, Knaben, YTS", "No presets", True, title="Movies")
+        lines, row, col = self.frame(renderer, ["one", "two", "three", "four", "five"], "dune", 4, 40, 12)
+        self.assertIn("› dune", lines[row - 1])
+        self.assert_cursor_after(lines, row, col, "e")
+        self.assertIn("torrent-finder", lines[0])
+        self.assertIn("Esc", "\n".join(lines))
+
+    def test_cursor_follows_wrapped_text(self):
+        text = "a" * 25 + " " + "b" * 15
+        for pos in (30, 26, 25, len(text)):
+            with self.subTest(pos=pos):
+                lines, row, col = self.frame(prompts.input_screen("Query"), [], text, pos, 40, 12)
+                self.assert_cursor_after(lines, row, col, text[pos - 1])
+
+    def test_long_help_gives_way_to_the_field_and_keys(self):
+        from torrent_finder.ui.combined import _shared_filter_screen
+        lines, row, col = self.frame(_shared_filter_screen("include_keywords"), [], "", 0, 50, 16)
+        self.assertIn("›", lines[row - 1])
+        self.assertIn("Esc cancel", lines[-1])
