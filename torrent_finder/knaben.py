@@ -1,10 +1,19 @@
-"""Category-scoped client for the Knaben torrent meta-index API."""
+"""Category-scoped client for the Knaben torrent meta-index API (v2).
+
+Knaben asks API clients to use v2: its GET searches can be cached by the edge
+server, where v1's POST bodies could not, and serving API bandwidth strained the
+site. The request keeps v1's results (checked on 12 query/page pairs in October
+2026: same totals, rows and order). It searches titles, sorted by seeders, 50
+rows a page, with unsafe and adult rows hidden (v2's defaults). The ``dead`` flag
+keeps zero-seed rows, which v1 returned and v2 otherwise hides.
+"""
 
 from __future__ import annotations
 
 import re
 from html import unescape
 from typing import Iterable
+from urllib.parse import urlencode
 
 import requests
 
@@ -12,7 +21,7 @@ from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
 
 
-API_URL = "https://api.knaben.org/v1"
+API_URL = "https://api.knaben.org/v2/search"
 _MAX_RESULTS = 50
 _INFO_HASH = re.compile(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})\Z")
 
@@ -29,22 +38,19 @@ def search(query: str, categories: Iterable[int], *, page: int = 1) -> list[Sear
         return []
     if not category_ids:
         return []
-    body = {
-        "search_type": "100%",
-        "search_field": "title",
-        "query": normalized_query,
-        "order_by": "seeders",
-        "order_direction": "desc",
-        "categories": category_ids,
-        "from": (max(1, page) - 1) * _MAX_RESULTS,
-        "size": _MAX_RESULTS,
-        "hide_unsafe": True,
-        "hide_xxx": True,
+    params = {
+        "q": normalized_query,
+        "sf": "title",
+        "o": "seeders",
+        "d": "desc",
+        "c": ",".join(str(category) for category in category_ids),
+        "s": _MAX_RESULTS,
+        "f": (max(1, page) - 1) * _MAX_RESULTS,
     }
     try:
-        response = search_request(requests.post,
-            API_URL,
-            json=body,
+        # Flags take no value; "dead" keeps zero-seed rows visible.
+        response = search_request(requests.get,
+            f"{API_URL}?{urlencode(params)}&dead",
             timeout=15,
             headers={"User-Agent": "torrent-finder-cli"},
         )

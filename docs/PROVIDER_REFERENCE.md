@@ -567,6 +567,16 @@ zero-seed rows unless requested: Blender returned one without `dead` versus
 eleven with it; Dune Books returned nine versus 24. Evaluate migration with
 category, hash, paging, safety and zero-seed compatibility checks. No migration
 deadline or current v1 outage was established.
+**Status (2026-10-04): migrated to v2.** Knaben's v2 page says the server
+struggled to serve API bandwidth, and that GET searches let its edge server
+cache work that v1's POST bodies could not. A live comparison of v1 and v2 on
+12 query/page pairs matched in every pair: totals, info-hash sets, order,
+zero-seed rows, hash-less rows and all-words title matching (Blender, Dune Part
+Two, One Piece, Dune books, Stardew Valley, Adobe Photoshop; two pages each).
+The client sends `sf=title`, seeders descending, 50 a page and the `dead` flag,
+so zero-seed rows stay visible as before. v2's defaults keep unsafe and XXX
+rows hidden. Uncached v2 calls were about 0.25 s slower; repeat calls were
+served from the edge in about 0.1 s.
 
 Suggested order, subject to a subsequent implementation request:
 

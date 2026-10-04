@@ -140,8 +140,9 @@ failed live attempt can replay it as `Apibay*`. Cache entries are bounded to
 
 When all On engines return zero raw rows, public-tracker providers make one
 category-scoped Knaben request in Auto mode. Knaben is a meta-index with a
-[documented API](https://knaben.org/api/v1/); the client requests its unsafe
-and XXX filters, requires a valid info hash, and caps each response at 50 rows.
+[documented API](https://knaben.org/api/v2/). The client uses v2's cacheable GET
+searches, as Knaben asks. Unsafe and XXX rows stay hidden, zero-seed rows stay
+listed, a valid info hash is required, and each response is capped at 50 rows.
 The selected-row metadata shows Knaben's originating tracker. Results removed
 later by local filters do not cause fallback traffic.
 

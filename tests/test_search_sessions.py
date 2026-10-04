@@ -225,20 +225,21 @@ class SearchSessionTests(unittest.TestCase):
         from torrent_finder import knaben
         response = Mock(status_code=200)
         response.json.return_value = {"hits": [{"title": "Invalid", "hash": None}] * 50}
-        with patch.object(knaben.requests, "post", return_value=response) as send:
+        with patch.object(knaben.requests, "get", return_value=response) as send:
             rows = knaben.search("Example", [6000000], page=3)
         self.assertEqual(rows, [])
         self.assertTrue(rows.has_more)
-        body = send.call_args.kwargs["json"]
-        self.assertEqual((body["from"], body["size"]), (100, 50))
-        self.assertTrue(body["hide_unsafe"])
-        self.assertTrue(body["hide_xxx"])
+        from urllib.parse import parse_qs, urlsplit
+        params = parse_qs(urlsplit(send.call_args.args[0]).query, keep_blank_values=True)
+        self.assertEqual((params["f"], params["s"]), (["100"], ["50"]))
+        self.assertNotIn("unsafe", params)  # v2 hides unsafe and adult rows unless asked
+        self.assertNotIn("xxx", params)
 
     def test_knaben_malformed_payload_produces_source_error(self):
         from torrent_finder import knaben
         response = Mock(status_code=200)
         response.json.return_value = {"error": "server"}
-        with patch.object(knaben.requests, "post", return_value=response):
+        with patch.object(knaben.requests, "get", return_value=response):
             results = self.provider(SearchEngine("Knaben", "", lambda q: knaben.search(q, [6000000]))).search("Example")
         self.assertEqual(results.session.diagnostics[0].status, "error")
 

@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import Mock, patch
+from urllib.parse import parse_qs, urlsplit
 
 import requests
 
@@ -48,10 +49,10 @@ class KnabenSearchTests(unittest.TestCase):
         }
 
         with patch(
-            "torrent_finder.knaben.requests.post",
+            "torrent_finder.knaben.requests.get",
             return_value=_response(payload),
-        ) as post:
-            results = knaben.search("fantastic mr. fox", (3_000_000,))
+        ) as get:
+            results = knaben.search("fantastic mr. fox", (3_000_000, 3_008_000))
 
         self.assertEqual(len(results), 1)
         result = results[0]
@@ -69,47 +70,48 @@ class KnabenSearchTests(unittest.TestCase):
         )
         self.assertIn("Knaben tracker: Example Tracker", metadata.plain)
 
-        request = post.call_args
-        self.assertEqual(request.args[0], knaben.API_URL)
+        request = get.call_args
+        url = urlsplit(request.args[0])
+        self.assertEqual(f"{url.scheme}://{url.netloc}{url.path}", knaben.API_URL)
         self.assertEqual(request.kwargs["timeout"], 15)
+        # v1's request in v2 terms: titles, by seeders, 50 a page, zero-seed rows
+        # kept ("dead"); unsafe and adult rows stay hidden (no "unsafe"/"xxx").
         self.assertEqual(
-            request.kwargs["json"],
+            parse_qs(url.query, keep_blank_values=True),
             {
-                "search_type": "100%",
-                "search_field": "title",
-                "query": "fantastic mr. fox",
-                "order_by": "seeders",
-                "order_direction": "desc",
-                "categories": [3_000_000],
-                "from": 0,
-                "size": 50,
-                "hide_unsafe": True,
-                "hide_xxx": True,
+                "q": ["fantastic mr. fox"],
+                "sf": ["title"],
+                "o": ["seeders"],
+                "d": ["desc"],
+                "c": ["3000000,3008000"],
+                "s": ["50"],
+                "f": ["0"],
+                "dead": [""],
             },
         )
 
     def test_search_fails_closed_on_network_or_payload_errors(self):
         with patch(
-            "torrent_finder.knaben.requests.post",
+            "torrent_finder.knaben.requests.get",
             side_effect=requests.ConnectionError("offline"),
         ):
             self.assertEqual(knaben.search("query", (3_000_000,)), [])
 
         with patch(
-            "torrent_finder.knaben.requests.post",
+            "torrent_finder.knaben.requests.get",
             return_value=_response({"hits": "not-a-list"}),
         ):
             self.assertEqual(knaben.search("query", (3_000_000,)), [])
 
     def test_empty_query_does_not_make_a_request(self):
-        with patch("torrent_finder.knaben.requests.post") as post:
+        with patch("torrent_finder.knaben.requests.get") as get:
             self.assertEqual(knaben.search("   ", (3_000_000,)), [])
-        post.assert_not_called()
+        get.assert_not_called()
 
     def test_missing_category_scope_does_not_make_a_request(self):
-        with patch("torrent_finder.knaben.requests.post") as post:
+        with patch("torrent_finder.knaben.requests.get") as get:
             self.assertEqual(knaben.search("query", ()), [])
-        post.assert_not_called()
+        get.assert_not_called()
 
 
 if __name__ == "__main__":
