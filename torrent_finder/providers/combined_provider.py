@@ -165,7 +165,7 @@ class CombinedProvider(BaseProvider):
         return self.search_many([query], cli_filters)
 
     def search_many(self, queries, cli_filters=None, cancel_event=None, *, finish_event=None,
-                    on_progress=None, timeout=None, work_titles=None):
+                    on_progress=None, timeout=None, work_titles=None, work_authors=None):
         from torrent_finder.search_session import SearchSession
         session = CombinedProvider(self.templates)
         session.restore(self.snapshot())
@@ -185,7 +185,7 @@ class CombinedProvider(BaseProvider):
             return True
 
         return SearchSession(providers, queries, combined=True, result_filter=matches_shared_rules,
-                             workers=_REQUEST_LIMIT, work_titles=work_titles,
+                             workers=_REQUEST_LIMIT, work_titles=work_titles, work_authors=work_authors,
                              shared_summary="Shared: " + session.name_rules.summary() +
                              f"; include {session.shared_filters.include_keywords}; exclude {session.shared_filters.exclude_keywords}"
                              + (f"; CLI {cli_filters}" if cli_filters else "")).run(

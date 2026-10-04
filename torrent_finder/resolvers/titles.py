@@ -133,7 +133,8 @@ def search_titles(catalog, query, page=1):
                 continue
             year = row.get("first_publish_year")
             detail = " · ".join(filter(None, [str(year or ""), ", ".join(row.get("author_name", [])[:3])]))
-            matches.append(TitleMatch(key, row["key"], Work(row["title"], year=year, subtitle=detail)))
+            matches.append(TitleMatch(key, row["key"], Work(row["title"], year=year, subtitle=detail,
+                                                            authors=tuple(row.get("author_name", [])[:3]))))
         total = data.get("numFound", data.get("num_found", 0))
         return matches, page * PAGE_SIZE < total and page < MAX_CATALOG_PAGES
     raise ValueError("Unknown title catalog")

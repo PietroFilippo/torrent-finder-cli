@@ -73,8 +73,13 @@ class BookProvider(BaseProvider):
             ),
         ]
 
-    def title_relevance(self, name: str, query: str) -> int:
-        return book_title_score(name, query)
+    looks_up_authors = True
+
+    def title_relevance(self, row, query: str, authors: tuple = ()) -> int:
+        return book_title_score(row.name, query, authors, row.get("lg_author"))
+
+    def lookup_authors(self, query: str) -> tuple:
+        return openlibrary.dominant_author(query)
 
     def _search_libgen(self, query: str) -> list[SearchResult]:
         return libgen.search(query)

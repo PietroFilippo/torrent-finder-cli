@@ -18,6 +18,8 @@ from torrent_finder.search_result import SearchResult, normalize_result
 from torrent_finder.result_view import release_tag_hits, title_score
 import requests
 
+# Once the searches finish, wait at most this long for the Books author lookup.
+_AUTHOR_LOOKUP_WAIT = 1.5
 MAX_PAGE = 10
 MAX_PAGE_TASKS = 24
 
@@ -48,7 +50,7 @@ class _Task:
 
 class SearchSession:
     def __init__(self, providers, queries, cli_filters=None, *, combined=False,
-                 result_filter=None, workers=6, work_titles=None, shared_summary=""):
+                 result_filter=None, workers=6, work_titles=None, shared_summary="", work_authors=None):
         from torrent_finder.providers.combined_provider import provider_label
         self.providers = list(providers)
         self.queries = list(dict.fromkeys(q.strip() for q in queries if q.strip()))
@@ -56,6 +58,9 @@ class SearchSession:
         self.combined = combined
         self.result_filter = result_filter
         self.work_titles = work_titles or {}
+        # query -> the requested work's authors (author search, Identify title,
+        # or a lookup for plain searches); used to rank listings.
+        self.work_authors = dict(work_authors or {})
         self.shared_summary = shared_summary
         self.workers = workers
         self._slots = threading.BoundedSemaphore(workers)
@@ -128,7 +133,8 @@ class SearchSession:
                 continue
             provider, query = self.groups[group]
             if provider.prefer_title_matches and provider.auto_needs_relevant_rows:
-                answered = any(provider.title_relevance(row.name, query) >= 1 for t in primary for row in t.rows)
+                authors = self.work_authors.get(query, ())
+                answered = any(provider.title_relevance(row, query, authors) >= 1 for t in primary for row in t.rows)
                 reason = "On engines returned rows matching the title; Auto was not needed."
             else:
                 answered = any(t.rows for t in primary)
@@ -259,11 +265,12 @@ class SearchSession:
             ordered = self.providers[0].rank_preferences(self.providers[0]._sort_results(ordered))
         if self.queries and self.providers and (self.combined or self.providers[0].prefer_title_matches):
             relevance = {p.slug: p.title_relevance for p in self.providers}
-            fallback = self.providers[0].title_relevance if not self.combined else title_score
+            fallback = (self.providers[0].title_relevance if not self.combined
+                        else lambda row, query, authors=(): title_score(row.name, query))
             # Equally good titles: releases carrying the tags typed with the
             # title first ("Finding Nemo pt-br"), then preferred presets.
-            ordered.sort(key=lambda r: (max(relevance.get(r.get("provider_slug"), fallback)(r.name, q)
-                                            for q in self.queries),
+            ordered.sort(key=lambda r: (max(relevance.get(r.get("provider_slug"), fallback)(
+                                                r, q, self.work_authors.get(q, ())) for q in self.queries),
                                         max(release_tag_hits(r.name, q) for q in self.queries),
                                         r.get("preference_score", 0)), reverse=True)
         notices = list(dict.fromkeys(d.message if d.status in ACCESS_STATUSES
@@ -287,6 +294,7 @@ class SearchSession:
         from torrent_finder.providers.combined_provider import SearchProgress, provider_label
         action_started = time.monotonic()
         control = SearchControl(timeout, cancel_event, finish_event)
+        author_lookup = self._start_author_lookup() if action == "initial" else None
         # Reuse slots across actions: requests still finishing after a stop
         # continue to count against this session's concurrency allowance.
         slots = self._slots
@@ -354,18 +362,42 @@ class SearchSession:
                                               seconds=time.monotonic() - action_started,
                                               attempt=task.diagnostic.attempt + 1,
                                               message=reason.lower() + "; showing results received so far.")
+        if author_lookup is not None and not control.stopped():
+            author_lookup.join(timeout=_AUTHOR_LOOKUP_WAIT)  # usually already done: it ran alongside
         publish()
         return self.snapshot()
 
+    def _start_author_lookup(self):
+        """Find the requested work's authors for plain queries (Books), in parallel
+        with the searches; rankings use them once known."""
+        provider = next((p for p in self.providers if p.looks_up_authors), None)
+        wanted = [q for q in self.queries if not self.work_authors.get(q)][:3]
+        if provider is None or not wanted:
+            return None
+
+        def look_up():
+            for query in wanted:
+                try:
+                    authors = provider.lookup_authors(query)
+                except Exception:
+                    continue  # ranking simply proceeds without authors
+                if authors:
+                    self.work_authors.setdefault(query, tuple(authors))
+
+        thread = threading.Thread(target=look_up, daemon=True)
+        thread.start()
+        return thread
+
 
 def search_many(provider, queries, cli_filters=None, *, cancel_event=None, finish_event=None,
-                on_progress=None, timeout=30, work_titles=None):
+                on_progress=None, timeout=30, work_titles=None, work_authors=None):
     """UI entry point: isolate settings before starting any source requests."""
     from torrent_finder.state import apply_provider_state, provider_snapshot
     if getattr(provider, "is_combined", False):
         return provider.search_many(queries, cli_filters, cancel_event, finish_event=finish_event,
-                                    on_progress=on_progress, timeout=timeout, work_titles=work_titles)
+                                    on_progress=on_progress, timeout=timeout, work_titles=work_titles,
+                                    work_authors=work_authors)
     child = type(provider)()
     apply_provider_state(child, provider_snapshot(provider))
-    return SearchSession([child], queries, cli_filters, work_titles=work_titles).run(
+    return SearchSession([child], queries, cli_filters, work_titles=work_titles, work_authors=work_authors).run(
         cancel_event=cancel_event, finish_event=finish_event, on_progress=on_progress, timeout=timeout)

@@ -8,6 +8,7 @@ from torrent_finder.providers.movie_provider import MovieProvider
 from torrent_finder.result_view import book_title_score
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_session import SearchSession
+import isolation  # noqa: F401  (keeps saved settings and Open Library lookups out of these tests)
 
 
 def row(name, source, n=1, seeders=0):
@@ -46,6 +47,8 @@ class BooksSearchTests(unittest.TestCase):
         with patch.object(provider_class, "_search_apibay", return_value=list(apibay)), \
              patch.object(provider_class, "_search_knaben", return_value=list(knaben)), \
              patch.object(provider_class, "_search_solidtorrents", return_value=[]), \
+             patch.object(MovieProvider, "_search_nyaa", return_value=[]), \
+             patch.object(MovieProvider, "_search_yts", return_value=[]), \
              patch.object(BookProvider, "_search_libgen", return_value=list(libgen)):
             return SearchSession([provider_class()], [query]).run()
 

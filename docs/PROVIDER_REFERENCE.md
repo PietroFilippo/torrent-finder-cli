@@ -461,6 +461,21 @@ approximate matches and useful editions while improving ranking.
   named after the original can tie with it. Other providers keep the raw-row
   Auto rule.
 
+**Status (2026-10-04): author-aware ranking (P13).**
+- When the requested work's author is known, an exact title by that author
+  ranks first. Libgen entries whose author field names a clearly different
+  author drop below exact titles with an unknown author.
+- Torrent names only gain from a match. Other scripts and missing authors stay
+  neutral.
+- Authors come from Search by Creator, Identify title, words typed in the query,
+  or a parallel Open Library title lookup. The lookup counts only a clearly
+  dominant work: at least 10 editions and 3× any same-title work by others.
+- A live calibration returned Kafka, Stoker, Austen, Tolkien, Shelley, Frank
+  Herbert and Zevin, and nothing for "The Name of the Rose" (Eco's work is
+  catalogued under its Italian title).
+- Replaying with authors puts Eco's listings above Christine Blum's "The Name of
+  the Rosé" and Shelley's editions above the Junji Ito Frankenstein collection.
+
 **Optional catalogs:** Gutenberg supplied verified originals for five sampled
 works already observed through existing searches, plus a German Metamorphosis
 route missed by `Die Verwandlung`. It is useful for a clean classics/language

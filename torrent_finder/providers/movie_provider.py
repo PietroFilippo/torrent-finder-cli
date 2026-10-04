@@ -116,8 +116,8 @@ class MovieProvider(BaseProvider):
         ),
     ]
 
-    def title_relevance(self, name: str, query: str) -> int:
-        return movie_title_score(name, query)
+    def title_relevance(self, row, query: str, authors: tuple = ()) -> int:
+        return movie_title_score(row.name, query)
 
     def expand_queries(self, query: str) -> list[str]:
         """Also search the bare title when release tags were typed with it:

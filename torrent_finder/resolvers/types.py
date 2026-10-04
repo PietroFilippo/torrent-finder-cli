@@ -35,6 +35,7 @@ class Work:
     year: "int | None" = None
     subtitle: str = ""   # display hint, e.g. "2001 · MOVIE"
     role: str = ""       # raw creator role, e.g. "Director" or "Director (eps 1-12)"
+    authors: tuple = ()  # book authors when known, for ranking listings of this work
 
 
 @dataclass

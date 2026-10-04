@@ -117,7 +117,8 @@ def title_search_flow(provider, cli_filters, browse_fn, initial=""):
             cancel = threading.Event()
             cancelled, results = _run_cancellable(
                 lambda: search_many(provider, queries, cli_filters, cancel_event=cancel,
-                                    work_titles={q: match.work.title for q in queries}),
+                                    work_titles={q: match.work.title for q in queries},
+                                    work_authors={q: match.work.authors for q in queries if match.work.authors}),
                 "Searching selected names (30s limit)…", cancel=cancel)
             if cancelled:
                 continue

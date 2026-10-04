@@ -173,6 +173,8 @@ class BaseProvider(ABC):
     # Nyaa RSS only holds the latest uploads; look up popular matches too when a
     # short title has no exact row (Anime).
     nyaa_title_discovery: bool = False
+    # Look up the requested work's authors for plain searches (Books).
+    looks_up_authors: bool = False
 
     # Optional one-line caveat shown when this provider is selected/searched
     # (e.g. Mobile noting it's Android-only). Empty = no note.
@@ -578,7 +580,7 @@ class BaseProvider(ABC):
                 unique.append(item)
         ordered = self.rank_preferences(self._sort_results(unique))
         if self.prefer_title_matches:
-            ordered.sort(key=lambda row: self.title_relevance(row.name, query), reverse=True)
+            ordered.sort(key=lambda row: self.title_relevance(row, query), reverse=True)
         return ordered
 
     @property
@@ -586,9 +588,14 @@ class BaseProvider(ABC):
         """Required and preferred presets can both request bounded extra queries."""
         return self.active_presets + [p for p in self.preferred_presets if p not in self.active_presets]
 
-    def title_relevance(self, name: str, query: str) -> int:
-        """0-3: how well a result's title matches the searched title (see title_score)."""
-        return title_score(name, query)
+    def title_relevance(self, row, query: str, authors: tuple = ()) -> int:
+        """How well a result matches the searched title (0-3, see title_score);
+        Books also use the requested work's *authors* (up to 4)."""
+        return title_score(row.name, query)
+
+    def lookup_authors(self, query: str) -> tuple:
+        """The requested work's authors for a plain search, or () (see looks_up_authors)."""
+        return ()
 
     def preference_score(self, row) -> int:
         return sum(bool(apply_filters([row], p.config)) for p in self.preferred_presets

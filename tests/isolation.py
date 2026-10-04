@@ -29,6 +29,11 @@ credentials._file_cache = None
 apibay_cache.CACHE_PATH = os.path.join(_RUN_DIRECTORY, "apibay_cache.json")
 constants.DOWNLOADS_DIR = os.path.join(_RUN_DIRECTORY, "downloads")
 
+# Books searches look up the requested work's author on Open Library; tests
+# that cover it switch this back on with a stubbed lookup.
+from torrent_finder.providers.book_provider import BookProvider  # noqa: E402
+BookProvider.looks_up_authors = False
+
 
 def isolate_store(case, data=None, path=None) -> Path:
     """Give one test a fresh store backed by its own settings file; undone on cleanup.

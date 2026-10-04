@@ -103,7 +103,7 @@ def _parse_rows(html: str, mirror: str) -> list[SearchResult]:
             source="Libgen",
             page_url=f"{mirror}/ads.php?md5={md5}",
             handle={"lg_md5": md5},
-            extra={"lg_ext": extension},
+            extra={"lg_ext": extension, "lg_author": author},
         ))
     return results
 

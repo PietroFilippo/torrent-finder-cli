@@ -58,8 +58,33 @@ _BOOK_NOISE = re.compile(r"\([^()]*\)|\{[^{}]*\}|\.(?:" + "|".join(_BOOK_FORMATS
                          r"|\b(?:" + "|".join(_BOOK_FORMATS) + r")\b", re.I)
 
 
-def book_title_score(name: str, query: str) -> int:
-    """``title_score`` for book listings, 0-3.
+def _surname(author: str) -> str:
+    """"austen" from "Jane Austen" or "Austen, Jane"."""
+    found = words(author.split(",")[0] if "," in author else author)
+    return found[-1] if found else ""
+
+
+def _latin(tokens) -> bool:
+    return any(re.search(r"[a-z]", token) for token in tokens)
+
+
+def _author_check(authors, listing_author, others) -> int:
+    """Score for an exact title once the requested work's *authors* are known."""
+    surnames = {surname for surname in map(_surname, authors) if surname}
+    if not surnames:
+        return 3
+    if listing_author is not None:  # an explicit author field (Libgen)
+        listed = set(words(listing_author))
+        if surnames & listed:
+            return 4
+        # Only a comparable, clearly different author demotes: another script
+        # ("Остин") or a missing author stays neutral.
+        return 2 if listed and _latin(listed) and _latin(surnames) else 3
+    return 4 if surnames & set(others) else 3  # torrent names: only a match counts
+
+
+def book_title_score(name: str, query: str, authors: tuple = (), listing_author: "str | None" = None) -> int:
+    """``title_score`` for book listings, 0-4.
 
     Each part of a name can be its title, the rest author or extra details.
     Word counts matter ("Tomorrow and Tomorrow" is a different book from
@@ -67,12 +92,16 @@ def book_title_score(name: str, query: str) -> int:
     sit beside an exact title, so the original work outranks titles that merely
     contain it ("A Pride and Prejudice Variation"). Format words ("Dune
     audiobook", "... epub") are filters, not part of the title.
+
+    With the requested work's *authors* known, an exact title naming a
+    matching author scores 4, and one whose *listing_author* field names a
+    clearly different author 2 ("The Name of the Rosé" by Christine Blum).
     """
     wanted_list = tuple(word for word in words(query) if word not in _BOOK_FORMATS) or words(query)
     wanted = Counter(wanted_list)
     if not wanted:
         return 0
-    text = _BOOK_NOISE.sub(" ", media_title(name))
+    text = media_title(_BOOK_NOISE.sub(" ", name))  # parentheses first: media_title trims a trailing ")"
     every = Counter(words(text))
     parts = []
     for part in _BOOK_PARTS.split(text):
@@ -83,7 +112,8 @@ def book_title_score(name: str, query: str) -> int:
     for part in parts:
         title = Counter(part)
         if not title - wanted and not (wanted - title) - (every - title):
-            return 3  # exactly this title, plus any author words the query names
+            # Exactly this title, plus any author words the query names.
+            return _author_check(authors, listing_author, every - title) if authors else 3
         if part[:len(wanted_list)] == wanted_list:
             best = 2  # the title with a subtitle or edition after it
     if best or wanted - every:

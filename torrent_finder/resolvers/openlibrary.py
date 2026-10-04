@@ -32,6 +32,41 @@ def _get(path: str, params: dict | None = None) -> dict | None:
         return None
 
 
+_dominant_authors: dict[str, tuple[str, ...]] = {}
+
+
+def dominant_author(title: str) -> tuple[str, ...]:
+    """Authors of the clearly dominant work titled exactly *title*, or ().
+
+    Dominant means at least 10 editions and three times the editions of any
+    same-title work by other authors: Kafka for "Metamorphosis", Zevin for
+    "Tomorrow and Tomorrow and Tomorrow", nothing for an ambiguous or rare
+    title. Cached for the session; () on any network error.
+    """
+    from torrent_finder.result_view import words
+    key = " ".join(words(title))
+    if not key:
+        return ()
+    if key in _dominant_authors:
+        return _dominant_authors[key]
+    data = _get("/search.json", {"title": title, "fields": "title,author_name,edition_count", "limit": 20})
+    if data is None:
+        return ()
+    exact = [doc for doc in data.get("docs") or []
+             if " ".join(words(doc.get("title") or "")) == key and doc.get("author_name")]
+    exact.sort(key=lambda doc: doc.get("edition_count") or 0, reverse=True)
+    authors: tuple[str, ...] = ()
+    if exact:
+        top = exact[0]
+        names = {name.casefold() for name in top["author_name"]}
+        rival = max((doc.get("edition_count") or 0 for doc in exact[1:]
+                     if not names & {name.casefold() for name in doc["author_name"]}), default=0)
+        if (top.get("edition_count") or 0) >= max(10, 3 * rival):
+            authors = tuple(top["author_name"][:3])
+    _dominant_authors[key] = authors
+    return authors
+
+
 def author_search(name: str) -> "list[Entity] | None":
     """Resolve an author name to candidate authors (for disambiguation).
 
@@ -91,6 +126,7 @@ def author_works(entity: Entity, page: int = 1) -> "tuple[list[Work], bool]":
             title=title,
             year=year if isinstance(year, int) else None,
             subtitle=str(year) if year else "",
+            authors=(entity.name,),
         ))
 
     try:

@@ -5,11 +5,13 @@ from torrent_finder.search_session import SearchSession
 
 
 def fan_out(provider, works, cli_filters=None, cancel_event=None, max_workers=6):
-    queries, origins = [], {}
+    queries, origins, authors = [], {}, {}
     for work in works:
         for query in distinct_names((work.title, *work.alt_titles))[:MAX_ALIASES]:
             if query not in origins:
                 queries.append(query)
                 origins[query] = work.title
-    return SearchSession([provider], queries, cli_filters, work_titles=origins,
+                if work.authors:
+                    authors[query] = tuple(work.authors)
+    return SearchSession([provider], queries, cli_filters, work_titles=origins, work_authors=authors,
                          workers=max(1, min(6, max_workers))).run(cancel_event=cancel_event)
