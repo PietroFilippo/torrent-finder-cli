@@ -1058,6 +1058,35 @@ def subtitle_source_prompt(current: dict | None = None) -> dict:
     return {"mode": "external", "path": chosen}
 
 
+def download_dir_ready() -> bool:
+    """Confirm the download folder is usable before a transfer starts.
+
+    When it isn't (e.g. a disconnected drive), say why and offer to choose
+    another folder; the caller keeps its torrent and file selection. False
+    means the user went back without a usable folder.
+    """
+    from rich.markup import escape
+    from torrent_finder.constants import get_download_dir, prepare_download_dir
+
+    while True:
+        try:
+            prepare_download_dir()
+            return True
+        except OSError as error:
+            reason = error.strerror or str(error)
+        items = [SelectItem("Choose another download folder", "choose"), SelectItem("Back", "back")]
+        pick = arrow_select(
+            items,
+            title="Download folder unavailable",
+            banner=_make_banner_panel(),
+            footer=f"Can't save to {escape(get_download_dir())}: {escape(reason)}\n"
+                   "Nothing was downloaded.\nEnter choose  •  Esc back",
+        )
+        if pick is None or items[pick].value == "back":
+            return False
+        download_dir_prompt()
+
+
 def download_dir_prompt() -> None:
     """Pick the default download directory. Persists via ``save_setting`` and
     returns to the caller — no return value. Applies to aria2, webtorrent /

@@ -1,9 +1,10 @@
 """Keep tests away from the user's saved settings; not a test module itself.
 
-Importing this module redirects saved settings, credentials and the Apibay
-cache to a temporary directory for the whole run. Test discovery imports every
-test module before any test runs, so one import protects the full suite; each
-module that reaches persistence imports it too, so running it alone is safe.
+Importing this module redirects saved settings, credentials, the Apibay cache
+and the default download folder to a temporary directory for the whole run.
+Test discovery imports every test module before any test runs, so one import
+protects the full suite; each module that reaches persistence imports it too,
+so running it alone is safe.
 """
 
 import atexit
@@ -14,7 +15,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from torrent_finder import apibay_cache, credentials, store
+from torrent_finder import apibay_cache, constants, credentials, store
 
 _RUN_DIRECTORY = tempfile.mkdtemp(prefix="torrent-finder-tests-")
 atexit.register(shutil.rmtree, _RUN_DIRECTORY, ignore_errors=True)
@@ -25,6 +26,7 @@ credentials._CRED_FILE = Path(_RUN_DIRECTORY) / "credentials.json"
 credentials._LEGACY_CRED_PATHS = []
 credentials._file_cache = None
 apibay_cache.CACHE_PATH = os.path.join(_RUN_DIRECTORY, "apibay_cache.json")
+constants.DOWNLOADS_DIR = os.path.join(_RUN_DIRECTORY, "downloads")
 
 
 def isolate_store(case, data=None, path=None) -> Path:

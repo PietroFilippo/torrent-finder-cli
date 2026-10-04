@@ -180,6 +180,10 @@ class OnlineFixAcquisition:
         from torrent_finder.constants import get_download_dir
         from torrent_finder.downloader import open_torrent_file
         from rich.panel import Panel
+        from torrent_finder.ui.prompts import download_dir_ready
+
+        if not download_dir_ready():
+            return PickOutcome("back")
 
         name = result.get("name", "Unknown")
         page_url = result.get("page_url") or result.get("of_post_url") or ""
@@ -302,6 +306,10 @@ class MadokamiAcquisition:
             if not picked:  # Esc / cancelled / confirmed empty → back to results
                 return PickOutcome("back")
             dl_paths = [files[i - 1]["path"] for i in picked if 1 <= i <= len(files)]
+
+        from torrent_finder.ui.prompts import download_dir_ready
+        if not download_dir_ready():
+            return PickOutcome("back")
 
         from urllib.parse import unquote
         from rich.progress import (
@@ -431,6 +439,10 @@ class LibgenAcquisition:
         name = result.get("name", "Unknown")
         md5 = result.get("lg_md5") or ""
         page_url = result.get("page_url", "")
+
+        from torrent_finder.ui.prompts import download_dir_ready
+        if not download_dir_ready():
+            return PickOutcome("back")
 
         with console.status("[bold cyan]Resolving the download link from Libgen…[/bold cyan]", spinner="dots"):
             url = libgen.resolve_download_url(md5)

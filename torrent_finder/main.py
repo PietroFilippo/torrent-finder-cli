@@ -164,7 +164,14 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
     (and mid-transfer for direct downloads).
     """
     from torrent_finder.constants import get_download_dir
+    from torrent_finder.ui.prompts import download_dir_ready
 
+    # Direct downloads and Online-Fix .torrent files are saved to the folder.
+    saves_files = any(not acquisition.for_result(results[gi]).has_magnet
+                      for gi in idxs if 0 <= gi < len(results))
+    if saves_files and not download_dir_ready():
+        clear_screen()
+        return "back"
     n = len(idxs)
     sent = 0
     saved_direct = 0
@@ -288,7 +295,11 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
     magnets are resolved on demand.
     """
     from torrent_finder.downloader import download_many_with_aria2
+    from torrent_finder.ui.prompts import download_dir_ready
 
+    if not download_dir_ready():
+        clear_screen()
+        return "back"
     magnets: list[str] = []
     picked: list[dict] = []
     skipped = 0
@@ -552,6 +563,12 @@ def _browse_results(provider, results, note: str = "") -> str:
                     session.set_selected_files(picked or None)
                 clear_screen()
                 continue
+
+            if method in ("aria", "p", "d"):
+                from torrent_finder.ui.prompts import download_dir_ready
+                if not download_dir_ready():
+                    clear_screen()
+                    continue
 
             if method == "t":
                 clear_screen()

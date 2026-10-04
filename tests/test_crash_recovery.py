@@ -1,16 +1,21 @@
 """Edge cases that used to end the whole app with a traceback stay inside their screen."""
 
 import io
+import os
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import readchar
 from rich.console import Console
 
-from torrent_finder import acquisition, bookmarks, settings_backup, state
+from torrent_finder import acquisition, bookmarks, downloader, jimaku, main, settings_backup, state
 from torrent_finder.providers.anime_provider import AnimeProvider
-from torrent_finder.ui import bookmarks as bookmarks_ui, history as history_ui, selector, table
+from torrent_finder.torrent_session import TorrentSession
+from torrent_finder.ui import bookmarks as bookmarks_ui, history as history_ui, prompts, selector, table
 from isolation import isolate_store
 
 K = readchar.key
@@ -103,6 +108,91 @@ class MarkupNameTests(unittest.TestCase):
                 self.assertEqual(outcome.action, "back")
                 self.assertIn(name, screen.file.getvalue())
                 self.assertIn("https://example.test/[/x]", screen.file.getvalue())
+
+
+class DownloadFolderTests(unittest.TestCase):
+    """A10: an unusable download folder is explained and can be replaced in place."""
+
+    MAGNET = "magnet:?xt=urn:btih:" + "a" * 40
+
+    def setUp(self):
+        isolate_store(self)
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        blocker = Path(directory.name) / "not-a-folder"
+        blocker.write_text("a file where a folder should be", encoding="utf-8")
+        self.broken = str(blocker / "Downloads")  # like a disconnected drive: can't be created
+        self.working = str(Path(directory.name) / "Downloads")
+        state.save_setting("download_dir", self.broken)
+
+    def choose(self, *values):
+        values = iter(values)
+        return lambda items, **kwargs: [item.value for item in items].index(next(values))
+
+    def use_working_folder(self):
+        state.save_setting("download_dir", self.working)
+
+    def test_cli_downloads_explain_and_start_nothing(self):
+        screen = Console(file=io.StringIO(), width=300, color_system=None)
+        calls = {
+            "aria2": lambda: downloader.download_with_aria2(self.MAGNET, [1]),
+            "aria2 batch": lambda: downloader.download_many_with_aria2([self.MAGNET]),
+            "webtorrent": lambda: downloader.download_with_webtorrent(self.MAGNET),
+            "peerflix": lambda: downloader.download_with_peerflix(self.MAGNET),
+        }
+        with patch.object(downloader.shutil, "which", return_value="tool"), \
+             patch.object(downloader, "_spawn_detached") as spawn, patch.object(downloader, "console", screen):
+            for name, call in calls.items():
+                with self.subTest(name=name):
+                    self.assertFalse(call())
+        spawn.assert_not_called()
+        self.assertEqual(screen.file.getvalue().count(f"Can't save to {self.broken}"), len(calls))
+
+    def test_choosing_another_folder_makes_it_ready_and_back_declines(self):
+        with patch.object(prompts, "arrow_select", side_effect=self.choose("choose")), \
+             patch.object(prompts, "download_dir_prompt", side_effect=self.use_working_folder):
+            self.assertTrue(prompts.download_dir_ready())
+        self.assertTrue(os.path.isdir(self.working))
+        state.save_setting("download_dir", self.broken)
+        with patch.object(prompts, "arrow_select", return_value=None):
+            self.assertFalse(prompts.download_dir_ready())
+
+    def test_method_menu_retries_the_same_selection_after_choosing_a_folder(self):
+        result = {"name": "Example", "source": "Nyaa", "info_hash": "a" * 40}
+        session = TorrentSession(result, self.MAGNET)
+        session.set_selected_files([1, 3])
+        adapter = Mock(style="magnet-direct")
+        adapter.pick.return_value = acquisition.PickOutcome("menu", self.MAGNET)
+        provider = SimpleNamespace(slug="anime", result_sort="relevance", filter_summary=lambda: "No filters")
+        quiet = [patch.object(main, name) for name in ("clear_screen", "record_torrent_picked",
+                                                       "record_method_pick", "record_method_complete")]
+        for patcher in quiet:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        with patch.object(main, "console", quiet_console()), \
+             patch("torrent_finder.qbittorrent.configured", return_value=False), \
+             patch.object(main.acquisition, "for_result", return_value=adapter), \
+             patch.object(main, "TorrentSession", return_value=session), \
+             patch.object(main, "interactive_select", return_value=("one", 0)), \
+             patch.object(main, "download_method_prompt", side_effect=["aria", "aria"]) as methods, \
+             patch.object(main, "download_complete_prompt", return_value="next"), \
+             patch.object(main, "download_with_aria2", return_value=True) as aria, \
+             patch.object(prompts, "arrow_select", side_effect=self.choose("back", "choose")), \
+             patch.object(prompts, "download_dir_prompt", side_effect=self.use_working_folder):
+            self.assertEqual(main.browse_results(provider, [result]), "next")
+        self.assertEqual(methods.call_count, 2)  # Back returned to the same download options
+        aria.assert_called_once_with(self.MAGNET, session.download_indexes)
+        self.assertEqual(session.selected_files, [1, 3])
+
+    def test_direct_downloads_check_the_folder_before_any_request(self):
+        with patch.object(prompts, "arrow_select", return_value=None), \
+             patch("torrent_finder.libgen.resolve_download_url") as resolve:
+            outcome = acquisition.LibgenAcquisition().pick({"name": "Book", "lg_md5": "abc"})
+        self.assertEqual(outcome.action, "back")
+        resolve.assert_not_called()
+        with patch.object(jimaku, "console", quiet_console()), patch.object(jimaku.requests, "get") as get:
+            self.assertIsNone(jimaku._download("https://example.test/sub.srt", "sub.srt", "key"))
+        get.assert_not_called()
 
 
 class HistoryTimestampTests(unittest.TestCase):

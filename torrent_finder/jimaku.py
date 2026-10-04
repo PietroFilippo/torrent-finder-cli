@@ -75,9 +75,9 @@ def _list_files(entry_id: int, key: str) -> list[dict]:
 
 def _download(url: str, name: str, key: str) -> Optional[str]:
     dl_dir = get_download_dir()
-    os.makedirs(dl_dir, exist_ok=True)
     dest = os.path.join(dl_dir, name)
     try:
+        os.makedirs(dl_dir, exist_ok=True)
         with requests.get(url, headers=_headers(key), timeout=30, stream=True) as resp:
             resp.raise_for_status()
             with open(dest, "wb") as fh:
@@ -86,7 +86,7 @@ def _download(url: str, name: str, key: str) -> Optional[str]:
                         fh.write(chunk)
         return dest
     except Exception as e:
-        console.print(f"[error]Jimaku download failed: {e}[/error]")
+        console.print(f"[error]Jimaku download failed: {escape(str(e))}[/error]")
         return None
 
 

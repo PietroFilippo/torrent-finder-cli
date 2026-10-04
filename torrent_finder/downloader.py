@@ -12,7 +12,9 @@ import time
 import urllib.parse
 from typing import TYPE_CHECKING
 
-from torrent_finder.constants import console, get_download_dir
+from rich.markup import escape
+
+from torrent_finder.constants import console, get_download_dir, prepare_download_dir
 from torrent_finder.state import load_setting
 from torrent_finder.torrent_meta import compact_ranges
 from torrent_finder.ui.streaming import (
@@ -398,6 +400,17 @@ def _cancel_download_proc(proc: subprocess.Popen) -> None:
     _kill_process_tree(proc)
 
 
+def _download_dir_or_explain() -> str | None:
+    """The usable download folder, or None after saying why it can't be used."""
+    try:
+        return prepare_download_dir()
+    except OSError as error:
+        console.print(f"[error] Can't save to {escape(get_download_dir())}: "
+                      f"{escape(error.strerror or str(error))}[/error]")
+        console.print("[info]Nothing was downloaded. Choose another download folder and try again.[/info]\n")
+        return None
+
+
 def _run_download(cmd: list[str], quiet: bool, status_msg: str) -> int | None:
     """Run one download subprocess to completion. Returns its exit code, or
     None when the user cancelled with Ctrl+C. In quiet mode the child's native
@@ -426,8 +439,9 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
         console.print("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n")
         return False
 
-    dl_dir = get_download_dir()
-    os.makedirs(dl_dir, exist_ok=True)
+    dl_dir = _download_dir_or_explain()
+    if dl_dir is None:
+        return False
     console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
     if select_indexes:
         console.print(f"[info]Selected files:[/info] [highlight]{compact_ranges(select_indexes)}[/highlight] ({len(select_indexes)} file(s))")
@@ -484,8 +498,9 @@ def download_many_with_aria2(magnets: list[str]) -> bool:
     if not magnets:
         return False
 
-    dl_dir = get_download_dir()
-    os.makedirs(dl_dir, exist_ok=True)
+    dl_dir = _download_dir_or_explain()
+    if dl_dir is None:
+        return False
     console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
     console.print(f"[info]Torrents:[/info] [highlight]{len(magnets)}[/highlight] (downloaded in parallel)")
     console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
@@ -535,8 +550,9 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
         console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
         return False
 
-    dl_dir = get_download_dir()
-    os.makedirs(dl_dir, exist_ok=True)
+    dl_dir = _download_dir_or_explain()
+    if dl_dir is None:
+        return False
     console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
     if select_indexes:
         console.print(
@@ -600,8 +616,9 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
         console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
         return False
 
-    dl_dir = get_download_dir()
-    os.makedirs(dl_dir, exist_ok=True)
+    dl_dir = _download_dir_or_explain()
+    if dl_dir is None:
+        return False
     console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
     if select_indexes:
         console.print(

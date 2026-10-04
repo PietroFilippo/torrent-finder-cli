@@ -4,6 +4,7 @@ import glob
 import os
 import shutil
 import sys
+import tempfile
 
 from rich.console import Console
 from rich.theme import Theme
@@ -128,15 +129,28 @@ def get_download_dir() -> str:
     """Return the user's effective download directory.
 
     Reads the persisted ``download_dir`` setting; falls back to the
-    default ``DOWNLOADS_DIR`` when unset, empty, or non-string. Callers
-    are responsible for creating the directory before writing into it
-    (existing ``os.makedirs(..., exist_ok=True)`` patterns still apply).
+    default ``DOWNLOADS_DIR`` when unset, empty, or non-string. Callers that
+    write into it use ``prepare_download_dir`` first.
     """
     from torrent_finder.state import load_setting
     saved = load_setting("download_dir", None)
     if isinstance(saved, str) and saved.strip():
         return saved
     return DOWNLOADS_DIR
+
+
+def prepare_download_dir() -> str:
+    """Create the download folder if needed and confirm it accepts new files.
+
+    Returns the folder. Raises ``OSError`` when it can't be used (e.g. a
+    disconnected drive or a missing permission), so callers can say so before
+    any transfer starts.
+    """
+    directory = get_download_dir()
+    os.makedirs(directory, exist_ok=True)
+    with tempfile.TemporaryFile(dir=directory):
+        pass
+    return directory
 
 TRACKERS = [
     "udp://tracker.opentrackr.org:1337/announce",

@@ -9,10 +9,12 @@ from rich.console import Console
 from torrent_finder import acquisition, main
 from torrent_finder.torrent_session import TorrentSession
 from torrent_finder.ui import prompts, selector
+from isolation import isolate_store
 
 
 class DownloadNavigationTests(unittest.TestCase):
     def setUp(self):
+        isolate_store(self)
         self.provider = SimpleNamespace(slug="anime", result_sort="relevance",
                                         filter_summary=lambda: "No filters")
         self.result = {"name": "Example", "source": "Nyaa", "info_hash": "a" * 40}
