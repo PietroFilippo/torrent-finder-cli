@@ -47,12 +47,19 @@ class ProductScoreTests(unittest.TestCase):
             ("Final Cut Pro X 10.7", "Final Cut Pro", 3),
             ("7-Zip 24.07 (x64)", "7-Zip", 3),
             ("MATLAB R2024a (x64)", "MATLAB", 3),
-            # Another name word: another product, still listed below.
-            ("Adobe Photoshop Lightroom Classic CC 2021 v16.4.1", "Adobe Photoshop", 1),
+            ("7zip 23.01 (x64)", "7-Zip", 3),
+            ("Geometry Dash v.2.001 APK", "Geometry Dash", 3),
+            # The listing starts with the name, then another name word: a longer
+            # product or its own edition, below the program itself.
+            ("Adobe Photoshop Lightroom Classic CC 2021 v16.4.1", "Adobe Photoshop", 2),
+            ("ABLETON LiVE PLUGiNS PACK (02) [dada]", "Ableton Live", 2),
+            ("Microsoft Office Tab Enterprise 14", "Microsoft Office", 2),
+            ("VLC Media Player 3.0.21", "VLC", 2),
+            # The name inside another product, or an add-on: listed last.
             ("Adobe Photoshop Elements 2024", "Photoshop", 1),
             ("[RUS] Adobe Photoshop Lightroom 2024 v. 13.0.1", "Photoshop 2024", 1),
-            ("ABLETON LiVE PLUGiNS PACK (02) [dada]", "Ableton Live", 1),
-            ("Microsoft Office Tab Enterprise 14", "Microsoft Office", 1),
+            ("Nik Collection 6 Plugins for Adobe Photoshop", "Photoshop", 1),
+            ("ReiBoot 7.1.zip", "7 zip", 1),
             ("7 Days to Die", "7-Zip", 0),
             ("Adobe Photoshop 2025", "Adobe Photoshop CS6", 0),
         ):

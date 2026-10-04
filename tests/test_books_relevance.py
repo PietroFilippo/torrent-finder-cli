@@ -72,13 +72,23 @@ class BooksSearchTests(unittest.TestCase):
         knaben = next(d for d in results.session.diagnostics if d.engine == "Knaben")
         self.assertEqual(knaben.status, "results")
 
-    def test_knaben_stays_unneeded_when_a_matching_title_was_found(self):
+    def test_knaben_stays_unneeded_when_the_book_itself_was_found(self):
         results = self.search(BookProvider, "Pride and Prejudice",
-                              libgen=[row("A Pride and Prejudice Variation — Someone [epub, English]", "Libgen", 1)],
+                              libgen=[row("Pride and Prejudice — Austen, Jane [epub, English]", "Libgen", 1)],
                               knaben=[row("Pride and Prejudice by Jane Austen.epub", "Knaben", 9)])
         knaben = next(d for d in results.session.diagnostics if d.engine == "Knaben")
         self.assertEqual(knaben.status, "skipped")
         self.assertIn("matching the title", knaben.message)
+
+    def test_a_book_merely_containing_the_title_does_not_stop_knaben(self):
+        # The 2026-10-04 review: "1984" journal issues and another author's
+        # "The Name of the Rosé" used to skip the only source with the book.
+        results = self.search(BookProvider, "Pride and Prejudice",
+                              libgen=[row("A Pride and Prejudice Variation — Someone [epub, English]", "Libgen", 1)],
+                              knaben=[row("Pride and Prejudice by Jane Austen.epub", "Knaben", 9)])
+        knaben = next(d for d in results.session.diagnostics if d.engine == "Knaben")
+        self.assertEqual(knaben.status, "results")
+        self.assertEqual(results[0].name, "Pride and Prejudice by Jane Austen.epub")
 
     def test_other_providers_keep_the_raw_row_rule(self):
         results = self.search(MovieProvider, "The Matrix",

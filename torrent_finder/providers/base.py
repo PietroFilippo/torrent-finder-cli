@@ -18,7 +18,7 @@ from torrent_finder.search_result import SearchResult, normalize_result
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_control import Cooldown, search_request
 from torrent_finder.search_diagnostics import ACCESS_STATUSES, record_failure
-from torrent_finder.result_view import title_score
+from torrent_finder.result_view import split_release_tags, title_score
 
 
 _APIBAY_NUMBER_WORDS = {
@@ -612,7 +612,7 @@ class BaseProvider(ABC):
         """How well a result matches the searched title (0-3, see title_score);
         Books also use the requested work's *authors* (up to 4). A typed preset
         word is not part of the title."""
-        return title_score(row.name, self.typed_split(query)[0])
+        return title_score(row.name, split_release_tags(self.typed_split(query)[0])[0])
 
     def lookup_authors(self, query: str) -> tuple:
         """The requested work's authors for a plain search, or () (see looks_up_authors)."""

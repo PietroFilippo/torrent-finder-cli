@@ -21,10 +21,19 @@ def words(text: str) -> tuple[str, ...]:
     return tuple(re.findall(r"[^\W_]+", "".join(c for c in folded if not unicodedata.combining(c))))
 
 
-def media_title(name: str) -> str:
-    """Strip common release tags, preserving sequel/subtitle words."""
+_YEAR_TOKEN = re.compile(r"\b(?:19|20)\d{2}\b")
+
+
+def media_title(name: str, keep=()) -> str:
+    """Strip common release tags, preserving sequel/subtitle words.
+
+    Numbers the searched title has (*keep*, its words: "Cyberpunk 2077",
+    "1984") are title words, not years or episodes. Of several bare years only
+    the last is the release year: "Blade Runner 2049 (2017)" keeps "2049"."""
+    keep = set(keep)
     name = re.sub(r"\[[^\]]*\]", " ", name)
     name = re.sub(r"\.(?:mkv|mp4|avi|torrent)$", "", name, flags=re.I)
+    years = [match.start() for match in _YEAR_TOKEN.finditer(name)]
     boundaries = re.finditer(
         r"(?:\b(?:19|20)\d{2}\b|\b\d{3,4}p\b|\bS\d{1,2}(?:E\d+)?\b"
         r"|\b(?:blu[- .]?ray|web[- .]?(?:dl|rip)|bdrip|hdtv|x26[45]|hevc|repack)\b"
@@ -32,13 +41,21 @@ def media_title(name: str) -> str:
     )
     # A title may itself be a year (1917, 1984). Only strip tags after a title.
     for boundary in boundaries:
+        text = boundary.group(0)
+        if keep and words(text) and set(words(text)) <= keep:
+            continue  # the searched title's own number
+        if _YEAR_TOKEN.fullmatch(text) and any(start > boundary.start() for start in years):
+            ranged = re.match(r"\s*[-–]\s*(?:19|20)\d{2}\b", name[boundary.end():])
+            if not ranged and not name[:boundary.start()].rstrip().endswith(("(", "[")):
+                continue  # a later year is the release year
         if words(name[:boundary.start()]):
             return name[:boundary.start()].strip(" ._-()")
     return name.strip(" ._-()")
 
 
 def title_score(name: str, query: str) -> int:
-    title, wanted = words(media_title(name)), words(query)
+    wanted = words(query)
+    title = words(media_title(name, wanted))
     if not wanted:
         return 0
     if title == wanted:
@@ -58,9 +75,13 @@ _BOOK_NOISE = re.compile(r"\([^()]*\)|\{[^{}]*\}|\.(?:" + "|".join(_BOOK_FORMATS
                          r"|\b(?:" + "|".join(_BOOK_FORMATS) + r")\b", re.I)
 
 
+_NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
+
+
 def _surname(author: str) -> str:
-    """"austen" from "Jane Austen" or "Austen, Jane"."""
-    found = words(author.split(",")[0] if "," in author else author)
+    """"austen" from "Jane Austen" or "Austen, Jane"; "miller" from "Walter M. Miller Jr."."""
+    found = [word for word in words(author.split(",")[0] if "," in author else author)
+             if word not in _NAME_SUFFIXES]
     return found[-1] if found else ""
 
 
@@ -75,7 +96,9 @@ def _author_check(authors, listing_author, others) -> int:
         return 3
     if listing_author is not None:  # an explicit author field (Libgen)
         listed = set(words(listing_author))
-        if surnames & listed:
+        requested = {word for author in authors for word in words(author)}
+        # Either name order: "Cervantes, Miguel de" for "Miguel de Cervantes Saavedra".
+        if surnames & listed or _surname(listing_author) in requested:
             return 4
         # Only a comparable, clearly different author demotes: another script
         # ("Остин") or a missing author stays neutral.
@@ -101,7 +124,7 @@ def book_title_score(name: str, query: str, authors: tuple = (), listing_author:
     wanted = Counter(wanted_list)
     if not wanted:
         return 0
-    text = media_title(_BOOK_NOISE.sub(" ", name))  # parentheses first: media_title trims a trailing ")"
+    text = media_title(_BOOK_NOISE.sub(" ", name), wanted_list)  # parentheses first: media_title trims a trailing ")"
     every = Counter(words(text))
     parts = []
     for part in _BOOK_PARTS.split(text):
@@ -148,9 +171,9 @@ def release_tag_hits(name: str, query: str) -> int:
     name_words = words(name)
     hits = 0
     for tag in split_release_tags(query)[1]:
-        tag_words = words(tag)
-        span = len(tag_words)
-        hits += any(name_words[i:i + span] == tag_words for i in range(len(name_words) - span + 1))
+        compact = "".join(words(tag))  # "ptbr" = "PT-BR", "h264" = "H.264", "bluray" = "Blu-Ray"
+        hits += any("".join(name_words[i:i + span]) == compact
+                    for span in (1, 2, 3) for i in range(len(name_words) - span + 1))
     return hits
 
 
@@ -170,13 +193,19 @@ def movie_title_score(name: str, query: str) -> int:
     wanted = tuple(_NUMBERS.get(word, word) for word in words(title_query))
     if not wanted:
         return 0
-    title = tuple(_NUMBERS.get(word, word) for word in words(media_title(name)))
-    if title == wanted:
-        score = 3
-    elif title[:len(wanted)] == wanted:
-        score = 2
-    else:
-        score = int(all(word in title for word in wanted))
+    keep = words(title_query)
+    score = 0
+    # "Город бога / Cidade de Deus / City of God [2002, …]": each part is a title.
+    # Release details follow the first bracket there: "… [1999, …] Dub + Sub".
+    parts = [re.split(r"\s\[", part, maxsplit=1)[0] for part in re.split(r"\s+/\s+", name)]
+    for part in [name, *parts] if len(parts) > 1 else [name]:
+        title = tuple(_NUMBERS.get(word, word) for word in words(media_title(part, keep)))
+        if title == wanted:
+            score = max(score, 3)
+        elif title[:len(wanted)] == wanted:
+            score = max(score, 2)
+        else:
+            score = max(score, int(all(word in title for word in wanted)))
     years = _YEAR.findall(name)
     if wanted_year and score and years and wanted_year not in years:
         score -= 1
@@ -184,15 +213,17 @@ def movie_title_score(name: str, query: str) -> int:
 
 
 # Source and platform words people add to a game title; dedicated game sites
-# search their own catalog, where these words only hide the game.
-_GAME_EXTRAS = re.compile(r"\b(?:fit\s?girl|dodi|elamigos|online[- ]?fix|repacks?|linux|windows|win(?:32|64)?"
-                          r"|macos|mac|osx|pc)\b", re.I)
+# search their own catalog, where these words only hide the game. Platform
+# words count only at the end: "PC Building Simulator" is a title.
+_GAME_SOURCES = re.compile(r"\b(?:fit\s?girl|dodi|elamigos|online[- ]?fix|repacks?)\b", re.I)
+_GAME_PLATFORMS = re.compile(r"(?:\s+(?:linux|windows|win(?:32|64)?|macos|mac|osx|pc))+\s*$", re.I)
 
 
 def game_title_query(query: str) -> str:
     """The game title in a query, without source/platform words:
     "Cyberpunk 2077 fitgirl" → "Cyberpunk 2077", "Stardew Valley linux" → "Stardew Valley"."""
-    return " ".join(_GAME_EXTRAS.sub(" ", query).split()) or query
+    title = " ".join(_GAME_SOURCES.sub(" ", query).split())
+    return _GAME_PLATFORMS.sub("", " " + title).strip() or title or query
 
 
 _DIGIT_ROMANS = {**{value: roman.upper() for roman, value in _ROMAN_VALUES.items()}, 5: "V", 10: "X"}
@@ -217,7 +248,7 @@ def number_variant(query: str) -> "str | None":
     return " ".join([*parts[:-1], swapped])
 
 
-_POSSESSIVE = re.compile(r"\b([^\W\d_]{3,})(?:['’]s|s)\b")
+_POSSESSIVE = re.compile(r"\b([^\W\d_]{3,})(?:['’\u02bc]s|s)\b")
 
 
 def possessive_variant(query: str) -> "str | None":
@@ -230,7 +261,7 @@ def possessive_variant(query: str) -> "str | None":
 
 def _compact_words(text: str) -> tuple[str, ...]:
     """``words`` that ignore apostrophes: "Baldur’s" and "Baldurs" are one word."""
-    return words(re.sub(r"['’`´]", "", text))
+    return words(re.sub(r"['’`´\u02bc]", "", text))
 
 
 # What may follow a program's name without making it another program: versions,
@@ -238,7 +269,7 @@ def _compact_words(text: str) -> tuple[str, ...]:
 # "OBS Studio", "MATLAB R2024a"). Another name word means another product
 # ("Photoshop Lightroom", "Photoshop Elements", "Ableton Live Packs").
 _PRODUCT_DETAIL = re.compile(
-    r"\d.*|v\d.*|r\d{4}\w*|cs\d*|x64|x86|amd64|arm64|aarch64|universal"
+    r"\d.*|v\d.*|v|r\d{4}\w*|cs\d*|x64|x86|amd64|arm64|aarch64|universal"
     r"|win|windows|mac|macos|osx|linux|android|ios|apk|obb|mod|modded|unlocked"
     r"|cc|pro|plus|premium|ultimate|enterprise|professional|business|home|standard|studio|suite"
     r"|producer|signature|deluxe|complete|x|pe|hd|lite|free|paid|prime|vip|gold"
@@ -263,22 +294,39 @@ def product_title_score(name: str, query: str) -> int:
     The query is a product name, then optional details ("Photoshop 2024").
     3: outside brackets, the name is followed by details only (version,
     edition, platform…), is not an add-on "for" it, and the typed details
-    appear anywhere; 1: a longer product contains the name ("Photoshop" in
-    "Photoshop Lightroom", "Pocket Minecraft Edition" in parentheses), or every
-    word appears apart; 0: words are missing.
+    appear anywhere; 2: the listing starts with the name and continues with
+    another word ("Minecraft Pocket Edition", "VLC Media Player"); 1: the name
+    sits inside another product ("Adobe Photoshop Lightroom", "Pixel Gun 3D
+    (Pocket Minecraft Edition)", "Mod for Minecraft"), or every word appears
+    apart; 0: words are missing.
     """
     wanted, have = _compact_words(query), _compact_words(name)
     if not wanted:
         return 0
     span = next((i for i, word in enumerate(wanted) if i and _PRODUCT_DETAIL.fullmatch(word)), len(wanted))
+    if all(word.isdigit() for word in wanted[:span]):
+        span = min(len(wanted), span + 1)  # "7 Zip": the number is part of the name
     product, details = wanted[:span], wanted[span:]
+    joined = "".join(product)  # "7zip" for "7-Zip"
     title = _compact_words(_ASIDES.sub(" ", name))
+    best = 0
     if all(word in have for word in details):
-        for start in range(len(title) - span + 1):
-            if title[start:start + span] == product and (start == 0 or title[start - 1] not in _ADDON_LINKS):
-                after = title[start + span] if start + span < len(title) else None
-                if after is None or _PRODUCT_DETAIL.fullmatch(after):
-                    return 3
+        for start in range(len(title)):
+            if title[start:start + span] == product:
+                length = span
+            elif span > 1 and title[start] == joined:
+                length = 1
+            else:
+                continue
+            if any(word in _ADDON_LINKS for word in title[max(0, start - 2):start]):
+                continue  # an add-on: "Plugins for Adobe Photoshop"
+            after = title[start + length] if start + length < len(title) else None
+            if after is None or _PRODUCT_DETAIL.fullmatch(after):
+                return 3
+            if start == 0:
+                best = 2
+    if best:
+        return best
     return 1 if all(word in have for word in wanted) else 0
 
 
@@ -332,20 +380,25 @@ def _number_at(words, i):
 def digit_spelling(query: str) -> "str | None":
     """The query with spelled-out numbers in digits ("Twenty First Century Boys"
     → "21st Century Boys", "Mob Psycho Hundred" → "Mob Psycho 100", "Catch-
-    Twenty-Two" → "Catch-22"), or None when it has none. A number before
-    "thousand" or "million" stays as typed."""
+    Twenty-Two" → "Catch-22", "Nineteen Eighty-Four" → "1984"), or None when it
+    has none. Titles with "thousand" or "million" stay as typed ("One Thousand
+    and One Nights")."""
     pieces = re.findall(r"(^|\s+|-)([^\s-]+)", query)  # (separator, token), hyphens split too
     words = [token.casefold().strip(".,:;!?()[]") for _sep, token in pieces]
+    if _LARGE_NUMBERS & set(words):
+        return None
     out, i, changed = [], 0, False
     while i < len(pieces):
         found = _number_at(words, i)
-        if found and i + found[1] < len(words) and words[i + found[1]] in _LARGE_NUMBERS:
-            found = None
         if found:
             digits, length = found
-            last = pieces[i + length - 1][1]
-            tail = last[len(last.rstrip(".,:;!?)]")):]
-            out.append(pieces[i][0] + digits + tail)
+            pair = _number_at(words, i + length) if digits.isdigit() and 10 <= int(digits) <= 99 else None
+            if pair and pair[0].isdigit() and int(pair[0]) <= 99:
+                digits, length = f"{digits}{int(pair[0]):02d}", length + pair[1]  # a year: "Nineteen Eighty-Four"
+            first, last = pieces[i][1], pieces[i + length - 1][1]
+            lead = first[:len(first) - len(first.lstrip("([{"))]
+            tail = last[len(last.rstrip(".,:;!?)]}")):]
+            out.append(pieces[i][0] + lead + digits + tail)
             i, changed = i + length, True
         else:
             out.append(pieces[i][0] + pieces[i][1])
@@ -362,7 +415,7 @@ def matches_name(name: str, query: str, mode: str = "contains") -> bool:
     if not query.strip():
         return True
     if mode == "title":
-        return words(media_title(name)) == words(query)
+        return words(media_title(name, words(query))) == words(query)
     if mode == "filename":
         return name.strip().casefold() == query.strip().casefold()
     # "Baldurs" finds "Baldur’s", and "Baldur's" still finds "Baldur.s".

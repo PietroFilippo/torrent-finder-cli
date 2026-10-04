@@ -33,7 +33,9 @@ class MobileProvider(BaseProvider):
     # Apibay is already scoped to Android; this keeps iOS out of any
     # SolidTorrents results too (it ignores the category param). Whole words
     # only: "Studios", "Radios" or "Kiosk" are not iOS.
-    default_filters = FilterConfig(name_predicate=lambda name: not re.search(r"\b(?:ios|ipa)\b", name, re.I))
+    # Listings naming Android too ("[Android + iOS]", "... Premium APK") stay.
+    default_filters = FilterConfig(name_predicate=lambda name: not re.search(r"\b(?:ios|ipa)\b", name, re.I)
+                                   or bool(re.search(r"\b(?:android|apk)\b", name, re.I)))
 
     presets = [
         FilterPreset("MOD / Patched", FilterConfig(include_keywords=[
@@ -53,7 +55,7 @@ class MobileProvider(BaseProvider):
     # Auto (APIBay) also runs when Knaben's rows are only other apps naming
     # this one ("Pixel Gun 3D (Pocket Minecraft Edition)", "Mod for Minecraft").
     auto_needs_relevant_rows = True
-    relevant_title_score = 3
+    relevant_title_score = 2
     # A tag typed after the name ("Minecraft obb") ranks those releases first
     # for the search; the name alone is searched too.
     typed_presets = {

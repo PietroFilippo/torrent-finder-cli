@@ -39,8 +39,12 @@ class SoftwareProvider(BaseProvider):
     # SolidTorrents doesn't strictly honor the category param, so keep mobile
     # results out by keyword while this provider is desktop-only. Whole words
     # only: BIOS tools and "Studios" are desktop software.
+    # Desktop programs about mobile platforms stay: "Android Studio ... Windows",
+    # "BlueStacks Android Emulator for Windows", "Xcode (iOS SDK) for macOS".
     default_filters = FilterConfig(
-        name_predicate=lambda name: not re.search(r"\b(?:android|ios|apk)\b", name, re.I))
+        name_predicate=lambda name: not re.search(r"\b(?:android|ios|apk)\b", name, re.I)
+        or bool(re.search(r"\b(?:windows|win(?:32|64)?|x64|x86|macos|mac|osx|linux|desktop|emulator|studio"
+                          r"|sdk|device manager|for pc)\b", name, re.I)))
 
     presets = [
         FilterPreset("Pre-activated / Cracked", FilterConfig(include_keywords=[

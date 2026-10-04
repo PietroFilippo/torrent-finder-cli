@@ -23,8 +23,11 @@ _SUBTITLE_CUE = re.compile(rf"\b(?:{_SUB_LABEL}|multisubs?)\b")
 _DUB_TAG = re.compile(r"\b(?:dublad[oa]|dublagem|nacional)\b")
 _BRAZIL_TAG = re.compile(rf"\b{_BRAZIL}\b")
 _BRAZIL_AUDIO_TAG = re.compile(rf"\b(?:{_BRAZIL}|brasileir[oa]|br)\b")
-_AUDIO_LABEL = r"(?:audio|dub|dubbed|dubbing|dublad[oa]|dublagem)"
-_AUDIO_PREFIX = re.compile(rf"\b{_AUDIO_LABEL}\b{_JOIN}(?:em\s+)?\b{_PORTUGUESE}\b")
+_AUDIO_LABEL = r"(?:audio|dual|dub|dubbed|dubbing|dublad[oa]|dublagem)"
+# Other audio languages may sit between the label and PT-BR: "[DUAL JAP PT-BR]".
+_OTHER_LANGUAGE = r"(?:jap|jpn|jp|ja|eng|en|ing|esp|spa|es|lat|fre|fra|fr|ger|deu|de|ita|it|rus|ru|kor|ko|chi|zh)"
+_AUDIO_PREFIX = re.compile(
+    rf"\b{_AUDIO_LABEL}\b{_JOIN}(?:em\s+)?(?:\b{_OTHER_LANGUAGE}\b{_JOIN}){{0,3}}\b{_PORTUGUESE}\b")
 _AUDIO_SUFFIX = re.compile(rf"\b{_PORTUGUESE}\b{_JOIN}\b{_AUDIO_LABEL}\b")
 
 
@@ -82,6 +85,9 @@ _MANGA_LANGUAGES = {
     "italian": (r"italiano|italian|ita", r"it"),
 }
 _KANA = re.compile(r"[\u3040-\u30ff]")
+_JAPANESE_VOLUME = re.compile(r"巻")  # the Japanese volume character; Chinese uses 卷
+_IDEOGRAPH = re.compile(r"[\u4e00-\u9fff]")
+_JAPANESE_TAG = re.compile(r"[\[(]\s*(?:jp|jap|jpn)\s*[\])]|\b(?:japanese|jpn|jap)\b")
 
 
 def manga_language_tag(language: str):
@@ -95,8 +101,11 @@ def manga_language_tag(language: str):
 
 
 def is_raw_release(name: str) -> bool:
-    """Japanese kana in the name, or a raw tag: untranslated manga."""
-    return bool(_KANA.search(name) or re.search(r"\braws?\b", _normalize(name)))
+    """Japanese kana or 巻 with kanji in the name, a raw tag, or a Japanese tag:
+    untranslated manga."""
+    normalized = _normalize(name)
+    return bool(_KANA.search(name) or (_JAPANESE_VOLUME.search(name) and _IDEOGRAPH.search(name))
+                or re.search(r"\braws?\b", normalized) or _JAPANESE_TAG.search(normalized))
 
 
 def has_brazilian_subtitles(name: str) -> bool:

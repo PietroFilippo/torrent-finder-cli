@@ -10,7 +10,7 @@ from torrent_finder import libgen
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.resolvers import CreatorFacet, openlibrary
-from torrent_finder.result_view import book_title_score
+from torrent_finder.result_view import _BOOK_FORMATS, book_title_score
 from torrent_finder.search_result import SearchResult
 
 
@@ -31,6 +31,9 @@ class BookProvider(BaseProvider):
     # help when Libgen answers with other books only ("Tomorrow and Tomorrow").
     prefer_title_matches = True
     auto_needs_relevant_rows = True
+    # Knaben is skipped only when a row is the requested book itself, not one
+    # merely containing its words ("1984" journal issues, another "Name of the Rose").
+    relevant_title_score = 3
 
     # Direct downloads / document torrents — no video features apply, but the
     # file picker does: Apibay book torrents are often bundles ("500 EPUBs",
@@ -79,7 +82,9 @@ class BookProvider(BaseProvider):
         return book_title_score(row.name, query, authors, row.get("lg_author"))
 
     def lookup_authors(self, query: str) -> tuple:
-        return openlibrary.dominant_author(query)
+        # "Pride and Prejudice epub": Open Library knows the title, not the format.
+        title = " ".join(word for word in query.split() if word.casefold().strip(".") not in _BOOK_FORMATS)
+        return openlibrary.dominant_author(title or query)
 
     def _search_libgen(self, query: str) -> list[SearchResult]:
         return libgen.search(query)

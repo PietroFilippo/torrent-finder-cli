@@ -641,6 +641,28 @@ so zero-seed rows stay visible as before. v2's defaults keep unsafe and XXX
 rows hidden. Uncached v2 calls were about 0.25 s slower; repeat calls were
 served from the edge in about 0.1 s.
 
+**Final review ranking fixes (2026-10-04).** A review replaying the audit's rows
+found and fixed these:
+- Numbers in the searched title stopped being treated as years or episodes.
+  `Cyberpunk 2077`'s 47 rows had all scored 0; `1984` now ranks Orwell's book
+  first instead of journal issues. Of several bare years only the last is the
+  release year, so `Blade Runner 2049 (2017)` ranks below the original.
+- Books' Auto rule now needs the requested book itself (score 3), so another
+  author's `The Name of the Rosé` or `1984` journals no longer keep Knaben
+  from running.
+- Movies score each title of `Матрица / The Matrix [...]` listings.
+- Release tags typed after an Anime/general title no longer zero every row
+  (`Saki 720p`).
+- Desktop/Mobile rank listings that start with the name (`Minecraft Pocket
+  Edition`, `VLC Media Player`) above add-ons and look-alikes. `7-Zip` no
+  longer matches every `.zip` with a 7 in its version. Mobile's Auto rule
+  counts those listings as answers.
+- Raw manga with kanji-only names or `[JP]` tags count for the Raw preset, and
+  `[DUAL JAP PT-BR]` counts as Brazilian audio.
+- Mobile/Desktop platform filters keep programs about the other platform
+  (`Android Studio … Windows`, `[Android + iOS]`).
+- Author matching accepts either name order and ignores "Jr.".
+
 Suggested order, subject to a subsequent implementation request:
 
 1. **Needed:** Online-Fix error/result parsing and shared pacing; clearer blocked
