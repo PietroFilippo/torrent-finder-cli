@@ -1,6 +1,7 @@
 """The Quiet layout's shared pieces: footer parsing, header, key bar, progress screen."""
 
 import io
+import os
 import unittest
 import warnings
 from types import SimpleNamespace
@@ -475,3 +476,42 @@ class SelectorRoundTwoTests(unittest.TestCase):
         one = next(line for line in lines if "Episode one" in line)
         two = next(line for line in lines if "Episode two" in line)
         self.assertEqual(one.index("1.4 GB"), two.index("1.4 GB"))
+
+
+class CancellationTests(unittest.TestCase):
+    def test_a_cancel_after_the_last_chunk_publishes_no_file(self):
+        import tempfile
+        import threading
+        from torrent_finder import direct_download
+        cancel = threading.Event()
+
+        class Response:
+            headers = {"Content-Length": "6"}
+
+            def iter_content(self, chunk_size):
+                yield b"abc"
+                yield b"def"
+                cancel.set()  # Ctrl+C lands after the final chunk
+
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaises(direct_download.Cancelled):
+                direct_download.save_response(Response(), folder, "late.torrent", cancel_event=cancel)
+            self.assertEqual(os.listdir(folder), [])
+
+    def test_a_worker_that_stops_on_cancel_reports_cancelled(self):
+        import contextlib
+        import threading
+        from torrent_finder import acquisition
+
+        def work(cancel_event):
+            cancel_event.set()  # as if Esc arrived and the worker gave up
+            return None
+
+        with patch("torrent_finder.utils.start_esc_listener", return_value=threading.Event()), \
+             patch.object(acquisition.console, "status", return_value=contextlib.nullcontext()):
+            self.assertEqual(acquisition._wait_with_esc("Fetching", work), (None, True))
+
+            def finished(cancel_event):
+                cancel_event.set()
+                return "magnet"
+            self.assertEqual(acquisition._wait_with_esc("Fetching", finished), ("magnet", False))

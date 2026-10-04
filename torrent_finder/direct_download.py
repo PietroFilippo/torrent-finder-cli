@@ -80,6 +80,10 @@ def save_response(resp, dest_dir: str, filename: str, cancel_event=None, progres
                     done += len(chunk)
                     if progress_cb:
                         progress_cb(done, total)
+        # A cancel that arrives after the last chunk still wins: the partial
+        # file is removed below instead of being published under its name.
+        if cancel_event is not None and cancel_event.is_set():
+            raise Cancelled()
         return _promote(temporary, dest)
     except BaseException:
         try:

@@ -155,6 +155,11 @@ def _wait_with_esc(message: str, work, *args):
         stop_listener.set()
     if worker.is_alive():
         return None, True
+    if cancel.is_set() and ("error" in box or box.get("value") is None):
+        # The worker saw the cancel and stopped without a result: that is a
+        # cancellation, not a failure. A result finished just before the
+        # cancel is still returned below.
+        return None, True
     if "error" in box:
         raise box["error"]
     return box.get("value"), False
