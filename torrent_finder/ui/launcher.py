@@ -70,19 +70,19 @@ def terminal_command_prompt() -> None:
         try:
             updated = set_terminal_command(selected)
         except LauncherConflict as exc:
-            notice = f"[bold yellow]Not changed:[/bold yellow] {exc}"
+            notice = f"[warning]Not changed:[/warning] {exc}"
             continue
         except LauncherError as exc:
-            notice = f"[bold red]Could not install command:[/bold red] {exc}"
+            notice = f"[error]Could not install command:[/error] {exc}"
             continue
 
         if selected == DEFAULT_COMMAND:
-            notice = "[bold green]Using torrent-finder.[/bold green] Managed quick-launch alias removed."
+            notice = "[success]Using torrent-finder.[/success] Managed quick-launch alias removed."
             continue
 
         if updated.path_ready:
             notice = (
-                f"[bold green]{selected} is ready.[/bold green] "
+                f"[success]{selected} is ready.[/success] "
                 "It forwards every option to torrent-finder."
             )
             continue
@@ -98,17 +98,17 @@ def terminal_command_prompt() -> None:
             )
             if add_path and ensure_launcher_dir_on_path(directory):
                 notice = (
-                    f"[bold green]{selected} is installed.[/bold green] "
+                    f"[success]{selected} is installed.[/success] "
                     "Open a new terminal before using it."
                 )
             else:
                 notice = (
-                    f"[bold yellow]{selected} was created but is not on PATH.[/bold yellow] "
+                    f"[warning]{selected} was created but is not on PATH.[/warning] "
                     f"Add {directory} to PATH to use it."
                 )
         else:
             notice = (
-                f"[bold yellow]{selected} was created but is not on PATH.[/bold yellow] "
+                f"[warning]{selected} was created but is not on PATH.[/warning] "
                 f"Add {directory} to PATH in your shell profile."
             )
 

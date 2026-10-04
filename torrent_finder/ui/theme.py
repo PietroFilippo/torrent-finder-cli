@@ -50,6 +50,14 @@ STYLES = {
     "warning": WARN,
     "error": f"bold {BAD}",
     "highlight": "bold",
+    # Rich's own spinners and progress bars follow the palette.
+    "status.spinner": ACCENT,
+    "bar.complete": ACCENT,
+    "bar.finished": GOOD,
+    "bar.pulse": ACCENT,
+    "progress.percentage": ACCENT,
+    "progress.remaining": MUTED,
+    "progress.elapsed": MUTED,
 }
 
 _STATE_STYLES = {
@@ -245,9 +253,12 @@ def has_key(segments: list[Text], key: str) -> bool:
     return any(segment.plain.split(" ", 1)[0] == key for segment in segments)
 
 
-def wrap_keys(segments: list[Text], width: int) -> list[Text]:
-    """Lay key segments out in as few lines as fit; never split a segment."""
-    room = inner_width(width)
+def wrap_keys(segments: list[Text], width: int, margin: str = MARGIN) -> list[Text]:
+    """Lay key segments out in as few lines as fit; never split a segment.
+
+    *margin* is the left margin: frames use two cells, main-screen logs none.
+    """
+    room = max(8, width - len(margin) - len(MARGIN))
     lines: list[Text] = []
     current: Text | None = None
     for segment in segments:
@@ -263,7 +274,7 @@ def wrap_keys(segments: list[Text], width: int) -> list[Text]:
         lines.append(current)
     framed = []
     for line in lines:
-        out = Text(MARGIN, no_wrap=True, overflow="ellipsis")
+        out = Text(margin, no_wrap=True, overflow="ellipsis")
         out.append_text(line)
         if cell_len(out.plain) > width:
             out.truncate(width, overflow="ellipsis")
@@ -271,15 +282,52 @@ def wrap_keys(segments: list[Text], width: int) -> list[Text]:
     return framed
 
 
-def wrap_block(text: Text, width: int, console) -> list[Text]:
+def wrap_block(text: Text, width: int, console, margin: str = MARGIN) -> list[Text]:
     """Wrap a prose block under the left margin; returns one Text per line."""
-    room = inner_width(width)
+    room = max(8, width - len(margin) - len(MARGIN))
     lines = []
     for line in text.wrap(console, room, overflow="fold"):
-        out = Text(MARGIN, no_wrap=True)
+        out = Text(margin, no_wrap=True)
         out.append_text(line)
         lines.append(out)
-    return lines or [Text(MARGIN)]
+    return lines or [Text(margin)]
+
+
+# --- main-screen logs ------------------------------------------------------
+# Download, stream and acquisition output shares the main screen with the
+# tools' own output, which starts at column 0, so these blocks use no margin.
+
+def log_header(title: str | Text = "", width: int = 80) -> Text:
+    """``torrent-finder › Title`` at column 0, for screens that print a log."""
+    line = Text(no_wrap=True, overflow="ellipsis")
+    line.append(APP_NAME, style="bold")
+    if title:
+        crumb = _as_text(title)
+        if crumb.plain.strip():
+            line.append(CRUMB, style=MUTED)
+            styled = Text(style=ACCENT)
+            styled.append_text(crumb)
+            line.append_text(styled)
+    if cell_len(line.plain) > width:
+        line.truncate(max(1, width), overflow="ellipsis")
+    return line
+
+
+def report(title: str, body: str, tone: str = "") -> Text:
+    """A titled result block for the main-screen log: bold title, then Rich-markup body.
+
+    Blank lines before and after set it apart from the log around it.
+    """
+    block = Text("\n")
+    block.append(title + "\n", style=f"bold {tone}".strip())
+    block.append_text(Text.from_markup(body))
+    block.append("\n")
+    return block
+
+
+def any_key(action: str = "continue") -> str:
+    """Markup for the pause line that ends a main-screen log."""
+    return f"[muted]Press [key]any key[/key] to {action}…[/muted]"
 
 
 def section_label(label: str) -> str:

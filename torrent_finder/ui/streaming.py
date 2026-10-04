@@ -80,8 +80,8 @@ def _print_stream_header(
     elif file_idx is not None:
         _set_terminal_title(f"Streaming file {file_idx} | v: VLC  Ctrl+C: cancel")
 
-    # Content sits inside the two-cell margins.
-    inner_width = theme.inner_width(console.size.width)
+    # Column 0, like the tools' own output below it.
+    inner_width = max(8, console.size.width - 2)
 
     # Escape user-supplied strings — torrent filenames often contain bracketed
     # tags like ``[x265]`` that Rich's markup parser would interpret as styles.
@@ -119,13 +119,13 @@ def _print_stream_header(
 
     width = console.size.width
     title_text = f"Streaming — Episode {n}/{total}" if multi else "Streaming"
-    lines: list[Text] = list(theme.header_lines(title_text, "", width))
+    lines: list[Text] = [theme.log_header(title_text, width)]
     for markup in (f"[highlight]{file_display}[/highlight]",
                    f"[muted]{size_str}{backend_str}{idx_str}[/muted]",
                    sub_line,
                    warning_line):
-        lines.extend(theme.wrap_block(Text.from_markup(markup), width, console))
-    lines.extend(theme.wrap_keys(theme.parse_footer("  •  ".join(binds)).keys, width))
+        lines.extend(theme.wrap_block(Text.from_markup(markup), width, console, margin=""))
+    lines.extend(theme.wrap_keys(theme.parse_footer("  •  ".join(binds)).keys, width, margin=""))
     panel = Group(*lines)
     rendered_lines = len(
         console.render_lines(

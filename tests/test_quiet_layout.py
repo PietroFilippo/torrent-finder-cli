@@ -199,3 +199,29 @@ class SecurityWarningTests(unittest.TestCase):
         result, _, save = self.frames(80, 24, ["d"])
         self.assertTrue(result)
         save.assert_called_once()
+
+
+class ConfirmPromptTests(unittest.TestCase):
+    def ask(self, key, width=50, height=16):
+        out = io.StringIO()
+        screen = Console(file=out, width=width, height=height, color_system=None)
+        with patch.object(prompts, "console", screen), \
+             patch.object(prompts.readchar, "readkey", return_value=key), \
+             patch.object(prompts.sys, "stdout", io.StringIO()):
+            answer = prompts.confirm_prompt("[error]Clear all search history?[/error]\n\nThis cannot be undone.",
+                                            title="Clear history")
+        return answer, out.getvalue()
+
+    def test_y_confirms_and_other_keys_cancel(self):
+        self.assertTrue(self.ask("y")[0])
+        self.assertTrue(self.ask("Y")[0])
+        self.assertFalse(self.ask("n")[0])
+        self.assertFalse(self.ask("\x1b")[0])
+
+    def test_dialog_fits_and_names_the_keys(self):
+        _, output = self.ask("n")
+        lines = output.rstrip("\n").split("\n")
+        self.assertLessEqual(len(lines), 16)
+        self.assertIn("Clear history", lines[0])
+        self.assertIn("Y confirm", output)
+        self.assertIn("Esc cancel", output)

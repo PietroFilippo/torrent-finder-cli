@@ -211,10 +211,10 @@ def history_select_prompt() -> dict | None:
         return (
             (notice + "\n" if notice else "")
             + "↑/↓ navigate  •  Enter re-run  •  Esc back\n"
-            f"[bold]Filters:[/bold]  [bold yellow]P[/bold yellow] provider: [cyan]{_option_label(prov_filter)}[/cyan]  •  "
-            f"[bold yellow]T[/bold yellow] type: [cyan]{type_filter}[/cyan]  •  "
-            f"[bold yellow]D[/bold yellow] date: [cyan]{date_filter}[/cyan]  •  "
-            f"[bold yellow]S[/bold yellow] sort: [cyan]{sort_order}[/cyan]"
+            f"[bold]Filters:[/bold]  [warning]P[/warning] provider: [muted]{_option_label(prov_filter)}[/muted]  •  "
+            f"[warning]T[/warning] type: [muted]{type_filter}[/muted]  •  "
+            f"[warning]D[/warning] date: [muted]{date_filter}[/muted]  •  "
+            f"[warning]S[/warning] sort: [muted]{sort_order}[/muted]"
         )
 
     # --- key_action callbacks (cycle filter + rebuild in-place) ---
@@ -237,7 +237,7 @@ def history_select_prompt() -> dict | None:
         nonlocal history, notice
         if items_list[idx].value == "clear":
             if not confirm_prompt(
-                "[bold red]Clear all search history?[/bold red]\n\n"
+                "[error]Clear all search history?[/error]\n\n"
                 "This will delete every saved search permanently."
             ):
                 return True  # stay
@@ -245,7 +245,7 @@ def history_select_prompt() -> dict | None:
                 clear_history()
             except (OSError, ValueError) as error:
                 from rich.markup import escape
-                notice = f"[bold red]History was not cleared:[/bold red] {escape(str(error))}"
+                notice = f"[error]History was not cleared:[/error] {escape(str(error))}"
                 return True  # stay; the saved history is unchanged
             notice = ""
             history = []

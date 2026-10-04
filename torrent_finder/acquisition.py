@@ -30,6 +30,7 @@ from rich.markup import escape
 
 from torrent_finder import unpack
 from torrent_finder.constants import console
+from torrent_finder.ui import theme
 from torrent_finder.utils import build_magnet
 
 
@@ -38,9 +39,9 @@ def _unpack_saved(paths) -> list[str]:
     on; summary lines for the result panel ([] when nothing to say)."""
     if not paths or not unpack.enabled():
         return []
-    with console.status("[bold cyan]Unpacking…[/bold cyan]", spinner="dots") as status:
+    with console.status("[accent]Unpacking…[/accent]", spinner="dots") as status:
         report = unpack.unpack_all(paths, expect_pages=True,
-                                   status=lambda text: status.update(f"[bold cyan]{escape(text)}[/bold cyan]"))
+                                   status=lambda text: status.update(f"[accent]{escape(text)}[/accent]"))
     return unpack.summary_lines(report)
 
 
@@ -141,7 +142,7 @@ def _wait_with_esc(message: str, work, *args):
     worker = threading.Thread(target=run, daemon=True)
     stop_listener = start_esc_listener(cancel)
     try:
-        with console.status(f"[bold cyan]{message}[/bold cyan] [dim]Esc to cancel[/dim]", spinner="dots"):
+        with console.status(f"[accent]{message}[/accent] [dim]Esc to cancel[/dim]", spinner="dots"):
             worker.start()
             while worker.is_alive() and not cancel.is_set():
                 worker.join(0.1)
@@ -179,7 +180,7 @@ class MagnetLazyResolve(MagnetDirect):
             return PickOutcome("back")
         if not real_hash:
             console.print(f"[error] {self.error_text}[/error]")
-            console.print("[dim]Press any key to continue...[/dim]")
+            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
             readchar.readkey()
             return PickOutcome("back")
         # Persist the real hash so everything downstream of the pick (session,
@@ -239,7 +240,6 @@ class OnlineFixAcquisition:
         from torrent_finder import online_fix
         from torrent_finder.constants import get_download_dir
         from torrent_finder.downloader import open_torrent_file
-        from rich.panel import Panel
         from torrent_finder.ui.prompts import download_dir_ready
 
         if not download_dir_ready():
@@ -252,30 +252,24 @@ class OnlineFixAcquisition:
         if cancelled:
             return PickOutcome("back")
         if not path:
-            console.print(Panel(
-                f"[bold]{escape(name)}[/bold]\n\n"
+            console.print(theme.report("Online-Fix", f"[bold]{escape(name)}[/bold]\n\n"
                 "[warning]Couldn't fetch the .torrent automatically[/warning] "
                 "(post layout changed or host blocked).\n"
-                f"[cyan]Open the page and grab it manually:[/cyan]\n{escape(page_url)}",
-                title="🔧 Online-Fix", border_style="yellow", padding=(1, 2),
-            ))
-            console.print("[dim]Press any key to continue...[/dim]")
+                f"[muted]Open the page and grab it manually:[/muted]\n{escape(page_url)}", tone=theme.WARN))
+            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
             readchar.readkey()
             return PickOutcome("back")
 
         opened = open_torrent_file(path)
         handoff = ("[success]✓ opened in your torrent client[/success]" if opened
                    else "[warning]saved, but couldn't auto-open — add it to your client manually[/warning]")
-        console.print(Panel(
-            f"[bold]{escape(name)}[/bold]\n\n"
-            f"[cyan].torrent saved:[/cyan]   {escape(path)}\n"
-            f"[cyan]Handed to client:[/cyan] {handoff}\n"
-            f"[cyan]Archive password:[/cyan] {online_fix.ARCHIVE_PASSWORD}\n\n"
+        console.print(theme.report("Online-Fix", f"[bold]{escape(name)}[/bold]\n\n"
+            f"[muted].torrent saved:[/muted]   {escape(path)}\n"
+            f"[muted]Handed to client:[/muted] {handoff}\n"
+            f"[muted]Archive password:[/muted] {online_fix.ARCHIVE_PASSWORD}\n\n"
             "[dim]Your client downloads the game from online-fix's tracker; unpack the "
-            "archives with the password above.[/dim]",
-            title="🔧 Online-Fix", border_style="bright_blue", padding=(1, 2),
-        ))
-        console.print("[dim]Press any key to continue...[/dim]")
+            "archives with the password above.[/dim]"))
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         return PickOutcome("next")
 
@@ -311,20 +305,16 @@ class MadokamiAcquisition:
         from torrent_finder.constants import get_download_dir
         from torrent_finder.credentials import madokami_config
         from torrent_finder.utils import start_esc_listener
-        from rich.panel import Panel
 
         name = result.get("name", "Unknown")
         path = result.get("mdk_path") or ""
         page_url = result.get("page_url", "")
 
         if madokami_config() is None:
-            console.print(Panel(
-                "[warning]Madokami needs a login[/warning] — add your account under "
+            console.print(theme.report("Madokami", "[warning]Madokami needs a login[/warning] — add your account under "
                 "Credentials on the provider screen (or set MADOKAMI_USERNAME / "
-                "MADOKAMI_PASSWORD).",
-                title="📕 Madokami", border_style="yellow", padding=(1, 2),
-            ))
-            console.print("[dim]Press any key to continue...[/dim]")
+                "MADOKAMI_PASSWORD).", tone=theme.WARN))
+            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
             readchar.readkey()
             return PickOutcome("back")
 
@@ -413,11 +403,8 @@ class MadokamiAcquisition:
             lines.append(f"[dim]Grab manually: {escape(page_url)}[/dim]")
         if not lines:
             lines.append("[warning] Nothing downloaded.[/warning]")
-        console.print(Panel(
-            f"[bold]{escape(name)}[/bold]\n\n" + "\n".join(lines),
-            title="📕 Madokami", border_style="bright_blue", padding=(1, 2),
-        ))
-        console.print("[dim]Press any key to continue...[/dim]")
+        console.print(theme.report("Madokami", f"[bold]{escape(name)}[/bold]\n\n" + "\n".join(lines)))
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         return PickOutcome("next" if saved else "back")
 
@@ -500,14 +487,10 @@ class MadokamiAcquisition:
     @staticmethod
     def _notice(here, message, path):
         from torrent_finder import madokami
-        from rich.panel import Panel
 
-        console.print(Panel(
-            f"[bold]{escape(here)}[/bold]\n\n{message}\n"
-            f"[cyan]Open it in your browser instead:[/cyan]\n{escape(madokami._BASE + path)}",
-            title="📕 Madokami", border_style="yellow", padding=(1, 2),
-        ))
-        console.print("[dim]Press any key to continue...[/dim]")
+        console.print(theme.report("Madokami", f"[bold]{escape(here)}[/bold]\n\n{message}\n"
+            f"[muted]Open it in your browser instead:[/muted]\n{escape(madokami._BASE + path)}", tone=theme.WARN))
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
 
     def batch_item(self, result, *, download_dir, cancel_event, set_status) -> BatchItemOutcome:
@@ -561,7 +544,6 @@ class LibgenAcquisition:
         from torrent_finder import libgen
         from torrent_finder.constants import get_download_dir
         from torrent_finder.utils import start_esc_listener
-        from rich.panel import Panel
         from rich.progress import (
             BarColumn, DownloadColumn, Progress, TextColumn, TimeRemainingColumn,
             TransferSpeedColumn,
@@ -579,14 +561,11 @@ class LibgenAcquisition:
         if cancelled:
             return PickOutcome("back")
         if not url:
-            console.print(Panel(
-                f"[bold]{escape(name)}[/bold]\n\n"
+            console.print(theme.report("Libgen", f"[bold]{escape(name)}[/bold]\n\n"
                 "[warning]Couldn't resolve the download link[/warning] "
                 "(mirrors unreachable or page layout changed).\n"
-                f"[cyan]Open the page and grab it manually:[/cyan]\n{escape(page_url)}",
-                title="📖 Libgen", border_style="yellow", padding=(1, 2),
-            ))
-            console.print("[dim]Press any key to continue...[/dim]")
+                f"[muted]Open the page and grab it manually:[/muted]\n{escape(page_url)}", tone=theme.WARN))
+            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
             readchar.readkey()
             return PickOutcome("back")
 
@@ -627,12 +606,9 @@ class LibgenAcquisition:
             body = "[warning] Download cancelled.[/warning]"
         else:
             body = ("[warning]Download failed.[/warning]\n"
-                    f"[cyan]Grab it manually:[/cyan]\n{escape(page_url)}")
-        console.print(Panel(
-            f"[bold]{escape(name)}[/bold]\n\n{body}",
-            title="📖 Libgen", border_style="bright_blue", padding=(1, 2),
-        ))
-        console.print("[dim]Press any key to continue...[/dim]")
+                    f"[muted]Grab it manually:[/muted]\n{escape(page_url)}")
+        console.print(theme.report("Libgen", f"[bold]{escape(name)}[/bold]\n\n{body}"))
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         return PickOutcome("next" if dest else "back")
 
@@ -678,7 +654,6 @@ class FDroidAcquisition:
         from torrent_finder import fdroid
         from torrent_finder.constants import get_download_dir
         from torrent_finder.utils import start_esc_listener
-        from rich.panel import Panel
         from rich.progress import (
             BarColumn, DownloadColumn, Progress, TextColumn, TimeRemainingColumn,
             TransferSpeedColumn,
@@ -696,14 +671,11 @@ class FDroidAcquisition:
         if cancelled:
             return PickOutcome("back")
         if not apk:
-            console.print(Panel(
-                f"[bold]{escape(name)}[/bold]\n\n"
+            console.print(theme.report("F-Droid", f"[bold]{escape(name)}[/bold]\n\n"
                 "[warning]Couldn't find a version to download[/warning] (F-Droid unreachable or no "
                 "suggested version).\n"
-                f"[cyan]Open the package page instead:[/cyan]\n{escape(page_url)}",
-                title="🤖 F-Droid", border_style="yellow", padding=(1, 2),
-            ))
-            console.print("[dim]Press any key to continue...[/dim]")
+                f"[muted]Open the package page instead:[/muted]\n{escape(page_url)}", tone=theme.WARN))
+            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
             readchar.readkey()
             return PickOutcome("back")
         url, version, builds = apk
@@ -745,12 +717,9 @@ class FDroidAcquisition:
             body = "[warning] Download cancelled.[/warning]"
         else:
             body = ("[warning]Download failed.[/warning]\n"
-                    f"[cyan]Get it from the package page:[/cyan]\n{escape(page_url)}")
-        console.print(Panel(
-            f"[bold]{escape(name)}[/bold]\n\n{body}",
-            title="🤖 F-Droid", border_style="bright_blue", padding=(1, 2),
-        ))
-        console.print("[dim]Press any key to continue...[/dim]")
+                    f"[muted]Get it from the package page:[/muted]\n{escape(page_url)}")
+        console.print(theme.report("F-Droid", f"[bold]{escape(name)}[/bold]\n\n{body}"))
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         return PickOutcome("next" if dest else "back")
 

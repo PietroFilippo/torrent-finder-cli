@@ -597,7 +597,7 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
     console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
     if select_indexes:
         console.print(f"[info]Selected files:[/info] [highlight]{compact_ranges(select_indexes)}[/highlight] ({len(select_indexes)} file(s))")
-    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
+    console.print("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n")
 
     cmd = [
         aria_path,
@@ -617,7 +617,7 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
     quiet = is_quiet_mode()
 
     try:
-        rc = _run_download(cmd, quiet, "[bold cyan]Downloading…[/bold cyan]  Ctrl+C cancel")
+        rc = _run_download(cmd, quiet, "[accent]Downloading…[/accent]  Ctrl+C cancel")
         if rc is None:
             console.print("\n[warning] Download cancelled.[/warning]\n")
             return False
@@ -655,7 +655,7 @@ def download_many_with_aria2(magnets: list[str]) -> bool:
         return False
     console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
     console.print(f"[info]Torrents:[/info] [highlight]{len(magnets)}[/highlight] (downloaded in parallel)")
-    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
+    console.print("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n")
 
     cmd = [
         aria_path,
@@ -668,7 +668,7 @@ def download_many_with_aria2(magnets: list[str]) -> bool:
     try:
         rc = _run_download(
             cmd, quiet,
-            f"[bold cyan]Downloading {len(magnets)} torrent(s)…[/bold cyan]  Ctrl+C cancel",
+            f"[accent]Downloading {len(magnets)} torrent(s)…[/accent]  Ctrl+C cancel",
         )
         if rc is None:
             console.print("\n[warning] Downloads cancelled.[/warning]\n")
@@ -716,7 +716,7 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
                 f"[warning] Running {len(select_indexes)} sequential sessions "
                 "(webtorrent-cli downloads one file per run).[/warning]"
             )
-    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
+    console.print("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n")
 
     targets: list[int | None] = [i for i in (select_indexes or [])] or [None]
     quiet = is_quiet_mode()
@@ -730,7 +730,7 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
                 cmd.extend(["--select", str(idx - 1)])  # webtorrent is 0-based
             rc = _run_download(
                 cmd, quiet,
-                f"[bold cyan]Downloading…[/bold cyan]  "
+                f"[accent]Downloading…[/accent]  "
                 f"{'session ' + str(n) + '/' + str(len(targets)) + '  •  ' if len(targets) > 1 else ''}"
                 "Ctrl+C cancel",
             )
@@ -781,7 +781,7 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
                 f"[warning] Running {len(select_indexes)} sequential sessions "
                 "(peerflix handles one file per run).[/warning]"
             )
-    console.print("[bold red]To cancel, press CTRL+C at any time.[/bold red]\n")
+    console.print("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n")
 
     targets: list[int | None] = [i for i in (select_indexes or [])] or [None]
     quiet = is_quiet_mode()
@@ -795,7 +795,7 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
                 cmd.extend(["-i", str(idx - 1)])  # peerflix is 0-based
             rc = _run_download(
                 cmd, quiet,
-                f"[bold cyan]Downloading…[/bold cyan]  "
+                f"[accent]Downloading…[/accent]  "
                 f"{'session ' + str(n) + '/' + str(len(targets)) + '  •  ' if len(targets) > 1 else ''}"
                 "Ctrl+C cancel",
             )
@@ -944,7 +944,7 @@ def _run_stream(
                     hints.append("v reopen VLC")
                 if allow_navigate:
                     hints.append("n/b next/prev")
-                msg = "[bold cyan]Streaming…[/bold cyan]  " + "  •  ".join(hints)
+                msg = "[accent]Streaming…[/accent]  " + "  •  ".join(hints)
                 with console.status(msg, spinner="dots"):
                     nav_action = _poll_loop()
             else:
@@ -1092,7 +1092,7 @@ def _resolve_subs_for_session(
         console.print(
             f"[info]Found {len(missing)} subtitle file(s) inside torrent — fetching via aria2c…[/info]"
         )
-        with console.status("[bold cyan]Downloading subtitles…[/bold cyan]", spinner="dots"):
+        with console.status("[accent]Downloading subtitles…[/accent]", spinner="dots"):
             local.update(_fetch_torrent_subs(magnet_link, files_meta, missing))
 
     result: dict[int, list[str]] = {}

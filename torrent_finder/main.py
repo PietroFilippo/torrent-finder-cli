@@ -189,7 +189,7 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
     # The status line names the item being handled ("(3/8) Title…") — and for a
     # Madokami file, a live MB counter — so a multi-minute batch isn't a blind
     # spinner. Titles are markup-escaped (manga names carry brackets).
-    status = console.status("[bold cyan]Opening torrents…  (Esc to stop)[/bold cyan]", spinner="dots")
+    status = console.status("[accent]Opening torrents…  (Esc to stop)[/accent]", spinner="dots")
     selection = [results[gi] for gi in idxs if 0 <= gi < len(results)]
     notes: list[str] = []
     try:
@@ -202,10 +202,10 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
                 r = results[gi]
                 name = r.get("name", "Unknown")
                 shown = escape(name[:40] + ("…" if len(name) > 40 else ""))
-                status.update(f"[bold cyan]({k}/{n}) {shown}  (Esc to stop)[/bold cyan]")
+                status.update(f"[accent]({k}/{n}) {shown}  (Esc to stop)[/accent]")
                 def _set_status(suffix, _k=k, _shown=shown):
                     status.update(
-                        f"[bold cyan]({_k}/{n}) {_shown} — {suffix}  (Esc to stop)[/bold cyan]"
+                        f"[accent]({_k}/{n}) {_shown} — {suffix}  (Esc to stop)[/accent]"
                     )
 
                 outcome = None
@@ -246,7 +246,7 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
     else:
         lines = [f"[success]✓ {sent} of {n} handed to your torrent client.[/success]"]
     if ofix_pw:
-        lines.append(f"[cyan]Online-Fix archive password:[/cyan] {escape(ofix_pw)}")
+        lines.append(f"[muted]Online-Fix archive password:[/muted] {escape(ofix_pw)}")
     lines += [f"[warning]{escape(note)}[/warning]" for note in notes[:4]]
     if failed:
         shown = ", ".join(failed[:6]) + (" …" if len(failed) > 6 else "")
@@ -264,7 +264,7 @@ def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
     """
     magnets: list[str] = []
     skipped = 0
-    with console.status("[bold cyan]Collecting magnet links…[/bold cyan]", spinner="dots"):
+    with console.status("[accent]Collecting magnet links…[/accent]", spinner="dots"):
         for gi in idxs:
             if not (0 <= gi < len(results)):
                 continue
@@ -276,7 +276,7 @@ def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
 
     if not magnets:
         console.print("[warning] No magnet links in this selection (e.g. all Online-Fix / Madokami).[/warning]")
-        console.print("[dim]Press any key to continue...[/dim]")
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         clear_screen()
         return
@@ -290,7 +290,7 @@ def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
         )
     if skipped:
         console.print(f"[dim]{skipped} skipped (no magnet link).[/dim]")
-    console.print("[dim]Press any key to continue...[/dim]")
+    console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
     readchar.readkey()
     clear_screen()
 
@@ -311,7 +311,7 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
     magnets: list[str] = []
     picked: list[dict] = []
     skipped = 0
-    with console.status("[bold cyan]Collecting magnet links…[/bold cyan]", spinner="dots"):
+    with console.status("[accent]Collecting magnet links…[/accent]", spinner="dots"):
         for gi in idxs:
             if not (0 <= gi < len(results)):
                 continue
@@ -324,7 +324,7 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
 
     if not magnets:
         console.print("[warning] Nothing to download via aria2c — no magnet links (e.g. all Online-Fix / Madokami).[/warning]")
-        console.print("[dim]Press any key to continue...[/dim]")
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         clear_screen()
         return "back"
@@ -341,7 +341,7 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
         for r in picked:
             record_torrent_picked(provider_for_result(r, provider).slug, int(r.get("seeders", 0) or 0))
     if not ok:
-        console.print("[dim]Press any key to return to download options...[/dim]")
+        console.print("[muted]Press [key]any key[/key] to return to download options…[/muted]")
         readchar.readkey()
         return "back"
     from torrent_finder import unpack
@@ -412,8 +412,8 @@ def _unpack_downloaded(paths) -> str:
 
     if not any(unpack.is_archive(path) for path in paths):
         return ""
-    with console.status("[bold cyan]Unpacking…[/bold cyan]", spinner="dots") as status:
-        report = unpack.unpack_all(paths, status=lambda text: status.update(f"[bold cyan]{escape(text)}[/bold cyan]"))
+    with console.status("[accent]Unpacking…[/accent]", spinner="dots") as status:
+        report = unpack.unpack_all(paths, status=lambda text: status.update(f"[accent]{escape(text)}[/accent]"))
     return "\n".join(unpack.summary_lines(report))
 
 
@@ -441,7 +441,7 @@ def _fetch_session_files(session) -> tuple[bool, object]:
     stop_listener = start_esc_listener(cancel_event)
     try:
         try:
-            with console.status("[bold cyan]Fetching file list...[/bold cyan]", spinner="dots"):
+            with console.status("[accent]Fetching file list...[/accent]", spinner="dots"):
                 metadata = session.fetch_files_meta(cancel_event=cancel_event)
         except KeyboardInterrupt:
             # Deeper flows cancel locally. Only the idle provider /
@@ -598,7 +598,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                 clear_screen()
                 if not has_aria2():
                     console.print("[error]aria2c required to list files. Install from https://aria2.github.io/[/error]\n")
-                    console.print("[dim]Press any key to continue...[/dim]")
+                    console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
                     readchar.readkey()
                     continue
                 cancelled, metadata = _fetch_session_files(session)
@@ -608,7 +608,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                 if not metadata or not metadata.files:
                     console.print("[error] Could not fetch file list (timeout or no metadata peers).[/error]")
                     console.print("[dim]Choose Browse torrent files again to retry.[/dim]\n")
-                    console.print("[dim]Press any key to continue...[/dim]")
+                    console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
                     readchar.readkey()
                     continue
                 picked = episode_select_prompt(metadata.files, preselected=session.selected_files)
@@ -639,7 +639,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                     console.print(f"[error] Couldn't open the magnet link: {escape(error.strerror or str(error))}[/error]")
                     console.print("[dim]Is a torrent client set to open magnet links? You can also use "
                                   "Copy magnet link and add it in your client.[/dim]\n")
-                    console.print("[dim]Press any key to return to download options...[/dim]")
+                    console.print("[muted]Press [key]any key[/key] to return to download options…[/muted]")
                     readchar.readkey()
                     continue
                 record_magnet_dispatch()
@@ -665,7 +665,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                         console.print("[warning] File list unavailable — streaming the backend's default file.[/warning]")
                 stream = stream_with_peerflix if method == "stream_p" else stream_with_webtorrent
                 stream(session)
-                console.print("\n[dim]Press any key to continue...[/dim]")
+                console.print("\n[muted]Press [key]any key[/key] to continue…[/muted]")
                 readchar.readkey()
                 continue
             elif method == "aria":
@@ -674,7 +674,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                 if ok:
                     record_method_complete("aria")
                 if not ok:
-                    console.print("\n[dim]Press any key to return to download options...[/dim]")
+                    console.print("\n[muted]Press [key]any key[/key] to return to download options…[/muted]")
                     readchar.readkey()
                     continue
                 if download_complete_prompt("Download finished", summary=_unpack_torrent(session)) == "next":
@@ -686,7 +686,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                 if ok:
                     record_method_complete("peerflix_download")
                 if not ok:
-                    console.print("\n[dim]Press any key to return to download options...[/dim]")
+                    console.print("\n[muted]Press [key]any key[/key] to return to download options…[/muted]")
                     readchar.readkey()
                     continue
                 if download_complete_prompt("Download finished", summary=_unpack_torrent(session)) == "next":
@@ -698,7 +698,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                 if ok:
                     record_method_complete("webtorrent_download")
                 if not ok:
-                    console.print("\n[dim]Press any key to return to download options...[/dim]")
+                    console.print("\n[muted]Press [key]any key[/key] to return to download options…[/muted]")
                     readchar.readkey()
                     continue
                 if download_complete_prompt("Download finished", summary=_unpack_torrent(session)) == "next":
@@ -748,7 +748,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                         f"[highlight]{_os.path.basename(sub_paths[0])}[/highlight]"
                         f"[success].[/success]"
                     )
-                console.print("\n[dim]Press any key to continue...[/dim]")
+                console.print("\n[muted]Press [key]any key[/key] to continue…[/muted]")
                 readchar.readkey()
                 continue
             elif method == "cancel":  # ✕ Cancel → done with this torrent → what's next
@@ -1011,13 +1011,13 @@ def _run_update_flow(info: dict) -> None:
         clear_screen()
         return
     if ok and needs_exit_before_update(info):
-        console.print("[dim]Press any key to close and let the update finish.[/dim]")
+        console.print("[muted]Press [key]any key[/key] to close and let the update finish.[/muted]")
         try:
             readchar.readkey()
         except KeyboardInterrupt:
             pass
         raise SystemExit(0)
-    console.print("\n[dim]Press any key to continue...[/dim]")
+    console.print("\n[muted]Press [key]any key[/key] to continue…[/muted]")
     try:
         readchar.readkey()
     except KeyboardInterrupt:

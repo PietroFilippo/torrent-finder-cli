@@ -164,14 +164,14 @@ def stats_page() -> None:
             val = items_list[idx].value
             if val == "reset":
                 if confirm_prompt(
-                    "[bold red]Reset all stats?[/bold red]\n\n"
+                    "[error]Reset all stats?[/error]\n\n"
                     "This will delete all usage counters permanently."
                 ):
                     try:
                         reset_stats()
                     except (OSError, ValueError) as error:
                         from rich.markup import escape
-                        notice = f"[bold red]Stats were not reset:[/bold red] {escape(str(error))}"
+                        notice = f"[error]Stats were not reset:[/error] {escape(str(error))}"
                         return True  # stay; the saved counters are unchanged
                     notice = ""
                     return False  # exit to outer loop → rebuild

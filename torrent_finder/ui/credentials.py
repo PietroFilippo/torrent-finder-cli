@@ -132,7 +132,7 @@ def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) ->
     """Validate, verify, and save entered values; False reopens the form."""
     if not entered:
         console.print("[dim]No changes entered — existing credentials kept, nothing saved.[/dim]")
-        console.print("[dim]Press any key to continue...[/dim]")
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         return True
 
@@ -141,12 +141,12 @@ def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) ->
     if missing:
         labels = ", ".join(field.label for field in missing)
         console.print(f"[warning]Required field(s) missing: {labels}.[/warning]")
-        console.print("[dim]Press any key to continue...[/dim]")
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         return False
 
     try:
-        with console.status("[bold cyan]Verifying credentials…[/bold cyan]", spinner="dots"):
+        with console.status("[accent]Verifying credentials…[/accent]", spinner="dots"):
             ok, message = meta.verify(effective)
     except KeyboardInterrupt:
         console.print("[warning]Verification cancelled — nothing saved.[/warning]")
@@ -163,7 +163,7 @@ def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) ->
             "Save these credentials anyway? — Y/Yes to save, anything else cancels:"
         ):
             console.print("[warning]Not saved.[/warning]")
-            console.print("[dim]Press any key to continue...[/dim]")
+            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
             readchar.readkey()
             return False
 
@@ -174,7 +174,7 @@ def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) ->
         readchar.readkey()
         return False
     console.print(f"[success]Saved {meta.name} credentials.[/success]")
-    console.print("[dim]Press any key to continue...[/dim]")
+    console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
     readchar.readkey()
     return True
 
@@ -286,7 +286,7 @@ def _manage_credentials(meta: CredentialSpec) -> None:
                     + ".[/warning]"
                 )
                 console.print("[dim]Unset those environment variables to fully remove them.[/dim]")
-            console.print("[dim]Press any key to continue...[/dim]")
+            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
             readchar.readkey()
 
 

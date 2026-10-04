@@ -128,10 +128,10 @@ def tips_page() -> None:
         category = _CATEGORY_OPTIONS[state["category_idx"]]
         query_label = escape(state["query"]) if state["query"] else "none"
         return (
-            "↑/↓ scroll  •  [bold yellow]/[/bold yellow] search  •  "
-            f"[bold yellow]C[/bold yellow] category: [cyan]{escape(category)}[/cyan]  •  "
-            f"[bold yellow]X[/bold yellow] clear  •  Esc back\n"
-            f" Search: [cyan]{query_label}[/cyan]"
+            "↑/↓ scroll  •  [warning]/[/warning] search  •  "
+            f"[warning]C[/warning] category: [muted]{escape(category)}[/muted]  •  "
+            f"[warning]X[/warning] clear  •  Esc back\n"
+            f" Search: [muted]{query_label}[/muted]"
         )
 
     def _cycle_category(cursor: int, items_list: list[SelectItem]):

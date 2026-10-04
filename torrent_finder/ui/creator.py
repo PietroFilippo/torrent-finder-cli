@@ -51,7 +51,7 @@ def _run_cancellable(fn, message: str, cancel: "threading.Event | None" = None):
     threading.Thread(target=work, daemon=True).start()
     stop = start_esc_listener(cancel)
     try:
-        with console.status(f"[bold cyan]{message}[/bold cyan]", spinner="dots"):
+        with console.status(f"[accent]{message}[/accent]", spinner="dots"):
             while not out.get("done") and not cancel.is_set():
                 time.sleep(0.05)
     except KeyboardInterrupt:
@@ -63,7 +63,7 @@ def _run_cancellable(fn, message: str, cancel: "threading.Event | None" = None):
 
 def _notice(msg: str) -> None:
     console.print(f"[warning] {escape(msg)}[/warning]")
-    console.print("[dim]Press any key to continue...[/dim]")
+    console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
     readchar.readkey()
 
 
@@ -246,9 +246,9 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
 
     nav_bits = []
     if has_prev:
-        nav_bits.append("[bold yellow]p[/bold yellow] prev")
+        nav_bits.append("[warning]p[/warning] prev")
     if has_next:
-        nav_bits.append("[bold yellow]n[/bold yellow] next")
+        nav_bits.append("[warning]n[/warning] next")
     nav = ("  •  " + " / ".join(nav_bits) + " page") if nav_bits else ""
     footer = (
         "↑/↓ nav  •  Space/Enter toggle  •  a all  •  i invert  •  c clear  •  "
@@ -333,7 +333,7 @@ def _apply_prefetch(cache):
     if holder is None:
         return
     if not holder["done"]:
-        with console.status("[bold cyan]Fetching more titles…[/bold cyan]", spinner="dots"):
+        with console.status("[accent]Fetching more titles…[/accent]", spinner="dots"):
             holder["thread"].join()
     have = {w.title for w in cache["all"]}
     cache["all"].extend(w for w in holder["works"] if w.title not in have)

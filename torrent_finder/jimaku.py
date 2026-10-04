@@ -117,7 +117,7 @@ def search_and_download(torrent_name: str) -> Optional[str]:
     query = _clean_title(torrent_name)
     console.print(f"[info]Searching Jimaku for:[/info] [highlight]{query}[/highlight]")
 
-    with console.status("[bold cyan]Querying Jimaku...[/bold cyan]", spinner="dots"):
+    with console.status("[accent]Querying Jimaku...[/accent]", spinner="dots"):
         entries = _search_entries(query, key)
     if not entries:
         console.print("[warning]No Jimaku series matched — trying subliminal instead.[/warning]")
@@ -134,7 +134,7 @@ def search_and_download(torrent_name: str) -> Optional[str]:
             return None
         entry = items[idx].value
 
-    with console.status("[bold cyan]Loading subtitle files...[/bold cyan]", spinner="dots"):
+    with console.status("[accent]Loading subtitle files...[/accent]", spinner="dots"):
         files = _list_files(entry.get("id"), key)
     files = [f for f in files if isinstance(f.get("name"), str) and f.get("url")]
     if not files:
@@ -153,7 +153,7 @@ def search_and_download(torrent_name: str) -> Optional[str]:
         return None
     chosen = file_items[idx].value
 
-    with console.status(f"[bold cyan]Downloading {chosen['name']}...[/bold cyan]", spinner="dots"):
+    with console.status(f"[accent]Downloading {chosen['name']}...[/accent]", spinner="dots"):
         saved = _download(chosen["url"], chosen["name"], key)
     if saved:
         console.print(f"\n[success]Saved Jimaku subtitle to {get_download_dir()}![/success]")

@@ -8,7 +8,6 @@ from collections.abc import Callable
 import readchar
 from rich.cells import cell_len
 from rich.console import Console
-from rich.panel import Panel
 from rich.markup import escape
 from rich.text import Text
 
@@ -847,7 +846,7 @@ def filter_menu(provider, on_save=None) -> None:
                 from rich.markup import escape
                 console.print(f"[warning] Filters apply to this session, but couldn't be saved: "
                               f"{escape(str(error))}[/warning]")
-                console.print("[dim]Press any key to continue...[/dim]")
+                console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
                 readchar.readkey()
     # "back" — just return
 
@@ -1114,7 +1113,7 @@ def subtitle_source_prompt(current: dict | None = None) -> dict:
             return current
         if not os.path.exists(path):
             console.print(f"[warning] File not found: {escape(path)}[/warning]")
-            console.print("[dim]Press any key to continue...[/dim]")
+            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
             readchar.readkey()
             return current
         return {"mode": "external", "path": os.path.abspath(path)}
@@ -1257,27 +1256,27 @@ def download_dir_prompt() -> None:
         os.makedirs(path, exist_ok=True)
     except OSError as e:
         console.print(f"[error] Could not create directory: {e}[/error]")
-        console.print("[dim]Press any key to continue...[/dim]")
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         return
     save_setting("download_dir", path)
 
 
 def confirm_prompt(message: str, title: str = "Confirm") -> bool:
-    """Show a Y/N confirmation modal in the alt-screen. Returns True on Y."""
-    panel = Panel(
-        Text.from_markup(
-            f"{message}\n\n"
-            "[bold yellow]Y[/bold yellow] confirm  •  any other key cancel"
-        ),
-        title=f"[bold red]{title}[/bold red]",
-        border_style="red",
-        padding=(1, 2),
-    )
+    """Show a Y/N confirmation on the alt-screen in the Quiet layout. Returns True on Y."""
+    from rich.console import Group
+    width = console.size.width
+    lines = list(theme.header_lines(title, "", width))
+    if console.size.height >= 12:
+        lines.append(Text(""))
+    lines += theme.wrap_block(Text.from_markup(message), width, console)
+    lines.append(Text(""))
+    lines += theme.wrap_block(Text("Any other key cancels too.", style=theme.MUTED), width, console)
+    lines += theme.wrap_keys(theme.parse_footer("Y confirm  •  Esc cancel").keys, width)
     sys.stdout.write("\033[?1049h\033[?25l\033[H\033[2J")
     sys.stdout.flush()
     try:
-        console.print(panel)
+        console.print(Group(*lines))
         try:
             key = readchar.readkey()
         except (EOFError, KeyboardInterrupt):
@@ -1289,8 +1288,8 @@ def confirm_prompt(message: str, title: str = "Confirm") -> bool:
 
 
 def print_banner() -> None:
-    """Display the app's header line and a spacer, as every screen starts."""
-    console.print(_make_banner_panel())
+    """Start a main-screen log: the app name at column 0, then a spacer."""
+    console.print(theme.log_header(width=console.size.width))
     console.print()
 
 
@@ -1308,7 +1307,7 @@ def torrent_info_screen(result: dict) -> None:
     from torrent_finder.torrent_info import fetch_torrent_info
 
     try:
-        with console.status("[bold cyan]Fetching torrent info…[/bold cyan]", spinner="dots"):
+        with console.status("[accent]Fetching torrent info…[/accent]", spinner="dots"):
             info, err = fetch_torrent_info(result)
     except KeyboardInterrupt:
         console.print("[warning]Torrent info fetch cancelled.[/warning]")
@@ -1316,7 +1315,7 @@ def torrent_info_screen(result: dict) -> None:
 
     if info is None:
         console.print(f"[warning]{err}[/warning]")
-        console.print("[dim]Press any key to continue...[/dim]")
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         return
 
@@ -1802,7 +1801,7 @@ def _provider_group_menu(group) -> object | None:
             title=f"{group.name} — choose a source",
             footer=(
                 "↑/↓ navigate  •  Enter select  •  "
-                "[bold yellow]F[/bold yellow] filters  •  Esc back"
+                "[warning]F[/warning] filters  •  Esc back"
             ),
             banner=_make_banner_panel(),
             start_index=start,

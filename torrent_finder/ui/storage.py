@@ -34,14 +34,14 @@ def storage_problem_prompt() -> None:
         if pick is None or items[pick].value == "continue":
             return
         if items[pick].value == "retry":
-            notice = "" if store.retry_load() else "[bold red]Still unreadable.[/bold red]"
+            notice = "" if store.retry_load() else "[error]Still unreadable.[/error]"
             continue
         try:
             aside = store.set_aside_unreadable()
         except OSError as error:
-            notice = f"[bold red]Could not rename it:[/bold red] {escape(str(error))}"
+            notice = f"[error]Could not rename it:[/error] {escape(str(error))}"
             continue
         console.print(f"[info]The unreadable settings were kept as {escape(aside)}. "
                       "New settings are saved from now on.[/info]")
-        console.print("[dim]Press any key to continue...[/dim]")
+        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
