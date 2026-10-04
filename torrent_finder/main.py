@@ -507,6 +507,7 @@ def _browse_results(provider, results, note: str = "") -> str:
         session = TorrentSession(selected, outcome.magnet)
 
         go_back_to_results = False
+        last_method = None  # coming back to the options keeps the cursor here
         while True:
             show_subs = getattr(selected_provider, "supports_subtitles", False)
             show_picker = getattr(selected_provider, "supports_episode_picker", False)
@@ -520,7 +521,9 @@ def _browse_results(provider, results, note: str = "") -> str:
                 show_streaming=show_stream,
                 page_url=session.result.get("page_url") or None,
                 info_source=session.result.get("source") or None,
+                focus=last_method,
             )
+            last_method = method
 
             if method in _METHOD_TRACK:
                 record_method_pick(_METHOD_TRACK[method])

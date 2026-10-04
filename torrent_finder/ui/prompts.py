@@ -1274,6 +1274,7 @@ def download_method_prompt(
     show_streaming: bool = True,
     page_url: str | None = None,
     info_source: str | None = None,
+    focus: str | None = None,
 ) -> str | None:
     """
     Prompt the user to choose a download method.
@@ -1281,7 +1282,8 @@ def download_method_prompt(
     'torrent_info', 'set_subs', 'back', 'cancel', or None (Esc). 'back' and Esc
     step back to the results table; 'cancel' (✕ Cancel) means "done with this
     torrent" → caller goes to what's next. 'l' (copy magnet) and 'open_page'
-    (browser) are handled internally.
+    (browser) are handled internally. *focus* is the value of the row to start
+    on (the option chosen last time); otherwise "Open in client" is focused.
     """
     wt_available = has_webtorrent()
     pf_available = has_peerflix()
@@ -1561,7 +1563,8 @@ def download_method_prompt(
         title=title,
         banner=_make_banner_panel(),
         on_action=handle_download_action,
-        start_index=default_focus,  # land on "Open in client" (the primary action)
+        # Return to the option chosen last time, else "Open in client" (the primary action).
+        start_index=next((i for i, item in enumerate(items) if focus and item.value == focus), default_focus),
     )
 
     if idx is None:

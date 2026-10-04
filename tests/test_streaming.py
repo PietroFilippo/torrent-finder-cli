@@ -325,6 +325,7 @@ class StreamPreparationTests(unittest.TestCase):
              patch.object(main, "stream_with_webtorrent", return_value="ended") as stream:
             self.assertEqual(main.browse_results(self.provider, [self.result]), "back")
         self.assertEqual(menu.call_count, 2)  # back at the same download options
+        self.assertEqual([call.kwargs["focus"] for call in menu.call_args_list], [None, "stream_w"])
         return stream
 
     def session(self, fetch, status="unknown"):
@@ -343,6 +344,21 @@ class StreamPreparationTests(unittest.TestCase):
         self.run_stream_choice(session).assert_called_once_with(session)
         failed_before = self.session(AssertionError("must not fetch again"), status="unavailable")
         self.run_stream_choice(failed_before).assert_called_once_with(failed_before)
+
+
+class MethodFocusTests(unittest.TestCase):
+    def start_row(self, **kwargs):
+        from torrent_finder.ui import prompts
+        with patch.object(prompts, "arrow_select", return_value=None) as select,              patch.object(prompts, "has_webtorrent", return_value=True),              patch.object(prompts, "has_peerflix", return_value=True),              patch.object(prompts, "has_aria2", return_value=True):
+            prompts.download_method_prompt(magnet=MAGNET, **kwargs)
+        items = select.call_args.args[0]
+        return items[select.call_args.kwargs["start_index"]].value
+
+    def test_returning_keeps_the_last_option_and_a_new_torrent_starts_on_the_client(self):
+        self.assertEqual(self.start_row(), "t")
+        self.assertEqual(self.start_row(focus="stream_w"), "stream_w")
+        self.assertEqual(self.start_row(focus="pick_episodes", show_episode_picker=True), "pick_episodes")
+        self.assertEqual(self.start_row(focus="no-longer-offered"), "t")
 
 
 class MetadataRetryTests(unittest.TestCase):
