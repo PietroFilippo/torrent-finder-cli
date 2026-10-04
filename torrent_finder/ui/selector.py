@@ -131,7 +131,7 @@ def _prefix_width(item: "SelectItem", multi: bool, badge_width: int) -> int:
 @dataclass(frozen=True)
 class _Geometry:
     badge_width: int
-    # Item index -> common label width, for rows whose inline hints line up.
+    # Item index -> cell where the label area ends, for rows whose inline hints line up.
     hint_columns: dict = field(default_factory=dict)
 
 
@@ -152,7 +152,8 @@ def _geometry(items: list["SelectItem"], multi: bool) -> _Geometry:
             hint_width = max(cell_len(item.hint) for item in hinted)
             prefix = max(_prefix_width(item, multi, badge_width) for item in hinted)
             if prefix + label_width + 2 + hint_width <= _inner_width():
-                columns.update((i, label_width) for i in run)
+                # An absolute column, so a row with a marker still lines up.
+                columns.update((i, prefix + label_width) for i in run)
         run.clear()
 
     for index, item in enumerate(items):
@@ -235,7 +236,8 @@ def _row(item: "SelectItem", index: int, is_cursor: bool, multi: bool, geometry:
     if _inline_hint(item):
         column = geometry.hint_columns.get(index)
         if column is not None:
-            row.append(" " * max(0, min(column, available) - cell_len(label)))
+            prefix = _prefix_width(item, multi, geometry.badge_width)
+            row.append(" " * max(0, min(column, prefix + available) - prefix - cell_len(label)))
         row.append(f"  {item.hint}", style=theme.MUTED)
     return row
 
@@ -344,6 +346,14 @@ def _build_panel(
         item_blocks = [_clip_lines(item_blocks, keep, inner_width)]
         chrome -= item_lines - keep
         item_lines = keep
+    # Still too tall: footer prose (notices, a long search text) shortens too.
+    missing = chrome + 1 - height
+    context = parsed.context
+    if missing > 0 and notice_lines > 1:
+        keep = max(1, notice_lines - missing)
+        context = [_clip_lines(parsed.context, keep, inner_width)]
+        chrome -= notice_lines - keep
+        notice_lines = keep
     max_visible = max(1, height - chrome)
 
     win_start_rel, win_end_rel = _compute_window(
@@ -376,7 +386,7 @@ def _build_panel(
         lines.append(_row(item, i, i == cursor, multi, geometry, tick))
 
     lines.append(Text(""))
-    for block in item_blocks + parsed.context:
+    for block in item_blocks + context:
         lines.extend(theme.wrap_block(block, width, console))
     if (item_lines or notice_lines) and not compact:
         lines.append(Text(""))

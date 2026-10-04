@@ -454,3 +454,24 @@ class SignInFitTests(unittest.TestCase):
                         self.assertLessEqual(len(lines), height)
                         self.assertIn(theme.CURSOR, "\n".join(lines))
                         self.assertIn("Esc cancel", "\n".join(lines))
+
+
+class SelectorRoundTwoTests(unittest.TestCase):
+    def test_long_footer_prose_is_clipped_to_keep_rows_and_keys(self):
+        items = [SelectItem(f"Tip {i}") for i in range(10)] + [SelectItem("Back", is_action=True)]
+        footer = f"Search: {'no-such-tip-' * 40}\n↑/↓ scroll • / search • C category: All • X clear • Esc back"
+        screen = Console(file=io.StringIO(), width=50, height=16, color_system=None)
+        with patch.object(selector, "console", screen):
+            lines = plain_lines(selector._build_panel(items, 0, "Tips", False, footer), 50, 16)
+        self.assertLessEqual(len(lines), 16)
+        self.assertIn("Esc back", "\n".join(lines))
+        self.assertIn("Tip 0", "\n".join(lines))
+
+    def test_hints_line_up_when_one_row_carries_a_marker(self):
+        items = [SelectItem("Episode one", hint="1.4 GB"), SelectItem("Episode two", hint="1.4 GB", marker=theme.MARKER)]
+        screen = Console(file=io.StringIO(), width=80, height=20, color_system=None)
+        with patch.object(selector, "console", screen):
+            lines = plain_lines(selector._build_panel(items, 0, "Files", True), 80, 20)
+        one = next(line for line in lines if "Episode one" in line)
+        two = next(line for line in lines if "Episode two" in line)
+        self.assertEqual(one.index("1.4 GB"), two.index("1.4 GB"))
