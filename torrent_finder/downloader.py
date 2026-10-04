@@ -131,9 +131,11 @@ _VLC_GRACE_S = 2.0
 class _StreamPlayer:
     """The VLC window(s) one streamed episode opens; other players are never touched.
 
-    Launches happen only while the episode is live: ``end()`` stops pending and
+    Launches happen only while the episode is live. ``end()`` stops pending and
     future launches, so a readiness waiter that wakes up late does nothing, and
-    ``end(close=True)`` also closes the windows this episode opened.
+    closes the windows this episode opened: once its server stops (Ctrl+C,
+    n/b, the backend exiting) they can't play anything more. webtorrent keeps
+    serving while VLC is connected, so a stream doesn't end under the viewer.
     """
 
     def __init__(self, url: str | None, sub_paths: list[str] | None) -> None:
@@ -167,10 +169,10 @@ class _StreamPlayer:
         thread.start()
         return thread
 
-    def end(self, close: bool = False) -> None:
+    def end(self) -> None:
         with self._lock:
             self.ended.set()
-            windows = list(self._windows) if close else []
+            windows = list(self._windows)
         for window in windows:
             if window.poll() is None:
                 _kill_process_tree(window)
@@ -836,7 +838,8 @@ def _run_stream(
     as soon as the streaming server is up — replaces webtorrent/peerflix's own
     ``--vlc`` flag so we control VLC's argv (and can attach ``--sub-file``).
     The VLC window opened this way (or by 'v') belongs to this episode: nothing
-    launches after it ends, and 'n'/'b' close only that window.
+    launches after it ends, and ending it (Ctrl+C, 'n'/'b', the backend
+    exiting) closes only that window.
     When allow_navigate is True, 'n'/'b' terminate the subprocess so the
     caller can advance or go back in a multi-ep flow. Returns (returncode,
     nav_action) where nav_action is 'next', 'back', or 'none'.
@@ -915,7 +918,7 @@ def _run_stream(
         return proc.returncode or 0, nav_action
     finally:
         stop_event.set()
-        player.end(close=nav_action in ("next", "back"))
+        player.end()
         if log is not None:
             log.close()
             _trim_log(log_path)

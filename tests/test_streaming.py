@@ -70,16 +70,34 @@ class PlayerOwnershipTests(unittest.TestCase):
         self.assertEqual(len(self.windows), 2)
         self.global_commands.assert_not_called()
 
-    def test_ending_closes_only_on_navigation_and_stops_later_launches(self):
+    def test_ending_closes_its_own_windows_and_stops_later_launches(self):
         player = downloader._StreamPlayer("http://127.0.0.1:8080/x", None)
         player.launch()
+        self.windows[0].returncode = 0  # the user closed it, then reopened with 'v'
+        player.launch()
         player.end()
-        self.assertEqual(self.killed, [])  # Ctrl+C / normal end leave the window alone
+        self.assertEqual(self.killed, [self.windows[1]])  # already-closed windows are left alone
         self.assertFalse(player.launch())
-        navigating = downloader._StreamPlayer("http://127.0.0.1:8080/y", None)
-        navigating.launch()
-        navigating.end(close=True)
-        self.assertEqual(self.killed, [self.windows[1]])
+        self.global_commands.assert_not_called()
+
+    def test_ctrl_c_while_streaming_closes_this_streams_window(self):
+        backend = FakeProcess()
+        polls = iter([None, KeyboardInterrupt()])
+
+        def interrupted_sleep(seconds):
+            outcome = next(polls, None)
+            if isinstance(outcome, BaseException):
+                raise outcome
+
+        with patch.object(downloader.subprocess, "Popen", return_value=backend), \
+             patch.object(downloader, "_start_vlc_hotkey_thread", return_value=threading.Event()), \
+             patch.object(downloader.time, "sleep", side_effect=interrupted_sleep):
+            with patch.object(downloader._StreamPlayer, "launch_when_ready",
+                              lambda player, host, port: player.launch()), \
+                 self.assertRaises(KeyboardInterrupt):
+                downloader._run_stream(["webtorrent"], "http://127.0.0.1:8080/x", allow_navigate=False,
+                                       launch_vlc_when_ready=("127.0.0.1", 8080))
+        self.assertEqual(self.killed, [backend, self.windows[0]])
         self.global_commands.assert_not_called()
 
     def test_nothing_launches_once_the_episode_ended(self):

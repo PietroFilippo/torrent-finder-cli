@@ -171,8 +171,9 @@ stream adapters consume the session directly; download adapters take
 session-unaware.**
 
 Each streamed episode owns the VLC window it opens (`_StreamPlayer` in
-`downloader.py`): `n`/`b` close only that window, `v` reopens only it, and no
-delayed launch happens after the episode ends. Other VLC playback is never
+`downloader.py`): leaving the episode (`n`/`b`, Ctrl+C, the backend exiting)
+closes only that window, `v` reopens only it, and no delayed launch happens
+after the episode ends. Other VLC playback is never
 looked up or closed by process name. Stream adapters return `ended`, `failed`,
 `cancelled` or `unavailable`. The backend's stderr goes to a small log in the
 temp folder, so a nonzero exit is reported with its last lines.
