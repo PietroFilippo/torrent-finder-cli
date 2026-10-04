@@ -78,7 +78,7 @@ def _get_session() -> requests.Session | None:
     global _session
     with _session_lock:
         cfg = madokami_config()
-        auth = (cfg["username"], cfg["password"]) if cfg else None
+        auth = _basic_auth(cfg["username"], cfg["password"]) if cfg else None
         if _session is not None and _session.auth != auth:
             _session.close()
             _session = None
@@ -87,6 +87,12 @@ def _get_session() -> requests.Session | None:
             _session.headers.update(_UA)
             _session.auth = auth
         return _session
+
+
+def _basic_auth(username: str, password: str) -> tuple[bytes, bytes]:
+    """Basic-auth credentials as UTF-8 bytes; requests would encode text as
+    Latin-1 and fail on characters such as "€"."""
+    return username.encode("utf-8"), password.encode("utf-8")
 
 
 def is_file_path(path: str) -> bool:
@@ -309,7 +315,7 @@ def test_credentials(username: str, password: str) -> tuple[bool | None, str]:
     True accepted, False rejected, None couldn't reach Madokami."""
     try:
         r = requests.get(
-            _BASE + "/", auth=(username, password), headers=_UA, timeout=25
+            _BASE + "/", auth=_basic_auth(username, password), headers=_UA, timeout=25
         )
     except requests.RequestException as e:
         return None, f"Couldn't reach Madokami ({type(e).__name__})"

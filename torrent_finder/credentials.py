@@ -14,6 +14,7 @@ import json
 import os
 import tempfile
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 
 from torrent_finder.credential_registry import credential_file_keys
@@ -22,6 +23,15 @@ from torrent_finder.constants import legacy_data_paths, machine_state_path
 _CRED_FILE = Path(machine_state_path("subtitle_credentials.json"))
 _LEGACY_CRED_PATHS = legacy_data_paths("subtitle_credentials.json")
 _lock = threading.RLock()
+
+
+@contextmanager
+def _transaction():
+    """One read-merge-write of the credential file, excluding this process's
+    threads and other Torrent Finder windows (whose saves would otherwise be lost)."""
+    from torrent_finder import store
+    with _lock, store._file_lock(str(_CRED_FILE), store.LOCK_TIMEOUT):
+        yield
 
 # Maps public env-var names to JSON keys, derived from the credential registry.
 _FILE_KEYS = credential_file_keys()
@@ -169,7 +179,7 @@ def save_credentials(updates: dict) -> None:
     takes effect immediately within the running program.
     """
     global _file_cache, _file_problem
-    with _lock:
+    with _transaction():
         _migrate_legacy_file()
         # A read/parse failure must abort, never overwrite other saved entries.
         data = _read_credentials(_CRED_FILE) if _CRED_FILE.exists() else {}
@@ -215,7 +225,7 @@ def import_file_values(values: dict, *, replace=False) -> None:
     if (not isinstance(values, dict) or set(values) - set(_FILE_KEYS)
             or any(not isinstance(value, str) for value in values.values())):
         raise ValueError("Invalid credential backup")
-    with _lock:
+    with _transaction():
         _migrate_legacy_file()
         current = _read_credentials(_CRED_FILE) if _CRED_FILE.exists() else {}
         data = {} if replace else current

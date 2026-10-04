@@ -394,8 +394,10 @@ do not bypass the challenge or infer missing titles from it.
   own captcha, an unreachable site and unexpected pages.
 - A blocked login is reported as an access problem ("blocked"; not a password
   problem, and not counted as retryable). It is not attempted again for five
-  minutes. A rejected login or captcha is not retried until the credentials
-  change.
+  minutes. A rejected login is not retried until the credentials change. A
+  captcha waits five minutes too, since logging in once in a browser clears
+  it (changed in the final review, which also applied the pause to an existing
+  session and made passwords with accents or "€" safe to send).
 - Other providers' results are kept, and the challenge is not bypassed. Catalog
   coverage stays unknown until ordinary access works.
 

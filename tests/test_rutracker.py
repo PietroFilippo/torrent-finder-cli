@@ -109,7 +109,7 @@ class FixtureAnime(AnimeProvider):
 
 class BlockedInSearchTests(unittest.TestCase):
     def test_blocked_rutracker_is_explained_and_other_results_stay(self):
-        blocked = rutracker._LOGIN_ERRORS["blocked"]
+        blocked = rutracker._login_error("blocked")
         with patch.object(rutracker, "_get_session", side_effect=blocked):
             results = SearchSession([RuTrackerProvider(), FixtureAnime()], ["Saki"], combined=True).run()
         self.assertEqual([r.name for r in results], ["Saki 01"])

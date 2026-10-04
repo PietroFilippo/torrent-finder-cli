@@ -142,6 +142,8 @@ def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) ->
     except KeyboardInterrupt:
         console.print("[warning]Verification cancelled — nothing saved.[/warning]")
         return False
+    except Exception as error:  # a verifier bug must not end the app
+        ok, message = None, f"Couldn't verify ({type(error).__name__})"
     if ok is True:
         console.print(f"[success]✓ Verified: {message}[/success]")
     elif ok is None:
