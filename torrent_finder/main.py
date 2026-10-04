@@ -391,6 +391,31 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
         return "back"
 
 
+def _fetch_session_files(session) -> tuple[bool, object]:
+    """Fetch the torrent's file list with Esc / Ctrl+C cancellation.
+
+    Returns ``(cancelled, metadata)``; metadata is None when cancelled or when
+    no file list could be found (timeout, no metadata peers).
+    """
+    console.print("[info]Looking for online peers that can share the torrent's file list…[/info]")
+    console.print("[dim]This may take a minute or time out. Listed seed counts can be stale; even a torrent showing seeders may have no reachable metadata peers right now.[/dim]")
+    console.print("[dim]Press Esc or Ctrl+C to cancel and go back.[/dim]\n")
+    cancel_event = threading.Event()
+    stop_listener = start_esc_listener(cancel_event)
+    try:
+        try:
+            with console.status("[bold cyan]Fetching file list...[/bold cyan]", spinner="dots"):
+                metadata = session.fetch_files_meta(cancel_event=cancel_event)
+        except KeyboardInterrupt:
+            # Deeper flows cancel locally. Only the idle provider /
+            # search screens participate in the double-press quit guard.
+            cancel_event.set()
+            metadata = None
+    finally:
+        stop_listener.set()
+    return cancel_event.is_set(), metadata
+
+
 def browse_results(provider, results, note: str = "") -> str:
     """Run the results/download flow with Ctrl+C scoped as local Back.
 
@@ -533,28 +558,13 @@ def _browse_results(provider, results, note: str = "") -> str:
                     console.print("[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
-                console.print("[info]Looking for online peers that can share the torrent's file list…[/info]")
-                console.print("[dim]This may take a minute or time out. Listed seed counts can be stale; even a torrent showing seeders may have no reachable metadata peers right now.[/dim]")
-                console.print("[dim]Press Esc or Ctrl+C to cancel and go back.[/dim]\n")
-                cancel_event = threading.Event()
-                stop_listener = start_esc_listener(cancel_event)
-                try:
-                    try:
-                        with console.status("[bold cyan]Fetching file list...[/bold cyan]", spinner="dots"):
-                            metadata = session.fetch_files_meta(cancel_event=cancel_event)
-                    except KeyboardInterrupt:
-                        # Deeper flows cancel locally. Only the idle provider /
-                        # search screens participate in the double-press quit guard.
-                        cancel_event.set()
-                        metadata = None
-                finally:
-                    stop_listener.set()
-                if cancel_event.is_set():
-                    console.print("[warning] Cancelled — returning to the menu.[/warning]")
+                cancelled, metadata = _fetch_session_files(session)
+                if cancelled:
                     clear_screen()
                     continue
                 if not metadata or not metadata.files:
-                    console.print("[error] Could not fetch file list (timeout or no metadata peers).[/error]\n")
+                    console.print("[error] Could not fetch file list (timeout or no metadata peers).[/error]")
+                    console.print("[dim]Choose Browse torrent files again to retry.[/dim]\n")
                     console.print("[dim]Press any key to continue...[/dim]")
                     readchar.readkey()
                     continue
@@ -589,15 +599,20 @@ def _browse_results(provider, results, note: str = "") -> str:
                 if download_complete_prompt("Magnet link sent to torrent client", summary=summary) == "next":
                     return "next"
                 continue
-            elif method == "stream_p":
+            elif method in ("stream_p", "stream_w"):
                 clear_screen()
-                stream_with_peerflix(session)
-                console.print("\n[dim]Press any key to continue...[/dim]")
-                readchar.readkey()
-                continue
-            elif method == "stream_w":
-                clear_screen()
-                stream_with_webtorrent(session)
+                # The file list picks the episode, its stream URL and in-torrent
+                # subtitles. Fetch it once, cancellably: Esc / Ctrl+C returns to
+                # these options without starting anything.
+                if session.files_meta_status == "unknown" and has_aria2():
+                    cancelled, metadata = _fetch_session_files(session)
+                    if cancelled:
+                        clear_screen()
+                        continue
+                    if metadata is None:
+                        console.print("[warning] File list unavailable — streaming the backend's default file.[/warning]")
+                stream = stream_with_peerflix if method == "stream_p" else stream_with_webtorrent
+                stream(session)
                 console.print("\n[dim]Press any key to continue...[/dim]")
                 readchar.readkey()
                 continue

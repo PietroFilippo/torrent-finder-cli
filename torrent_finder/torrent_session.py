@@ -16,9 +16,6 @@ from torrent_finder.torrent_meta import (
 )
 
 
-_UNSET = object()
-
-
 class TorrentSession:
     def __init__(self, result_dict: dict, magnet: str) -> None:
         self.result = result_dict
@@ -26,7 +23,10 @@ class TorrentSession:
         self.name: str = result_dict.get("name", "Unknown")
         self.selected_files: list[int] | None = None
         self.sub_choice: dict | None = None
-        self._files_meta = _UNSET
+        self._files_meta: TorrentMetadata | None = None
+        # "unknown" until a fetch completes; "unavailable" after one found no
+        # metadata (timeout, no peers), which a later explicit fetch retries.
+        self.files_meta_status = "unknown"
         self._sub_paths: dict[int, list[str]] | None = None
 
     # ---- Setters ----
@@ -38,27 +38,32 @@ class TorrentSession:
         self.sub_choice = choice
         self._sub_paths = None
 
-    # ---- Lazy metadata (cached) ----
+    # ---- Metadata (fetched explicitly, kept once found) ----
 
     @property
     def files_meta(self) -> TorrentMetadata | None:
-        if self._files_meta is _UNSET:
-            self._files_meta = fetch_file_list(self.magnet)
+        """The file list once fetched. Never fetches by itself: callers use the
+        cancellable ``fetch_files_meta`` first (a silent wait couldn't be
+        cancelled and would start a stream on a default file)."""
         return self._files_meta
 
     def fetch_files_meta(self, cancel_event=None) -> TorrentMetadata | None:
-        """Cancellable variant of the ``files_meta`` property.
+        """Fetch the file list unless it is already known.
 
-        Caches a real result (success or genuine failure/timeout) so repeat
-        accesses are instant, but does NOT cache when the user cancelled —
-        leaving the cache unset so a later retry re-fetches.
+        A successful result is kept and reused for the session. A failed
+        attempt (timeout, no metadata peers) sets ``files_meta_status`` to
+        "unavailable" but is not final: the next call tries again. Cancelling
+        changes nothing.
         """
-        if self._files_meta is not _UNSET:
+        if self._files_meta is not None:
             return self._files_meta
         result = fetch_file_list(self.magnet, cancel_event=cancel_event)
         if cancel_event is not None and cancel_event.is_set():
-            return None  # aborted — keep cache unset for retry
-        self._files_meta = result
+            return None  # aborted — nothing learned
+        self.files_meta_status = "ok" if result is not None else "unavailable"
+        if result is not None:
+            self._files_meta = result
+            self._sub_paths = None  # auto subtitles can be matched now
         return result
 
     @property

@@ -162,10 +162,20 @@ handoff). A new non-standard source is one adapter plus one registry line.
 
 `TorrentSession` (`torrent_session.py`): post-pick state owner, constructed
 once per torrent the user picks, alive for the download-method menu loop. It
-caches the file list, tracks selected files (episode picker) and subtitle
-choice. **Rule: stream adapters consume the session directly; download
-adapters take `session.magnet` + `session.download_indexes` projections and
-stay session-unaware.**
+tracks selected files (episode picker) and subtitle choice. The file list is
+fetched only through the cancellable `fetch_files_meta`, before browsing or
+streaming. Esc/Ctrl+C there starts nothing, a found list is kept for the
+session, and a failed attempt is retried by the next explicit fetch. **Rule:
+stream adapters consume the session directly; download adapters take
+`session.magnet` + `session.download_indexes` projections and stay
+session-unaware.**
+
+Each streamed episode owns the VLC window it opens (`_StreamPlayer` in
+`downloader.py`): `n`/`b` close only that window, `v` reopens only it, and no
+delayed launch happens after the episode ends. Other VLC playback is never
+looked up or closed by process name. Stream adapters return `ended`, `failed`,
+`cancelled` or `unavailable`. The backend's stderr goes to a small log in the
+temp folder, so a nonzero exit is reported with its last lines.
 
 ## Filters & Presets
 

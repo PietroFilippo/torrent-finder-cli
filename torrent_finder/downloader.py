@@ -7,6 +7,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.parse
@@ -57,42 +58,20 @@ def _resolve_vlc_path() -> str | None:
     return vlc_path
 
 
-def _vlc_running() -> bool:
-    """Return True if any VLC process is currently running."""
-    system = platform.system()
-    try:
-        if system == "Windows":
-            r = subprocess.run(
-                ["tasklist", "/FI", "IMAGENAME eq vlc.exe", "/NH"],
-                capture_output=True, text=True, timeout=2,
-            )
-            return "vlc.exe" in r.stdout.lower()
-        elif system == "Darwin":
-            r = subprocess.run(
-                ["pgrep", "-x", "VLC"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2,
-            )
-            return r.returncode == 0
-        else:
-            r = subprocess.run(
-                ["pgrep", "-x", "vlc"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2,
-            )
-            return r.returncode == 0
-    except Exception:
-        return False
-
-
-def _wait_for_port(host: str, port: int, timeout: float = 30.0) -> bool:
-    """Block until *host:port* accepts a TCP connection, or *timeout* elapses."""
+def _wait_for_port(host: str, port: int, timeout: float = 30.0,
+                   stop: threading.Event | None = None) -> bool:
+    """Block until *host:port* accepts a TCP connection; False on timeout or *stop*."""
     import socket
+    pause = stop.wait if stop is not None else time.sleep
     end = time.monotonic() + timeout
     while time.monotonic() < end:
+        if stop is not None and stop.is_set():
+            return False
         try:
             with socket.create_connection((host, port), timeout=0.5):
                 return True
-        except (ConnectionRefusedError, OSError):
-            time.sleep(0.25)
+        except OSError:
+            pause(0.25)
     return False
 
 
@@ -107,6 +86,10 @@ def _build_vlc_cmd(url: str, sub_paths: list[str] | None) -> list[str] | None:
     if not vlc_path:
         return None
     cmd = [vlc_path, url]
+    if platform.system() == "Windows":
+        # Its own window even when VLC is set to reuse one instance, so the
+        # stream can close it without touching the user's other playback.
+        cmd.append("--no-one-instance")
     if sub_paths:
         cmd.extend(["--sub-file", sub_paths[0]])
         for extra in sub_paths[1:]:
@@ -114,16 +97,19 @@ def _build_vlc_cmd(url: str, sub_paths: list[str] | None) -> list[str] | None:
     return cmd
 
 
-def _launch_vlc(url: str, sub_paths: list[str] | None) -> bool:
-    """Spawn VLC with the stream URL (+ optional subs). Returns True on launch."""
+def _launch_vlc(url: str, sub_paths: list[str] | None) -> subprocess.Popen | None:
+    """Start a VLC window for the stream (+ optional subs); None if VLC can't start."""
     cmd = _build_vlc_cmd(url, sub_paths)
-    if cmd is not None:
-        try:
-            subprocess.Popen(cmd)
-            return True
-        except Exception:
-            pass
-    # Fallback: hand the URL to the OS — won't carry sub args
+    if cmd is None:
+        return None
+    try:
+        return subprocess.Popen(cmd)
+    except Exception:
+        return None
+
+
+def _open_with_default_player(url: str) -> bool:
+    """Hand the URL to the OS when VLC is missing. That player isn't ours to close."""
     try:
         if platform.system() == "Windows":
             os.startfile(url)  # type: ignore[attr-defined]
@@ -136,6 +122,60 @@ def _launch_vlc(url: str, sub_paths: list[str] | None) -> bool:
         return False
 
 
+# webtorrent-cli accepts connections well before the selected file's route
+# resolves, so VLC's first GET can 404 if launched too eagerly. A short grace
+# smooths most multi-file torrents.
+_VLC_GRACE_S = 2.0
+
+
+class _StreamPlayer:
+    """The VLC window(s) one streamed episode opens; other players are never touched.
+
+    Launches happen only while the episode is live: ``end()`` stops pending and
+    future launches, so a readiness waiter that wakes up late does nothing, and
+    ``end(close=True)`` also closes the windows this episode opened.
+    """
+
+    def __init__(self, url: str | None, sub_paths: list[str] | None) -> None:
+        self.url = url
+        self.sub_paths = sub_paths
+        self.ended = threading.Event()
+        self._lock = threading.Lock()
+        self._windows: list[subprocess.Popen] = []
+
+    def is_open(self) -> bool:
+        return any(window.poll() is None for window in self._windows)
+
+    def launch(self) -> bool:
+        """Open the stream unless the episode ended or its own window is still open."""
+        with self._lock:
+            if self.ended.is_set() or not self.url or self.is_open():
+                return False
+            window = _launch_vlc(self.url, self.sub_paths)
+            if window is not None:
+                self._windows.append(window)
+                return True
+            return _open_with_default_player(self.url)
+
+    def launch_when_ready(self, host: str, port: int) -> threading.Thread:
+        """Open VLC once the streaming server accepts connections, if still live."""
+        def waiter():
+            if _wait_for_port(host, port, timeout=60, stop=self.ended) and not self.ended.wait(_VLC_GRACE_S):
+                self.launch()
+
+        thread = threading.Thread(target=waiter, daemon=True)
+        thread.start()
+        return thread
+
+    def end(self, close: bool = False) -> None:
+        with self._lock:
+            self.ended.set()
+            windows = list(self._windows) if close else []
+        for window in windows:
+            if window.poll() is None:
+                _kill_process_tree(window)
+
+
 def _fetch_torrent_subs(magnet: str, files_meta, indexes: list[int]) -> dict[int, str]:
     """Download a subset of torrent files (subtitles) via aria2c.
 
@@ -145,8 +185,6 @@ def _fetch_torrent_subs(magnet: str, files_meta, indexes: list[int]) -> dict[int
     """
     if not has_aria2() or not indexes or files_meta is None:
         return {}
-
-    import tempfile
 
     tmpdir = tempfile.mkdtemp(prefix="trnt_subs_")
     cmd = [
@@ -189,46 +227,17 @@ def _fetch_torrent_subs(magnet: str, files_meta, indexes: list[int]) -> dict[int
     return result
 
 
-def _kill_vlc() -> None:
-    """Terminate all running VLC instances."""
-    system = platform.system()
-    try:
-        if system == "Windows":
-            subprocess.run(
-                ["taskkill", "/IM", "vlc.exe", "/F"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        elif system == "Darwin":
-            subprocess.run(
-                ["pkill", "-f", "VLC"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        else:
-            subprocess.run(
-                ["pkill", "vlc"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-    except Exception:
-        pass
-
-
 def _start_vlc_hotkey_thread(
-    url_holder: list,
-    subs_holder: list | None = None,
+    player: _StreamPlayer,
     advance_event: threading.Event | None = None,
     back_event: threading.Event | None = None,
 ) -> threading.Event:
     """Listen for 'v' (reopen VLC), 'n' (next episode), and 'b' (previous episode).
 
-    url_holder is a single-element list so callers can update the URL after
-    capturing it from a subprocess's stdout. subs_holder, when provided, holds
-    ``list[str] | None`` of subtitle file paths to attach when relaunching VLC.
-    advance_event, when provided, is set on 'n' so the caller can terminate the
-    current session and move on. back_event, when provided, is set on 'b' to go
-    back to the previous episode.
+    'v' reopens this episode's own VLC window when the user closed it; it never
+    looks at other VLC windows. advance_event, when provided, is set on 'n' so
+    the caller can terminate the current session and move on. back_event, when
+    provided, is set on 'b' to go back to the previous episode.
     """
     stop_event = threading.Event()
 
@@ -239,14 +248,7 @@ def _start_vlc_hotkey_thread(
                 if msvcrt.kbhit():
                     key = msvcrt.getch()
                     if key.lower() == b'v':
-                        url = url_holder[0] if url_holder else None
-                        if not url:
-                            continue
-                        # Skip relaunch if VLC already running — avoids spawning duplicates
-                        if _vlc_running():
-                            continue
-                        subs = subs_holder[0] if subs_holder else None
-                        _launch_vlc(url, subs)
+                        player.launch()
                     elif key.lower() == b'n' and advance_event is not None:
                         advance_event.set()
                     elif key.lower() == b'b' and back_event is not None:
@@ -256,6 +258,61 @@ def _start_vlc_hotkey_thread(
     t = threading.Thread(target=listener, daemon=True)
     t.start()
     return stop_event
+
+
+# Streams send the backend's error output here instead of discarding it, so a
+# failure can be explained even in quiet mode. Trimmed to stay small.
+_STREAM_LOG_LIMIT = 256 * 1024
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def _new_stream_log(backend: str) -> str:
+    """Start an empty error log for one streaming session; "" when unavailable."""
+    path = os.path.join(tempfile.gettempdir(), f"torrent-finder-{backend}-stream.log")
+    try:
+        open(path, "w", encoding="utf-8").close()
+    except OSError:
+        return ""
+    return path
+
+
+def _trim_log(path: str, limit: int = _STREAM_LOG_LIMIT) -> None:
+    """Keep only the newest *limit* bytes of a log."""
+    try:
+        if os.path.getsize(path) <= limit:
+            return
+        with open(path, "rb") as log:
+            log.seek(-limit, os.SEEK_END)
+            tail = log.read()
+        with open(path, "wb") as log:
+            log.write(tail)
+    except OSError:
+        pass
+
+
+def _log_tail(path: str, lines: int = 8) -> str:
+    """The last non-empty lines of a log, without terminal colour codes."""
+    try:
+        with open(path, "rb") as log:
+            text = log.read()[-16384:].decode("utf-8", "replace")
+    except OSError:
+        return ""
+    kept = [line.rstrip() for line in _ANSI.sub("", text).splitlines() if line.strip()]
+    return "\n".join(kept[-lines:])
+
+
+def _report_stream_end(returncode: int, log_path: str) -> str:
+    """Say how streaming ended; a nonzero exit is a failure, shown with its log."""
+    if not returncode:
+        console.print("\n[success] Streaming session(s) ended![/success]")
+        return "ended"
+    console.print(f"\n[error] Streaming stopped with an error (exit code {returncode}).[/error]")
+    tail = _log_tail(log_path) if log_path else ""
+    if tail:
+        console.print(escape(tail), style="dim")
+    if log_path:
+        console.print(f"[dim]Full log: {escape(log_path)}[/dim]")
+    return "failed"
 
 
 def detect_torrent_client() -> str:
@@ -703,6 +760,7 @@ def _run_stream(
     quiet: bool = False,
     sub_paths: list[str] | None = None,
     launch_vlc_when_ready: tuple[str, int] | None = None,
+    log_path: str = "",
 ) -> tuple[int, str]:
     """Run a streaming subprocess with native TTY (no stdout piping).
 
@@ -713,91 +771,90 @@ def _run_stream(
     poll that TCP socket and spawn VLC ourselves with ``vlc_url`` + ``sub_paths``
     as soon as the streaming server is up — replaces webtorrent/peerflix's own
     ``--vlc`` flag so we control VLC's argv (and can attach ``--sub-file``).
+    The VLC window opened this way (or by 'v') belongs to this episode: nothing
+    launches after it ends, and 'n'/'b' close only that window.
     When allow_navigate is True, 'n'/'b' terminate the subprocess so the
     caller can advance or go back in a multi-ep flow. Returns (returncode,
     nav_action) where nav_action is 'next', 'back', or 'none'.
 
-    When quiet is True, subprocess stdout/stderr are redirected to DEVNULL
-    (full-screen UI suppressed) and a rich spinner renders in its place.
+    When quiet is True, subprocess stdout is discarded (full-screen UI
+    suppressed) and a rich spinner renders in its place. log_path, when set,
+    receives the child's stderr so a failure can be explained afterwards.
     """
-    url_holder: list[str | None] = [vlc_url]
-    subs_holder: list[list[str] | None] = [sub_paths]
+    player = _StreamPlayer(vlc_url, sub_paths)
     advance_event = threading.Event() if allow_navigate else None
     back_event = threading.Event() if allow_navigate else None
-    stop_event = _start_vlc_hotkey_thread(url_holder, subs_holder, advance_event, back_event)
-
-    stdout_arg, stderr_arg = _quiet_streams(quiet)
-    # stdin=DEVNULL so the child can't steal our v/n/b keystrokes — the hotkey
-    # thread owns stdin. Side-effect: webtorrent/peerflix's own SPACE/CTRL+L
-    # keybinds stop working, but those aren't surfaced in our header anyway.
-    # cwd=system tempdir keeps webtorrent's transient files out of the user's
-    # working directory.
-    # New process group / session for the same reason as _spawn_detached: the
-    # console must deliver Ctrl+C to us alone, so the KeyboardInterrupt always
-    # lands inside this function's try (which kills the child tree) instead of
-    # racing the child's own death and escaping the caller's except scope.
-    import tempfile as _tempfile
-    detach: dict = (
-        {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
-        if platform.system() == "Windows"
-        else {"start_new_session": True}
-    )
-    proc = subprocess.Popen(
-        cmd,
-        stdout=stdout_arg,
-        stderr=stderr_arg,
-        stdin=subprocess.DEVNULL,
-        cwd=_tempfile.gettempdir(),
-        **detach,
-    )
+    stop_event = _start_vlc_hotkey_thread(player, advance_event, back_event)
     nav_action = "none"
-
-    if launch_vlc_when_ready and vlc_url:
-        host, port = launch_vlc_when_ready
-
-        def vlc_waiter():
-            if _wait_for_port(host, port, timeout=60):
-                # Grace period for the server to register the selected file's
-                # route. webtorrent-cli accepts connections on the port well
-                # before /webtorrent/<infohash>/<encoded_path> resolves to a
-                # real BitTorrent piece, so VLC's first GET can 404 if we
-                # launch too eagerly. 2s smooths most multi-file torrents.
-                time.sleep(2.0)
-                if not _vlc_running():
-                    _launch_vlc(vlc_url, sub_paths)
-
-        threading.Thread(target=vlc_waiter, daemon=True).start()
-
-    def _poll_loop() -> str:
-        while proc.poll() is None:
-            if advance_event is not None and advance_event.is_set():
-                _kill_process_tree(proc)
-                return "next"
-            if back_event is not None and back_event.is_set():
-                _kill_process_tree(proc)
-                return "back"
-            time.sleep(0.25)
-        return "none"
+    log = None
 
     try:
-        if quiet:
-            hints = ["Ctrl+C cancel"]
-            if vlc_url:
-                hints.append("v reopen VLC")
-            if allow_navigate:
-                hints.append("n/b next/prev")
-            msg = "[bold cyan]Streaming…[/bold cyan]  " + "  •  ".join(hints)
-            with console.status(msg, spinner="dots"):
+        stdout_arg = stderr_arg = subprocess.DEVNULL if quiet else None
+        if log_path:
+            try:
+                log = stderr_arg = open(log_path, "ab")
+            except OSError:
+                pass
+        # stdin=DEVNULL so the child can't steal our v/n/b keystrokes — the hotkey
+        # thread owns stdin. Side-effect: webtorrent/peerflix's own SPACE/CTRL+L
+        # keybinds stop working, but those aren't surfaced in our header anyway.
+        # cwd=system tempdir keeps webtorrent's transient files out of the user's
+        # working directory.
+        # New process group / session for the same reason as _spawn_detached: the
+        # console must deliver Ctrl+C to us alone, so the KeyboardInterrupt always
+        # lands inside this function's try (which kills the child tree) instead of
+        # racing the child's own death and escaping the caller's except scope.
+        detach: dict = (
+            {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+            if platform.system() == "Windows"
+            else {"start_new_session": True}
+        )
+        proc = subprocess.Popen(
+            cmd,
+            stdout=stdout_arg,
+            stderr=stderr_arg,
+            stdin=subprocess.DEVNULL,
+            cwd=tempfile.gettempdir(),
+            **detach,
+        )
+
+        if launch_vlc_when_ready and vlc_url:
+            player.launch_when_ready(*launch_vlc_when_ready)
+
+        def _poll_loop() -> str:
+            while proc.poll() is None:
+                if advance_event is not None and advance_event.is_set():
+                    _kill_process_tree(proc)
+                    return "next"
+                if back_event is not None and back_event.is_set():
+                    _kill_process_tree(proc)
+                    return "back"
+                time.sleep(0.25)
+            return "none"
+
+        try:
+            if quiet:
+                hints = ["Ctrl+C cancel"]
+                if vlc_url:
+                    hints.append("v reopen VLC")
+                if allow_navigate:
+                    hints.append("n/b next/prev")
+                msg = "[bold cyan]Streaming…[/bold cyan]  " + "  •  ".join(hints)
+                with console.status(msg, spinner="dots"):
+                    nav_action = _poll_loop()
+            else:
                 nav_action = _poll_loop()
-        else:
-            nav_action = _poll_loop()
-    except KeyboardInterrupt:
-        if proc.poll() is None:
-            _kill_process_tree(proc)
-        raise
+        except KeyboardInterrupt:
+            if proc.poll() is None:
+                _kill_process_tree(proc)
+            raise
+        return proc.returncode or 0, nav_action
     finally:
         stop_event.set()
-    return proc.returncode or 0, nav_action
+        player.end(close=nav_action in ("next", "back"))
+        if log is not None:
+            log.close()
+            _trim_log(log_path)
 
 
 def _extract_infohash(magnet_link: str) -> str:
@@ -936,18 +993,21 @@ def _resolve_subs_for_session(
     return result
 
 
-def stream_with_webtorrent(session: "TorrentSession") -> None:
+def stream_with_webtorrent(session: "TorrentSession") -> str:
     """Stream selected files from *session* to VLC using webtorrent-cli.
 
     Reads precedence + metadata + sub paths off the session; renders the
     per-episode subprocess loop here. webtorrent-cli uses full-screen ANSI
     rendering (``\033[2J``) that clears through scroll regions, so we use
     the terminal window title for persistent episode info instead.
+
+    Returns "ended", "failed" (nonzero exit, explained with its log),
+    "cancelled" or "unavailable" (nothing could be streamed).
     """
     wt_path = shutil.which("webtorrent")
     if not wt_path:
         console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
-        return
+        return "unavailable"
 
     magnet_link = session.magnet
 
@@ -965,7 +1025,7 @@ def stream_with_webtorrent(session: "TorrentSession") -> None:
                 "[error] Selection contains no streamable video files. "
                 "Pick a video file or use a download method instead.[/error]\n"
             )
-            return
+            return "unavailable"
 
     file_list = session.file_list
     targets: list[int | None] = list(session.stream_indexes) if session.stream_indexes else [None]
@@ -975,10 +1035,12 @@ def stream_with_webtorrent(session: "TorrentSession") -> None:
     is_multi_file = len(file_list) > 1
     torrent_name = session.torrent_name
     quiet = is_quiet_mode()
-
-    sub_map = session.sub_paths
+    log_path = _new_stream_log("webtorrent")
+    failed_rc = 0
 
     try:
+        # Inside the try: auto-matched subtitles are fetched now (Ctrl+C cancels).
+        sub_map = session.sub_paths
         ep_idx = 0
         while 0 <= ep_idx < len(targets):
             idx = targets[ep_idx]
@@ -1020,46 +1082,44 @@ def stream_with_webtorrent(session: "TorrentSession") -> None:
                 cmd, vlc_url, allow_navigate=multi, quiet=quiet,
                 sub_paths=ep_subs,
                 launch_vlc_when_ready=("127.0.0.1", 8080),
+                log_path=log_path,
             )
 
-            if nav == "next":
-                _kill_vlc()
-                time.sleep(1)
-                ep_idx += 1
+            if nav in ("next", "back"):
+                time.sleep(1)  # let the previous server release its port
+                ep_idx += 1 if nav == "next" else -1
                 continue
-            elif nav == "back":
-                _kill_vlc()
-                time.sleep(1)
-                ep_idx -= 1
-                continue
-            else:
-                break
+            failed_rc = rc
+            break
 
         _reset_terminal_title()
         time.sleep(0.5)  # let dying processes flush their final output
         _clear_terminal()
-        console.print("\n[success] Streaming session(s) ended![/success]")
+        return _report_stream_end(failed_rc, log_path)
     except KeyboardInterrupt:
         _reset_terminal_title()
         time.sleep(0.5)
         _clear_terminal()
         console.print("\n[warning] Streaming cancelled.[/warning]\n")
+        return "cancelled"
     except FileNotFoundError:
         _reset_terminal_title()
         console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
+        return "unavailable"
 
 
-def stream_with_peerflix(session: "TorrentSession") -> None:
+def stream_with_peerflix(session: "TorrentSession") -> str:
     """Stream selected files from *session* to VLC using peerflix.
 
     One subprocess per selected 1-based index; peerflix serves the currently
     streaming file at the server root, so the VLC URL is fixed. Reads
-    precedence + metadata + sub paths off the session.
+    precedence + metadata + sub paths off the session. Returns the same
+    outcomes as ``stream_with_webtorrent``.
     """
     pf_path = shutil.which("peerflix")
     if not pf_path:
         console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
-        return
+        return "unavailable"
 
     magnet_link = session.magnet
 
@@ -1074,7 +1134,7 @@ def stream_with_peerflix(session: "TorrentSession") -> None:
                 "[error] Selection contains no streamable video files. "
                 "Pick a video file or use a download method instead.[/error]\n"
             )
-            return
+            return "unavailable"
 
     file_list = session.file_list
     targets: list[int | None] = list(session.stream_indexes) if session.stream_indexes else [None]
@@ -1082,10 +1142,12 @@ def stream_with_peerflix(session: "TorrentSession") -> None:
     multi = len(targets) > 1
     vlc_url = "http://127.0.0.1:8888/"
     quiet = is_quiet_mode()
-
-    sub_map = session.sub_paths
+    log_path = _new_stream_log("peerflix")
+    failed_rc = 0
 
     try:
+        # Inside the try: auto-matched subtitles are fetched now (Ctrl+C cancels).
+        sub_map = session.sub_paths
         ep_idx = 0
         while 0 <= ep_idx < len(targets):
             idx = targets[ep_idx]
@@ -1116,34 +1178,31 @@ def stream_with_peerflix(session: "TorrentSession") -> None:
                 cmd, vlc_url, allow_navigate=multi, quiet=quiet,
                 sub_paths=ep_subs,
                 launch_vlc_when_ready=("127.0.0.1", 8888),
+                log_path=log_path,
             )
 
-            if nav == "next":
-                _kill_vlc()
-                time.sleep(1)
-                ep_idx += 1
+            if nav in ("next", "back"):
+                time.sleep(1)  # let the previous server release its port
+                ep_idx += 1 if nav == "next" else -1
                 continue
-            elif nav == "back":
-                _kill_vlc()
-                time.sleep(1)
-                ep_idx -= 1
-                continue
-            else:
-                break
+            failed_rc = rc
+            break
 
         _reset_scroll_region()
         _reset_terminal_title()
         time.sleep(0.5)  # let dying processes flush their final output
         _clear_terminal()
-        console.print("\n[success] Streaming session(s) ended![/success]")
+        return _report_stream_end(failed_rc, log_path)
     except KeyboardInterrupt:
         _reset_scroll_region()
         _reset_terminal_title()
         time.sleep(0.5)
         _clear_terminal()
         console.print("\n[warning] Streaming cancelled.[/warning]\n")
+        return "cancelled"
     except FileNotFoundError:
         _reset_scroll_region()
         _reset_terminal_title()
         console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
+        return "unavailable"
 
