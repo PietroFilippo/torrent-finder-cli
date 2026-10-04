@@ -241,6 +241,10 @@ class BaseProvider(ABC):
             if term.strip()
         ):
             return
+        # Likewise a typed preset word ("Gimp portable" must not become
+        # "portable"); the bare title is searched as its own expansion.
+        if self.typed_split(normalized)[1] is not None:
+            return
         fallback = _apibay_fallback_query(query)
         if fallback:
             yield fallback

@@ -123,6 +123,8 @@ def search(query: str) -> list[SearchResult]:
     it can't collide with real hashes). A pick downloads the file directly
     (``LibgenAcquisition``), never the magnet pipeline. Empty list on error.
     """
+    from torrent_finder.search_diagnostics import failure_mark, forget_failures
+    mark = failure_mark()
     for mirror in _MIRRORS:
         try:
             r = search_request(requests.get,
@@ -137,6 +139,7 @@ def search(query: str) -> list[SearchResult]:
             continue
         results = _parse_rows(r.text, mirror)
         if results:
+            forget_failures(mark)  # an earlier mirror's failure doesn't make this answer incomplete
             return results
     return []
 

@@ -83,7 +83,8 @@ class DesktopSearchTests(unittest.TestCase):
         results, calls = search("Photoshop mac", knaben)
         self.assertIn(("Knaben", "Photoshop"), calls)
         self.assertEqual(results[0].name, "Adobe Photoshop 2024 v25.7.0 for Mac")
-        self.assertIn("1 result(s) carry a macOS tag and are listed first; the title alone was searched too.",
+        self.assertIn("1 result(s) carry a macOS tag and come first among equally good matches; the title alone "
+                      "was searched too.",
                       results.notices)
 
 

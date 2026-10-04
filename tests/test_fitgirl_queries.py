@@ -29,8 +29,12 @@ BALDUR = post(2, "Baldur&#8217;s Gate 3: Digital Deluxe Edition &#8211; v4.1.1 +
 
 
 class Response:
-    def __init__(self, text):
-        self.text, self.status_code = text, 200
+    def __init__(self, text, status=200):
+        self.text, self.status_code = text, status
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"HTTP {self.status_code}")
 
 
 class FitGirlCase(unittest.TestCase):
@@ -64,14 +68,25 @@ class FitGirlQueryTests(FitGirlCase):
         self.assertEqual(self.searched(), ["Cyberpunk 2077", "Stardew Valley"])
 
     def test_number_written_the_other_way_is_tried_once_when_nothing_matches(self):
-        self.pages = {"Dying Light 2": post(5, "Dying Light 2: Stay Human &#8211; Ultimate Edition"),
+        self.pages = {"Grand Theft Auto V": post(5, "Grand Theft Auto V: Premium Edition &#8211; v1.0"),
                       "Civilization 6": post(6, "Sid Meier&#8217;s Civilization 6: Anthology"),
                       "Civilization VI": post(7, "Sid Meier&#8217;s Civilization VII: Settler&#8217;s Edition")}
-        self.assertEqual([r.name for r in fitgirl.search("Dying Light Two")],
-                         ["Dying Light 2: Stay Human – Ultimate Edition"])
+        self.assertEqual([r.name for r in fitgirl.search("Grand Theft Auto 5")],
+                         ["Grand Theft Auto V: Premium Edition – v1.0"])
         # VII is a different game: it does not count as a match for VI.
         self.assertEqual([r.name for r in fitgirl.search("Civilization VI")], ["Sid Meier’s Civilization 6: Anthology"])
-        self.assertEqual(self.searched(), ["Dying Light Two", "Dying Light 2", "Civilization VI", "Civilization 6"])
+        self.assertEqual(self.searched(), ["Grand Theft Auto 5", "Grand Theft Auto V", "Civilization VI", "Civilization 6"])
+
+    def test_spelled_out_numbers_are_left_to_the_session_retry(self):
+        self.assertEqual(fitgirl.search("Dying Light Two"), [])
+        self.assertEqual(self.searched(), ["Dying Light Two"])  # the session then searches "Dying Light 2"
+
+    def test_an_error_page_is_a_failure_and_is_not_reused(self):
+        self.session.get.side_effect = lambda url, params=None, **_: Response("<h1>Service Unavailable</h1>", 503)
+        with self.assertRaises(requests.HTTPError):
+            fitgirl.search("Celeste")
+        self.session.get.side_effect = lambda url, params=None, **_: Response(post(11, "Celeste"))
+        self.assertEqual([r.name for r in fitgirl.search("Celeste")], ["Celeste"])
 
     def test_possessive_stem_search_keeps_only_posts_matching_the_typed_title(self):
         self.pages = {"Baldur Gate 3": DIGEST + BALDUR + post(8, "Baldur Gate 3 Fan Remake Tools")}
@@ -171,9 +186,10 @@ class GameQueryHelperTests(unittest.TestCase):
                 self.assertEqual(game_title_query(typed), title)
 
     def test_number_variant(self):
-        for typed, variant in (("Dying Light Two", "Dying Light 2"), ("Civilization VI", "Civilization 6"),
-                               ("Final Fantasy 7", "Final Fantasy VII"), ("Far Cry 5", None),
-                               ("Cyberpunk 2077", None), ("Mega Man X", None), ("Two", None)):
+        for typed, variant in (("Dying Light Two", None), ("Civilization VI", "Civilization 6"),
+                               ("Final Fantasy 7", "Final Fantasy VII"), ("Grand Theft Auto 5", "Grand Theft Auto V"),
+                               ("Final Fantasy 10", "Final Fantasy X"), ("Cyberpunk 2077", None),
+                               ("Mega Man X", None), ("Two", None)):
             with self.subTest(typed=typed):
                 self.assertEqual(number_variant(typed), variant)
 

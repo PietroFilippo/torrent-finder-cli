@@ -23,7 +23,9 @@ from torrent_finder.search_control import search_request
 
 API_URL = "https://api.knaben.org/v2/search"
 _MAX_RESULTS = 50
-_INFO_HASH = re.compile(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})\Z")
+# 40-hex BitTorrent v1 hashes only: magnets here are built as urn:btih, which
+# a 64-character (v2) hash would make unusable.
+_INFO_HASH = re.compile(r"[0-9a-fA-F]{40}\Z")
 
 
 def search(query: str, categories: Iterable[int], *, page: int = 1) -> list[SearchResult]:

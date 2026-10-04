@@ -52,7 +52,6 @@ class _Task:
 class SearchSession:
     def __init__(self, providers, queries, cli_filters=None, *, combined=False,
                  result_filter=None, workers=6, work_titles=None, shared_summary="", work_authors=None):
-        from torrent_finder.providers.combined_provider import provider_label
         self.providers = list(providers)
         self.queries = list(dict.fromkeys(q.strip() for q in queries if q.strip()))
         self.cli_filters = deepcopy(cli_filters)
@@ -138,12 +137,14 @@ class SearchSession:
         ready = []
         for group in range(len(self.groups)):
             tasks = [t for t in self.tasks if t.group == group]
+            if not any(t.diagnostic.status == "auto" for t in tasks):
+                continue  # nothing left to decide for this group
             primary = [t for t in tasks if t.diagnostic.status not in {"auto", "off", "skipped"}]
             if any(t.diagnostic.status == "pending" for t in primary):
                 continue
             provider, query = self.groups[group]
             if provider.prefer_title_matches and provider.auto_needs_relevant_rows:
-                authors = self.work_authors.get(query, ())
+                authors = self.work_authors.get(self.alias_of.get(query, query), ())
                 answered = any(provider.title_relevance(row, query, authors) >= provider.relevant_title_score
                                for t in primary for row in t.rows)
                 reason = "On engines returned rows matching the title; Auto was not needed."
@@ -243,6 +244,8 @@ class SearchSession:
         provider_order = {p.slug: i for i, p in enumerate(self.providers)}
         groups = sorted(enumerate(self.groups), key=lambda item: (provider_order[item[1][0].slug], item[0]))
         for group, (provider, query) in groups:
+            # Rows found under another spelling belong to the title that was typed.
+            origin = self.alias_of.get(query, query)
             candidates = [r for t in self.tasks if t.group == group for r in t.rows]
             rows = provider._filter_search_results(candidates, query, self.cli_filters, self.result_filter)
             for raw in rows:
@@ -257,24 +260,25 @@ class SearchSession:
                         existing.update(origins)
                         if self.combined:
                             existing["preference_score"] = provider.preference_score(row)
-                    for field, value in (("matched_providers", provider.slug), ("matched_queries", query)):
+                    for field, value in (("matched_providers", provider.slug), ("matched_queries", origin)):
                         if field in existing and value not in existing[field]:
                             existing[field].append(value)
                     continue
                 if self.combined or len(self.queries) > 1 or self.work_titles:
-                    row["matched_queries"] = [query]
+                    row["matched_queries"] = [origin]
                     row["matched_providers"] = [provider.slug]
                 if self.combined:
                     row["provider_slug"] = provider.slug
                     row["provider_label"] = provider_label(provider)
                     row["preference_score"] = provider.preference_score(row)
                 if len(self.queries) > 1 or self.work_titles:
-                    row["from_work"] = self.work_titles.get(query, query)
+                    row["from_work"] = self.work_titles.get(origin, origin)
                 merged[key] = row
         ordered = list(merged.values())
         if not self.combined and self.providers:
             ordered = self.providers[0].rank_preferences(self.providers[0]._sort_results(ordered))
-        typed = {p.slug: [t for t in (p.typed_preset(q) for q in self.queries) if t] for p in self.providers}
+        typed = {p.slug: list({t.name: t for t in (p.typed_preset(q) for q in self.queries) if t}.values())
+                 for p in self.providers}
 
         def typed_hits(row):
             """Presets typed after the title ("Berserk português") that the row matches."""
@@ -288,7 +292,8 @@ class SearchSession:
             # Equally good titles: releases carrying the tags typed with the
             # title first ("Finding Nemo pt-br"), then preferred presets.
             ordered.sort(key=lambda r: (max(relevance.get(r.get("provider_slug"), fallback)(
-                                                r, q, self.work_authors.get(q, ())) for q in self.queries),
+                                                r, q, self.work_authors.get(self.alias_of.get(q, q), ()))
+                                            for q in self.queries),
                                         max(release_tag_hits(r.name, q) for q in self.queries) + typed_hits(r),
                                         r.get("preference_score", 0)), reverse=True)
         elif any(typed.values()):
@@ -297,11 +302,12 @@ class SearchSession:
                                     else f"{d.provider} / {d.engine}: {d.message}"
                                     for d in self.diagnostics if d.retryable or d.status in ACCESS_STATUSES))
         notices += self.notes
-        for presets in typed.values():
-            for preset in presets:
-                count = sum(bool(apply_filters([row], preset.config)) for row in ordered)
-                notices.append(f"{count} result(s) carry a {preset.name} tag and are listed first; the title "
-                               "alone was searched too." if count else
+        for slug, presets in typed.items():
+            rows = [r for r in ordered if (r.get("provider_slug") or self.providers[0].slug) == slug]
+            for preset in presets if rows else ():
+                count = sum(bool(apply_filters([row], preset.config)) for row in rows)
+                notices.append(f"{count} result(s) carry a {preset.name} tag and come first among equally good "
+                               "matches; the title alone was searched too." if count else
                                f"No result carries a {preset.name} tag; the title alone was searched too, "
                                "so other releases are shown.")
         if not ordered:  # source advice only when nothing at all was found
@@ -431,14 +437,15 @@ class SearchSession:
                 wanted.append((provider, query, spelling))
         lookups = {}
         for provider, query, _spelling in wanted:
+            title = provider.typed_split(query)[0]  # "Berserk português": the catalog knows "Berserk"
             if provider.looks_up_aliases and len(lookups) < 3:
-                lookups.setdefault((provider.alias_catalog or provider.slug, query), provider)
+                lookups.setdefault((provider.alias_catalog or provider.slug, title), provider)
         found = {}
 
         def look_up():
-            for (catalog, query), provider in lookups.items():
+            for (catalog, title), provider in lookups.items():
                 try:
-                    found[catalog, query] = tuple(provider.lookup_aliases(query))
+                    found[catalog, title] = tuple(provider.lookup_aliases(title))
                 except Exception:
                     continue  # the search simply ends without other names
 
@@ -452,7 +459,10 @@ class SearchSession:
         added = []
         searched = {(p.slug, q) for p, q in self.groups}
         for provider, query, spelling in wanted:
-            aliases = found.get((provider.alias_catalog or provider.slug, query), ())
+            title = provider.typed_split(query)[0]
+            typed_word = query[len(title):].strip()  # kept, so the typed preset still applies
+            aliases = [f"{alias} {typed_word}".strip()
+                       for alias in found.get((provider.alias_catalog or provider.slug, title), ())]
             names = [name for name in dict.fromkeys(filter(None, (spelling, *aliases)))
                      if (provider.slug, name) not in searched]
             for name in names:
@@ -462,13 +472,14 @@ class SearchSession:
                 searched.add((provider.slug, name))
                 group = self._add_group(provider, name)
                 added += [t for t in self.tasks if t.group == group and t.diagnostic.status == "pending"]
+            catalog_names = [alias for alias in aliases if alias in names]
             for note, shown in ((f"Nothing matched “{query}”, so “{spelling}” was searched too.", spelling in names),
                                 (f"Nothing matched “{query}”, so its catalog title was searched too: "
-                                 + ", ".join(f"“{alias}”" for alias in aliases) + ".",
-                                 any(alias in names for alias in aliases))):
+                                 + ", ".join(f"“{alias}”" for alias in catalog_names) + ".", bool(catalog_names))):
                 if shown and note not in self.notes:
                     self.notes.append(note)
-        return added
+        # Groups whose engines are all Auto start now: they have no On engine to wait for.
+        return added + self._auto_ready()
 
     def _start_author_lookup(self):
         """Find the requested work's authors for plain queries (Books), in parallel

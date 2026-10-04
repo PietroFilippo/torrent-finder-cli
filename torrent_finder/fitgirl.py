@@ -137,9 +137,11 @@ def search(query: str) -> list[SearchResult]:
 
     Source/platform words are dropped first ("Cyberpunk 2077 fitgirl"): post
     titles never contain them. When nothing matches, at most two other spellings
-    are tried: the final number in its other form ("Dying Light Two" → "Dying
-    Light 2"), then without possessive endings ("Baldurs Gate 3" → "Baldur Gate 3",
-    which the site matches to "Baldur’s Gate 3"; rows must still match the title).
+    are tried: the final number in its other form ("Civilization VI" →
+    "Civilization 6", "Grand Theft Auto 5" → "Grand Theft Auto V"), then without
+    possessive endings ("Baldurs Gate 3" → "Baldur Gate 3", which the site
+    matches to "Baldur’s Gate 3"; rows must still match the title). Spelled-out
+    numbers ("Dying Light Two") are left to the search session's digit retry.
     """
     title = game_title_query(query)
     return _shared.run(title, _search_with_fallback)
@@ -164,6 +166,7 @@ def _search_once(query: str, wanted: tuple[str, ...]) -> list[SearchResult]:
     results: list[SearchResult] = []
     seen: set[str] = set()
     r = search_request(session.get, f"{_BASE}/", params={"s": query}, timeout=30)
+    r.raise_for_status()  # an error page is a failure, not "no posts"
     _parse_page(r.text, results, seen, wanted)
     if _NEXT_PAGE_RE.search(r.text):
         try:

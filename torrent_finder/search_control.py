@@ -136,7 +136,8 @@ class SharedResults:
     Both game providers search FitGirl and Online-Fix: an identical query asked
     again within *seconds* reuses the rows, and a concurrent identical search
     waits for the first instead of sending its own requests. A search that
-    raises is not remembered, so a retry asks the source again.
+    raises or records a failure (an HTTP error, a missing second page) is not
+    remembered, so a retry asks the source again.
     """
 
     def __init__(self, seconds: float) -> None:
@@ -156,7 +157,11 @@ class SharedResults:
             reused = self._recent.get(key)
             if reused and time.monotonic() - reused[0] < self.seconds:
                 return list(reused[1])
+            from torrent_finder.search_diagnostics import failure_mark
+            mark = failure_mark()
             rows = search(query)
+            if failure_mark() > mark:
+                return list(rows)  # incomplete: shown, but not reused
             now = time.monotonic()
             self._recent = {k: v for k, v in self._recent.items() if now - v[0] < self.seconds}
             self._recent[key] = (now, list(rows))
@@ -181,16 +186,18 @@ class SearchControl:
             return set(self._timeouts)
 
     def run_engine(self, provider_slug, engine_name, operation, slots):
+        """Run one engine search within its budget. A search stopped before it
+        started raises ``SearchInterrupted``: it is unanswered, not empty."""
         while not self.stopped():
             if slots.acquire(timeout=0.05):
                 break
         else:
-            return []
+            raise SearchInterrupted()
         budget = _RequestBudget(self, min(self.deadline, time.monotonic() + _ENGINE_SECONDS))
         token = _request_budget.set(budget)
         try:
             if self.stopped():
-                return []
+                raise SearchInterrupted()
             return operation()
         finally:
             _request_budget.reset(token)

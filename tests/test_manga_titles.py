@@ -66,7 +66,8 @@ class AliasTests(MangaCase):
                               aliases={"Yokohama Shopping Log": ("Yokohama Kaidashi Kikou",)})
         self.assertEqual(self.lookups, ["Yokohama Shopping Log"])
         self.assertEqual(results[0].name, "Yokohama Kaidashi Kikou - Deluxe Edition (Digital) (1r0n)")
-        self.assertEqual(results[0]["from_work"], "Yokohama Kaidashi Kikou")
+        # Rows found under the catalog title belong to the title that was typed.
+        self.assertEqual(results[0]["from_work"], "Yokohama Shopping Log")
         self.assertIn(("EN", "Yokohama Kaidashi Kikou"), self.calls)
         self.assertIn("Nothing matched “Yokohama Shopping Log”, so its catalog title was searched too: "
                       "“Yokohama Kaidashi Kikou”.", results.notices)
@@ -133,7 +134,8 @@ class TypedLanguageTests(MangaCase):
         self.assertIn(("Non-English", "Berserk"), self.calls)
         self.assertNotIn("Raw", {engine for engine, _ in self.calls})
         self.assertEqual(results[0].name, "Berserk - Volume 1 (Português) PT-BR")
-        self.assertIn("1 result(s) carry a Portuguese tag and are listed first; the title alone was searched too.",
+        self.assertIn("1 result(s) carry a Portuguese tag and come first among equally good matches; the title alone "
+                      "was searched too.",
                       results.notices)
         self.assertEqual(self.lookups, [])  # Berserk rows match the title; no alias lookup
 

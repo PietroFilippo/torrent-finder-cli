@@ -21,6 +21,19 @@ class RequestTrace:
         _trace.reset(self.token)
 
 
+def failure_mark() -> int:
+    """How many failures the current search has recorded (see forget_failures)."""
+    trace = _trace.get()
+    return len(trace.failures) if trace is not None else 0
+
+
+def forget_failures(mark: int) -> None:
+    """Drop failures recorded since *mark*: a later attempt (another mirror) answered."""
+    trace = _trace.get()
+    if trace is not None:
+        del trace.failures[mark:]
+
+
 def record_failure(error=None, *, message=""):
     trace = _trace.get()
     if trace is None:

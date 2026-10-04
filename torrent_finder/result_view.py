@@ -195,21 +195,23 @@ def game_title_query(query: str) -> str:
     return " ".join(_GAME_EXTRAS.sub(" ", query).split()) or query
 
 
+_DIGIT_ROMANS = {**{value: roman.upper() for roman, value in _ROMAN_VALUES.items()}, 5: "V", 10: "X"}
+
+
 def number_variant(query: str) -> "str | None":
-    """The query with its final number written the other common way: words and
-    Roman numerals as digits ("Dying Light Two" → "Dying Light 2", "Civilization
-    VI" → "Civilization 6"), digits as Roman numerals ("Final Fantasy 7" → "Final
-    Fantasy VII"). None when the query does not end in such a number."""
+    """The query with its final number written the other common way: Roman
+    numerals as digits ("Civilization VI" → "Civilization 6"), digits as Roman
+    numerals ("Final Fantasy 7" → "Final Fantasy VII", "Grand Theft Auto 5" →
+    "Grand Theft Auto V"). None when the query does not end in such a number.
+    Lone "V"/"X" stay as typed: they are often letters ("Mega Man X")."""
     parts = query.split()
     if len(parts) < 2:
         return None
     last = parts[-1].casefold()
-    if last in _NUMBER_WORDS[1:]:
-        swapped = str(_NUMBER_WORDS.index(last))
-    elif last in _ROMAN_VALUES:
+    if last in _ROMAN_VALUES:
         swapped = str(_ROMAN_VALUES[last])
-    elif last.isdigit() and int(last) in _ROMAN_VALUES.values():
-        swapped = _ROMAN[list(_ROMAN_VALUES.values()).index(int(last))].upper()
+    elif last.isdigit() and int(last) in _DIGIT_ROMANS:
+        swapped = _DIGIT_ROMANS[int(last)]
     else:
         return None
     return " ".join([*parts[:-1], swapped])

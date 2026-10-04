@@ -131,4 +131,6 @@ def build_magnet(info_hash: str, name: str) -> str:
     otherwise end or alter the display-name parameter for every client.
     """
     trackers = "&".join(f"tr={t}" for t in TRACKERS)
-    return f"magnet:?xt=urn:btih:{info_hash}&dn={quote(name, safe='')}&{trackers}"
+    # The hash is encoded too: a malformed one from an index must not end the
+    # parameter or reach a client's command line with quotes.
+    return f"magnet:?xt=urn:btih:{quote(info_hash, safe='')}&dn={quote(name, safe='')}&{trackers}"

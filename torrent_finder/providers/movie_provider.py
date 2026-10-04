@@ -6,7 +6,7 @@ import requests
 
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.language_tags import has_brazilian_audio, has_portuguese_subtitles
-from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.providers.base import _MAX_QUERY_EXPANSIONS, BaseProvider, SearchEngine
 from torrent_finder.result_view import movie_title_score, split_release_tags
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
@@ -126,7 +126,7 @@ class MovieProvider(BaseProvider):
         title, tags = split_release_tags(query)
         if tags and title not in queries:
             queries.insert(1, title)
-        return queries
+        return queries[:_MAX_QUERY_EXPANSIONS]
 
     def _init_engines(self) -> list[SearchEngine]:
         """APIBay + Nyaa on, Knaben auto, noisier engines manually off."""

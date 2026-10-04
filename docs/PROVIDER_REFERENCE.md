@@ -245,15 +245,18 @@ broader discovery is wanted.
   ignore apostrophes, so `Baldurs`, `Baldur's` and `Baldur’s` match each other
   (FitGirl, Online-Fix and the result-list search).
 - When the title finds no matching post, at most two more searches run:
-  1. the final number written the other way (`Dying Light Two` → `Dying Light
-     2`, `Civilization VI` → `Civilization 6`, `Final Fantasy 7` → `Final
-     Fantasy VII`);
+  1. the final number written the other way (`Civilization VI` →
+     `Civilization 6`, `Final Fantasy 7` → `Final Fantasy VII`, `Grand Theft
+     Auto 5` → `Grand Theft Auto V`). Spelled-out numbers (`Dying Light Two`)
+     later moved to the search session's digit retry, which every provider
+     shares;
   2. possessive endings dropped (`Baldurs Gate 3` → `Baldur Gate 3`). Posts
      from this broader search must still match the typed title.
 - Live checks: `Dying Light Two` and `Civilization VI` (titled `Civilization
   6` on the site) find their posts with four requests in about 3 seconds.
 - A failed first request is now a retryable failure instead of an empty
-  result.
+  result. Since the final review, an HTTP error page is one too, and a search
+  that recorded any failure is not reused by the 30-second shared cache.
 
 ## Desktop Software
 
