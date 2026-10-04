@@ -237,6 +237,29 @@ def _scenarios():
         edit_name_rules(NameRules())
 
     scenarios.append(("name-rules", name_rules))
+
+    def creator_works():
+        from torrent_finder.resolvers.types import Entity, Work
+        from torrent_finder.ui.creator import _works_select_prompt
+        works = [Work(title=f"Film number {i} with a longer title", subtitle=f"{1980 + i} · MOVIE")
+                 for i in range(12)]
+        _works_select_prompt(works, Entity("1", "Hayao Miyazaki"), anime.creator_facets[0],
+                             preselected={works[1].title}, page_no=1, total_pages=3, has_next=True)
+
+    def diagnostics():
+        from types import SimpleNamespace
+        from torrent_finder.ui.search_diagnostics import diagnostics_menu
+        session = SimpleNamespace(
+            can_retry=True, can_load_more=True, queries=["dune", "dune part two"],
+            diagnostics=[SimpleNamespace(provider="Movies & Series", engine=name, status=status, raw=raw,
+                                         kept=kept, seconds=secs, retryable=status != "results")
+                         for name, status, raw, kept, secs in (("Apibay", "results", 28, 20, 0.9),
+                                                               ("Knaben", "timed_out", 0, 0, 30.0),
+                                                               ("YTS", "blocked", 0, 0, 1.2))],
+            page_status=lambda: ["Apibay: page 1 of 3", "Knaben: unavailable"])
+        diagnostics_menu(session)
+
+    scenarios += [("creator-works", creator_works), ("diagnostics", diagnostics)]
     return scenarios
 
 
