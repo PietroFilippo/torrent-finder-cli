@@ -243,7 +243,7 @@ def _table_caption(
         if cell_len(legend) > room:  # one line, always: the row budget counts one
             legend = ellipsize_cells("Apibay* = cached results", room)
         caption.append(theme.MARGIN + legend + "\n", style=theme.WARN)
-    if console.size.height >= 20:  # short windows keep the row for results
+    if theme.roomy(console.size.height, 20):  # short windows keep the row for results
         caption.append_text(theme.rule(width))
         caption.append("\n")
     caption.append_text(Text("\n").join(theme.wrap_keys(
@@ -312,7 +312,7 @@ def _visible_count(
         details = 1 if tiny else 1 + _METADATA_LINES[layout.mode] + (2 if show_provider else 0)
     header = 1 if tiny else len(theme.header_lines(
         heading or "Results", "888–888 of 888 · page 88/88 · 888 picked", width))
-    compact = height < 20
+    compact = not theme.roomy(height, 20)
     keys = len(theme.wrap_keys(theme.parse_footer(
         Text(_result_keys(2, frozenset(range(100))))).keys, width))
     chrome = (
@@ -549,7 +549,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
             parts: list[object] = [theme.header(heading or "Results", status, console.size.width)]
         else:
             parts = list(theme.header_lines(heading or "Results", status, console.size.width))
-        if console.size.height >= 20:
+        if theme.roomy(console.size.height, 20):
             parts.append(theme.rule(console.size.width))
         order_label = SORT_ORDERS.get(view_order, view_order)
         if view_order != "relevance":

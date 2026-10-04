@@ -153,17 +153,14 @@ def check_for_update(force: bool = False) -> "dict | None":
 
 
 def _banner(headline: str, action: str) -> str:
-    """High-visibility notice: black-on-yellow headline + bright action text.
+    """High-visibility notice: the theme's banner headline + bright action text.
 
-    ``not dim`` is load-bearing: the selector footer renders with a dim base
-    style, which would grey the notice out without it. No ``bold`` on the
-    headline: terminals render bold black as bright black (grey), which is
-    barely readable on the yellow background.
+    The ``banner`` styles (ui/theme.py) carry ``not dim``, which is
+    load-bearing: the selector footer renders with a dim base style, which
+    would grey the notice out without it. The headline is not bold: terminals
+    render bold black as bright black (grey), barely readable on the banner.
     """
-    return (
-        f"[not dim black on yellow] {headline} [/not dim black on yellow] "
-        f"[not dim bold yellow]{action}[/not dim bold yellow]"
-    )
+    return f"[banner] {headline} [/banner] [banner.action]{action}[/banner.action]"
 
 
 def notice_line(info: "dict | None") -> str:

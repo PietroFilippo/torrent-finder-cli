@@ -12,7 +12,7 @@ from torrent_finder.result_view import SORT_ORDERS
 from torrent_finder.search_profiles import ProfileLibrary
 from torrent_finder.state import compact_history, load_history
 
-PREFERENCES = {"download_dir", "hide_stream_output", "search_profiles", "combined_search"}
+PREFERENCES = {"download_dir", "hide_stream_output", "search_profiles", "combined_search", "appearance"}
 
 
 def _object(value, allowed=None):
@@ -75,6 +75,10 @@ def validate_payload(data):
             raise ValueError("Invalid download folder")
         if key == "hide_stream_output" and type(value) is not bool:
             raise ValueError("Invalid stream preference")
+        if key == "appearance":
+            _object(value, {"theme", "focus", "density"})
+            if any(not isinstance(item, str) for item in value.values()):
+                raise ValueError("Invalid appearance settings")
         if key == "combined_search":
             validate_profile(value)
         if key == "search_profiles":

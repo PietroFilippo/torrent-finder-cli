@@ -2,9 +2,11 @@
 
 Screens draw no boxes. A header line names the app and the current screen,
 content sits under a two-cell margin, and one key bar lists the keys as
-``key action`` pairs. The terminal's own bright blue carries focus, keys and
-the brand; three fixed shades of blue give headings, secondary text and rules
-their own weight. See docs/adr/0020-quiet-terminal-design.md.
+``key action`` pairs. Colours come from a palette with one job per colour:
+an accent for focus, keys and the brand, three shades for headings,
+secondary text and rules, and the state colours. Themes swap the palette,
+never the roles. See docs/adr/0020-quiet-terminal-design.md and
+docs/adr/0021-themes.md.
 """
 
 from __future__ import annotations
@@ -23,68 +25,199 @@ UNCHECKED = "•"
 MARKER = "◆"
 CRUMB = " › "
 KEY_GAP = "   "
+BAR = "▇"  # one cell of a bar in a chart row
 
-# One blue scale, each shade with one job. The accent is the terminal's own
-# bright blue so it matches the user's palette; the three fixed shades sit
-# around it (tuned to Windows Terminal's Campbell blue) and degrade to the
-# nearest named colour on terminals without true colour.
-ACCENT = "bright_blue"    # focus: the cursor bar, the focused row, keys, the brand
-SKY = "#7DAEFF"           # light: section and column headings, the subject of a screen
-STEEL = "#6A86B3"         # blue-grey: labels, hints, separators, Off, disabled rows
-DEEP = "#3A5A8C"          # dark: rules
-KEY = f"bold {ACCENT}"
-MUTED = STEEL
-GOOD = "green"
-WARN = "yellow"
-BAD = "red"
-SECTION = f"bold {SKY}"   # uppercase section headers and table column headers
-FOCUS = f"bold {ACCENT}"
-BRAND = f"bold {ACCENT}"  # the app name in every header
-SCREEN = "bold"           # the screen name after it
-SUBJECT = f"not bold {SKY}"  # what the screen is about: the query, torrent or provider after the name
+
+@dataclass(frozen=True)
+class Palette:
+    """A theme: one colour for every role, nothing else.
+
+    *accent* carries focus (the brand, cursor bar, focused row, keys and
+    Prefer); *sky* section and column headings and the subject of a screen;
+    *steel* labels, hints, separators, Off and disabled rows; *deep* rules and
+    bars; *fill* the focused row's background when focus is "fill". *good*,
+    *warn* and *bad* are the state colours (On / Auto / failures, seed health).
+    """
+
+    key: str
+    name: str
+    accent: str
+    sky: str
+    steel: str
+    deep: str
+    fill: str
+    good: str = "green"
+    warn: str = "yellow"
+    bad: str = "red"
+    note: str = ""
+    light: bool = False
+
+
+# Dark palettes leave the state colours to the terminal's own green, yellow and
+# red. Hex shades degrade to the nearest named colour without true colour.
+THEMES: dict[str, Palette] = {palette.key: palette for palette in (
+    Palette("quiet", "Quiet Blue", "bright_blue", "#7DAEFF", "#6A86B3", "#3A5A8C", "#16233D",
+            note="The default: your terminal's bright blue with three fixed shades of blue."),
+    Palette("iris", "Iris", "#A78BFA", "#C9B8FF", "#8F86B5", "#4B3F86", "#231B3F",
+            note="Violet; green, yellow and red stay free for states."),
+    Palette("lagoon", "Lagoon", "#2DD4BF", "#9FF2E4", "#6E9CA3", "#1E5C66", "#0E2A2E",
+            note="Teal; as cool as Quiet Blue, further from the blue of links."),
+    Palette("ember", "Ember", "#FFB454", "#FFD9A0", "#A89378", "#6F4A2A", "#30220F", warn="#FF8A3D",
+            note="Warm amber; Auto turns orange so it never looks like the accent."),
+    Palette("mono", "Mono", "#F2F2F2", "#D9D9D9", "#8C8C8C", "#474747", "#262626",
+            note="No hue: weight carries the structure, states keep their colours."),
+    Palette("paper", "Paper", "#1F5FD6", "#2B4C8C", "#6B7A99", "#B9C6DC", "#DCE6F7",
+            good="#1A7F37", warn="#9A6700", bad="#CF222E", light=True,
+            note="For light terminal backgrounds; every shade is darker than the page."),
+)}
+DEFAULT_THEME = "quiet"
+FOCUS_STYLES = {"bar": "Cursor bar", "fill": "Filled row"}
+DENSITIES = {"comfortable": "Comfortable", "compact": "Compact"}
+
+# The active palette's roles, rebound by apply(). Screens read these at render
+# time (``theme.ACCENT``), so a theme change reaches the next frame.
+PALETTE: Palette = THEMES[DEFAULT_THEME]
+ACCENT = SKY = STEEL = DEEP = FILL = GOOD = WARN = BAD = ""
+KEY = MUTED = SECTION = FOCUS = BRAND = SUBJECT = RULE_STYLE = ""
+SCREEN = "bold"           # the screen name after the app name
 RULE = "─"
-RULE_STYLE = DEEP
+FILL_FOCUS = False        # focus style "fill": the focused row on a tinted background
+COMPACT = False           # density "compact": the short-window layout at every size
 
 # Rich theme entries; constants.custom_theme registers these so markup such as
-# "[muted]…[/muted]" works in every console that renders the app.
-STYLES = {
-    "accent": ACCENT,
-    "key": KEY,
-    "muted": MUTED,
-    "sky": SKY,
-    "good": GOOD,
-    "warn": WARN,
-    "bad": BAD,
-    "section": SECTION,
-    # Message styles used by console output across the app.
-    "title": "bold",
-    "info": MUTED,
-    "success": GOOD,
-    "warning": WARN,
-    "error": f"bold {BAD}",
-    "highlight": "bold",
-    # Rich's own spinners and progress bars follow the palette.
-    "status.spinner": ACCENT,
-    "bar.complete": ACCENT,
-    "bar.finished": GOOD,
-    "bar.pulse": ACCENT,
-    "progress.percentage": ACCENT,
-    "progress.remaining": MUTED,
-    "progress.elapsed": MUTED,
-}
+# "[muted]…[/muted]" works in every console that renders the app. Updated in
+# place by apply().
+STYLES: dict[str, str] = {}
+_STATE_STYLES: dict[str, str] = {}
 
-_STATE_STYLES = {
-    "on": GOOD,
-    "auto": WARN,
-    "off": MUTED,
-    "require": f"bold {ACCENT}",
-    "prefer": ACCENT,
-}
+
+def _bind(palette: Palette) -> None:
+    global PALETTE, ACCENT, SKY, STEEL, DEEP, FILL, GOOD, WARN, BAD
+    global KEY, MUTED, SECTION, FOCUS, BRAND, SUBJECT, RULE_STYLE
+    PALETTE = palette
+    ACCENT, SKY, STEEL, DEEP, FILL = palette.accent, palette.sky, palette.steel, palette.deep, palette.fill
+    GOOD, WARN, BAD = palette.good, palette.warn, palette.bad
+    KEY = f"bold {ACCENT}"
+    MUTED = STEEL
+    SECTION = f"bold {SKY}"     # uppercase section headers and table column headers
+    FOCUS = f"bold {ACCENT}"
+    BRAND = f"bold {ACCENT}"    # the app name in every header
+    SUBJECT = f"not bold {SKY}"  # what the screen is about: the query, torrent or provider after the name
+    RULE_STYLE = DEEP
+    STYLES.clear()
+    STYLES.update({
+        "accent": ACCENT,
+        "key": KEY,
+        "muted": MUTED,
+        "steel": STEEL,
+        "sky": SKY,
+        "deep": DEEP,
+        "good": GOOD,
+        "warn": WARN,
+        "bad": BAD,
+        "section": SECTION,
+        # Message styles used by console output across the app.
+        "title": "bold",
+        "info": MUTED,
+        "success": GOOD,
+        "warning": WARN,
+        "error": f"bold {BAD}",
+        "highlight": "bold",
+        # A transient line that needs attention (the quit guard) and the update
+        # banner. "not dim" keeps them bright inside dimmed footers; the banner's
+        # headline is not bold because bold black reads as grey on many terminals.
+        "alert": f"not dim bold {WARN}",
+        "banner": f"not dim black on {WARN}",
+        "banner.action": f"not dim bold {WARN}",
+        # Rich's own spinners and progress bars follow the palette.
+        "status.spinner": ACCENT,
+        "bar.complete": ACCENT,
+        "bar.finished": GOOD,
+        "bar.pulse": ACCENT,
+        "progress.percentage": ACCENT,
+        "progress.remaining": MUTED,
+        "progress.elapsed": MUTED,
+    })
+    _STATE_STYLES.clear()
+    _STATE_STYLES.update({
+        "on": GOOD,
+        "auto": WARN,
+        "off": MUTED,
+        "require": f"bold {ACCENT}",
+        "prefer": ACCENT,
+    })
+
+
+_bind(PALETTE)
+_pushed_theme = False
+
+
+def apply(palette: "Palette | str | None" = None, *, focus: str | None = None,
+          density: str | None = None) -> Palette:
+    """Switch the active palette and/or the focus and density settings.
+
+    Every role name in this module is rebound, the Rich markup styles follow,
+    and the app's consoles pick them up for the next frame. Unknown names
+    raise ``KeyError``/``ValueError``; callers resolve user input first.
+    """
+    global FILL_FOCUS, COMPACT, _pushed_theme
+    if isinstance(palette, str):
+        palette = THEMES[palette]
+    if focus is not None:
+        if focus not in FOCUS_STYLES:
+            raise ValueError(f"Unknown focus style {focus!r}")
+        FILL_FOCUS = focus == "fill"
+    if density is not None:
+        if density not in DENSITIES:
+            raise ValueError(f"Unknown density {density!r}")
+        COMPACT = density == "compact"
+    if palette is not None:
+        _bind(palette)
+        from rich.theme import Theme
+
+        from torrent_finder import constants
+        constants.custom_theme = Theme(dict(STYLES))
+        if _pushed_theme:
+            constants.console.pop_theme()
+        constants.console.push_theme(constants.custom_theme)
+        _pushed_theme = True
+    return PALETTE
+
+
+def current() -> tuple[Palette, str, str]:
+    """The active palette, focus style and density."""
+    return PALETTE, "fill" if FILL_FOCUS else "bar", "compact" if COMPACT else "comfortable"
+
+
+def roomy(height: int, threshold: int) -> bool:
+    """True when a window *height* rows tall has room for spacing and rules.
+
+    Every frame asks this before adding a rule or spacer line; the compact
+    density answers no at any size, so lists get those rows instead.
+    """
+    return not COMPACT and height >= threshold
 
 
 def state_style(state: str) -> str:
     """Colour for a named toggle state (engine On/Auto/Off, preset Require/Prefer)."""
     return _STATE_STYLES.get(state.strip().casefold(), "")
+
+
+def seed_style(seeds: int) -> str:
+    """Seed health: good from 10 seeds, warn below, bad at none."""
+    return GOOD if seeds >= 10 else WARN if seeds >= 1 else BAD
+
+
+def leech_style(leeches: int) -> str:
+    """Leeches: muted when few, then warn, then bad."""
+    return MUTED if leeches <= 5 else WARN if leeches <= 50 else BAD
+
+
+def bar(value: float, largest: float, width: int) -> str:
+    """A run of bar cells scaled so *largest* fills *width*; at least one cell for any value."""
+    if width <= 0 or value <= 0 or largest <= 0:
+        return ""
+    return BAR * max(1, min(width, round(width * value / largest)))
 
 
 def inner_width(width: int) -> int:
@@ -155,7 +288,7 @@ def header_lines(title: str | Text = "", status: str | Text = "", width: int = 8
     needed = cell_len(left.plain) + (cell_len(right.plain) + 2 if right.plain else 0)
     if needed <= usable or width < 24:
         return [header(title, status, width)]
-    right.stylize(MUTED)
+    right.stylize_before(MUTED)  # the status's own colours win
     if cell_len(left.plain) <= usable:
         first, rest = left, Text()
     else:
@@ -190,7 +323,7 @@ def header(title: str | Text = "", status: str | Text = "", width: int = 80) -> 
     left = _header_left(title)
     right = _as_text(status) if status else Text()
     if right.plain:
-        right.stylize(MUTED)
+        right.stylize_before(MUTED)  # the status's own colours win
     usable = max(1, width - len(MARGIN))
     if right.plain:
         room = usable - cell_len(left.plain) - 2

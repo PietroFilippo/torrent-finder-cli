@@ -81,16 +81,16 @@ def input_screen(
     def render(target: Console) -> None:
         for line in theme.header_lines(title, status, target.size.width):
             target.print(line)
-        if target.size.height >= 12:
+        if theme.roomy(target.size.height, 12):
             target.print(theme.rule(target.size.width))
         for line in lines:
             if line:
                 _print_lines(target, Text.from_markup(line))
-        if lines and any(lines) and target.size.height >= 12:
+        if lines and any(lines) and theme.roomy(target.size.height, 12):
             target.print()
 
     def footer(target: Console) -> None:
-        if target.size.height >= 12:
+        if theme.roomy(target.size.height, 12):
             target.print(theme.rule(target.size.width))
         _print_keys(target, keys)
 
@@ -125,18 +125,18 @@ def make_search_screen_renderer(
         in_header = cell_len(theme.APP_NAME) + cell_len(title) + cell_len(status_plain) + 12 <= width
         for line in theme.header_lines(title, status if in_header else "", width):
             target.print(line)
-        if height >= 14:
+        if theme.roomy(height, 14):
             target.print(theme.rule(width))
-        if not in_header and height >= 12:
+        if not in_header and theme.roomy(height, 12):
             for line in theme.wrap_block(theme.labelled(Text.from_markup(status).plain, wrap=True), width, target):
                 target.print(line)
         if notice:
             _print_lines(target, theme.strip_text(Text.from_markup(notice)))
-        if height >= 12 and (notice or not in_header):
+        if theme.roomy(height, 12) and (notice or not in_header):
             target.print()
 
     def footer(target: Console) -> None:
-        if target.size.height >= 12:
+        if theme.roomy(target.size.height, 12):
             target.print(theme.rule(target.size.width))
         _print_keys(target, full_shortcuts if target.size.height >= 18 else compact_shortcuts)
 
@@ -1290,12 +1290,12 @@ def confirm_prompt(message: str, title: str = "Confirm") -> bool:
     from rich.console import Group
     width = console.size.width
     lines = list(theme.header_lines(title, "", width))
-    if console.size.height >= 12:
+    if theme.roomy(console.size.height, 12):
         lines.append(theme.rule(width))
     lines += theme.wrap_block(Text.from_markup(message), width, console)
     lines.append(Text(""))
     lines += theme.wrap_block(Text("Any other key cancels too.", style=theme.MUTED), width, console)
-    if console.size.height >= 12:
+    if theme.roomy(console.size.height, 12):
         lines.append(theme.rule(width))
     lines += theme.wrap_keys(theme.parse_footer("Y confirm  •  Esc cancel").keys, width)
     sys.stdout.write("\033[?1049h\033[?25l\033[H\033[2J")

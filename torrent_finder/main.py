@@ -1051,12 +1051,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Search by creator role (use with --name and -t), e.g. --by director",
     )
     parser.add_argument("--name", type=str, help='Creator name for --by, e.g. --name "Hayao Miyazaki"')
+    from torrent_finder.ui.theme import THEMES
+    parser.add_argument("--theme", choices=tuple(THEMES), type=str.lower,
+                        help="Colour theme for this run (saved choice: Settings › Appearance)")
     return parser
+
+
+def _apply_appearance(args) -> str:
+    """Apply the theme before the first frame; returns a notice for the main menu."""
+    from torrent_finder.ui.appearance import apply_startup
+    return apply_startup(getattr(args, "theme", None))
 
 
 def _main_loop(args=None) -> None:
     parser = _build_parser()
     args = args or parser.parse_args()
+    theme_notice = _apply_appearance(args)
     if args.preview_update:
         preview_update(args.preview_update)
         return
@@ -1141,6 +1151,8 @@ def _main_loop(args=None) -> None:
     # printed once here for direct -q/-t runs that skip the menu.
     update_info = check_for_update()
     update_msg = notice_line(update_info)
+    if theme_notice:
+        update_msg = "\n".join(filter(None, (update_msg, f"[warning]{markup_escape(theme_notice)}[/warning]")))
     from rich.markup import escape
     update_report = consume_update_report()
     if update_report:
@@ -1209,7 +1221,7 @@ def _main_loop(args=None) -> None:
 
         if not current_provider:
             exit_hint = (
-                "[not dim bold yellow]Press Esc or Ctrl+C again to quit[/not dim bold yellow]"
+                "[alert]Press Esc or Ctrl+C again to quit[/alert]"
                 if exit_armed else ""
             )
             try:
@@ -1502,6 +1514,7 @@ def main() -> None:
     from torrent_finder.search_profiles import ProfileError
     args = _build_parser().parse_args()
     if args.preview_update:
+        _apply_appearance(args)
         try:
             preview_update(args.preview_update)
         except (KeyboardInterrupt, EOFError):

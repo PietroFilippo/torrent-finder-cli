@@ -6,7 +6,7 @@ import time
 from urllib.parse import quote
 
 from torrent_finder.constants import TRACKERS
-from torrent_finder.ui.theme import MUTED
+from torrent_finder.ui import theme
 
 
 def start_esc_listener(cancel_event: "threading.Event", *, finish_event=None) -> "threading.Event":
@@ -90,21 +90,13 @@ def parse_size_to_bytes(size_str: str) -> int:
 
 
 def seed_style(seeds: int) -> str:
-    """Seed-health colour: green from 10 seeds, yellow below, red at none."""
-    if seeds >= 10:
-        return "green"
-    elif seeds >= 1:
-        return "yellow"
-    return "red"
+    """Seed-health colour from the active theme: good from 10 seeds, warn below, bad at none."""
+    return theme.seed_style(seeds)
 
 
 def leech_style(leeches: int) -> str:
-    """Leech colour: muted when few, then yellow, red."""
-    if leeches <= 5:
-        return MUTED
-    elif leeches <= 50:
-        return "yellow"
-    return "red"
+    """Leech colour from the active theme: muted when few, then warn, bad."""
+    return theme.leech_style(leeches)
 
 
 def marquee(text: str, width: int, tick: int, sep: str = "   •   ") -> str:

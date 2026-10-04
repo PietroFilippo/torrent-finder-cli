@@ -359,7 +359,7 @@ class MadokamiAcquisition:
         # markup=False: manga filenames routinely contain brackets ("[Group] …"),
         # which rich would otherwise try to parse as style tags.
         progress = Progress(
-            TextColumn("{task.description}", style="cyan", markup=False),
+            TextColumn("{task.description}", style="accent", markup=False),
             BarColumn(),
             DownloadColumn(),
             TransferSpeedColumn(),
@@ -585,7 +585,7 @@ class LibgenAcquisition:
         # markup=False: book titles routinely contain brackets, which rich
         # would otherwise try to parse as style tags.
         progress = Progress(
-            TextColumn("{task.description}", style="cyan", markup=False),
+            TextColumn("{task.description}", style="accent", markup=False),
             BarColumn(),
             DownloadColumn(),
             TransferSpeedColumn(),
@@ -694,7 +694,7 @@ class FDroidAcquisition:
         cancel_event = threading.Event()
         stop_listener = start_esc_listener(cancel_event)
         progress = Progress(
-            TextColumn("{task.description}", style="cyan", markup=False),
+            TextColumn("{task.description}", style="accent", markup=False),
             BarColumn(),
             DownloadColumn(),
             TransferSpeedColumn(),

@@ -194,6 +194,8 @@ def main():
     parser.add_argument("--job-id")
     parser.add_argument("--preview", choices=("success", "failure"), default="success")
     args = parser.parse_args()
+    from torrent_finder.ui.appearance import apply_startup
+    apply_startup()  # the viewer is its own process: draw it in the saved theme
     if args.watch:
         if not args.job_id:
             parser.error("--watch requires --job-id")

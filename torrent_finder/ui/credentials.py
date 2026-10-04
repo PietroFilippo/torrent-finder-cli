@@ -72,7 +72,7 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
         scroll around the focused one. The focused field and the keys stay.
         """
         width, height = console.size.width, console.size.height
-        compact = height < 20
+        compact = not theme.roomy(height, 20)
         parsed = theme.parse_footer(footer)
         title = f"Credentials › {meta.name} — sign in"
         top = theme.header_lines(title, "", width)

@@ -262,7 +262,7 @@ def _build_panel(
     width = console.size.width
     height = console.size.height
     inner_width = _inner_width()
-    compact = height < _COMPACT_HEIGHT
+    compact = not theme.roomy(height, _COMPACT_HEIGHT)
     has_actions = any(item.is_action for item in items)
     geometry = _geometry(items, multi)
 

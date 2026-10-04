@@ -168,7 +168,7 @@ def show_security_warning(force: bool = False) -> bool:
                 line.append(value, style="bold")
             line.truncate(room + len(theme.MARGIN), overflow="ellipsis")
             detail.append((line, 2 if optional else min(index, 1)))
-        spaced = height >= 20
+        spaced = theme.roomy(height, 20)
         one_line_header = [theme.header("Network exposure warning", "", width)]
 
         def assemble(max_rank: int, spacing: bool, header: list[Text], parts: list[list[Text]]) -> list[Text]:

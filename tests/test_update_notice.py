@@ -20,9 +20,12 @@ class UpdateNoticeTests(unittest.TestCase):
     def test_notice_survives_a_dim_base_style(self):
         # The provider-menu footer renders with a dim base style; the notice
         # must carry "not dim" so it stays bright there.
+        from torrent_finder.ui import theme
         line = notice_line({"kind": "pip", "current": "0.1.0", "latest": "9.9.9"})
-        self.assertIn("not dim", line)
-        self.assertIn("on yellow", line)
+        self.assertIn("[banner]", line)
+        self.assertIn("not dim", theme.STYLES["banner"])
+        self.assertIn("not dim", theme.STYLES["banner.action"])
+        self.assertIn("on yellow", theme.STYLES["banner"])  # the default theme's warn colour
         self.assertIn("9.9.9", line)
         Text.from_markup(line, style="dim")  # must parse as valid markup
 
@@ -66,9 +69,11 @@ class BannerContrastTests(unittest.TestCase):
     def test_headline_is_not_bold_black(self):
         # Terminals render bold black as bright black (grey) — unreadable on
         # the yellow background.
+        from torrent_finder.ui import theme
         line = notice_line({"kind": "pip", "current": "0.1.0", "latest": "9.9.9"})
-        self.assertIn("[not dim black on yellow]", line)
-        self.assertNotIn("bold black", line)
+        self.assertIn("[banner]", line)
+        self.assertIn("black on", theme.STYLES["banner"])
+        self.assertNotIn("bold", theme.STYLES["banner"])
 
 
 class PipxUpgradeExitCodeTests(unittest.TestCase):

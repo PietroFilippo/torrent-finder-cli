@@ -61,7 +61,7 @@ def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: 
         waiting = theme.wrap_block(Text(f"Waiting: {pending}", style=theme.MUTED), width, console)
     keys = theme.wrap_keys(theme.parse_footer(KEYS).keys, width)
 
-    spaced = height >= 14 and len(top) + len(info) + 1 + len(waiting) + len(keys) + 3 <= height
+    spaced = theme.roomy(height, 14) and len(top) + len(info) + 1 + len(waiting) + len(keys) + 3 <= height
     spacers = 3 if spaced else 0
     fixed = len(top) + 1 + len(waiting) + len(keys) + spacers
     if fixed + 1 > height and waiting:
