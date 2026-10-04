@@ -91,17 +91,15 @@ class EngineFallbackStateTests(unittest.TestCase):
     def test_save_state_preserves_explicit_disable_metadata(self):
         provider = FallbackStateProvider()
         provider.engines[1].set_mode("off")
-        persisted = {}
+        persisted = {"providers": {"other": {"active_presets": ["kept"]}}}
 
-        with (
-            patch("torrent_finder.state.store.read", return_value={}),
-            patch(
-                "torrent_finder.state.store.write",
-                side_effect=lambda data: persisted.update(data),
-            ),
-            patch("torrent_finder.state.store.flush"),
+        with patch(
+            "torrent_finder.state.store.commit",
+            side_effect=lambda change: change(persisted),
         ):
             state.save_state([provider])
+
+        self.assertEqual(persisted["providers"]["other"], {"active_presets": ["kept"]})
 
         self.assertEqual(
             persisted["providers"]["fallback"]["explicitly_disabled_engines"],

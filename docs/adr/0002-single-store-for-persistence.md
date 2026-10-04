@@ -1,6 +1,8 @@
 # ADR-0002: One store owns filter_state.json
 
-Status: accepted (2026-07-04)
+Status: accepted (2026-07-04). The write/flush lifecycle below is amended by
+[ADR-0019](0019-operation-based-settings-and-safe-direct-downloads.md):
+changes are saved as operations replayed onto the current file.
 
 ## Context
 

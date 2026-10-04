@@ -1,0 +1,54 @@
+"""Keep tests away from the user's saved settings; not a test module itself.
+
+Importing this module redirects saved settings, credentials and the Apibay
+cache to a temporary directory for the whole run. Test discovery imports every
+test module before any test runs, so one import protects the full suite; each
+module that reaches persistence imports it too, so running it alone is safe.
+"""
+
+import atexit
+import json
+import os
+import shutil
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+from torrent_finder import apibay_cache, credentials, store
+
+_RUN_DIRECTORY = tempfile.mkdtemp(prefix="torrent-finder-tests-")
+atexit.register(shutil.rmtree, _RUN_DIRECTORY, ignore_errors=True)
+store.STATE_PATH = os.path.join(_RUN_DIRECTORY, "filter_state.json")
+store.LEGACY_STATE_PATHS = []
+store._atexit_registered = True  # never save leftover test changes at exit
+credentials._CRED_FILE = Path(_RUN_DIRECTORY) / "credentials.json"
+credentials._LEGACY_CRED_PATHS = []
+credentials._file_cache = None
+apibay_cache.CACHE_PATH = os.path.join(_RUN_DIRECTORY, "apibay_cache.json")
+
+
+def isolate_store(case, data=None, path=None) -> Path:
+    """Give one test a fresh store backed by its own settings file; undone on cleanup.
+
+    *data*, when given, is written as the saved file before the first read.
+    *path* places that file in a directory the test already owns.
+    """
+    if path is None:
+        directory = tempfile.TemporaryDirectory()
+        case.addCleanup(directory.cleanup)
+        path = Path(directory.name) / "filter_state.json"
+    if data is not None:
+        path.write_text(json.dumps(data), encoding="utf-8")
+    for name, value in (("STATE_PATH", str(path)), ("LEGACY_STATE_PATHS", []),
+                        ("_cache", None), ("_pending", []), ("_signature", None),
+                        ("_problem", None)):
+        patcher = patch.object(store, name, value)
+        patcher.start()
+        case.addCleanup(patcher.stop)
+    return path
+
+
+def restart_store() -> None:
+    """Forget the in-memory view, like a new app session reading the same file."""
+    store._cache, store._signature, store._problem = None, None, None
+    store._pending.clear()

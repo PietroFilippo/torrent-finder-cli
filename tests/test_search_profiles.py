@@ -1,7 +1,5 @@
 import io
 import json
-from pathlib import Path
-import tempfile
 import threading
 import unittest
 from unittest.mock import patch
@@ -11,25 +9,19 @@ from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.manga_provider import MangaProvider
 from torrent_finder.providers.combined_provider import CombinedProvider, CombinedResults
 from torrent_finder.search_profiles import ProfileLibrary
+from isolation import isolate_store, restart_store
 
 
 class ProfileTests(unittest.TestCase):
     def setUp(self):
-        directory = tempfile.TemporaryDirectory()
-        self.addCleanup(directory.cleanup)
-        self.path = Path(directory.name) / "filter_state.json"
-        for attr, value in (("STATE_PATH", str(self.path)), ("LEGACY_STATE_PATHS", []),
-                            ("_cache", None), ("_dirty", False), ("_atexit_registered", True)):
-            mocked = patch.object(store, attr, value)
-            mocked.start()
-            self.addCleanup(mocked.stop)
+        self.path = isolate_store(self)
         self.anime, self.manga = AnimeProvider(), MangaProvider()
 
     def provider(self):
         return CombinedProvider([self.anime, self.manga])
 
     def restart(self):
-        store._cache, store._dirty = None, False
+        restart_store()
         return self.provider()
 
     def test_legacy_profile_migrates_without_changing_solo_or_other_settings(self):

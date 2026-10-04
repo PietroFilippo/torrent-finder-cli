@@ -1,10 +1,12 @@
 """Persist engine modes, active filter presets, history, and misc settings.
 
-Persistence itself (cache / dirty / flush of filter_state.json) is owned by
-``store.py``; this module reads and mutates the dict through that interface.
-Destructive UI sites (``save_state``, ``clear_history``) flush explicitly so
-the action survives a hard kill.
+Persistence itself (filter_state.json, its lock and cache) is owned by
+``store.py``; this module reads the state and changes it with store operations.
+Explicit user actions (``save_state``, ``clear_history``) are committed at once
+and raise when saving fails; other changes are saved with the session.
 """
+
+from copy import deepcopy
 
 from torrent_finder import store
 
@@ -22,7 +24,7 @@ _LEGACY_NAME_TO_SLUG = {
 
 def _migrate_legacy_names(data: dict) -> bool:
     """Rewrite display-name keys to slugs across providers, history, and stats
-    subtrees. Returns True if anything changed (caller should mark dirty)."""
+    subtrees. Returns True if anything changed."""
     changed = False
 
     providers = data.get("providers")
@@ -61,10 +63,9 @@ def _migrate_legacy_names(data: dict) -> bool:
 
 def load_state(providers) -> None:
     """Apply saved engine/preset selections onto the given provider instances in place."""
-    data = store.read()
-    if _migrate_legacy_names(data):
-        store.write(data)
-    provider_states = data.get("providers", {})
+    if _migrate_legacy_names(deepcopy(store.read())):
+        store.update(_migrate_legacy_names)
+    provider_states = store.read().get("providers", {})
     for provider in providers:
         pstate = provider_states.get(provider.slug)
         if not pstate:
@@ -131,15 +132,16 @@ def provider_snapshot(provider) -> dict:
 
 
 def save_state(providers) -> None:
-    """Write current engine/preset selections, preserving other top-level keys.
+    """Save the selections of *providers*; other providers and keys are kept.
 
-    Flushes immediately — filter-menu Confirm is an explicit user action and
-    should survive a hard kill.
+    Filter-menu Confirm is an explicit user action: it is saved immediately and
+    raises ``ValueError`` / ``store.SaveError`` when that fails.
     """
-    data = store.read()
-    data["providers"] = {p.slug: provider_snapshot(p) for p in providers}
-    store.write(data)
-    store.flush()
+    snapshots = {p.slug: provider_snapshot(p) for p in providers}
+
+    def change(data):
+        store.section(data, "providers").update(deepcopy(snapshots))
+    store.commit(change)
 
 
 def load_setting(key: str, default=None):
@@ -148,10 +150,10 @@ def load_setting(key: str, default=None):
 
 
 def save_setting(key: str, value) -> None:
-    """Write a value into the `settings` subtree of the state file, preserving other keys."""
-    data = store.read()
-    data.setdefault("settings", {})[key] = value
-    store.write(data)
+    """Set one value in the `settings` subtree; saved with the session's other changes."""
+    def change(data):
+        store.section(data, "settings")[key] = deepcopy(value)
+    store.update(change)
 
 
 # ---------------------------------------------------------------------------
@@ -167,13 +169,6 @@ def load_history() -> list[dict]:
     Each entry is ``{"query": str, "provider": str, "timestamp": str}``.
     """
     return store.read().get("history", [])
-
-
-def save_history(entries: list[dict]) -> None:
-    """Persist a history list, capping at *_HISTORY_MAX* entries."""
-    data = store.read()
-    data["history"] = entries[:_HISTORY_MAX]
-    store.write(data)
 
 
 def add_history_entry(
@@ -196,25 +191,6 @@ def add_history_entry(
     """
     from datetime import datetime, timezone
 
-    history = load_history()
-
-    if kind == "creator":
-        history = [
-            e for e in history
-            if not (e.get("kind") == "creator"
-                    and e.get("provider") == provider_name
-                    and e.get("facet") == facet
-                    and (e.get("name", "") or "").lower() == (name or "").lower())
-        ]
-    else:
-        history = [
-            e for e in history
-            if not (e.get("kind", "keyword") == "keyword"
-                    and e.get("query", "").lower() == query.lower()
-                    and e.get("provider") == provider_name
-                    and e.get("queries") == queries)
-        ]
-
     entry = {
         "query": query,
         "provider": provider_name,
@@ -226,12 +202,26 @@ def add_history_entry(
         entry["facet"] = facet
         entry["name"] = name
     if search_profile is not None:
-        from copy import deepcopy
         entry["search_profile"] = deepcopy(search_profile)
     if queries:
         entry["queries"] = list(queries)
-    history.insert(0, entry)
-    save_history(history)
+
+    def replaces(e: dict) -> bool:
+        if kind == "creator":
+            return (e.get("kind") == "creator"
+                    and e.get("provider") == provider_name
+                    and e.get("facet") == facet
+                    and (e.get("name", "") or "").lower() == (name or "").lower())
+        return (e.get("kind", "keyword") == "keyword"
+                and (e.get("query", "") or "").lower() == query.lower()
+                and e.get("provider") == provider_name
+                and e.get("queries") == queries)
+
+    def change(data):
+        history = data.get("history")
+        history = [e for e in history if isinstance(e, dict) and not replaces(e)] if isinstance(history, list) else []
+        data["history"] = [deepcopy(entry), *history][:_HISTORY_MAX]
+    store.update(change)
 
 
 def history_queries(provider_slug: str) -> list[str]:
@@ -263,6 +253,11 @@ def creator_history(provider_slug: str, facet_key: str) -> list[str]:
 
 
 def clear_history() -> None:
-    """Wipe all history entries (keyword + creator). Flushes immediately."""
-    save_history([])
-    store.flush()
+    """Wipe all history entries (keyword + creator).
+
+    Saved immediately; raises ``ValueError`` / ``store.SaveError`` when that
+    fails, leaving the history in place.
+    """
+    def change(data):
+        data["history"] = []
+    store.commit(change)

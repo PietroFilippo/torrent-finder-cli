@@ -1,22 +1,37 @@
-"""Single owner of filter_state.json: location, migration, cache, and flush.
+"""Single owner of filter_state.json: location, migration, cache, and saving.
 
-Every module that persists something (state.py's engine toggles / settings /
-history, stats.py's counters) goes through the ``read`` / ``write`` / ``flush``
-trio here and never touches the file, the cache, or the dirty flag directly.
+Every module that persists something (state.py's engine modes / settings /
+history, stats.py's counters, bookmarks, search profiles, settings imports)
+goes through this interface and never touches the file, cache, or lock.
 
-Lifecycle: the first ``read()`` consolidates legacy state copies when needed,
-loads the machine-stable file, and registers an atexit flush.
-``write()`` only updates the cache and marks it dirty — no disk hit. ``flush()``
-persists if dirty; it runs at process exit and is called explicitly from
-destructive UI sites (save_state, clear_history, reset_stats) so an explicit
-user action survives a hard kill.
+Changes are *operations*, not snapshots. ``update(op)`` applies a mutation to
+the in-memory view and remembers it. Saving takes an inter-process lock,
+re-reads the file, replays the remembered operations onto that fresh copy,
+and atomically replaces it. Another Torrent Finder window's newer changes are
+therefore never overwritten by a stale in-memory copy (see ADR-0019).
+
+- ``read()`` — the current view; picks up changes another window saved.
+- ``update(op)`` — best-effort change (stats, history, update checks), saved
+  by ``flush()`` at exit.
+- ``commit(op)`` — explicit user action (Save, Clear, bookmark, import): saved
+  immediately. On failure ``ValueError`` / ``SaveError`` is raised and the view
+  is unchanged, so the caller can keep its draft and offer a retry.
+
+If the file exists but cannot be read at startup (after short retries for
+transient locks), the store is *unavailable*: the session runs on defaults,
+nothing is written, and ``problem()`` describes it until ``retry_load()`` or
+``set_aside_unreadable()`` recovers.
 """
 
 import atexit
 import json
 import os
 import tempfile
+import threading
+import time
+from contextlib import contextmanager
 from copy import deepcopy
+from datetime import datetime
 
 from torrent_finder.constants import legacy_data_paths, machine_state_path
 
@@ -24,19 +39,80 @@ STATE_PATH = machine_state_path("filter_state.json")
 LEGACY_STATE_PATHS = legacy_data_paths("filter_state.json")
 
 _cache: dict | None = None
-_dirty: bool = False
+_pending: list = []        # operations applied to _cache but not yet on disk
+_signature = None          # identity of the file version _cache is based on
+_problem = None            # StorageProblem while saved settings are unreadable
 _atexit_registered: bool = False
+_mutex = threading.RLock()
+
+LOCK_TIMEOUT = 5.0         # explicit saves wait this long for another window
+_FLUSH_LOCK_TIMEOUT = 3.0  # exit never hangs longer than this
+# Windows antivirus/sync tools and another window's reader briefly hold files open.
+_RETRY_DELAYS = (0.05, 0.1, 0.2, 0.4, 0.8)
+
+
+class SaveError(OSError):
+    """An explicit save did not reach the disk; saved data was not changed."""
+
+
+class StorageProblem:
+    """Why saved settings could not be read; ``damaged`` means invalid content."""
+
+    __slots__ = ("path", "reason", "damaged")
+
+    def __init__(self, path: str, reason: str, damaged: bool) -> None:
+        self.path, self.reason, self.damaged = path, reason, damaged
+
+    def message(self) -> str:
+        return (f"Saved settings could not be read ({self.reason}): {self.path}. "
+                "The file was left untouched, and changes are not saved until it can be read.")
+
+
+class _Unreadable(Exception):
+    def __init__(self, reason: str, damaged: bool) -> None:
+        super().__init__(reason)
+        self.reason, self.damaged = reason, damaged
+
+
+def _read_document(path: str, *, patient: bool = False) -> dict | None:
+    """The JSON object at *path*, or None when missing. Raises ``_Unreadable``.
+
+    *patient* retries OS errors briefly; invalid content is never retried.
+    """
+    for delay in (*(_RETRY_DELAYS if patient else ()), None):
+        try:
+            with open(path, "rb") as stream:
+                raw = stream.read()
+            break
+        except FileNotFoundError:
+            return None
+        except OSError as error:
+            if delay is None:
+                raise _Unreadable(error.strerror or str(error), damaged=False) from error
+            time.sleep(delay)
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, ValueError) as error:
+        raise _Unreadable("the file is not valid settings data", damaged=True) from error
+    if not isinstance(data, dict):
+        raise _Unreadable("the file is not valid settings data", damaged=True)
+    return data
 
 
 def _read_json(path: str) -> dict | None:
-    if not os.path.isfile(path):
-        return None
+    """Best-effort read for legacy copies: None when missing or unreadable."""
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else None
-    except (OSError, ValueError, UnicodeError):
+        return _read_document(path)
+    except _Unreadable:
         return None
+
+
+def _file_signature(path: str):
+    try:
+        status = os.stat(path)
+    except OSError:
+        return None
+    return status.st_mtime_ns, status.st_size, status.st_ino
 
 
 def _history_identity(entry: dict) -> tuple:
@@ -129,12 +205,15 @@ def _merge_state_copies(copies: list[tuple[float, dict]]) -> dict:
     return merged
 
 
-def _load_initial_state(target_path: str, legacy_paths: list[str]) -> dict:
-    current = _read_json(target_path)
+def _initial_load(target_path: str, legacy_paths: list[str]):
+    """Return ``(data, problem, unsaved_migration)`` for the first read."""
+    try:
+        current = _read_document(target_path, patient=True)
+    except _Unreadable as error:
+        # Preserve an unreadable authoritative file for recovery.
+        return {}, StorageProblem(target_path, error.reason, error.damaged), None
     if current is not None:
-        return current
-    if os.path.exists(target_path):
-        return {}  # Preserve an unreadable authoritative file for recovery.
+        return current, None, None
 
     copies = []
     seen = set()
@@ -152,36 +231,159 @@ def _load_initial_state(target_path: str, legacy_paths: list[str]) -> dict:
             copies.append((modified, data))
 
     if not copies:
-        return {}
+        return {}, None, None
 
     merged = _merge_state_copies(copies)
     try:
         atomic_json(target_path, merged)
     except OSError:
-        pass
-    return merged
+        return merged, None, merged
+    return merged, None, None
 
 
-def _load_from_disk() -> dict:
-    return _load_initial_state(STATE_PATH, LEGACY_STATE_PATHS)
+def _load_initial_state(target_path: str, legacy_paths: list[str]) -> dict:
+    return _initial_load(target_path, legacy_paths)[0]
+
+
+def _seed(document: dict):
+    """Operation that writes a migration whose first save failed, if still absent."""
+    def apply(data):
+        if not data:
+            data.update(deepcopy(document))
+    return apply
+
+
+def _replace_document(document: dict):
+    def apply(data):
+        data.clear()
+        data.update(deepcopy(document))
+    return apply
+
+
+def _ensure_loaded() -> None:
+    global _cache, _problem, _signature, _atexit_registered
+    if _cache is not None:
+        return
+    signature = _file_signature(STATE_PATH)  # before reading: a racing save triggers a refresh
+    data, problem, unsaved = _initial_load(STATE_PATH, LEGACY_STATE_PATHS)
+    _cache, _problem = data, problem
+    _signature = None if problem else signature
+    if unsaved is not None:
+        _pending.append(_seed(unsaved))
+    if not _atexit_registered:
+        atexit.register(flush)
+        _atexit_registered = True
+
+
+def _refresh_if_changed() -> None:
+    """Adopt a version another window saved, keeping this session's pending changes."""
+    global _cache, _signature
+    if _problem is not None:
+        return
+    signature = _file_signature(STATE_PATH)
+    if signature is None or signature == _signature:
+        return
+    try:
+        fresh = _read_document(STATE_PATH)
+        if fresh is None:
+            return
+        for op in _pending:
+            op(fresh)
+    except Exception:
+        return  # keep the current view; a later read tries again
+    _cache, _signature = fresh, signature
+
+
+def section(data: dict, key: str) -> dict:
+    """The dict stored at ``data[key]``, created (or replaced if malformed)."""
+    value = data.get(key)
+    if not isinstance(value, dict):
+        value = data[key] = {}
+    return value
 
 
 def read() -> dict:
-    """Return the in-memory state dict, loading from disk on first call."""
-    global _cache, _atexit_registered
-    if _cache is None:
-        _cache = _load_from_disk()
-        if not _atexit_registered:
-            atexit.register(flush)
-            _atexit_registered = True
-    return _cache
+    """Return the current state view, loading from disk on first call.
+
+    Treat it as read-only: change state with ``update`` or ``commit``.
+    """
+    with _mutex:
+        _ensure_loaded()
+        _refresh_if_changed()
+        return _cache
 
 
-def write(data: dict) -> None:
-    """Update the cache and mark it dirty. No disk hit — see ``flush()``."""
-    global _cache, _dirty
-    _cache = data
-    _dirty = True
+def update(op) -> None:
+    """Apply a best-effort change now; ``flush()`` replays it onto the saved file."""
+    with _mutex:
+        read()
+        op(_cache)
+        _pending.append(op)
+
+
+def problem() -> StorageProblem | None:
+    """Describe unreadable saved settings, or None when storage is healthy."""
+    with _mutex:
+        _ensure_loaded()
+        return _problem
+
+
+if os.name == "nt":
+    import msvcrt
+
+    def _try_lock(fd: int) -> bool:
+        os.lseek(fd, 0, os.SEEK_SET)
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+
+    def _unlock(fd: int) -> None:
+        os.lseek(fd, 0, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+
+    def _try_lock(fd: int) -> bool:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except OSError:
+            return False
+
+    def _unlock(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+@contextmanager
+def _file_lock(path: str, timeout: float):
+    """Exclusive inter-process lock covering one read-modify-write of *path*."""
+    lock_path = path + ".lock"
+    os.makedirs(os.path.dirname(os.path.abspath(lock_path)), exist_ok=True)
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        deadline = time.monotonic() + timeout
+        while not _try_lock(fd):
+            if time.monotonic() >= deadline:
+                raise SaveError("Another Torrent Finder window is saving settings. Try again in a moment.")
+            time.sleep(0.05)
+        try:
+            yield
+        finally:
+            _unlock(fd)
+    finally:
+        os.close(fd)
+
+
+def _replace(source: str, target: str) -> None:
+    for delay in _RETRY_DELAYS:
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            time.sleep(delay)  # Windows: a reader briefly holds the target open
+    os.replace(source, target)
 
 
 def atomic_json(path, data) -> None:
@@ -194,28 +396,96 @@ def atomic_json(path, data) -> None:
             json.dump(data, stream, indent=2, ensure_ascii=False)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        _replace(temporary, path)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
 
 
-def commit(data: dict) -> None:
-    """Explicit transactional save. Validate existing data and report failures."""
-    global _cache, _dirty
-    if os.path.exists(STATE_PATH) and _read_json(STATE_PATH) is None:
-        raise ValueError("Existing settings cannot be read; the file was preserved.")
-    candidate = deepcopy(data)
-    atomic_json(STATE_PATH, candidate)
-    _cache, _dirty = candidate, False
+def _save(extra_op, timeout: float):
+    """Fresh file + pending operations (+ *extra_op*) → disk, under the lock."""
+    with _file_lock(STATE_PATH, timeout):
+        try:
+            document = _read_document(STATE_PATH, patient=True) or {}
+        except _Unreadable as error:
+            raise ValueError("Existing settings cannot be read; the file was preserved.") from error
+        for op in _pending:
+            op(document)
+        if extra_op is not None:
+            extra_op(document)
+        atomic_json(STATE_PATH, document)
+        return document, _file_signature(STATE_PATH)
+
+
+def commit(change) -> None:
+    """Explicitly save *change* now: an operation, or a dict replacing the document.
+
+    Pending best-effort changes are saved with it. Raises ``ValueError`` when
+    saved settings are unreadable (or the operation rejects them) and
+    ``SaveError`` when writing fails; the view is unchanged in both cases.
+    """
+    global _cache, _signature
+    op = change if callable(change) else _replace_document(change)
+    with _mutex:
+        _ensure_loaded()
+        if _problem is not None:
+            raise ValueError(_problem.message())
+        try:
+            document, signature = _save(op, LOCK_TIMEOUT)
+        except SaveError:
+            raise
+        except OSError as error:
+            raise SaveError(f"Couldn't save settings ({error.strerror or error}). Nothing was changed.") from error
+        _cache, _signature = document, signature
+        _pending.clear()
 
 
 def flush() -> None:
-    """Persist the cache to disk if dirty. Called from atexit + destructive sites."""
-    global _dirty
-    if not _dirty or _cache is None:
-        return
-    try:
-        commit(_cache)
-    except (OSError, ValueError):
-        pass
+    """Best-effort save of pending changes; runs at exit and never raises."""
+    global _cache, _signature
+    with _mutex:
+        if not _pending or _cache is None or _problem is not None:
+            return
+        try:
+            document, signature = _save(None, _FLUSH_LOCK_TIMEOUT)
+        except Exception:
+            return
+        _cache, _signature = document, signature
+        _pending.clear()
+
+
+def retry_load() -> bool:
+    """Re-read unreadable saved settings; True once storage is healthy."""
+    global _cache, _signature, _problem
+    with _mutex:
+        _ensure_loaded()
+        if _problem is None:
+            return True
+        signature = _file_signature(STATE_PATH)
+        try:
+            data = _read_document(STATE_PATH, patient=True) or {}
+        except _Unreadable as error:
+            _problem = StorageProblem(STATE_PATH, error.reason, error.damaged)
+            return False
+        for op in _pending:
+            op(data)
+        _cache, _signature, _problem = data, signature, None
+        return True
+
+
+def set_aside_unreadable() -> str:
+    """Rename unreadable saved settings aside and start fresh; return the new path."""
+    global _cache, _signature, _problem
+    with _mutex:
+        _ensure_loaded()
+        if _problem is None:
+            return ""
+        root, extension = os.path.splitext(STATE_PATH)
+        aside = f"{root}.unreadable-{datetime.now():%Y%m%d-%H%M%S}{extension}"
+        with _file_lock(STATE_PATH, LOCK_TIMEOUT):
+            os.rename(STATE_PATH, aside)
+        data = {}
+        for op in _pending:
+            op(data)
+        _cache, _signature, _problem = data, None, None
+        return aside

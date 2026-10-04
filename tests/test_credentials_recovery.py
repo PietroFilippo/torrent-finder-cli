@@ -8,9 +8,13 @@ from unittest.mock import Mock, patch
 from torrent_finder import credentials, madokami, rutracker
 from torrent_finder.providers.madokami_provider import MadokamiProvider
 from torrent_finder.search_errors import SearchError
+from isolation import isolate_store
 
 
 class CredentialRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        isolate_store(self)
+
     def test_legacy_credentials_migrate_without_deleting_source(self):
         with tempfile.TemporaryDirectory() as directory:
             old = Path(directory) / "old.json"

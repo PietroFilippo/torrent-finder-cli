@@ -24,6 +24,7 @@ from html import unescape
 
 import requests
 
+from torrent_finder.direct_download import Cancelled, save_response
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
 
@@ -160,10 +161,6 @@ def resolve_download_url(md5: str) -> str | None:
     return None
 
 
-class _Cancelled(Exception):
-    """Internal: the caller's cancel_event fired mid-transfer."""
-
-
 def _safe_filename(name: str) -> str:
     return re.sub(r'[\\/:*?"<>|]+', "_", name).strip() or "libgen-download"
 
@@ -173,9 +170,10 @@ def download_file(url: str, dest_dir: str, fallback_name: str,
     """Stream one file into ``dest_dir``; return the saved path or None.
 
     The filename comes from the CDN's Content-Disposition when sent, else
-    ``fallback_name``. Books are usually small but audio/scan files aren't:
-    ``cancel_event`` is checked between chunks (partial file removed on
-    abort) and ``progress_cb(bytes_done, total_or_None)`` runs per chunk.
+    ``fallback_name``; it is numbered when already taken, since different books
+    can share one (see ``direct_download``). Books are usually small but
+    audio/scan files aren't: ``cancel_event`` is checked between chunks and
+    ``progress_cb(bytes_done, total_or_None)`` runs per chunk.
     """
     if not url:
         return None
@@ -183,7 +181,6 @@ def download_file(url: str, dest_dir: str, fallback_name: str,
         os.makedirs(dest_dir, exist_ok=True)
     except OSError:
         return None
-    dest = ""
     try:
         with requests.get(url, headers=_UA, timeout=60, stream=True) as resp:
             if resp.status_code != 200:
@@ -193,28 +190,7 @@ def download_file(url: str, dest_dir: str, fallback_name: str,
             m = _FILENAME_RE.search(disposition)
             if m:
                 fname = os.path.basename(unescape(m.group(1)).strip())
-            dest = os.path.join(dest_dir, _safe_filename(fname or fallback_name))
-            try:
-                total = int(resp.headers.get("Content-Length", "")) or None
-            except ValueError:
-                total = None
-            done = 0
-            if progress_cb:
-                progress_cb(0, total)
-            with open(dest, "wb") as fh:
-                for chunk in resp.iter_content(chunk_size=65536):
-                    if cancel_event is not None and cancel_event.is_set():
-                        raise _Cancelled()
-                    if chunk:
-                        fh.write(chunk)
-                        done += len(chunk)
-                        if progress_cb:
-                            progress_cb(done, total)
-    except (_Cancelled, requests.RequestException, OSError):
-        if dest:
-            try:
-                os.remove(dest)  # don't leave a truncated file behind
-            except OSError:
-                pass
+            return save_response(resp, dest_dir, _safe_filename(fname or fallback_name),
+                                 cancel_event, progress_cb)
+    except (Cancelled, requests.RequestException, OSError):
         return None
-    return dest

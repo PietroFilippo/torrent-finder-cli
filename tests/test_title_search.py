@@ -13,6 +13,7 @@ from torrent_finder.resolvers.types import Work
 from torrent_finder.search_errors import SearchError
 from torrent_finder.ui import titles as title_ui
 from torrent_finder.ui import selector
+from isolation import isolate_store
 
 
 class TitleSearchTests(unittest.TestCase):
@@ -119,20 +120,20 @@ class TitleSearchTests(unittest.TestCase):
         self.assertEqual(names, ["Primary", "English"])
 
     def test_alias_history_replay_and_backup_keep_exact_chosen_names(self):
-        with patch.object(store, "_cache", {}), patch.object(store, "_dirty", False):
-            state.add_history_entry("Title", "anime", queries=["Title", "別名"])
-            state.add_history_entry("Title", "anime")
-            history = state.load_history()
-            self.assertEqual(len(history), 2)
-            entry = history[1]
-            _, facet, queries = main._history_pick(entry)
-            self.assertIsNone(facet)
-            self.assertEqual(queries, ["Title", "別名"])
-            settings_backup.validate_payload({"history": history})
-            self.assertEqual(len(store._merge_history([(0, {"history": history})])), 2)
-            entry["queries"] = ["name"] * 7
-            with self.assertRaises(ValueError):
-                settings_backup.validate_payload({"history": [entry]})
+        isolate_store(self)
+        state.add_history_entry("Title", "anime", queries=["Title", "別名"])
+        state.add_history_entry("Title", "anime")
+        history = state.load_history()
+        self.assertEqual(len(history), 2)
+        entry = history[1]
+        _, facet, queries = main._history_pick(entry)
+        self.assertIsNone(facet)
+        self.assertEqual(queries, ["Title", "別名"])
+        settings_backup.validate_payload({"history": history})
+        self.assertEqual(len(store._merge_history([(0, {"history": history})])), 2)
+        entry["queries"] = ["name"] * 7
+        with self.assertRaises(ValueError):
+            settings_backup.validate_payload({"history": [entry]})
 
     def test_diagnostic_rows_and_long_detail_view_fit_compact_terminal(self):
         from torrent_finder.ui.search_diagnostics import read_details

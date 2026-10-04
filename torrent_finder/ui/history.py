@@ -139,6 +139,7 @@ def history_select_prompt() -> dict | None:
     }
 
     history = load_history()
+    notice = ""  # shown above the footer, e.g. a failed Clear history
 
     # --- helpers to build / rebuild the items list in place ---
 
@@ -219,7 +220,8 @@ def history_select_prompt() -> dict | None:
     def _footer():
         prov_filter, date_filter, sort_order, type_filter = _current_filters()
         return (
-            "↑/↓ navigate  •  Enter re-run  •  Esc back\n"
+            (notice + "\n" if notice else "")
+            + "↑/↓ navigate  •  Enter re-run  •  Esc back\n"
             f"[bold]Filters:[/bold]  [bold yellow]P[/bold yellow] provider: [cyan]{prov_filter}[/cyan]  •  "
             f"[bold yellow]T[/bold yellow] type: [cyan]{type_filter}[/cyan]  •  "
             f"[bold yellow]D[/bold yellow] date: [cyan]{date_filter}[/cyan]  •  "
@@ -243,14 +245,20 @@ def history_select_prompt() -> dict | None:
     # --- on_action for Clear History ---
 
     def on_action(idx, items_list):
-        nonlocal history
+        nonlocal history, notice
         if items_list[idx].value == "clear":
             if not confirm_prompt(
                 "[bold red]Clear all search history?[/bold red]\n\n"
                 "This will delete every saved search permanently."
             ):
                 return True  # stay
-            clear_history()
+            try:
+                clear_history()
+            except (OSError, ValueError) as error:
+                from rich.markup import escape
+                notice = f"[bold red]History was not cleared:[/bold red] {escape(str(error))}"
+                return True  # stay; the saved history is unchanged
+            notice = ""
             history = []
             _rebuild(items_list)
             return True

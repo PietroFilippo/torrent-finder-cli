@@ -11,6 +11,7 @@ from torrent_finder.providers.combined_provider import CombinedProvider, result_
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_result import SearchResult
 from torrent_finder import state
+from isolation import isolate_store
 
 
 def row(name, key, source="Nyaa", **extra):
@@ -147,12 +148,11 @@ class CombinedSearchTests(unittest.TestCase):
         solo = {"providers": {"anime": {"active_presets": ["1080p"]}}}
         self.combined.selected_slugs = {"manga"}
         self.combined.shared_filters.exclude_keywords = ["sample"]
-        with patch.object(state.store, "_cache", solo), patch.object(state.store, "_dirty", False), \
-             patch.object(state.store, "flush"):
-            self.combined.save_profile()
-            restored = CombinedProvider([self.anime, self.manga])
-            self.assertEqual(restored.snapshot(), self.combined.snapshot())
-        self.assertEqual(solo["providers"]["anime"]["active_presets"], ["1080p"])
+        isolate_store(self, solo)
+        self.combined.save_profile()
+        restored = CombinedProvider([self.anime, self.manga])
+        self.assertEqual(restored.snapshot(), self.combined.snapshot())
+        self.assertEqual(state.store.read()["providers"], solo["providers"])
 
     def test_explicit_combined_resolution_choice_survives_restore(self):
         child = self.combined.children[0]
@@ -165,10 +165,10 @@ class CombinedSearchTests(unittest.TestCase):
         from torrent_finder.main import _history_pick
         self.combined.selected_slugs = {"manga"}
         profile = self.combined.snapshot()
-        with patch.object(state.store, "_cache", {}), patch.object(state.store, "_dirty", False):
-            state.add_history_entry("Saki", "all", search_profile=profile)
-            profile["selected"].clear()
-            entry = state.load_history()[0]
+        isolate_store(self)
+        state.add_history_entry("Saki", "all", search_profile=profile)
+        profile["selected"].clear()
+        entry = state.load_history()[0]
         self.combined.selected_slugs = {"anime"}
         with patch("torrent_finder.main.get_provider", return_value=self.combined):
             _history_pick(entry)

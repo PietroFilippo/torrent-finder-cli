@@ -1,4 +1,8 @@
-"""Persistent listing handles and search snapshots. Saving never resolves/downloads."""
+"""Persistent listing handles and search snapshots. Saving never resolves/downloads.
+
+Every change is committed against the collection as currently saved, so a
+bookmark added or removed in another window is never undone by this one.
+"""
 
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -12,8 +16,8 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def entries():
-    data = store.read().get("bookmarks", [])
+def _validated(data):
+    rows = data.get("bookmarks", [])
     def valid(entry):
         return (isinstance(entry, dict) and entry.get("kind") in ("result", "search")
                 and all(isinstance(entry.get(key), str) and entry[key] for key in ("id", "name", "provider", "saved_at"))
@@ -21,15 +25,22 @@ def entries():
                 and all(isinstance(q, str) for q in entry["queries"])
                 and isinstance(entry.get("search_profile"), dict)
                 and (entry["kind"] == "search" or (isinstance(entry.get("result"), dict) and "fetched_at" in entry)))
-    if not isinstance(data, list) or not all(valid(e) for e in data) or len({e["id"] for e in data}) != len(data):
+    if not isinstance(rows, list) or not all(valid(e) for e in rows) or len({e["id"] for e in rows}) != len(rows):
         raise ValueError("Cannot read saved bookmarks; existing data was preserved.")
-    return deepcopy(data)
+    return rows
 
 
-def _save(rows):
-    data = deepcopy(store.read())
-    data["bookmarks"] = rows
-    store.commit(data)
+def entries():
+    return deepcopy(_validated(store.read()))
+
+
+def _change(edit):
+    """Commit *edit(rows)* against the saved collection; raises when saving fails."""
+    def apply(data):
+        rows = deepcopy(_validated(data))
+        edit(rows)
+        data["bookmarks"] = rows
+    store.commit(apply)
 
 
 def context(provider, queries):
@@ -38,36 +49,42 @@ def context(provider, queries):
 
 
 def save_results(provider, results):
-    saved = entries()
+    new = []
     for row in results:
         value = deepcopy(dict(row))
         value.setdefault("provider_slug", provider.slug)
         value.setdefault("provider_label", provider.name)
-        identity = result_identity(value)
-        if any(e.get("kind") == "result" and result_identity(e["result"]) == identity for e in saved):
-            continue
         queries = (row.get("matched_queries") or ([row["from_work"]] if row.get("from_work") else None)
                    or getattr(provider, "last_queries", None) or [row.get("name", "")])
-        saved.append({"id": uuid4().hex, "kind": "result", "name": value["name"],
-                      "saved_at": now(), "fetched_at": value.get("fetched_at") or now(),
-                      "result": value, **context(provider, queries)})
-    _save(saved)
+        new.append({"id": uuid4().hex, "kind": "result", "name": value["name"],
+                    "saved_at": now(), "fetched_at": value.get("fetched_at") or now(),
+                    "result": value, **context(provider, queries)})
+
+    def edit(saved):
+        for entry in new:
+            identity = result_identity(entry["result"])
+            if not any(e.get("kind") == "result" and result_identity(e["result"]) == identity for e in saved):
+                saved.append(entry)
+    _change(edit)
     return "Bookmarked. Open Bookmarks from the main menu or quick actions to review."
 
 
 def save_search(provider, query):
-    saved = entries()
     entry = {"id": uuid4().hex, "kind": "search", "name": query, "saved_at": now(),
              **context(provider, [query])}
-    if not any(e.get("kind") == "search" and e["provider"] == entry["provider"] and e["queries"] == entry["queries"]
-               and e["search_profile"] == entry["search_profile"] for e in saved):
-        saved.append(entry)
-    _save(saved)
+
+    def edit(saved):
+        if not any(e.get("kind") == "search" and e["provider"] == entry["provider"] and e["queries"] == entry["queries"]
+                   and e["search_profile"] == entry["search_profile"] for e in saved):
+            saved.append(entry)
+    _change(edit)
     return True
 
 
 def remove(identity):
-    _save([e for e in entries() if e["id"] != identity])
+    def edit(saved):
+        saved[:] = [e for e in saved if e["id"] != identity]
+    _change(edit)
 
 
 def search_provider(entry):
@@ -88,19 +105,22 @@ def search_provider(entry):
 
 def refresh(identity, results):
     """Update an exact listing identity only; keep old handles when absent."""
-    saved = entries()
-    entry = next((e for e in saved if e["id"] == identity), None)
-    if entry is None or entry["kind"] != "result":
-        return
-    entry["checked_at"] = now()
-    match = next((r for r in results if result_identity(r) == result_identity(entry["result"])), None)
-    entry["refresh_status"] = "Listing found" if match is not None else "Not returned by this search; saved listing retained"
-    if match is not None:
-        refreshed = deepcopy(dict(match))
-        for key in ("provider_slug", "provider_label"):
-            if key in entry["result"]:
-                refreshed.setdefault(key, entry["result"][key])
-        entry["result"] = refreshed
-        entry["name"] = match["name"]
-        entry["fetched_at"] = match.get("fetched_at") or now()
-    _save(saved)
+    checked = now()
+
+    def edit(saved):
+        entry = next((e for e in saved if e["id"] == identity), None)
+        if entry is None or entry["kind"] != "result":
+            return
+        entry["checked_at"] = checked
+        match = next((r for r in results if result_identity(r) == result_identity(entry["result"])), None)
+        entry["refresh_status"] = "Listing found" if match is not None else "Not returned by this search; saved listing retained"
+        if match is not None:
+            refreshed = deepcopy(dict(match))
+            for key in ("provider_slug", "provider_label"):
+                if key in entry["result"]:
+                    refreshed.setdefault(key, entry["result"][key])
+            entry["result"] = refreshed
+            entry["name"] = match["name"]
+            entry["fetched_at"] = match.get("fetched_at") or checked
+    if any(e["id"] == identity and e["kind"] == "result" for e in entries()):
+        _change(edit)

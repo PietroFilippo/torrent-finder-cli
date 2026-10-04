@@ -11,6 +11,7 @@ from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.providers.movie_provider import MovieProvider
 from torrent_finder.search_result import SearchResult
+from isolation import isolate_store
 
 
 def _row(name: str, source: str = "Apibay", seeders: int = 10) -> SearchResult:
@@ -466,7 +467,7 @@ class LanguageSearchRegressionTests(unittest.TestCase):
 
         provider = MovieProvider()
         modes = {e.name: e.mode for e in provider.engines}
-        persisted = {}
+        isolate_store(self)
 
         def select(items, **kwargs):
             for item in items:
@@ -478,9 +479,6 @@ class LanguageSearchRegressionTests(unittest.TestCase):
         with (
             patch.object(prompts, "PROVIDERS", [provider]),
             patch.object(prompts, "arrow_select", side_effect=select),
-            patch.object(state.store, "read", return_value=persisted),
-            patch.object(state.store, "write", side_effect=lambda data: persisted.update(data)),
-            patch.object(state.store, "flush"),
         ):
             prompts.filter_menu(provider)
             restored = MovieProvider()

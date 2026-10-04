@@ -1,26 +1,18 @@
 import importlib
-import os
-import tempfile
 import unittest
 from unittest.mock import patch
 
 from torrent_finder.search_result import SearchResult
+from isolation import isolate_store
 
 
 class MagnetForContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._tmp = tempfile.TemporaryDirectory()
-        from torrent_finder import store
-
-        store.STATE_PATH = os.path.join(cls._tmp.name, "filter_state.json")
-        store._cache = None
-        store._dirty = False
         cls.main = importlib.import_module("torrent_finder.main")
 
-    @classmethod
-    def tearDownClass(cls):
-        cls._tmp.cleanup()
+    def setUp(self):
+        isolate_store(self)
 
     def test_magnet_for_direct_hash_result_builds_magnet(self):
         magnet = self.main._magnet_for(

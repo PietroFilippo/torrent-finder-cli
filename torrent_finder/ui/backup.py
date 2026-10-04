@@ -49,7 +49,7 @@ def backup_menu():
                 changes = [f"{mode.title()} saved credentials: {len(data)} fields",
                            "Fields: " + ", ".join(data), "Environment overrides stay active. Settings/history will not change."]
             else:
-                candidate, changes = backup.prepare_import(data, mode)
+                _, changes = backup.prepare_import(data, mode)
             preview = [SelectItem(line, passive=True) for line in changes]
             preview += [SelectItem("Apply import", "apply"), SelectItem("Cancel", "cancel")]
             choice = arrow_select(preview, title="Import preview", footer="Review with arrows • Enter apply/cancel • Esc cancel")
@@ -58,7 +58,7 @@ def backup_menu():
             if secret:
                 credentials.import_file_values(data, replace=mode == "replace")
             else:
-                store.commit(candidate)
+                store.commit(backup.import_change(data, mode))
                 restored = True
             message = "Import complete."
         except (OSError, ValueError, TypeError) as error:

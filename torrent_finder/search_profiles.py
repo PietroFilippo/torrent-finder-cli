@@ -10,7 +10,7 @@ import unicodedata
 from uuid import uuid4
 
 from torrent_finder import store
-from torrent_finder.state import load_setting, save_setting
+from torrent_finder.state import load_setting
 
 
 class ProfileError(ValueError):
@@ -98,11 +98,16 @@ class ProfileLibrary:
             self.select(self.entries[0]["id"])
 
     def save(self):
+        """Save every profile at once; on failure raise and keep this draft for a retry."""
         # Validate every draft, including a profile edited before switching.
         for entry in self.entries:
             if entry["settings"].get("selected") == []:
                 raise ProfileError(f"Choose at least one provider for {entry['name']} before saving.")
-        save_setting("search_profiles", deepcopy(self.data))
-        # Keep the single-profile representation usable by previous versions.
-        save_setting("combined_search", deepcopy(self.current["settings"]))
-        store.flush()
+        profiles, current = deepcopy(self.data), deepcopy(self.current["settings"])
+
+        def change(data):
+            settings = store.section(data, "settings")
+            settings["search_profiles"] = deepcopy(profiles)
+            # Keep the single-profile representation usable by previous versions.
+            settings["combined_search"] = deepcopy(current)
+        store.commit(change)

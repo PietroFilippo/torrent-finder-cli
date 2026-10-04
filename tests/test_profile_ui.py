@@ -12,16 +12,14 @@ from torrent_finder.providers.movie_provider import MovieProvider
 from torrent_finder.providers.combined_provider import CombinedProvider
 from torrent_finder.search_profiles import ProfileLibrary
 from torrent_finder.ui import combined, prompts, selector, result_filters
+from isolation import isolate_store
 
 
 class ProfileUITests(unittest.TestCase):
     def setUp(self):
-        for attr, value in (("_cache", {}), ("_dirty", False)):
-            mocked = patch.object(store, attr, value)
-            mocked.start()
-            self.addCleanup(mocked.stop)
-        mocked = patch.object(store, "flush")
-        self.flush = mocked.start()
+        isolate_store(self)
+        mocked = patch.object(store, "commit", wraps=store.commit)
+        self.commit = mocked.start()
         self.addCleanup(mocked.stop)
         self.provider = CombinedProvider([AnimeProvider(), MangaProvider()])
         self.provider.snapshot()
@@ -46,7 +44,7 @@ class ProfileUITests(unittest.TestCase):
         self.assertEqual(library.current["name"], "Default")
         self.assertEqual(library.current["settings"]["result_sort"], "relevance")
         self.assertEqual(library.find("Anime + Manga")["settings"]["result_sort"], "newest")
-        self.flush.assert_called_once()
+        self.commit.assert_called_once()
 
     def test_cancel_discards_copies_renames_switches_and_sorts(self):
         before = self.provider.snapshot()
@@ -57,7 +55,7 @@ class ProfileUITests(unittest.TestCase):
             combined.combined_filter_menu(self.provider)
         self.assertEqual(self.provider.snapshot(), before)
         self.assertNotIn("search_profiles", store.read().get("settings", {}))
-        self.flush.assert_not_called()
+        self.commit.assert_not_called()
 
     def test_delete_requires_confirmation_and_outer_save(self):
         library = self.provider.profile_draft()
@@ -65,7 +63,7 @@ class ProfileUITests(unittest.TestCase):
         library.save()
         self.provider.use_profile(added)
         before = ProfileLibrary.load().data
-        self.flush.reset_mock()
+        self.commit.reset_mock()
         for confirmed, finish in ((False, "save"), (True, "cancel"), (True, "save")):
             with self.subTest(confirmed=confirmed, finish=finish), \
                  patch.object(combined, "arrow_select", side_effect=self.choose_actions(["profiles", ("delete", None), finish])), \

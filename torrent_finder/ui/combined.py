@@ -196,8 +196,8 @@ def combined_filter_menu(provider):
         elif action == "save":
             try:
                 draft.save_profile(library)
-            except ValueError as problem:
-                error = str(problem)
+            except (OSError, ValueError) as problem:
+                error = str(problem)  # the draft stays open; w retries
                 continue
             provider.use_profile(library.current)
             return

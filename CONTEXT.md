@@ -278,14 +278,18 @@ comparison uses the existing table and original result indexes. `result_details`
 provides offline listing metadata and separately labelled filename hints.
 
 `store.py` is the single owner of `filter_state.json`: machine-stable location,
-legacy-copy consolidation, in-memory cache, dirty flag, and flush at exit + at
-destructive sites. Everything above it (`state.py` engine modes/settings/history,
-`stats.py` counters) goes through `store.read()` / `store.write()` /
-`store.flush()` and never touches the file. Explicit bookmark/import transactions
-use `store.commit(candidate)`: write/fsync a unique sibling temporary file,
-atomically replace, then update the cache. Failures preserve the prior file and
-cache; unreadable authoritative files block replacement and legacy migration.
-Ordinary flush uses the same atomic writer while keeping its fail-silent API.
+legacy-copy consolidation, in-memory view, inter-process lock and saving.
+Everything above it (`state.py` engine modes/settings/history, `stats.py`
+counters, bookmarks, profiles, imports) changes state through operations and
+never touches the file. `store.update(op)` is best-effort and saved at exit;
+`store.commit(op)` is an explicit action saved at once. Each save locks, re-reads
+the file, replays this session's operations onto it, writes/fsyncs a sibling
+temporary file and atomically replaces it. Another window's changes are kept,
+and `store.read()` picks them up. A commit failure raises, preserving the prior
+file and view so the UI can report it and keep the draft. An unreadable file
+makes the store unavailable: nothing is written until retry or a set-aside at the
+startup prompt (`ui/storage.py`). See
+[ADR-0019](docs/adr/0019-operation-based-settings-and-safe-direct-downloads.md).
 
 `settings_backup.py` validates versioned transfer documents, allowlists portable
 settings, prepares detached merge/replace candidates and previews, and excludes

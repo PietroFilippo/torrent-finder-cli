@@ -33,6 +33,7 @@ from urllib.parse import unquote, urlsplit
 
 import requests
 
+from torrent_finder.direct_download import Cancelled, save_response
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
 
@@ -184,17 +185,14 @@ def list_directory(path: str) -> list[dict] | None:
     return children
 
 
-class _Cancelled(Exception):
-    """Internal: the caller's cancel_event fired mid-transfer."""
-
-
 def download_file(path: str, dest_dir: str, cancel_event=None, progress_cb=None) -> str | None:
     """Stream one library file into ``dest_dir``; return the saved file path or
-    None (failed or cancelled). The filename is the decoded last path segment.
+    None (failed or cancelled). The filename is the decoded last path segment,
+    numbered when that name is already taken (see ``direct_download``).
 
     Volume archives run to hundreds of MB, so the transfer is observable and
-    abortable mid-file: ``cancel_event`` is checked between chunks (the partial
-    file is removed on abort), and ``progress_cb`` — when given — is called with
+    abortable mid-file: ``cancel_event`` is checked between chunks, and
+    ``progress_cb`` — when given — is called with
     ``(bytes_done, total_bytes_or_None)`` per chunk, the total coming from
     Content-Length when the server sends one.
     """
@@ -206,34 +204,13 @@ def download_file(path: str, dest_dir: str, cancel_event=None, progress_cb=None)
         os.makedirs(dest_dir, exist_ok=True)
     except OSError:
         return None
-    dest = os.path.join(dest_dir, fname)
     try:
         with session.get(_BASE + path, timeout=60, stream=True) as resp:
             if resp.status_code != 200:
                 return None
-            try:
-                total = int(resp.headers.get("Content-Length", "")) or None
-            except ValueError:
-                total = None
-            done = 0
-            if progress_cb:
-                progress_cb(0, total)
-            with open(dest, "wb") as fh:
-                for chunk in resp.iter_content(chunk_size=65536):
-                    if cancel_event is not None and cancel_event.is_set():
-                        raise _Cancelled()
-                    if chunk:
-                        fh.write(chunk)
-                        done += len(chunk)
-                        if progress_cb:
-                            progress_cb(done, total)
-    except (_Cancelled, requests.RequestException, OSError):
-        try:
-            os.remove(dest)  # don't leave a truncated archive behind
-        except OSError:
-            pass
+            return save_response(resp, dest_dir, fname, cancel_event, progress_cb)
+    except (Cancelled, requests.RequestException, OSError):
         return None
-    return dest
 
 
 def test_credentials(username: str, password: str) -> tuple[bool | None, str]:

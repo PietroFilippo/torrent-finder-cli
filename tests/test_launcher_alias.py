@@ -4,9 +4,13 @@ import unittest
 from unittest.mock import patch
 
 from torrent_finder import launcher_alias
+from isolation import isolate_store
 
 
 class LauncherRenderingTests(unittest.TestCase):
+    def setUp(self):
+        isolate_store(self)
+
     def test_command_choices_are_fixed_presets(self):
         self.assertEqual(
             launcher_alias.COMMAND_CHOICES,
@@ -40,6 +44,9 @@ class LauncherRenderingTests(unittest.TestCase):
 
 
 class LauncherLocationTests(unittest.TestCase):
+    def setUp(self):
+        isolate_store(self)
+
     def test_read_only_package_directory_falls_back_to_user_bin(self):
         user_bin = "C:/Users/test/.local/bin"
         with patch.object(
@@ -57,6 +64,9 @@ class LauncherLocationTests(unittest.TestCase):
 
 
 class LauncherLifecycleTests(unittest.TestCase):
+    def setUp(self):
+        isolate_store(self)
+
     def test_packaged_torrent_entry_point_is_selected_without_a_shim(self):
         canonical = "C:/bin/torrent-finder.exe"
         short = "C:/bin/torrent.exe"

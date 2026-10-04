@@ -771,7 +771,14 @@ def filter_menu(provider, on_save=None) -> None:
             on_save()
         else:
             from torrent_finder.state import save_state
-            save_state(PROVIDERS)
+            try:
+                save_state([provider])
+            except (OSError, ValueError) as error:
+                from rich.markup import escape
+                console.print(f"[warning] Filters apply to this session, but couldn't be saved: "
+                              f"{escape(str(error))}[/warning]")
+                console.print("[dim]Press any key to continue...[/dim]")
+                readchar.readkey()
     # "back" — just return
 
 

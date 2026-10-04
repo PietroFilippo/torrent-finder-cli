@@ -15,7 +15,7 @@ import warnings
 warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
-from torrent_finder import __version__, acquisition
+from torrent_finder import __version__, acquisition, store
 from torrent_finder.constants import console
 import readchar
 from torrent_finder.downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, stream_with_peerflix, stream_with_webtorrent
@@ -968,6 +968,9 @@ def _main_loop(args=None) -> None:
     if args.preview_update:
         preview_update(args.preview_update)
         return
+    if store.problem() is not None:
+        from torrent_finder.ui.storage import storage_problem_prompt
+        storage_problem_prompt()
     load_state(PROVIDERS)
     if args.profile:
         if args.type not in (None, "all"):

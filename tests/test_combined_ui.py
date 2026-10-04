@@ -8,19 +8,21 @@ from rich.cells import cell_len
 from rich.console import Console, Group
 from rich.text import Text
 
-from torrent_finder import main, store
+from torrent_finder import main
 from torrent_finder.search_profiles import ProfileLibrary
 from torrent_finder.acquisition import PickOutcome
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.manga_provider import MangaProvider
 from torrent_finder.providers.combined_provider import CombinedProvider, CombinedResults
 from torrent_finder.ui import combined, prompts, table
+from isolation import isolate_store
 
 
 class CombinedUITests(unittest.TestCase):
     def test_nested_settings_save_together_or_cancel_without_touching_solo(self):
         for finish in ("save", "cancel"):
             with self.subTest(finish=finish):
+                isolate_store(self)
                 anime, manga = AnimeProvider(), MangaProvider()
                 provider = CombinedProvider([anime, manga])
                 provider.restore({})
@@ -48,7 +50,6 @@ class CombinedUITests(unittest.TestCase):
                      patch.object(prompts, "arrow_select", side_effect=choose_preset), \
                      patch.object(prompts, "get_query_with_shortcut", return_value="batch, dual audio"), \
                      patch("torrent_finder.state.save_state") as solo_save, \
-                     patch.object(store, "_cache", {}), patch.object(store, "_dirty", False), \
                      patch.object(ProfileLibrary, "save") as save:
                     prompts.filter_menu(provider)
                 solo_save.assert_not_called()

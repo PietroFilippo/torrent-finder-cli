@@ -154,18 +154,26 @@ def _build_items(stats: dict) -> list[SelectItem]:
 
 def stats_page() -> None:
     """Show the stats menu. Loops until the user picks Go Back or hits Esc."""
+    notice = ""  # shown above the footer, e.g. a failed reset
     while True:
         stats = get_all_stats()
         items = _build_items(stats)
 
         def on_action(idx, items_list):
+            nonlocal notice
             val = items_list[idx].value
             if val == "reset":
                 if confirm_prompt(
                     "[bold red]Reset all stats?[/bold red]\n\n"
                     "This will delete all usage counters permanently."
                 ):
-                    reset_stats()
+                    try:
+                        reset_stats()
+                    except (OSError, ValueError) as error:
+                        from rich.markup import escape
+                        notice = f"[bold red]Stats were not reset:[/bold red] {escape(str(error))}"
+                        return True  # stay; the saved counters are unchanged
+                    notice = ""
                     return False  # exit to outer loop → rebuild
                 return True  # stay
             return False  # Go Back → exit
@@ -175,7 +183,7 @@ def stats_page() -> None:
             title="📊 Usage Stats",
             banner=_make_banner_panel(),
             on_action=on_action,
-            footer="↑/↓ scroll  •  Enter on action  •  Esc back",
+            footer=lambda: (notice + "\n" if notice else "") + "↑/↓ scroll  •  Enter on action  •  Esc back",
         )
 
         if result is None:

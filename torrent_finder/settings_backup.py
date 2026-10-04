@@ -102,7 +102,7 @@ def validate_payload(data):
 
 
 def export_settings(path, *, history=False):
-    if Path(store.STATE_PATH).exists() and store._read_json(store.STATE_PATH) is None:
+    if store.problem() is not None:
         raise ValueError("Existing settings cannot be read; repair them before exporting.")
     current = store.read()
     data = {"providers": deepcopy(current.get("providers", {})),
@@ -154,11 +154,30 @@ def read_backup(path, *, credentials=False):
 
 
 def prepare_import(data, mode="merge"):
-    """Return a detached candidate and human-readable preview; no writes."""
+    """Return a detached candidate and human-readable preview; no writes.
+
+    Apply it with ``store.commit(import_change(data, mode))``, which merges
+    into the settings as saved at that moment rather than this candidate.
+    """
+    _check_import(data, mode)
+    result = deepcopy(store.read())
+    return result, _apply_import(result, data, mode)
+
+
+def import_change(data, mode="merge"):
+    """Store operation applying a validated backup; see ``prepare_import``."""
+    _check_import(data, mode)
+    return lambda document: _apply_import(document, data, mode)
+
+
+def _check_import(data, mode):
     validate_payload(data)
     if mode not in ("merge", "replace"):
         raise ValueError("Choose merge or replace")
-    result = deepcopy(store.read())
+
+
+def _apply_import(result, data, mode):
+    """Apply *data* to the settings document *result* in place; return the preview lines."""
     incoming = deepcopy(data)
     previous = result.setdefault("settings", {})
     changes = ["Merge: imported provider/preferences win; other settings stay." if mode == "merge"
@@ -210,7 +229,7 @@ def prepare_import(data, mode="merge"):
         changes.append("History: unchanged (not included)")
     if "download_dir" in settings:
         changes.append("Download folder: " + str(settings["download_dir"] or "default") + " (check it exists on this computer)")
-    return result, changes
+    return changes
 
 
 def export_credentials(path):

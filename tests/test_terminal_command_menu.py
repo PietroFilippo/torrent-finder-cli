@@ -7,9 +7,13 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 from torrent_finder.launcher_alias import LauncherStatus
 from torrent_finder.ui import launcher, prompts
+from isolation import isolate_store
 
 
 class TerminalCommandMenuTests(unittest.TestCase):
+    def setUp(self):
+        isolate_store(self)
+
     def test_selector_exposes_only_the_fixed_command_presets(self):
         items = launcher._command_items("tf", available=True)
 

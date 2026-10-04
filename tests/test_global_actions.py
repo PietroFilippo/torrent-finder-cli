@@ -6,9 +6,13 @@ from unittest.mock import Mock, patch
 from rich.console import Console
 from torrent_finder import main
 from torrent_finder.ui import prompts, selector, table
+from isolation import isolate_store
 
 
 class GlobalActionsTests(unittest.TestCase):
+    def setUp(self):
+        isolate_store(self)
+
     def test_main_menu_exposes_quick_actions_without_duplicate_bookmarks(self):
         def select(items, **kwargs):
             self.assertNotIn("__bookmarks__", [item.value for item in items])

@@ -23,6 +23,7 @@ from torrent_finder.state import provider_snapshot, apply_provider_state
 from torrent_finder.result_details import detail_lines
 from torrent_finder.language_tags import has_brazilian_subtitles
 from torrent_finder.ui import table, prompts, backup as backup_ui
+from isolation import isolate_store, restart_store
 
 
 class IsolatedState(unittest.TestCase):
@@ -30,10 +31,8 @@ class IsolatedState(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        self.path = self.root / "state.json"
-        for owner, key, value in ((store, "STATE_PATH", str(self.path)), (store, "LEGACY_STATE_PATHS", []),
-                                  (store, "_cache", {}), (store, "_dirty", False),
-                                  (credentials, "_CRED_FILE", self.root / "credentials.json"),
+        self.path = isolate_store(self, path=self.root / "state.json")
+        for owner, key, value in ((credentials, "_CRED_FILE", self.root / "credentials.json"),
                                   (credentials, "_LEGACY_CRED_PATHS", []), (credentials, "_file_cache", None)):
             mock = patch.object(owner, key, value)
             mock.start()
@@ -199,7 +198,7 @@ class BookmarkTests(IsolatedState):
         bookmarks.save_results(provider, rows)
         bookmarks.save_results(provider, rows)
         self.assertEqual(len(bookmarks.entries()), len(rows))
-        store._cache = None
+        restart_store()
         for saved, row in zip(bookmarks.entries(), rows):
             for key, value in row.items():
                 self.assertEqual(saved["result"][key], value)
