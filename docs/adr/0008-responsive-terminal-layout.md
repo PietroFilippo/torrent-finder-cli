@@ -1,6 +1,7 @@
 # ADR-0008: Responsive terminal layout
 
-Status: accepted (2026-07-15)
+Status: accepted (2026-07-15). Presentation amended by
+[ADR-0020](0020-quiet-terminal-design.md); the responsive rules stand.
 
 ## Context
 

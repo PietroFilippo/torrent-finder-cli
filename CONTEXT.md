@@ -357,8 +357,8 @@ Main and What's Next menus expose general quick actions, which contain bookmarks
 choose a scope only when it is absent. A provider-bound entry keeps that scope.
 `_bookmarks_flow` shares reopening, saved searches, comparison and refresh across
 these entry points. Expanded result rows retain the normal background and use
-the arrow/bold style for focus. Short menus omit long random tips to preserve
-room for their choices. What's Next has unique case-insensitive letter shortcuts
+the cursor bar and bold for focus. Random tips need a window at least 30 rows
+tall, so they never cost list rows. What's Next has unique case-insensitive letter shortcuts
 and Tab for quick actions; its footer responds to viewport changes.
 
 `ui.prompts.download_complete_prompt` offers Continue or Back after actions from
@@ -375,14 +375,19 @@ cursor movement and height windowing are stable; contextual hints,
 descriptions, footers, and result metadata may wrap.
 
 The result table progressively removes columns as the viewport narrows and
-shows hidden fields for the selected result in its caption. Selectors and the
+shows the selected result's full name and hidden fields below it. Selectors and the
 result table watch live size changes. Streaming headers reserve their measured
 wrapped height before subprocess output begins. See
 [ADR-0008](docs/adr/0008-responsive-terminal-layout.md).
 
-Short viewports use a one-line banner and tighter padding. Windowed selectors
-show position in the border instead of extra “more above/below” rows and accept
-PgUp/PgDn/Home/End. Action-only menus scroll too.
+Every frame follows the Quiet layout of `ui/theme.py`: a header line naming the
+screen (continued on a second line when long) with an optional status on the
+right, two-cell margins, a cursor bar, aligned state and hint columns, and one
+key bar parsed from the footer string; prose in a footer is shown above the
+keys. Main-screen logs start at column 0. Short viewports drop the spacer lines.
+Windowed selectors show position in the header instead of extra “more
+above/below” rows and accept PgUp/PgDn/Home/End. Action-only menus scroll too.
+See [ADR-0020](docs/adr/0020-quiet-terminal-design.md).
 Search notices collapse to one line in short windows; `n` opens a notice
 browser without resetting the result selection. Mixed results show provider
 labels and selected-row provenance even when columns collapse.
