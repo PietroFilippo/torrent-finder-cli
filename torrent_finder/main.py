@@ -1214,7 +1214,8 @@ def _main_loop(args=None) -> None:
             )
             try:
                 result = provider_select_prompt(
-                    notice="\n".join(m for m in (update_msg, exit_hint) if m),
+                    notice=update_msg or "",
+                    alert=exit_hint,  # the last line of the frame, under the keys
                     open_group=pending_open_group,
                     update_available=bool(update_info),
                 )

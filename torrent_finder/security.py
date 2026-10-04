@@ -52,6 +52,11 @@ def _looks_like_vpn(org: str) -> bool:
     return any(token in org_l for token in VPN_ORG_HINTS)
 
 
+def mask_text(value: str) -> str:
+    """``São Paulo, Brazil`` → ``••• •••••, ••••••``: the shape of the text, letters and digits hidden."""
+    return re.sub(r"\w", "•", value)
+
+
 def mask_ip(ip: str) -> str:
     """``203.0.113.7`` → ``•••.•.•••.•``: the shape of the address without its digits.
 
@@ -60,7 +65,7 @@ def mask_ip(ip: str) -> str:
     """
     if not re.search(r"\d", ip):
         return ip
-    return re.sub(r"[0-9A-Fa-f]", "•", ip)
+    return mask_text(ip)
 
 
 def show_security_warning(force: bool = False) -> bool:
@@ -69,7 +74,7 @@ def show_security_warning(force: bool = False) -> bool:
     Returns False only if the user aborts with Esc/Ctrl-C. Returns True on
     Enter, on `D` (permanently dismiss), when bypassed via the
     TORRENT_SKIP_WARNING env var, or when previously dismissed. The public IP
-    is masked until `R` reveals it; `R` hides it again.
+    and the location are masked until `R` reveals them; `R` hides them again.
 
     Pass force=True to bypass the env var and the dismissed flag (used by
     the provider selector's "Network exposure info" action).
@@ -129,13 +134,14 @@ def show_security_warning(force: bool = False) -> bool:
         "Every peer and tracker in that swarm sees this IP address. "
         "Seed counts and names are not safety signals — content is not verified."
     )
-    has_ip = any(label == "Public IP" for label, _, _ in rows)
+    masked_labels = ("Public IP", "Location")  # what identifies you: hidden until R
+    has_masked = any(label in masked_labels for label, _, _ in rows)
     revealed = False
 
     def key_line() -> str:
         parts = ["Enter continue"]
-        if has_ip:
-            parts.append("R hide IP" if revealed else "R reveal IP")
+        if has_masked:
+            parts.append("R hide" if revealed else "R reveal")
         if not force:
             parts.append("D don't show again")
         parts.append("Esc abort")
@@ -156,8 +162,8 @@ def show_security_warning(force: bool = False) -> bool:
         for index, (label, value, optional) in enumerate(rows):
             line = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
             line.append(label.ljust(label_width), style=theme.MUTED)
-            if label == "Public IP" and not revealed:
-                line.append(mask_ip(value), style=theme.MUTED)  # blurred until R reveals it
+            if label in masked_labels and not revealed:  # blurred until R reveals them
+                line.append(mask_ip(value) if label == "Public IP" else mask_text(value), style=theme.MUTED)
             else:
                 line.append(value, style="bold")
             line.truncate(room + len(theme.MARGIN), overflow="ellipsis")
@@ -205,7 +211,7 @@ def show_security_warning(force: bool = False) -> bool:
                 return False
             if key in (readchar.key.ENTER, readchar.key.CR, readchar.key.LF):
                 return True
-            if has_ip and key in ("r", "R"):
+            if has_masked and key in ("r", "R"):
                 revealed = not revealed
                 continue
             if not force and key in ("d", "D"):

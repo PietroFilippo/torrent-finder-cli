@@ -1917,7 +1917,7 @@ def _provider_source_menu(provider, facets=None) -> "str | object | None":
 
 
 def provider_select_prompt(
-    notice: str = "", open_group=None, update_available: bool = False
+    notice: str = "", open_group=None, update_available: bool = False, alert: str = ""
 ) -> object | None:
     """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled.
 
@@ -1927,7 +1927,8 @@ def provider_select_prompt(
     A "Network exposure info" action re-opens the security warning on demand.
 
     ``notice`` is an optional Rich-markup line (e.g. an "update available"
-    banner) prepended to the footer; pass "" to show nothing.
+    banner) prepended to the footer; pass "" to show nothing. ``alert`` is a
+    transient line drawn under the key bar (the "press again to quit" guard).
 
     ``update_available`` adds an "Install update" action row (and the U hotkey)
     so the update is reachable right here, not only via Tab → quick actions.
@@ -2056,6 +2057,7 @@ def provider_select_prompt(
             footer=footer,
             banner=_make_banner_panel(),
             start_index=start,
+            alert=alert,
             hotkeys={
                 "H": "history",
                 "h": "history",

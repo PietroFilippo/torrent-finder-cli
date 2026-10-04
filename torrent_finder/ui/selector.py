@@ -251,8 +251,9 @@ def _build_panel(
     footer: str = "",
     tick: int = 0,
     status: str = "",
+    alert: str = "",
 ) -> Group:
-    """Render one complete selector frame: header, windowed list, context, keys.
+    """Render one complete selector frame: header, windowed list, context, keys, alert.
 
     Every selectable row stays one physical line so the window is stable;
     descriptions, notices and the key bar wrap and are measured, and the list
@@ -278,6 +279,8 @@ def _build_panel(
         item_blocks.append(description)
     item_lines = sum(_wrapped_line_count(block, inner_width) for block in item_blocks)
     notice_lines = sum(_wrapped_line_count(block, inner_width) for block in parsed.context)
+    # A transient message (the quit guard) is the last line, under the key bar.
+    alert_lines = theme.wrap_block(Text.from_markup(alert), width, console) if alert else []
 
     # Partition into leading actions, a windowed main list, and trailing actions.
     n = len(items)
@@ -310,7 +313,7 @@ def _build_panel(
         if context_lines and not compact:
             spacing += 1  # between the context and the keys
         return (header_count + spacing + always_visible_rows + separators + context_lines
-                + len(theme.wrap_keys(key_segments, width)))
+                + len(theme.wrap_keys(key_segments, width)) + len(alert_lines))
 
     def windowed_keys() -> list[Text]:
         if theme.has_key(keys, "PgUp/PgDn"):
@@ -394,6 +397,7 @@ def _build_panel(
     if has_context and not compact:
         lines.append(theme.rule(width))
     lines.extend(theme.wrap_keys(shown_keys, width))
+    lines.extend(alert_lines)
     return Group(*lines)
 
 
@@ -465,6 +469,7 @@ def arrow_select(
     hotkeys: dict[str, str] | None = None,
     key_actions: dict[str, Callable[[int, list[SelectItem]], object]] | None = None,
     status: str | Callable[[], str] = "",
+    alert: str | Callable[[], str] = "",
 ) -> int | list[int] | tuple | None:
     """Interactive arrow-key selector.
 
@@ -487,6 +492,8 @@ def arrow_select(
         start_index: Initial cursor position.
         banner: Accepted for older callers; every frame draws its own header.
         status: Optional right-aligned header text (str or callable).
+        alert: Optional transient Rich-markup message drawn as the last line,
+               under the key bar (e.g. "press again to quit"); str or callable.
         on_action: Optional callback for action items. Called with
                    (index, items). Return True to stay in the menu,
                    False to exit and return the index.
@@ -527,6 +534,7 @@ def arrow_select(
                     _resolve(footer),
                     tick=tick,
                     status=_resolve(status),
+                    alert=_resolve(alert),
                 )
                 if _render(
                     banner,

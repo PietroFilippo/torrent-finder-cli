@@ -194,11 +194,12 @@ class SecurityWarningTests(unittest.TestCase):
                              "don't show again"):
                     self.assertIn(text, output.replace("\n  ", " "))
 
-    def test_ip_is_masked_until_revealed(self):
-        from torrent_finder.security import mask_ip
+    def test_ip_and_location_are_masked_until_revealed(self):
+        from torrent_finder.security import mask_ip, mask_text
         self.assertEqual(mask_ip("203.0.113.7"), "•••.•.•••.•")
         self.assertEqual(mask_ip("2001:db8::1"), "••••:•••::•")
         self.assertEqual(mask_ip("unknown"), "unknown")
+        self.assertEqual(mask_text("São Paulo, Brazil"), "••• •••••, ••••••")
         for width, height in ((50, 16), (80, 24)):
             with self.subTest(width=width, height=height):
                 result, frames, _ = self.frames(width, height, ["r", "R", "\r"])
@@ -206,8 +207,12 @@ class SecurityWarningTests(unittest.TestCase):
                 outputs = ["\n".join(plain_lines(frame, width, height)) for frame in frames]
                 self.assertEqual(["203.0.113.7" in out for out in outputs], [False, True, False])
                 self.assertIn("•••.•.•••.•", outputs[0])
-                self.assertIn("R reveal IP", outputs[0].replace("\n  ", " "))
-                self.assertIn("R hide IP", outputs[1].replace("\n  ", " "))
+                self.assertIn("R reveal", outputs[0].replace("\n  ", " "))
+                self.assertIn("R hide", outputs[1].replace("\n  ", " "))
+                if height >= 24:  # the Location row is optional in short windows
+                    self.assertEqual(["Brazil" in out for out in outputs], [False, True, False])
+                    self.assertIn("••••••", outputs[0])
+                self.assertIn("Example ISP", outputs[0])  # the provider stays visible
                 self.assertTrue(all(len(plain_lines(frame, width, height)) <= height for frame in frames))
 
     def test_keys_keep_their_meaning(self):
@@ -638,6 +643,21 @@ class ContrastTests(unittest.TestCase):
         self.assertEqual(hint_style(row("Terminal command"), "setup needed"), theme.MUTED)  # other hints stay quiet
         segment = theme.key_segment("Esc", "back")
         self.assertFalse(any(str(span.style) == theme.MUTED for span in segment.spans))
+
+    def test_alert_is_the_last_line_under_the_keys(self):
+        items = [SelectItem(f"Provider {i}") for i in range(30)]
+        alert = "[bold yellow]Press Esc or Ctrl+C again to quit[/bold yellow]"
+        for width, height in ((50, 16), (80, 24), (120, 40)):
+            with self.subTest(width=width, height=height):
+                screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
+                with patch.object(selector, "console", screen):
+                    frame = selector._build_panel(items, 0, "Select Provider", False, "Enter select • Esc cancel",
+                                                  alert=alert)
+                lines = plain_lines(frame, width, height)
+                self.assertLessEqual(len(lines), height)
+                self.assertEqual(lines[-1].strip(), "Press Esc or Ctrl+C again to quit")
+                self.assertIn("Esc cancel", lines[-2])
+                self.assertNotIn("again to quit", "\n".join(lines[:-1]))
 
     def test_compact_frames_keep_their_height(self):
         items = [SelectItem(f"Row {i}") for i in range(30)]

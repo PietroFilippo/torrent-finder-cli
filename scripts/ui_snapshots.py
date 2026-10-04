@@ -170,7 +170,7 @@ def _scenarios():
     scenarios = [
         ("provider-menu", lambda: prompts.provider_select_prompt(update_available=True)),
         ("provider-menu-exit-armed", lambda: prompts.provider_select_prompt(
-            notice="[not dim bold yellow]Press Esc or Ctrl+C again to quit[/not dim bold yellow]")),
+            alert="[not dim bold yellow]Press Esc or Ctrl+C again to quit[/not dim bold yellow]")),
         ("group-games", lambda: prompts._provider_group_menu(GAMES_GROUP)),
         ("group-software", lambda: prompts._provider_group_menu(SOFTWARE_GROUP)),
         ("group-manga", lambda: prompts._provider_group_menu(MANGA_GROUP)),

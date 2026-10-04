@@ -60,7 +60,7 @@ The separate [provider reference](docs/PROVIDER_REFERENCE.md) details each provi
   - **Unpack Page Archives:** Off by default; turn it on under **Download folder** (provider screen) or in the Download Method menu. Downloaded manga and comic archives (`.zip`, `.cbz`, `.rar`, `.cbr`, `.7z`, `.cb7`) that hold only images become a folder of pages beside them, and the archive is deleted once the pages are in place. It applies to Madokami files and to torrents downloaded in the app (aria2c, webtorrent, peerflix), not to a torrent client you hand a magnet to. Other archives (games, software, documents) are left alone. ZIP-based archives always work; RAR and 7z use the `tar` built into Windows 10/11 and macOS, 7-Zip or UnRAR, and an archive that can't be opened stays packed with a note saying why.
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
   - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
-- **Network Exposure Warning:** At startup a warning screen queries `ip-api.com` and shows your public IP (masked until you press **R**), ISP, ASN, location, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
+- **Network Exposure Warning:** At startup a warning screen queries `ip-api.com` and shows your public IP and location (masked until you press **R**), ISP, ASN, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
 - **Install-Aware Update Check:** On startup the app checks for a newer version (at most once a day, fail-silent) and shows a notice tailored to how you installed it — a pip/pipx install compares against PyPI, a git clone against `origin`, a standalone binary against the latest Release. The notice is a high-visibility black-on-yellow banner; press **U** on the provider menu (an **Install update** row also appears there) or **Tab → Install update** at the search prompt to update in place (`pipx upgrade`/`pip -U`, `git pull`, or open the Releases page).
 - **Pagination & Navigation:** Navigate through large sets of search results cleanly, with the ability to safely go back to your previous search results after viewing download options.
 - **Refine Results:** Press **f** in the results table to match words, an exact media title (ignoring common release tags), or an exact full filename. Sort by Recommended order, newest upload, most seeders, name, or size. Unknown upload dates sort last. Filtering keeps only visible selections; sorting preserves the selected downloads.
@@ -623,7 +623,7 @@ From a source clone with no pip install, replace `torrent` with `python -m torre
 
 ### Network Exposure Warning
 
-On launch you'll see a warning screen listing your public IP, ISP, ASN and location, with a verdict line (in a short window the Org, ASN and Location rows give way first). The IP is masked (`•••.•.•••.•`) until you reveal it, so the screen is safe to share:
+On launch you'll see a warning screen listing your public IP, ISP, ASN and location, with a verdict line (in a short window the Org, ASN and Location rows give way first). The IP and the location are masked (`•••.•.•••.•`) until you reveal them, so the screen is safe to share:
 
 - ✓ **Proxy/VPN flagged** — detected by the IP database.
 - ✓ **Hosting/datacenter IP** — likely a VPN exit (not a residential ISP).
@@ -634,7 +634,7 @@ On launch you'll see a warning screen listing your public IP, ISP, ASN and locat
 Controls on the warning screen:
 
 - **Enter** — acknowledge and continue.
-- **R** — reveal the public IP; press again to hide it.
+- **R** — reveal the public IP and location; press again to hide them.
 - **D** — don't show again (saved to `filter_state.json`).
 - **Esc** — abort the program.
 
@@ -656,7 +656,7 @@ Even after dismissing, you can re-open the warning at any time from the **Select
 - **History / stats / tips / filters**: On the provider screen press `H` (history), `S` (stats), `T` (tips), or `F` (filters). At the search prompt, press `Tab` for the same quick-actions menu (then `F`/`H`/`S`/`T` or arrows) — your in-progress query is preserved. The prompt itself has no single-letter shortcuts, so queries can start with any letter.
 - **Tips browser**: Use `/` to search across categories, tip text, and tags; `C` to cycle categories; `X` to clear the search/filter; and `Esc` to go back.
 - **Cancel / Back**: Press `Esc` to safely cancel an action, close a menu, or go back to the previous screen.
-- **Quitting**: On the provider menu, quitting takes **two** presses of `Esc` or `Ctrl+C` (mix allowed) — the screen shows *"Press Esc or Ctrl+C again to quit"* above the key bar after the first, and any other key disarms it. Deeper in a flow, `Ctrl+C` still cancels the running operation instantly.
+- **Quitting**: On the provider menu, quitting takes **two** presses of `Esc` or `Ctrl+C` (mix allowed) — the screen shows *"Press Esc or Ctrl+C again to quit"* as its last line, under the key bar, after the first, and any other key disarms it. Deeper in a flow, `Ctrl+C` still cancels the running operation instantly.
 - **Download Method and batch navigation**: After a download or client handoff, choose **Continue to What's Next** or **Back to download options**. `Esc` also returns to those options with the same torrent, file/subtitle choices, or batch selection. Returning does not repeat the download or handoff.
 - **What's Next shortcuts**: `R` Search Again, `P` Change Provider, `M` Main menu, `Tab` Quick actions, `H` Search History, `S` Usage Stats, `T` Tips, `C` Credentials, and `Q` Exit. Letter shortcuts also accept lowercase.
 - **Post-action exit confirmation**: On the **What's Next?** screen, choosing **Exit**, pressing `Q`, or pressing `Esc` / `Ctrl+C` opens a Y/N confirmation. Declining returns to the same menu.
