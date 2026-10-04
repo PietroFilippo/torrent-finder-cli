@@ -60,7 +60,7 @@ The separate [provider reference](docs/PROVIDER_REFERENCE.md) details each provi
   - **Unpack Page Archives:** Off by default; turn it on under **Download folder** (provider screen) or in the Download Method menu. Downloaded manga and comic archives (`.zip`, `.cbz`, `.rar`, `.cbr`, `.7z`, `.cb7`) that hold only images become a folder of pages beside them, and the archive is deleted once the pages are in place. It applies to Madokami files and to torrents downloaded in the app (aria2c, webtorrent, peerflix), not to a torrent client you hand a magnet to. Other archives (games, software, documents) are left alone. ZIP-based archives always work; RAR and 7z use the `tar` built into Windows 10/11 and macOS, 7-Zip or UnRAR, and an archive that can't be opened stays packed with a note saying why.
   - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
   - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
-- **Network Exposure Warning:** At startup a warning screen queries `ip-api.com` and shows your public IP, ISP, ASN, location, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
+- **Network Exposure Warning:** At startup a warning screen queries `ip-api.com` and shows your public IP (masked until you press **R**), ISP, ASN, location, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
 - **Install-Aware Update Check:** On startup the app checks for a newer version (at most once a day, fail-silent) and shows a notice tailored to how you installed it — a pip/pipx install compares against PyPI, a git clone against `origin`, a standalone binary against the latest Release. The notice is a high-visibility black-on-yellow banner; press **U** on the provider menu (an **Install update** row also appears there) or **Tab → Install update** at the search prompt to update in place (`pipx upgrade`/`pip -U`, `git pull`, or open the Releases page).
 - **Pagination & Navigation:** Navigate through large sets of search results cleanly, with the ability to safely go back to your previous search results after viewing download options.
 - **Refine Results:** Press **f** in the results table to match words, an exact media title (ignoring common release tags), or an exact full filename. Sort by Recommended order, newest upload, most seeders, name, or size. Unknown upload dates sort last. Filtering keeps only visible selections; sorting preserves the selected downloads.
@@ -623,7 +623,7 @@ From a source clone with no pip install, replace `torrent` with `python -m torre
 
 ### Network Exposure Warning
 
-On launch you'll see a warning screen listing your public IP, ISP, ASN and location, with a verdict line (in a short window the Org, ASN and Location rows give way first):
+On launch you'll see a warning screen listing your public IP, ISP, ASN and location, with a verdict line (in a short window the Org, ASN and Location rows give way first). The IP is masked (`•••.•.•••.•`) until you reveal it, so the screen is safe to share:
 
 - ✓ **Proxy/VPN flagged** — detected by the IP database.
 - ✓ **Hosting/datacenter IP** — likely a VPN exit (not a residential ISP).
@@ -634,6 +634,7 @@ On launch you'll see a warning screen listing your public IP, ISP, ASN and locat
 Controls on the warning screen:
 
 - **Enter** — acknowledge and continue.
+- **R** — reveal the public IP; press again to hide it.
 - **D** — don't show again (saved to `filter_state.json`).
 - **Esc** — abort the program.
 

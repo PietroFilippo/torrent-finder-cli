@@ -185,7 +185,7 @@ class SecurityWarningTests(unittest.TestCase):
     def test_warning_fits_small_windows_and_keeps_the_essentials(self):
         for width, height in ((50, 16), (80, 24)):
             with self.subTest(width=width, height=height):
-                result, frames, _ = self.frames(width, height, ["\r"])
+                result, frames, _ = self.frames(width, height, ["r", "\r"])  # R reveals the IP
                 lines = plain_lines(frames[-1], width, height)
                 output = "\n".join(lines)
                 self.assertTrue(result)
@@ -193,6 +193,22 @@ class SecurityWarningTests(unittest.TestCase):
                 for text in ("203.0.113.7", "Example ISP", "no VPN detected", "public", "Esc abort",
                              "don't show again"):
                     self.assertIn(text, output.replace("\n  ", " "))
+
+    def test_ip_is_masked_until_revealed(self):
+        from torrent_finder.security import mask_ip
+        self.assertEqual(mask_ip("203.0.113.7"), "•••.•.•••.•")
+        self.assertEqual(mask_ip("2001:db8::1"), "••••:•••::•")
+        self.assertEqual(mask_ip("unknown"), "unknown")
+        for width, height in ((50, 16), (80, 24)):
+            with self.subTest(width=width, height=height):
+                result, frames, _ = self.frames(width, height, ["r", "R", "\r"])
+                self.assertTrue(result)
+                outputs = ["\n".join(plain_lines(frame, width, height)) for frame in frames]
+                self.assertEqual(["203.0.113.7" in out for out in outputs], [False, True, False])
+                self.assertIn("•••.•.•••.•", outputs[0])
+                self.assertIn("R reveal IP", outputs[0].replace("\n  ", " "))
+                self.assertIn("R hide IP", outputs[1].replace("\n  ", " "))
+                self.assertTrue(all(len(plain_lines(frame, width, height)) <= height for frame in frames))
 
     def test_keys_keep_their_meaning(self):
         self.assertFalse(self.frames(80, 24, ["\x1b"])[0])
@@ -526,7 +542,7 @@ class SecurityTinyTests(unittest.TestCase):
     def test_startup_warning_fits_40x12_with_a_long_isp(self):
         for isp in ("Example ISP", "Comcast Cable Communications, LLC"):
             with self.subTest(isp=isp), patch.dict(self.INFO, {"isp": isp}):
-                result, frames, _ = self.frames(40, 12, ["\r"])
+                result, frames, _ = self.frames(40, 12, ["r", "\r"])  # R reveals the IP
                 lines = plain_lines(frames[-1], 40, 12)
                 output = " ".join(line.strip() for line in lines)
                 self.assertTrue(result)
