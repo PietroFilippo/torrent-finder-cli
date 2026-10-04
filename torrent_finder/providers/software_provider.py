@@ -6,6 +6,8 @@ put them in ``categories`` and drop the android/ios excludes in
 ``default_filters`` below.
 """
 
+import re
+
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.result_view import product_title_score
@@ -35,8 +37,10 @@ class SoftwareProvider(BaseProvider):
     supports_episode_picker = False
 
     # SolidTorrents doesn't strictly honor the category param, so keep mobile
-    # results out by keyword while this provider is desktop-only.
-    default_filters = FilterConfig(exclude_keywords=["android", "ios", "apk"])
+    # results out by keyword while this provider is desktop-only. Whole words
+    # only: BIOS tools and "Studios" are desktop software.
+    default_filters = FilterConfig(
+        name_predicate=lambda name: not re.search(r"\b(?:android|ios|apk)\b", name, re.I))
 
     presets = [
         FilterPreset("Pre-activated / Cracked", FilterConfig(include_keywords=[

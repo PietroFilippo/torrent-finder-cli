@@ -144,7 +144,8 @@ class SearchSession:
             provider, query = self.groups[group]
             if provider.prefer_title_matches and provider.auto_needs_relevant_rows:
                 authors = self.work_authors.get(query, ())
-                answered = any(provider.title_relevance(row, query, authors) >= 1 for t in primary for row in t.rows)
+                answered = any(provider.title_relevance(row, query, authors) >= provider.relevant_title_score
+                               for t in primary for row in t.rows)
                 reason = "On engines returned rows matching the title; Auto was not needed."
             else:
                 answered = any(t.rows for t in primary)

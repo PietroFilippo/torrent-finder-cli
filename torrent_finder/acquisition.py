@@ -584,6 +584,113 @@ class LibgenAcquisition:
         return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
 
 
+class FDroidAcquisition:
+    """F-Droid: official repository APKs — no magnet, no login.
+
+    A pick resolves the repository's suggested version and downloads that APK
+    from f-droid.org with a transfer bar; Esc aborts mid-file. The done panel
+    names the package and version, and links F-Droid's PGP signature.
+    """
+
+    style = "direct-download"
+    has_magnet = False
+
+    def magnet(self, result) -> str | None:
+        return None
+
+    def pick(self, result) -> PickOutcome:
+        import os
+        from torrent_finder import fdroid
+        from torrent_finder.constants import get_download_dir
+        from torrent_finder.utils import start_esc_listener
+        from rich.panel import Panel
+        from rich.progress import (
+            BarColumn, DownloadColumn, Progress, TextColumn, TimeRemainingColumn,
+            TransferSpeedColumn,
+        )
+
+        name = result.get("name", "Unknown")
+        package = result.get("fd_package") or ""
+        page_url = result.get("page_url", "")
+
+        from torrent_finder.ui.prompts import download_dir_ready
+        if not download_dir_ready():
+            return PickOutcome("back")
+
+        with console.status("[bold cyan]Finding the current version on F-Droid…[/bold cyan]", spinner="dots"):
+            apk = fdroid.suggested_apk(package)
+        if not apk:
+            console.print(Panel(
+                f"[bold]{escape(name)}[/bold]\n\n"
+                "[warning]Couldn't find a version to download[/warning] (F-Droid unreachable or no "
+                "suggested version).\n"
+                f"[cyan]Open the package page instead:[/cyan]\n{escape(page_url)}",
+                title="🤖 F-Droid", border_style="yellow", padding=(1, 2),
+            ))
+            console.print("[dim]Press any key to continue...[/dim]")
+            readchar.readkey()
+            return PickOutcome("back")
+        url, version = apk
+
+        cancel_event = threading.Event()
+        stop_listener = start_esc_listener(cancel_event)
+        progress = Progress(
+            TextColumn("{task.description}", style="cyan", markup=False),
+            BarColumn(),
+            DownloadColumn(),
+            TransferSpeedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        )
+        console.print("[info]Downloading from F-Droid — press Esc to stop.[/info]")
+        try:
+            with progress:
+                task = progress.add_task(url.rsplit("/", 1)[-1], total=None)
+
+                def _on_progress(done: int, total: int | None) -> None:
+                    progress.update(task, completed=done, total=total)
+
+                dest = fdroid.download_apk(url, get_download_dir(), cancel_event=cancel_event,
+                                           progress_cb=_on_progress)
+        finally:
+            stop_listener.set()
+
+        if dest:
+            body = (f"[success]✓ Saved to {escape(get_download_dir())}[/success]\n"
+                    f"[dim]{escape(os.path.basename(dest))}[/dim]\n\n"
+                    f"Package {escape(package)}, version {escape(version or '?')}, from f-droid.org.\n"
+                    "[dim]Android checks the APK's signature when you install it. "
+                    f"F-Droid's PGP signature: {escape(url)}.asc[/dim]")
+        elif cancel_event.is_set():
+            body = "[warning] Download cancelled.[/warning]"
+        else:
+            body = ("[warning]Download failed.[/warning]\n"
+                    f"[cyan]Get it from the package page:[/cyan]\n{escape(page_url)}")
+        console.print(Panel(
+            f"[bold]{escape(name)}[/bold]\n\n{body}",
+            title="🤖 F-Droid", border_style="bright_blue", padding=(1, 2),
+        ))
+        console.print("[dim]Press any key to continue...[/dim]")
+        readchar.readkey()
+        return PickOutcome("next" if dest else "back")
+
+    def batch_item(self, result, *, download_dir, cancel_event, set_status) -> BatchItemOutcome:
+        from torrent_finder import fdroid
+
+        apk = fdroid.suggested_apk(result.get("fd_package") or "")
+        if not apk:
+            return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
+
+        def _on_progress(done, total):
+            size = (f"{done / 1048576:.1f}/{total / 1048576:.1f} MB"
+                    if total else f"{done / 1048576:.1f} MB")
+            set_status(size)
+
+        if fdroid.download_apk(apk[0], download_dir, cancel_event=cancel_event, progress_cb=_on_progress):
+            return BatchItemOutcome(ok=True, saved_direct=True)
+        return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
+
+
 # The registry: one line per non-standard source. Anything absent acquires via
 # magnet-direct (Apibay, Knaben, SolidTorrents, Nyaa, YTS, …).
 _DEFAULT = MagnetDirect()
@@ -593,6 +700,7 @@ _BY_SOURCE = {
     "Online-Fix": OnlineFixAcquisition(),
     "Madokami": MadokamiAcquisition(),
     "Libgen": LibgenAcquisition(),
+    "F-Droid": FDroidAcquisition(),
 }
 
 

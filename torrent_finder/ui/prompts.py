@@ -547,6 +547,7 @@ def filter_menu(provider, on_save=None) -> None:
         from torrent_finder.ui.combined import combined_filter_menu
         combined_filter_menu(provider)
         return
+    from rich.markup import escape
     has_engines = hasattr(provider, 'engines') and provider.engines
     has_presets = bool(provider.presets)
     from torrent_finder.result_view import SORT_ORDERS
@@ -574,6 +575,7 @@ def filter_menu(provider, on_save=None) -> None:
                     mode.title() for mode in engine.available_modes
                 ),
                 toggle_state=engine.mode.title(),
+                description=escape(engine.description),
             ))
             engine_indices.append(len(items) - 1)
 

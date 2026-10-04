@@ -12,13 +12,15 @@ from torrent_finder.providers.software_provider import SoftwareProvider
 class KnabenProviderDefaultsTests(unittest.TestCase):
     def test_every_public_tracker_provider_has_scoped_knaben(self):
         # Desktop searches Knaben alongside APIBay (the audit's APIBay found
-        # rows for 8 of 32 programs in 5.4 s on average, Knaben 26 in 0.8 s);
-        # elsewhere Knaben is the Auto fallback. Either can be switched.
+        # rows for 8 of 32 programs in 5.4 s on average, Knaben 26 in 0.8 s),
+        # and Mobile first with APIBay as its Auto fallback (APIBay found rows
+        # for 1 of 32, all also in Knaben's); elsewhere Knaben is the Auto
+        # fallback. Either can be switched.
         cases = (
             (MovieProvider(), (2_000_000, 3_000_000), "auto"),
             (GameProvider(), (4_000_000, 7_000_000), "auto"),
             (SoftwareProvider(), (4_002_000, 4_003_000, 4_004_000), "on"),
-            (MobileProvider(), (8_001_000,), "auto"),
+            (MobileProvider(), (8_001_000,), "on"),
             (AnimeProvider(), (6_000_000,), "auto"),
             (MangaProvider(), (6_006_000, 9_002_000), "auto"),
             (BookProvider(), (9_000_000,), "auto"),
@@ -36,7 +38,7 @@ class KnabenProviderDefaultsTests(unittest.TestCase):
             (MovieProvider(), {"SolidTorrents", "YTS"}),
             (GameProvider(), {"SolidTorrents"}),
             (SoftwareProvider(), {"SolidTorrents"}),
-            (MobileProvider(), {"SolidTorrents"}),
+            (MobileProvider(), {"SolidTorrents", "F-Droid"}),
             (AnimeProvider(), {"SolidTorrents"}),
             (BookProvider(), {"SolidTorrents"}),
         )

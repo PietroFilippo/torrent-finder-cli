@@ -99,6 +99,8 @@ class SearchEngine:
     initial_page: int = 0
     # Advice shown when a whole search finds nothing and this engine had no rows.
     empty_hint: Callable[[str], str] | None = None
+    # Shown in Filters & engines while this engine is highlighted.
+    description: str = ""
 
     @property
     def available_modes(self) -> tuple[str, ...]:
@@ -168,8 +170,9 @@ class BaseProvider(ABC):
     apibay_cache_enabled: bool = True
     prefer_title_matches: bool = False
     # With prefer_title_matches: Auto fallbacks also run when On engines returned
-    # rows but none matches the title (title_relevance >= 1).
+    # rows but none matches the title (title_relevance >= relevant_title_score).
     auto_needs_relevant_rows: bool = False
+    relevant_title_score: int = 1
     # Nyaa RSS only holds the latest uploads; look up popular matches too when a
     # short title has no exact row (Anime).
     nyaa_title_discovery: bool = False

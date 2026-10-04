@@ -122,7 +122,7 @@ to integers at construction.
 
 Source-specific acquisition identifiers live in `SearchResult.handle`:
 `rt_topic_id` (RuTracker), `fg_post_url` (FitGirl), `of_post_url` (Online-Fix),
-`mdk_path` (Madokami). During migration, `SearchResult` still behaves like a
+`mdk_path` (Madokami), `lg_md5` (Libgen), `fd_package` (F-Droid). During migration, `SearchResult` still behaves like a
 mapping, so legacy reads such as `result.get("rt_topic_id")` continue to work.
 
 Combined rows additionally carry `provider_slug`, `provider_label`,
@@ -149,7 +149,8 @@ in `acquisition.py` behind one interface
 3. **torrent-file-handoff** — no public magnet; fetch the `.torrent` and open
    it in the system client (Online-Fix; file host is referer-gated).
 4. **direct-download** — no torrent at all; stream files straight to the
-   download folder (Madokami, login required).
+   download folder (Madokami, login required; Libgen; F-Droid, whose APKs come
+   only from `https://f-droid.org/repo/`).
 
 The adapter is chosen by `result.source` via `acquisition.for_result()` —
 keyed per source, not per provider, because one provider merges engines with

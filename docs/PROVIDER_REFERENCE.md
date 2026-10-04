@@ -335,6 +335,34 @@ is a priority. It would not fill commercial-game gaps. Show exact package identi
 and use official repository provenance/signature verification for any future
 acquisition. Also evaluate Knaben-first latency before changing defaults.
 
+**Status (2026-10-04): Knaben first, app ranking, optional F-Droid.**
+- Audit timings: APIBay averaged 5.6 s and returned rows for 1 of 32 Android
+  queries (VLC, all four also in Knaben's). Knaben averaged 1.0 s and returned
+  rows for 21. The defaults are now Knaben On and APIBay Auto. APIBay also runs
+  when Knaben's rows are only other apps naming the query. Saved engine choices
+  are kept.
+- Ranking: the app itself (name followed only by version/edition/packaging
+  details) ranks above look-alikes and add-ons. Names only inside parentheses
+  or brackets (`Pixel Gun 3D (Pocket Minecraft Edition)`) and "… for Minecraft"
+  add-ons rank below.
+- Typed tags (`Minecraft obb`, `… apk`, `… mod`) apply the matching preset for
+  the search, search the name alone too, and list tagged releases first. The
+  "APK only" preset now explains that Prefer is usually better than Require.
+- The iOS exclusion matched substrings, so it hid names such as "Studios" or
+  "Kiosk". It now matches whole words, as does Desktop's mobile exclusion, which
+  had hidden BIOS tools.
+- **F-Droid engine (Off by default).** It searches F-Droid's public search API
+  (about 0.8 s). Rows show the exact package: `VLC [org.videolan.vlc]` ranks
+  above `VlcFreemote`, and Organic Maps (an audit gap) is found.
+- A pick asks the package API for the suggested version and downloads that APK
+  from `https://f-droid.org/repo/` over HTTPS, the files F-Droid's website
+  links. Downloads from other URLs, or that end up on another host, are
+  refused. A live download produced a valid APK.
+- Verification: Android checks the APK signature on install. F-Droid's
+  per-APK PGP signature (`.apk.asc`) is linked, not checked. F-Droid exposes no
+  per-APK hash outside its large signed index, and checking PGP would require
+  gpg plus F-Droid's key.
+
 ## RuTracker
 
 **Scope:** dedicated RuTracker search. Credentials were configured during the
