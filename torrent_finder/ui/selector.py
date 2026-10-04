@@ -297,7 +297,8 @@ def _build_panel(
     ) if multi and has_actions else 0
 
     def header_status(position: str) -> str:
-        return " · ".join(part for part in (status, position) if part)
+        # Position first: it is what a cut-down status should still show.
+        return " · ".join(part for part in (position, status) if part)
 
     header_count = len(theme.header_lines(title, header_status(""), width))
 

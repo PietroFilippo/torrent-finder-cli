@@ -133,11 +133,17 @@ def header_lines(title: str | Text = "", status: str | Text = "", width: int = 8
         first.truncate(usable, overflow="ellipsis")
     second = Text(MARGIN + "  ", no_wrap=True, overflow="ellipsis")
     second.append_text(rest)
+    if right.plain:
+        # The screen name keeps up to two thirds of the line; the status gets
+        # the rest, cut from its end, and gives way entirely when tiny.
+        title_need = min(cell_len(second.plain), max(len(MARGIN) + 3, usable * 2 // 3))
+        status_room = usable - title_need - 2
+        if status_room < min(cell_len(right.plain), 6):
+            right = Text()
+        elif cell_len(right.plain) > status_room:
+            right.truncate(status_room, overflow="ellipsis")
     room = usable - (cell_len(right.plain) + 2 if right.plain else 0)
     if cell_len(second.plain) > room:
-        if right.plain and room < 12:
-            right.truncate(max(0, usable - cell_len(second.plain) - 2), overflow="ellipsis")
-            room = usable - (cell_len(right.plain) + 2 if right.plain else 0)
         second.truncate(max(len(MARGIN) + 3, room), overflow="ellipsis")
     if right.plain:
         second.append(" " * max(2, usable - cell_len(second.plain) - cell_len(right.plain)))

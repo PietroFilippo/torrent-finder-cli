@@ -211,7 +211,8 @@ def _table_caption(
         caption.append_text(_selected_metadata(results, selected_idx, layout, show_from))
     if not expanded and any(item.get("apibay_cached_at") for item in results):
         caption.append(theme.MARGIN + "Apibay* = cached last-known-good results\n", style=theme.WARN)
-    caption.append("\n")
+    if console.size.height >= 20:
+        caption.append("\n")  # short windows keep the row for results
     caption.append_text(Text("\n").join(theme.wrap_keys(
         theme.parse_footer(Text(_result_keys(total_pages, picked, expanded))).keys, width)))
     return caption
@@ -263,7 +264,7 @@ def _visible_count(
         + 1 + _note_line_count(note, width)  # view status, notices
         + 1                                  # table header row
         + 1 + 1 + _METADATA_LINES[layout.mode] + (2 if show_provider else 0)  # spacer, name, metadata
-        + 1 + 1 + keys                       # cached-results note, spacer, keys
+        + 1 + (0 if compact else 1) + keys   # cached-results note, spacer, keys
     )
     available = max(1, height - chrome)
     return min(total, available)
