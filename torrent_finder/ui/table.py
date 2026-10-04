@@ -700,6 +700,12 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                 else:
                     num_buffer = ""
 
+                # A refined, retried or extended view may have no current row:
+                # details stay open only while there is a row to show them for.
+                current = min(current, max(0, total - 1))
+                if expanded and not total:
+                    expanded, detail_offset, scroll_offset = False, 0, 0
+
                 # Keep cursor visible: adjust scroll_offset to follow current
                 if current < scroll_offset:
                     scroll_offset = current

@@ -1,6 +1,7 @@
 """Versioned local transfer files with validation, preview and atomic restoration."""
 
 from copy import deepcopy
+from datetime import datetime
 import json
 from pathlib import Path
 from uuid import uuid4
@@ -93,12 +94,22 @@ def validate_payload(data):
             for key in ("query", "provider", "timestamp"):
                 if not isinstance(entry.get(key), str):
                     raise ValueError("Invalid history entry")
+            if not _has_timezone(entry["timestamp"]):
+                raise ValueError(f"Invalid history timestamp {entry['timestamp']!r}: use ISO 8601 with a "
+                                 "timezone, e.g. 2026-10-03T12:00:00+00:00")
             for key in ("kind", "facet", "name"):
                 if key in entry and entry[key] is not None and not isinstance(entry[key], str):
                     raise ValueError("Invalid history entry")
             _strings(entry.get("presets", []))
             if "search_profile" in entry:
                 validate_profile(entry["search_profile"])
+
+
+def _has_timezone(timestamp):
+    try:
+        return datetime.fromisoformat(timestamp).utcoffset() is not None
+    except ValueError:
+        return False
 
 
 def export_settings(path, *, history=False):

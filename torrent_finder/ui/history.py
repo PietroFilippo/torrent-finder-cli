@@ -12,12 +12,10 @@ from torrent_finder.ui.prompts import _make_banner_panel, confirm_prompt
 
 def _relative_time(iso_ts: str) -> str:
     """Turn an ISO-8601 timestamp into a human-friendly relative string."""
-    try:
-        dt = datetime.fromisoformat(iso_ts)
-        delta = datetime.now(timezone.utc) - dt
-        secs = int(delta.total_seconds())
-    except Exception:
+    dt = _parse_ts(iso_ts)
+    if dt is None:
         return ""
+    secs = int((datetime.now(timezone.utc) - dt).total_seconds())
 
     if secs < 60:
         return "just now"
@@ -55,10 +53,17 @@ _NAME_TO_SLUG = {p.name: p.slug for p in PROVIDERS}
 
 
 def _parse_ts(iso_ts: str) -> datetime | None:
+    """The entry's moment, or None when the timestamp is missing, malformed or has no timezone.
+
+    History is always recorded in UTC. A timezone-less value (hand-edited or
+    from elsewhere) has no reliable moment, so it sorts as oldest and matches
+    no date range instead of guessing one.
+    """
     try:
-        return datetime.fromisoformat(iso_ts)
-    except Exception:
+        dt = datetime.fromisoformat(iso_ts)
+    except (TypeError, ValueError):
         return None
+    return dt if dt.utcoffset() is not None else None
 
 
 # Filter definitions

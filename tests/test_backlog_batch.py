@@ -48,7 +48,7 @@ class BackupTests(IsolatedState):
                 "settings": {"combined_search": profile.snapshot(), "download_dir": "D:/Downloads",
                              "hide_stream_output": True, "last_update_check": 123, "launcher_alias": "private",
                              "password": "DO-NOT-EXPORT"},
-                "history": [{"query": "Saki", "provider": "anime", "timestamp": "2026-10-01"}],
+                "history": [{"query": "Saki", "provider": "anime", "timestamp": "2026-10-01T09:30:00+00:00"}],
                 "bookmarks": [], "stats": {"total_searches": 7}}
         store.commit(data)
         return data

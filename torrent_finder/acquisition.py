@@ -25,6 +25,7 @@ Interface:
 import threading
 
 import readchar
+from rich.markup import escape
 
 from torrent_finder.constants import console
 from torrent_finder.utils import build_magnet
@@ -187,10 +188,10 @@ class OnlineFixAcquisition:
 
         if not path:
             console.print(Panel(
-                f"[bold]{name}[/bold]\n\n"
+                f"[bold]{escape(name)}[/bold]\n\n"
                 "[warning]Couldn't fetch the .torrent automatically[/warning] "
                 "(post layout changed or host blocked).\n"
-                f"[cyan]Open the page and grab it manually:[/cyan]\n{page_url}",
+                f"[cyan]Open the page and grab it manually:[/cyan]\n{escape(page_url)}",
                 title="🔧 Online-Fix", border_style="yellow", padding=(1, 2),
             ))
             console.print("[dim]Press any key to continue...[/dim]")
@@ -201,8 +202,8 @@ class OnlineFixAcquisition:
         handoff = ("[success]✓ opened in your torrent client[/success]" if opened
                    else "[warning]saved, but couldn't auto-open — add it to your client manually[/warning]")
         console.print(Panel(
-            f"[bold]{name}[/bold]\n\n"
-            f"[cyan].torrent saved:[/cyan]   {path}\n"
+            f"[bold]{escape(name)}[/bold]\n\n"
+            f"[cyan].torrent saved:[/cyan]   {escape(path)}\n"
             f"[cyan]Handed to client:[/cyan] {handoff}\n"
             f"[cyan]Archive password:[/cyan] {online_fix.ARCHIVE_PASSWORD}\n\n"
             "[dim]Your client downloads the game from online-fix's tracker; unpack the "
@@ -272,9 +273,9 @@ class MadokamiAcquisition:
                 children = madokami.list_directory(path)
             if children is None:
                 console.print(Panel(
-                    f"[bold]{name}[/bold]\n\n"
+                    f"[bold]{escape(name)}[/bold]\n\n"
                     "[warning]Couldn't list the folder[/warning] (login rejected or site layout changed).\n"
-                    f"[cyan]Open it in your browser instead:[/cyan]\n{page_url}",
+                    f"[cyan]Open it in your browser instead:[/cyan]\n{escape(page_url)}",
                     title="📕 Madokami", border_style="yellow", padding=(1, 2),
                 ))
                 console.print("[dim]Press any key to continue...[/dim]")
@@ -285,9 +286,9 @@ class MadokamiAcquisition:
             if not files:
                 hint = (f"It holds {len(subdirs)} subfolder(s) — " if subdirs else "")
                 console.print(Panel(
-                    f"[bold]{name}[/bold]\n\n"
+                    f"[bold]{escape(name)}[/bold]\n\n"
                     f"[warning]No files at this level.[/warning] {hint}"
-                    f"[cyan]browse it directly:[/cyan]\n{page_url}",
+                    f"[cyan]browse it directly:[/cyan]\n{escape(page_url)}",
                     title="📕 Madokami", border_style="yellow", padding=(1, 2),
                 ))
                 console.print("[dim]Press any key to continue...[/dim]")
@@ -358,18 +359,18 @@ class MadokamiAcquisition:
         if cancel_event.is_set():
             lines.append(f"[warning] Stopped after {len(saved)} of {len(dl_paths)}.[/warning]")
         elif saved:
-            lines.append(f"[success]✓ {len(saved)} file(s) saved to {get_download_dir()}[/success]")
+            lines.append(f"[success]✓ {len(saved)} file(s) saved to {escape(get_download_dir())}[/success]")
         for s in saved[:6]:
-            lines.append(f"[dim]{os.path.basename(s)}[/dim]")
+            lines.append(f"[dim]{escape(os.path.basename(s))}[/dim]")
         if len(saved) > 6:
             lines.append(f"[dim]… +{len(saved) - 6} more[/dim]")
         if failed:
-            lines.append(f"[warning] Couldn't download {len(failed)}:[/warning] " + ", ".join(failed[:4]))
-            lines.append(f"[dim]Grab manually: {page_url}[/dim]")
+            lines.append(f"[warning] Couldn't download {len(failed)}:[/warning] " + escape(", ".join(failed[:4])))
+            lines.append(f"[dim]Grab manually: {escape(page_url)}[/dim]")
         if not lines:
             lines.append("[warning] Nothing downloaded.[/warning]")
         console.print(Panel(
-            f"[bold]{name}[/bold]\n\n" + "\n".join(lines),
+            f"[bold]{escape(name)}[/bold]\n\n" + "\n".join(lines),
             title="📕 Madokami", border_style="bright_blue", padding=(1, 2),
         ))
         console.print("[dim]Press any key to continue...[/dim]")
@@ -435,10 +436,10 @@ class LibgenAcquisition:
             url = libgen.resolve_download_url(md5)
         if not url:
             console.print(Panel(
-                f"[bold]{name}[/bold]\n\n"
+                f"[bold]{escape(name)}[/bold]\n\n"
                 "[warning]Couldn't resolve the download link[/warning] "
                 "(mirrors unreachable or page layout changed).\n"
-                f"[cyan]Open the page and grab it manually:[/cyan]\n{page_url}",
+                f"[cyan]Open the page and grab it manually:[/cyan]\n{escape(page_url)}",
                 title="📖 Libgen", border_style="yellow", padding=(1, 2),
             ))
             console.print("[dim]Press any key to continue...[/dim]")
@@ -476,15 +477,15 @@ class LibgenAcquisition:
             stop_listener.set()
 
         if dest:
-            body = (f"[success]✓ Saved to {get_download_dir()}[/success]\n"
-                    f"[dim]{os.path.basename(dest)}[/dim]")
+            body = (f"[success]✓ Saved to {escape(get_download_dir())}[/success]\n"
+                    f"[dim]{escape(os.path.basename(dest))}[/dim]")
         elif cancel_event.is_set():
             body = "[warning] Download cancelled.[/warning]"
         else:
             body = ("[warning]Download failed.[/warning]\n"
-                    f"[cyan]Grab it manually:[/cyan]\n{page_url}")
+                    f"[cyan]Grab it manually:[/cyan]\n{escape(page_url)}")
         console.print(Panel(
-            f"[bold]{name}[/bold]\n\n{body}",
+            f"[bold]{escape(name)}[/bold]\n\n{body}",
             title="📖 Libgen", border_style="bright_blue", padding=(1, 2),
         ))
         console.print("[dim]Press any key to continue...[/dim]")

@@ -13,6 +13,7 @@ import threading
 import time
 
 import readchar
+from rich.markup import escape
 
 from torrent_finder.constants import console
 from torrent_finder.creator_search import fan_out
@@ -59,7 +60,6 @@ def _run_cancellable(fn, message: str, cancel: "threading.Event | None" = None):
 
 
 def _notice(msg: str) -> None:
-    from rich.markup import escape
     console.print(f"[warning] {escape(msg)}[/warning]")
     console.print("[dim]Press any key to continue...[/dim]")
     readchar.readkey()
@@ -260,7 +260,7 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
     page_label = f"page {page_no}" + (f"/{total_pages}" if total_pages else "")
     result = arrow_select(
         items,
-        title=f"{facet.label}: {entity.name} — {page_label}",
+        title=f"{facet.label}: {escape(entity.name)} — {page_label}",
         multi=True,
         banner=_make_banner_panel(),
         on_action=on_action,

@@ -283,6 +283,16 @@ def _next_enabled(items: list[SelectItem], current: int, direction: int) -> int:
     return current  # All disabled — stay put
 
 
+def _valid_cursor(items: list[SelectItem], cursor: int) -> int:
+    """Keep the cursor on an existing enabled row, e.g. after an action rebuilt *items*."""
+    direction = 1
+    if cursor >= len(items):
+        cursor, direction = len(items) - 1, -1  # the list shrank: stay near its end
+    if items[cursor].enabled:
+        return cursor
+    return _next_enabled(items, cursor, direction)
+
+
 def _render(
     banner: object,
     panel: Panel,
@@ -376,9 +386,7 @@ def arrow_select(
         return None
 
     # Ensure cursor starts on an enabled item
-    cursor = start_index
-    if not items[cursor].enabled:
-        cursor = _next_enabled(items, cursor, 1)
+    cursor = _valid_cursor(items, start_index)
 
     # Shared state for resize watcher + marquee ticker
     state = {
@@ -468,8 +476,8 @@ def arrow_select(
             elif key == readchar.key.DOWN:
                 cursor = _next_enabled(items, cursor, 1)
             elif key in (readchar.key.PAGE_UP, readchar.key.PAGE_DOWN, readchar.key.HOME, readchar.key.END):
-                enabled = [i for i, item in enumerate(items) if item.enabled]
-                position = enabled.index(cursor)
+                enabled = [i for i, item in enumerate(items) if item.enabled] or [cursor]
+                position = enabled.index(cursor) if cursor in enabled else 0
                 step = max(1, console.size.height - 10)
                 if key == readchar.key.HOME:
                     position = 0
@@ -516,6 +524,11 @@ def arrow_select(
                     if 0 <= new < len(items) and items[new].enabled:
                         cursor = new
                 # else: no-op (None/other) — still redraw
+
+            # Callbacks may have rebuilt the list (e.g. Clear history shrinking it).
+            if not items:
+                return None
+            cursor = _valid_cursor(items, cursor)
 
             # Reset marquee state on cursor move
             if cursor != prev_cursor:

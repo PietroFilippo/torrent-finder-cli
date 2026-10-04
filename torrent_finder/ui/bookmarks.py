@@ -24,7 +24,7 @@ def bookmark_menu():
         actions = [SelectItem("Open saved result / download options" if entry["kind"] == "result" else "Run saved search", "open"),
                    SelectItem("Refresh listing with its saved search", "refresh", enabled=entry["kind"] == "result"),
                    SelectItem("Remove bookmark", "remove"), SelectItem("Back", "back")]
-        chosen = arrow_select(actions, title=entry["name"], footer="Enter choose • Esc back")
+        chosen = arrow_select(actions, title=escape(entry["name"]), footer="Enter choose • Esc back")
         if chosen is None:
             continue
         action = actions[chosen].value

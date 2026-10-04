@@ -12,6 +12,7 @@ import re
 from typing import Optional
 
 import requests
+from rich.markup import escape
 
 from torrent_finder.constants import console, get_download_dir
 from torrent_finder.credentials import jimaku_api_key
@@ -149,7 +150,7 @@ def search_and_download(torrent_name: str) -> Optional[str]:
         hint = f"{int(size)/1024:.0f} KiB" if isinstance(size, (int, float)) and size else ""
         file_items.append(SelectItem(label=f["name"], value=f, is_action=True, hint=hint))
     file_items.append(SelectItem(label="↩ Cancel", value=None, is_action=True))
-    idx = arrow_select(file_items, title=f"Jimaku — {_entry_label(entry)}")
+    idx = arrow_select(file_items, title=f"Jimaku — {escape(_entry_label(entry))}")
     if idx is None or file_items[idx].value is None:
         return None
     chosen = file_items[idx].value

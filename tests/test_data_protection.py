@@ -113,7 +113,7 @@ class UnreadableStateTests(unittest.TestCase):
 
     def setUp(self):
         self.original = {"settings": {"download_dir": "D:/Media"}, "stats": {"session_count": 4},
-                         "history": [{"query": "Saki", "provider": "anime", "timestamp": "2026-10-01"}]}
+                         "history": [{"query": "Saki", "provider": "anime", "timestamp": "2026-10-01T09:30:00+00:00"}]}
         self.path = isolate_store(self, self.original)
         self.before = self.path.read_bytes()
         delays = patch.object(store, "_RETRY_DELAYS", (0, 0))
