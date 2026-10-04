@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import isolation  # noqa: F401  (keeps the user's settings out of reach)
 from torrent_finder.language_tags import is_raw_release, manga_language_tag
-from torrent_finder.providers.manga_provider import MangaProvider, typed_language
+from torrent_finder.providers.manga_provider import MangaProvider
 from torrent_finder.resolvers import titles
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_session import search_many
@@ -146,11 +146,16 @@ class TypedLanguageTests(MangaCase):
         self.assertEqual(self.lookups, [])  # the rows match "Berserk"; the language is not part of the title
 
     def test_typed_language_only_at_the_end_and_after_a_title(self):
-        self.assertEqual(typed_language("Berserk português"), ("Berserk", "Portuguese"))
-        self.assertEqual(typed_language("One Piece raw"), ("One Piece", "Raw (Japanese)"))
-        self.assertIsNone(typed_language("The Italian Job"))
-        self.assertIsNone(typed_language("Raw"))
-        self.assertEqual(MangaProvider().expand_queries("Berserk italiano"), ["Berserk italiano", "Berserk"])
+        provider = MangaProvider()
+
+        def typed(query):
+            title, preset = provider.typed_split(query)
+            return (title, preset.name) if preset else None
+        self.assertEqual(typed("Berserk português"), ("Berserk", "Portuguese"))
+        self.assertEqual(typed("One Piece raw"), ("One Piece", "Raw (Japanese)"))
+        self.assertIsNone(typed("The Italian Job"))
+        self.assertIsNone(typed("Raw"))
+        self.assertEqual(provider.expand_queries("Berserk italiano"), ["Berserk italiano", "Berserk"])
 
     def test_language_tags(self):
         for language, name, tagged in (

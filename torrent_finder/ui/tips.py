@@ -68,7 +68,7 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
             Tip("Use -f and -x on the CLI to add ad-hoc include or exclude keywords.", ("cli", "filters")),
             Tip(f"Use -t with a provider name for direct CLI searches. Accepted names: {_PROVIDER_CLI_NAMES}.", ("cli", "provider")),
             Tip("Software is a group: pick it to choose Desktop, Mobile, or RuTracker as the source.", ("software", "apps", "provider")),
-            Tip("Need a desktop program? Software → Desktop keeps APIBay On, Knaben Auto, and the noisier SolidTorrents Off unless you enable it; or use -t software.", ("software", "apps", "apibay", "knaben", "solidtorrents", "cli")),
+            Tip("Need a desktop program? Software → Desktop searches APIBay and Knaben together, keeps the noisier SolidTorrents Off unless you enable it, and lists the program itself above longer products with its name (Photoshop before Photoshop Lightroom); or use -t software.", ("software", "apps", "apibay", "knaben", "solidtorrents", "cli")),
             Tip("Looking for an Android app? Software → Mobile searches APIBay's Android category (APK/MOD/OBB), with Knaben on Auto as a category-scoped backup; it's Android-only. Try -t mobile.", ("mobile", "android", "apibay", "knaben", "cli")),
             Tip("RuTracker (Software → RuTracker) is great for software, audio, and rare content — add your rutracker.org login under Credentials first.", ("rutracker", "credentials", "cli")),
             Tip("Games is a group: pick General (public trackers), Online-Fix (co-op / online game cracks from online-fix.me — no account needed; it saves the .torrent, opens your client, and shows the archive password), or FitGirl (repacks).", ("games", "online-fix", "fitgirl", "provider")),

@@ -231,6 +231,46 @@ def _compact_words(text: str) -> tuple[str, ...]:
     return words(re.sub(r"['’`´]", "", text))
 
 
+# What may follow a program's name without making it another program: versions,
+# years, editions, platforms, languages and packaging ("Photoshop 2024 (x64)",
+# "OBS Studio", "MATLAB R2024a"). Another name word means another product
+# ("Photoshop Lightroom", "Photoshop Elements", "Ableton Live Packs").
+_PRODUCT_DETAIL = re.compile(
+    r"\d.*|v\d.*|r\d{4}\w*|cs\d*|x64|x86|amd64|arm64|aarch64|universal"
+    r"|win|windows|mac|macos|osx|linux|android|ios|apk|obb|mod|modded|unlocked"
+    r"|cc|pro|plus|premium|ultimate|enterprise|professional|business|home|standard|studio|suite"
+    r"|producer|signature|deluxe|complete|x|portable|repack|repacked|multilingual|multilang|multi"
+    r"|multilanguage|english|eng|en|ru|rus|pt|br|ptbr|portugues|portuguese|brasil|espanol|spanish|french"
+    r"|francais|german|deutsch|italian|italiano|russian|final|full|retail|stable|lts|beta|build|release"
+    r"|latest|edition"
+    r"|version|ver|update|updated|setup|installer|offline|crack|cracked|keygen|patch|patched|activated"
+    r"|preactivated|pre|activator|incl|including|with|for|and|by|iso|dmg|exe|msi|zip|rar|appimage|deb|rpm"
+)
+
+
+def product_title_score(name: str, query: str) -> int:
+    """How well a program listing matches the searched product (3, 1 or 0).
+
+    The query is a product name, then optional details ("Photoshop 2024").
+    3: the name is followed by details only (version, edition, platform…) and
+    the typed details appear anywhere; 1: a longer product contains the name
+    ("Photoshop" in "Photoshop Lightroom"), or every word appears apart;
+    0: words are missing.
+    """
+    wanted, have = _compact_words(query), _compact_words(name)
+    if not wanted:
+        return 0
+    span = next((i for i, word in enumerate(wanted) if i and _PRODUCT_DETAIL.fullmatch(word)), len(wanted))
+    product, details = wanted[:span], wanted[span:]
+    if all(word in have for word in details):
+        for start in range(len(have) - span + 1):
+            if have[start:start + span] == product:
+                after = have[start + span] if start + span < len(have) else None
+                if after is None or _PRODUCT_DETAIL.fullmatch(after):
+                    return 3
+    return 1 if all(word in have for word in wanted) else 0
+
+
 def same_title(first: str, second: str) -> bool:
     """Equal titles, ignoring case, accents, punctuation and apostrophes."""
     return bool(_compact_words(first)) and _compact_words(first) == _compact_words(second)

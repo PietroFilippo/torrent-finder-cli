@@ -282,6 +282,26 @@ preserving APIBay's distinct relevant listings. Do not remove APIBay based only
 on query counts. Product/platform disambiguation may be more useful than adding
 another broad indexer.
 
+**Status (2026-10-04): Knaben On beside APIBay; product and platform ranking.**
+- Audit timings: APIBay averaged 5.4 s per program (often after empty retries)
+  and returned rows for 8 of 32. Knaben averaged 0.8 s and returned rows for
+  26. Because Auto waited for APIBay, most searches took both times in turn.
+- When APIBay did return rows, most were not in Knaben's 50 (VLC 0/93, DaVinci
+  Resolve 8/92, Ableton Live 21/88). So APIBay stays On, and Knaben is On beside
+  it rather than Auto after it. Knaben can still be set to Auto.
+- Live, `Photoshop` showed Knaben's rows after about 1 s. The search finished
+  in 1.9 s, since this time APIBay answered quickly with nothing.
+- Saved engine choices are kept. Profiles that saved the old default still say
+  Knaben Auto until changed in Filters & engines.
+- Ranking: the program counts as found when its name is followed only by
+  details (version, year, edition, platform, language, packaging). Another name
+  word means another product. Replaying the audit, `Adobe Photoshop` no longer
+  starts with Photoshop Lightroom; Lightroom, Elements, bundles, plugin packs
+  and AutoCAD LT rank below the program itself.
+- A platform typed after the name (`mac`, `windows`, `linux`, `portable`)
+  applies that preset for the search, searches the name alone too, and lists
+  tagged releases first. The macOS preset now also recognizes "Mac" as a word.
+
 ## Mobile / Android
 
 **Scope:** Android app/game listings, not general iOS coverage. The sample mixed

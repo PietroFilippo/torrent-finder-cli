@@ -139,7 +139,12 @@ failed live attempt can replay it as `Apibay*`. Cache entries are bounded to
 128 queries.
 
 When all On engines return zero raw rows, public-tracker providers make one
-category-scoped Knaben request in Auto mode. Knaben is a meta-index with a
+category-scoped Knaben request in Auto mode. Desktop searches Knaben On, alongside
+APIBay, by default: in the 2026-10-03 audit, APIBay averaged 5.4 s and found rows
+for 8 of 32 programs, and Knaben 0.8 s and 26. Desktop also ranks the searched
+program above longer products containing its name (Photoshop before Photoshop
+Lightroom or Elements), and a platform typed after the name (`Photoshop mac`,
+`… portable`) also searches the name alone and lists that platform first. Knaben is a meta-index with a
 [documented API](https://knaben.org/api/v2/). The client uses v2's cacheable GET
 searches, as Knaben asks. Unsafe and XXX rows stay hidden, zero-seed rows stay
 listed, a valid info hash is required, and each response is capped at 50 rows.

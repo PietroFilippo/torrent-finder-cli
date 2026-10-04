@@ -8,6 +8,7 @@ put them in ``categories`` and drop the android/ios excludes in
 
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.result_view import product_title_score
 
 
 class SoftwareProvider(BaseProvider):
@@ -43,17 +44,38 @@ class SoftwareProvider(BaseProvider):
         ])),
         FilterPreset("Portable", FilterConfig(include_keywords=["portable"])),
         FilterPreset("Windows", FilterConfig(include_keywords=["windows", "win64", "win32", "x64", "x86"])),
-        FilterPreset("macOS", FilterConfig(include_keywords=["macos", "mac os", "osx", "dmg"])),
+        FilterPreset("macOS", FilterConfig(include_keywords=["macos", "mac os", "osx", "dmg"],
+                                          include_regex=r"\bmac\b")),  # "for Mac", "(MAC)"
         FilterPreset("Linux", FilterConfig(include_keywords=["linux", "ubuntu", "debian", "appimage"])),
     ]
 
+    # The searched program before longer products containing its name
+    # ("Photoshop 2024" before "Photoshop Lightroom Classic").
+    prefer_title_matches = True
+    # A platform typed after the name ("Photoshop mac") ranks that platform's
+    # releases first for the search; the name alone is searched too.
+    typed_presets = {
+        "Windows": ("windows", "win", "win64", "win32"),
+        "macOS": ("mac", "macos", "osx"),
+        "Linux": ("linux",),
+        "Portable": ("portable",),
+    }
+
+    def title_relevance(self, row, query: str, authors: tuple = ()) -> int:
+        return product_title_score(row.name, self.typed_split(query)[0])
+
     def _init_engines(self) -> list[SearchEngine]:
-        """APIBay on, category-scoped Knaben auto, SolidTorrents manually off."""
+        """APIBay and category-scoped Knaben on, SolidTorrents manually off.
+
+        The 2026-10-03 audit: APIBay averaged 5.4 s and found rows for 8 of 32
+        programs, Knaben 0.8 s and 26. Knaben runs alongside instead of after
+        APIBay; APIBay stays on because its rows were mostly not in Knaben's.
+        """
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
             SearchEngine(
                 "Knaben", "🧭", self._search_knaben,
-                enabled=False, emergency_fallback=True,
+                enabled=True, emergency_fallback=True,
             ),
             SearchEngine(
                 "SolidTorrents", "🔗", self._search_solidtorrents,

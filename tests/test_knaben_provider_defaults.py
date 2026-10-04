@@ -10,21 +10,25 @@ from torrent_finder.providers.software_provider import SoftwareProvider
 
 
 class KnabenProviderDefaultsTests(unittest.TestCase):
-    def test_every_public_tracker_provider_has_scoped_auto_knaben(self):
+    def test_every_public_tracker_provider_has_scoped_knaben(self):
+        # Desktop searches Knaben alongside APIBay (the audit's APIBay found
+        # rows for 8 of 32 programs in 5.4 s on average, Knaben 26 in 0.8 s);
+        # elsewhere Knaben is the Auto fallback. Either can be switched.
         cases = (
-            (MovieProvider(), (2_000_000, 3_000_000)),
-            (GameProvider(), (4_000_000, 7_000_000)),
-            (SoftwareProvider(), (4_002_000, 4_003_000, 4_004_000)),
-            (MobileProvider(), (8_001_000,)),
-            (AnimeProvider(), (6_000_000,)),
-            (MangaProvider(), (6_006_000, 9_002_000)),
-            (BookProvider(), (9_000_000,)),
+            (MovieProvider(), (2_000_000, 3_000_000), "auto"),
+            (GameProvider(), (4_000_000, 7_000_000), "auto"),
+            (SoftwareProvider(), (4_002_000, 4_003_000, 4_004_000), "on"),
+            (MobileProvider(), (8_001_000,), "auto"),
+            (AnimeProvider(), (6_000_000,), "auto"),
+            (MangaProvider(), (6_006_000, 9_002_000), "auto"),
+            (BookProvider(), (9_000_000,), "auto"),
         )
 
-        for provider, categories in cases:
+        for provider, categories, mode in cases:
             with self.subTest(provider=provider.slug):
                 engine = next(e for e in provider.engines if e.name == "Knaben")
-                self.assertEqual(engine.mode, "auto")
+                self.assertEqual(engine.mode, mode)
+                self.assertEqual(engine.available_modes, ("on", "auto", "off"))
                 self.assertEqual(provider.knaben_categories, categories)
 
     def test_noisy_legacy_engines_are_manual_off_options(self):

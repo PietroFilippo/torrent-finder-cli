@@ -13,7 +13,7 @@ import requests
 
 from torrent_finder import apibay_cache, knaben
 from torrent_finder.constants import API_URL, console
-from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
+from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters, strip_accents
 from torrent_finder.search_result import SearchResult, normalize_result
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_control import Cooldown, search_request
@@ -178,6 +178,10 @@ class BaseProvider(ABC):
     # When a search finds nothing matching the title, search the work's other
     # names from its catalog too (General Manga, see lookup_aliases).
     looks_up_aliases: bool = False
+    # Words typed after a title that ask for one of this provider's presets for
+    # that search ("Berserk português", "Photoshop mac"): preset name -> words,
+    # lowercase and without accents. See typed_split.
+    typed_presets: dict = {}
 
     # Optional one-line caveat shown when this provider is selected/searched
     # (e.g. Mobile noting it's Android-only). Empty = no note.
@@ -501,6 +505,10 @@ class BaseProvider(ABC):
         presets can't multiply one search into a request storm.
         """
         queries = [query]
+        # Release names rarely carry a typed preset word: search the title alone too.
+        title, typed = self.typed_split(query)
+        if typed:
+            queries.append(title)
         for preset in self.search_presets:
             for term in getattr(preset, "query_terms", ()):
                 candidate = f"{query} {term}".strip()
@@ -593,8 +601,9 @@ class BaseProvider(ABC):
 
     def title_relevance(self, row, query: str, authors: tuple = ()) -> int:
         """How well a result matches the searched title (0-3, see title_score);
-        Books also use the requested work's *authors* (up to 4)."""
-        return title_score(row.name, query)
+        Books also use the requested work's *authors* (up to 4). A typed preset
+        word is not part of the title."""
+        return title_score(row.name, self.typed_split(query)[0])
 
     def lookup_authors(self, query: str) -> tuple:
         """The requested work's authors for a plain search, or () (see looks_up_authors)."""
@@ -604,10 +613,22 @@ class BaseProvider(ABC):
         """Other names of the work *query* names, or () (see looks_up_aliases)."""
         return ()
 
+    def typed_split(self, query: str):
+        """(title, preset) when the query ends in a word from ``typed_presets``
+        ("Berserk português" → ("Berserk", Portuguese)), else (query, None)."""
+        words = query.split()
+        if len(words) >= 2 and self.typed_presets:
+            last = strip_accents(words[-1]).casefold().strip("()[]")
+            for name, typed in self.typed_presets.items():
+                preset = next((p for p in self.presets if p.name == name), None)
+                if preset is not None and last in typed:
+                    return " ".join(words[:-1]), preset
+        return query, None
+
     def typed_preset(self, query: str):
-        """A preset the query asks for by a word typed after the title (Manga:
-        "Berserk português" → Portuguese), applied to this search only; or None."""
-        return None
+        """The preset a word typed after the title asks for, applied to this
+        search only (see typed_presets); or None."""
+        return self.typed_split(query)[1]
 
     def preference_score(self, row) -> int:
         return sum(bool(apply_filters([row], p.config)) for p in self.preferred_presets
