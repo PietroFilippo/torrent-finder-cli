@@ -22,7 +22,7 @@ from torrent_finder.search_profiles import ProfileLibrary
 from torrent_finder.state import provider_snapshot, apply_provider_state
 from torrent_finder.result_details import detail_lines
 from torrent_finder.language_tags import has_brazilian_subtitles
-from torrent_finder.ui import table, prompts, backup as backup_ui
+from torrent_finder.ui import table, prompts, theme, backup as backup_ui
 from isolation import isolate_store, restart_store
 
 
@@ -368,7 +368,7 @@ class DetailsTests(unittest.TestCase):
                 with self.subTest(width=width, height=height, offset=offset):
                     screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
                     with patch.object(table, "console", screen):
-                        screen.print(Group(Text("Torrent Search CLI"), Text("Sort: Recommended"),
+                        screen.print(Group(theme.header(width=width), Text("Sort: Recommended"),
                                            table._note_preview("Saved listing; metadata may be stale"),
                                            table.build_table(rows, 0, 0, 1, 1, expanded=True, detail_offset=offset)))
                     output = screen.file.getvalue()

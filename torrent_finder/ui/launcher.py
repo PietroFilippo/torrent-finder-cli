@@ -39,7 +39,7 @@ def _command_items(selected: str, available: bool) -> list[SelectItem]:
             is_action=True,
             description=_DESCRIPTIONS[name],
         ))
-    items.append(SelectItem(label="←  Go back", value="back", is_action=True))
+    items.append(SelectItem(label="Back", value="back", is_action=True))
     return items
 
 

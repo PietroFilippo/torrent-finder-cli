@@ -888,9 +888,9 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
         ))
         file_item_indexes.append(len(items) - 1)
 
-    items.append(SelectItem(label="Select all  [a]", value="all", is_action=True))
-    items.append(SelectItem(label="Invert selection  [i]", value="invert", is_action=True))
-    items.append(SelectItem(label="Clear  [c]", value="clear", is_action=True))
+    items.append(SelectItem(label="Select all", value="all", is_action=True, hint="a"))
+    items.append(SelectItem(label="Invert selection", value="invert", is_action=True, hint="i"))
+    items.append(SelectItem(label="Clear", value="clear", is_action=True, hint="c"))
     items.append(SelectItem(label="Confirm", value="confirm", is_action=True, hint="w"))
     items.append(SelectItem(label="Cancel", value="cancel", is_action=True))
 

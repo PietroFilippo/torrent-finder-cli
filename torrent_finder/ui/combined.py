@@ -40,7 +40,7 @@ def _choose_providers(draft):
         for p in draft.children
     ]
     count = len(items)
-    items += [SelectItem("Use this selection  [w]", "save", is_action=True),
+    items += [SelectItem("Use this selection", "save", is_action=True, hint="w"),
               SelectItem("Cancel", "cancel", is_action=True)]
 
     def set_all(value):
@@ -168,7 +168,7 @@ def combined_filter_menu(provider):
                        description="All words / any word / exact phrase / exclusions. Applies together with existing phrase rules."),
             SelectItem(f"Result order: {SORT_ORDERS[draft.result_sort]}", "sort",
                        description="Saved in this profile. Recommended uses title relevance, then preferences. Other sorts override ranking; required filters still apply."),
-            SelectItem("Save and return  [w]", "save", enabled=bool(draft.selected_slugs),
+            SelectItem("Save and return", "save", enabled=bool(draft.selected_slugs), hint="w",
                        description="Select at least one provider to save." if not draft.selected_slugs else ""),
             SelectItem("Cancel", "cancel"),
         ]

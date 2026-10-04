@@ -166,4 +166,4 @@ def _reset_scroll_region() -> None:
 
 def _reset_terminal_title() -> None:
     """Restore the terminal title to the default."""
-    _set_terminal_title("Torrent Search CLI")
+    _set_terminal_title(theme.APP_NAME)

@@ -14,7 +14,7 @@ from torrent_finder.acquisition import PickOutcome
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.manga_provider import MangaProvider
 from torrent_finder.providers.combined_provider import CombinedProvider, CombinedResults
-from torrent_finder.ui import combined, prompts, search_progress, table
+from torrent_finder.ui import combined, prompts, search_progress, table, theme
 from isolation import isolate_store
 
 
@@ -135,7 +135,7 @@ class CombinedUITests(unittest.TestCase):
                 with patch.object(table, "console", screen), patch.object(prompts, "console", screen):
                     count = table._visible_count(len(rows), height, width, note, False, True)
                     rendered_table = table.build_table(rows, 0, 0, count, len(rows))
-                    heading = Text("Torrent Search CLI") if height < 28 else prompts._make_banner_panel()
+                    heading = theme.header(width=width)
                     screen.print(Group(heading, Text("contains: all names • sort: relevance"), table._note_preview(note), rendered_table))
                 rendered = screen.file.getvalue()
                 self.assertIn("Provider: Manga · General", rendered)

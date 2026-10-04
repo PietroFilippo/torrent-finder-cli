@@ -82,25 +82,28 @@ def _build_items(query: str, category_idx: int) -> list[SelectItem]:
 
     items.append(SelectItem(label="", value="spacer", enabled=False))
     items.append(SelectItem(
-        label="Search tips  [/]",
+        label="Search tips",
         value="search",
         is_action=True,
+        hint="/",
         description="Type text to match against categories, tip text, and tags.",
     ))
     items.append(SelectItem(
-        label=f"Category: {_CATEGORY_OPTIONS[category_idx]}  [c]",
+        label=f"Category: {_CATEGORY_OPTIONS[category_idx]}",
         value="category",
         is_action=True,
+        hint="c",
         description="Cycle the category filter.",
     ))
     items.append(SelectItem(
-        label="Clear search/filter  [x]",
+        label="Clear search/filter",
         value="clear",
         is_action=True,
+        hint="x",
         enabled=bool(query.strip()) or category_idx != 0,
         description="Reset the search text and category filter.",
     ))
-    items.append(SelectItem(label="Go Back", value="back", is_action=True))
+    items.append(SelectItem(label="Back", value="back", is_action=True))
     return items
 
 
@@ -122,16 +125,15 @@ def tips_page() -> None:
         if state["query"]:
             parts.append(f'search: "{escape(state["query"])}"')
         parts.append(f"{_match_count(state['query'], state['category_idx'])} shown")
-        return " - ".join(parts)
+        return " · ".join(parts)
 
     def _footer() -> str:
         category = _CATEGORY_OPTIONS[state["category_idx"]]
         query_label = escape(state["query"]) if state["query"] else "none"
         return (
-            "↑/↓ scroll  •  [warning]/[/warning] search  •  "
-            f"[warning]C[/warning] category: [muted]{escape(category)}[/muted]  •  "
-            f"[warning]X[/warning] clear  •  Esc back\n"
-            f" Search: [muted]{query_label}[/muted]"
+            f"Search: {query_label}\n"
+            "↑/↓ scroll  •  / search  •  "
+            f"C category: {escape(category)}  •  X clear  •  Esc back"
         )
 
     def _cycle_category(cursor: int, items_list: list[SelectItem]):

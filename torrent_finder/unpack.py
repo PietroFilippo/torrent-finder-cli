@@ -275,7 +275,7 @@ def summary_lines(report: Report) -> list:
 
     lines = []
     if report.unpacked:
-        lines.append(f"[success]📦 Unpacked {len(report.unpacked)} archive(s) into folders of pages.[/success]")
+        lines.append(f"[success]✓ Unpacked {len(report.unpacked)} archive(s) into folders of pages.[/success]")
     for path, problem in report.kept[:4]:
         lines.append(f"[warning]Kept {escape(os.path.basename(path))} packed:[/warning] {escape(problem)}")
     if len(report.kept) > 4:
