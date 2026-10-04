@@ -3,11 +3,12 @@
 import sys
 
 import readchar
-from rich.panel import Panel
+from rich.console import Group
 from rich.text import Text
 
 from torrent_finder.constants import console
 from torrent_finder.credential_registry import CREDENTIAL_REGISTRY, CredentialField, CredentialSpec
+from torrent_finder.ui import theme
 from torrent_finder.ui.prompts import _make_banner_panel, confirm_prompt
 from torrent_finder.ui.selector import SelectItem, _render, arrow_select
 
@@ -24,9 +25,8 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
         notes.append(meta.limit)
     if any(field.env_override() for field in meta.required_fields):
         notes.append("Env var overrides the saved file")
-    notes.append("Type to edit • ↑/↓ or Tab move • Enter on a field = next • Esc cancels")
     notes.append("Stored in plaintext in subtitle_credentials.json")
-    footer = "  •  ".join(notes)
+    footer = "Type to edit the focused field.\n↑/↓ move  •  Tab next  •  Enter next field / choose  •  Esc cancel"
 
     def _field_text(field: CredentialField, focused: bool) -> str:
         buf = buffers.get(field.env_key, "")
@@ -42,35 +42,44 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
             return f"{field.label}: {shown}  (unchanged)"
         return f"{field.label}: not set"
 
-    def _panel() -> Panel:
-        body = Text()
+    def _row(label: str, focused: bool) -> Text:
+        row = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
+        row.append(theme.CURSOR if focused else " ", style=theme.ACCENT)
+        row.append(" ")
+        row.append(label, style=theme.FOCUS if focused else "")
+        return row
+
+    def _panel() -> Group:
+        """The sign-in frame; the how-to steps shorten first in a small window."""
+        width, height = console.size.width, console.size.height
+        compact = height < 20
+        parsed = theme.parse_footer(footer)
+        top = theme.header_lines(f"Credentials › {meta.name} — sign in", "", width)
+        guide: list[Text] = []
         if meta.howto:
-            body.append("  How to get this:\n", style="bold")
+            guide.append(Text(theme.MARGIN + "HOW TO GET THIS", style=theme.SECTION))
             for step_no, step in enumerate(meta.howto, 1):
-                body.append(f"   {step_no}. {step}\n", style="dim")
+                guide.extend(theme.wrap_block(Text(f"{step_no}. {step}", style=theme.MUTED), width, console))
             if meta.tip:
-                body.append(f"   💡 {meta.tip}\n", style="yellow")
-            body.append("  " + "─" * 25 + "\n", style="dim")
-        for index, field in enumerate(fields):
-            focused = focus == index
-            style = "bold cyan" if focused else "white"
-            body.append("  ❯ " if focused else "    ", style=style)
-            body.append(_field_text(field, focused), style=style)
-            body.append("\n")
-        body.append("  " + "─" * 25 + "\n", style="dim")
-        for row, label in ((save_row, "✅  Save"), (cancel_row, "↩  Cancel")):
-            style = "bold cyan" if focus == row else "white"
-            body.append("  ❯ " if focus == row else "    ", style=style)
-            body.append(label, style=style)
-            body.append("\n")
-        body.append("\n")
-        body.append_text(Text.from_markup(f" {footer}", style="dim"))
-        return Panel(
-            body,
-            title=f"[bold magenta]{meta.icon} {meta.name} — sign in[/bold magenta]",
-            border_style="bright_blue",
-            padding=(1, 2),
-        )
+                tip = Text("Tip  ", style=theme.ACCENT)
+                tip.append(meta.tip, style=theme.MUTED)
+                guide.extend(theme.wrap_block(tip, width, console))
+            guide.append(Text(""))
+        rows = [_row(_field_text(field, focus == index), focus == index) for index, field in enumerate(fields)]
+        rows.append(Text(""))
+        rows += [_row("Save", focus == save_row), _row("Cancel", focus == cancel_row)]
+        bottom = [Text("")]
+        bottom += theme.wrap_block(Text(" · ".join(notes), style=theme.MUTED), width, console)
+        for line in parsed.context:
+            bottom += theme.wrap_block(line, width, console)
+        if not compact:
+            bottom.append(Text(""))
+        bottom += theme.wrap_keys(parsed.keys, width)
+        spacer = [] if compact else [Text("")]
+        room = height - len(top) - len(spacer) - len(rows) - len(bottom)
+        if len(guide) > max(0, room):
+            guide = guide[:max(0, room - 1)] + ([Text(theme.MARGIN + "…", style=theme.MUTED)] if room > 0 else [])
+        return Group(*top, *spacer, *guide, *rows, *bottom)
 
     sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
     sys.stdout.flush()
@@ -81,7 +90,7 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
                 key = readchar.readkey()
             except KeyboardInterrupt:
                 return None
-            if key == readchar.key.ESC:
+            if key in (readchar.key.ESC, readchar.key.CTRL_C, "\x03"):
                 return None
             if key == readchar.key.UP:
                 focus = (focus - 1) % (n + 2)
@@ -98,7 +107,7 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
                     env_key = fields[focus].env_key
                     if buffers.get(env_key):
                         buffers[env_key] = buffers[env_key][:-1]
-            elif len(key) == 1 and not key.startswith(("\x1b", "\x00", "\xe0")):
+            elif len(key) == 1 and key >= " " and not key.startswith(("\x1b", "\x00", "\xe0")):
                 if focus < n:
                     env_key = fields[focus].env_key
                     buffers[env_key] = buffers.get(env_key, "") + key
@@ -196,7 +205,7 @@ def _view_credentials(meta: CredentialSpec) -> None:
     state = {"revealed": False}
 
     def _toggle_label() -> str:
-        return "🙈 Hide password / API key" if state["revealed"] else "👁  Show password / API key"
+        return "Hide password / API key" if state["revealed"] else "Show password / API key"
 
     items = [
         SelectItem(
@@ -214,7 +223,7 @@ def _view_credentials(meta: CredentialSpec) -> None:
         is_action=True,
         description="Reveal or hide the stored password / API key.",
     ))
-    items.append(SelectItem(label="↩  Back", value="back", is_action=True))
+    items.append(SelectItem(label="Back", value="back", is_action=True))
 
     def on_action(index, menu_items):
         if menu_items[index].value != "toggle":
@@ -227,7 +236,7 @@ def _view_credentials(meta: CredentialSpec) -> None:
 
     arrow_select(
         items,
-        title=f"{meta.icon} {meta.name} — stored credentials",
+        title=f"Credentials › {meta.name} — stored credentials",
         banner=_make_banner_panel(),
         footer="Secrets are masked — pick Show password / API key to reveal.",
         on_action=on_action,
@@ -238,18 +247,18 @@ def _manage_credentials(meta: CredentialSpec) -> None:
     """View, enter/update, or clear one registry entry."""
     while True:
         items = [
-            SelectItem(label="👁  View credentials", value="view", is_action=True),
-            SelectItem(label="✏  Enter / update credentials", value="edit", is_action=True),
+            SelectItem(label="View credentials", value="view", is_action=True),
+            SelectItem(label="Enter / update credentials", value="edit", is_action=True),
         ]
         if meta.has_any_credentials():
             items.append(SelectItem(
-                label="🗑  Clear stored credentials", value="clear", is_action=True
+                label="Clear stored credentials", value="clear", is_action=True
             ))
-        items.append(SelectItem(label="↩  Back", value="back", is_action=True))
+        items.append(SelectItem(label="Back", value="back", is_action=True))
 
         index = arrow_select(
             items,
-            title=f"{meta.icon} {meta.name}",
+            title=f"Credentials › {meta.name}",
             banner=_make_banner_panel(),
         )
         if index is None:
@@ -299,13 +308,13 @@ def credentials_menu() -> None:
                 ))
                 last_category = meta.category
             items.append(SelectItem(
-                label=f"{meta.icon} {meta.name}",
+                label=meta.name,
                 value=meta,
                 is_action=True,
                 hint=meta.status(),
                 description=meta.limit or "No notable daily limit.",
             ))
-        items.append(SelectItem(label="↩  Back", value="__back__", is_action=True))
+        items.append(SelectItem(label="Back", value="__back__", is_action=True))
 
         index = arrow_select(
             items,

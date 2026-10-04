@@ -134,3 +134,29 @@ class InputScreenTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CredentialFormTests(unittest.TestCase):
+    def run_form(self, keys, width=50, height=16):
+        from torrent_finder.credential_registry import CREDENTIAL_REGISTRY
+        from torrent_finder.ui import credentials as credentials_ui
+        meta = next(m for m in CREDENTIAL_REGISTRY if m.howto)
+        frames, buffers = [], {}
+        screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
+        with patch.object(credentials_ui, "console", screen), \
+             patch.object(credentials_ui, "_render", lambda banner, frame, **kw: frames.append(frame)), \
+             patch.object(credentials_ui.readchar, "readkey", side_effect=keys), \
+             patch.object(credentials_ui.sys, "stdout", io.StringIO()):
+            result = credentials_ui._credentials_form(meta, buffers)
+        return result, buffers, frames, meta
+
+    def test_ctrl_c_cancels_and_control_keys_are_not_typed(self):
+        result, buffers, _, meta = self.run_form(["a", "\x0e", "\x03"])
+        self.assertIsNone(result)
+        self.assertEqual(buffers, {meta.fields[0].env_key: "a"})
+
+    def test_sign_in_frame_fits_a_small_window(self):
+        _, _, frames, _ = self.run_form(["\x03"])
+        lines = plain_lines(frames[-1], 50, 16)
+        self.assertLessEqual(len(lines), 16)
+        self.assertIn("Esc cancel", "\n".join(lines))
