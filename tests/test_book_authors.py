@@ -1,12 +1,12 @@
 """Books rank listings by the requested work's author when it is reliably known."""
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from torrent_finder import creator_search
 from torrent_finder.providers.book_provider import BookProvider
 from torrent_finder.resolvers import openlibrary, titles
-from torrent_finder.resolvers.types import Entity, Work
+from torrent_finder.resolvers.types import Entity
 from torrent_finder.result_view import book_title_score
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_session import SearchSession

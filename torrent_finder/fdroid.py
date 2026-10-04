@@ -71,8 +71,10 @@ def search(query: str) -> list[SearchResult]:
     return rows
 
 
-def suggested_apk(package: str) -> "tuple[str, str] | None":
-    """(APK URL, version name) of the repository's suggested version, or None."""
+def suggested_apk(package: str) -> "tuple[str, str, int] | None":
+    """(APK URL, version name, builds of that version) for the repository's
+    suggested version, or None. Several builds of one version are usually one
+    per CPU type; the suggested one is the build F-Droid offers by default."""
     if not _PACKAGE.fullmatch(package or ""):
         return None
     try:
@@ -84,9 +86,10 @@ def suggested_apk(package: str) -> "tuple[str, str] | None":
     code = data.get("suggestedVersionCode") if isinstance(data, dict) else None
     if not isinstance(code, int) or isinstance(code, bool) or code <= 0:
         return None
-    version = next((str(p.get("versionName") or "") for p in data.get("packages") or []
-                    if isinstance(p, dict) and p.get("versionCode") == code), "")
-    return f"{REPO_URL}{package}_{code}.apk", version
+    packages = [p for p in data.get("packages") or [] if isinstance(p, dict)]
+    version = next((str(p.get("versionName") or "") for p in packages if p.get("versionCode") == code), "")
+    builds = sum(1 for p in packages if version and p.get("versionName") == version)
+    return f"{REPO_URL}{package}_{code}.apk", version, max(1, builds)
 
 
 def download_apk(url: str, dest_dir: str, cancel_event=None, progress_cb=None) -> "str | None":

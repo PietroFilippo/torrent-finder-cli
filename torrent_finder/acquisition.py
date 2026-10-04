@@ -630,7 +630,7 @@ class FDroidAcquisition:
             console.print("[dim]Press any key to continue...[/dim]")
             readchar.readkey()
             return PickOutcome("back")
-        url, version = apk
+        url, version, builds = apk
 
         cancel_event = threading.Event()
         stop_listener = start_esc_listener(cancel_event)
@@ -659,6 +659,10 @@ class FDroidAcquisition:
             body = (f"[success]✓ Saved to {escape(get_download_dir())}[/success]\n"
                     f"[dim]{escape(os.path.basename(dest))}[/dim]\n\n"
                     f"Package {escape(package)}, version {escape(version or '?')}, from f-droid.org.\n"
+                    + (f"[warning]This version has {builds} builds, usually one per CPU type; this is the one "
+                       "F-Droid suggests (most phones). For another device type, use the F-Droid app or "
+                       f"the package page: {escape(page_url)}[/warning]\n" if builds > 1 else "")
+                    +
                     "[dim]Android checks the APK's signature when you install it. "
                     f"F-Droid's PGP signature: {escape(url)}.asc[/dim]")
         elif cancel_event.is_set():

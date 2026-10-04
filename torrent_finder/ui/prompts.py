@@ -9,6 +9,7 @@ import readchar
 from rich.cells import cell_len
 from rich.console import Console
 from rich.panel import Panel
+from rich.markup import escape
 from rich.text import Text
 
 from torrent_finder.constants import console, custom_theme

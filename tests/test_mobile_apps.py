@@ -58,7 +58,7 @@ class FDroidClientTests(unittest.TestCase):
                             {"versionName": "2026.08.27-18-FDroid", "versionCode": 26082718}]}
         with patch.object(fdroid.requests, "get", return_value=response(api)) as get:
             self.assertEqual(fdroid.suggested_apk("app.organicmaps"),
-                             ("https://f-droid.org/repo/app.organicmaps_26092932.apk", "2026.09.29-32-FDroid"))
+                             ("https://f-droid.org/repo/app.organicmaps_26092932.apk", "2026.09.29-32-FDroid", 1))
         self.assertEqual(get.call_args.args[0], "https://f-droid.org/api/v1/packages/app.organicmaps")
         for bad in ({"suggestedVersionCode": "26092932"}, {"suggestedVersionCode": True}, {}):
             with patch.object(fdroid.requests, "get", return_value=response(bad)):
@@ -66,6 +66,12 @@ class FDroidClientTests(unittest.TestCase):
         with patch.object(fdroid.requests, "get") as get:
             self.assertIsNone(fdroid.suggested_apk("../../etc"))
         get.assert_not_called()
+
+    def test_builds_per_cpu_type_are_counted(self):
+        api = {"suggestedVersionCode": 13070108, "packages": [
+            {"versionName": "3.7.1", "versionCode": code} for code in (13070105, 13070106, 13070107, 13070108)]}
+        with patch.object(fdroid.requests, "get", return_value=response(api)):
+            self.assertEqual(fdroid.suggested_apk("org.videolan.vlc")[2], 4)
 
     def test_apks_come_only_from_the_official_repository(self):
         url = "https://f-droid.org/repo/org.example.app_7.apk"
@@ -170,7 +176,7 @@ class FDroidBatchTests(unittest.TestCase):
                               page_url="https://f-droid.org/en/packages/org.videolan.vlc/",
                               handle={"fd_package": "org.videolan.vlc"})
         url = "https://f-droid.org/repo/org.videolan.vlc_13060407.apk"
-        with patch.object(fdroid, "suggested_apk", return_value=(url, "3.6.4")), \
+        with patch.object(fdroid, "suggested_apk", return_value=(url, "3.6.4", 4)), \
              patch.object(fdroid, "download_apk", return_value="C:/x/org.videolan.vlc_13060407.apk") as download:
             outcome = acquisition.for_result(result).batch_item(
                 result, download_dir="C:/x", cancel_event=threading.Event(), set_status=lambda _: None)

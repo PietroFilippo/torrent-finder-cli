@@ -361,6 +361,9 @@ acquisition. Also evaluate Knaben-first latency before changing defaults.
   from `https://f-droid.org/repo/` over HTTPS, the files F-Droid's website
   links. Downloads from other URLs, or that end up on another host, are
   refused. A live download produced a valid APK.
+- Some apps publish one build per CPU type (VLC 3.7.1 has four). The
+  download is F-Droid's suggested build, and the done panel says so and links
+  the package page for other device types.
 - Verification: Android checks the APK signature on install. F-Droid's
   per-APK PGP signature (`.apk.asc`) is linked, not checked. F-Droid exposes no
   per-APK hash outside its large signed index, and checking PGP would require

@@ -1,7 +1,6 @@
 """Streaming and input fixes from the 2026-10-04 final review."""
 
 import socket
-import subprocess
 import unittest
 from unittest.mock import Mock, patch
 
@@ -78,6 +77,21 @@ class CleanupInterruptTests(unittest.TestCase):
         self.assertEqual(popen.call_args.args[0], ["taskkill", "/T", "/F", "/PID", "4242"])
         self.assertEqual(popen.call_args.kwargs["creationflags"], 512)
         self.assertEqual(killer.wait.call_count, 2)
+
+
+class SubtitlePathTests(unittest.TestCase):
+    def test_a_missing_typed_path_with_brackets_is_reported(self):
+        def choose(items, **_):
+            wanted = "external" if any(item.value == "external" for item in items) else "__type__"
+            return next(i for i, item in enumerate(items) if item.value == wanted)
+        current = {"mode": "auto", "path": None}
+        with patch.object(prompts, "arrow_select", side_effect=choose), \
+             patch.object(prompts, "_make_banner_panel", return_value=None), \
+             patch.object(prompts.console, "input", return_value="C:/missing/[subs].srt"), \
+             patch.object(prompts.console, "print") as printed, \
+             patch.object(prompts.readchar, "readkey"):
+            self.assertEqual(prompts.subtitle_source_prompt(current), current)
+        self.assertIn("[subs]", str(printed.call_args_list))
 
 
 class NestedFieldTests(unittest.TestCase):

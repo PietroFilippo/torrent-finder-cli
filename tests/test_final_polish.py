@@ -4,7 +4,6 @@ import io
 import os
 import tempfile
 import unittest
-from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
