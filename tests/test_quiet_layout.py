@@ -401,3 +401,34 @@ class TextFieldFrameTests(unittest.TestCase):
         lines, row, col = self.frame(_shared_filter_screen("include_keywords"), [], "", 0, 50, 16)
         self.assertIn("›", lines[row - 1])
         self.assertIn("Esc cancel", lines[-1])
+
+
+class ResultsTinyAndLongDetailsTests(unittest.TestCase):
+    def test_long_details_and_tiny_windows_keep_rows_and_keys(self):
+        from rich.console import Group
+        from torrent_finder.ui import table
+        long_from = "A long movie title with many words " * 10
+        for provider in (False, True):
+            rows = [dict(name=f"Release {i} 1080p WEB-DL", source="Apibay", seeders=10 + i, leechers=3,
+                         size=1_000_000_000, uploaded_at=1_700_000_000, apibay_cached_at=1.0,
+                         from_work=long_from if i % 2 else "Dune",
+                         **({"provider_slug": "anime", "provider_label": "Anime"} if provider else {}))
+                    for i in range(20)]
+            heading = "Movies & Series › a, b"
+            for width, height in ((40, 12), (45, 14), (50, 16), (60, 20), (80, 24)):
+                for focus in (0, 1, 7):
+                    with self.subTest(provider=provider, width=width, height=height, focus=focus):
+                        screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
+                        with patch.object(table, "console", screen):
+                            count = table._visible_count(len(rows), height, width, "Search diagnostics", True,
+                                                         provider, heading=heading, rows=rows, indexes=range(20))
+                            head = ([theme.header(heading, "1–9 of 20", width)] if height < 16 else
+                                    theme.header_lines(heading, "1–9 of 20 · page 1/2", width)
+                                    + ([Text("")] if height >= 20 else []))
+                            frame = Group(*head, Text("  Sort"), Text("  n diagnostics   r retry   m more"),
+                                          table.build_table(rows, focus, max(0, focus - count + 1), count, 20,
+                                                            total_pages=2, show_from=True,
+                                                            original_indices=list(range(20))))
+                            lines = plain_lines(frame, width, height)
+                        self.assertLessEqual(len(lines), height)
+                        self.assertIn("Esc back", "\n".join(lines))

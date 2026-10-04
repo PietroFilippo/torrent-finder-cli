@@ -105,14 +105,25 @@ def _page_layout(rows: list[dict], width: int, show_from: bool, indexes=()) -> _
 
 
 def _pack(parts: list[str], width: int) -> list[str]:
-    """Join *parts* with " · " into lines of *width* cells; a part never splits."""
+    """Join *parts* with " · " into lines of *width* cells.
+
+    Parts stay whole when they fit; a part longer than a line is wrapped on its
+    own lines, so every returned line fits and line counts match the screen.
+    """
     lines: list[str] = []
     for part in parts:
         if lines and cell_len(lines[-1]) + 3 + cell_len(part) <= width:
             lines[-1] += " · " + part
-        else:
+        elif cell_len(part) <= width:
             lines.append(part)
+        else:
+            lines.extend(line.plain for line in Text(part).wrap(console, max(1, width), overflow="fold"))
     return lines
+
+
+def _tiny() -> bool:
+    """Windows under 16 rows keep one header line and one line of details."""
+    return console.size.height < 16
 
 
 def _age(uploaded: int, now: float | None = None) -> str:
@@ -144,9 +155,9 @@ def _selected_metadata(
     item = results[selected_idx]
     room = theme.inner_width(console.size.width)
     parts: list[str] = []
+    origin: list[str] = []
     if item.get("provider_label"):
-        for line in _pack([f"Provider: {item['provider_label']}", f"Source: {_source_label(item)}"], room):
-            details.append(f"{theme.MARGIN}{line}\n", style=theme.MUTED)
+        origin = [f"Provider: {item['provider_label']}", f"Source: {_source_label(item)}"]
     uploaded = timestamp(item.get("uploaded_at"))
     parts.append("Uploaded: " + (datetime.fromtimestamp(uploaded, timezone.utc).strftime("%Y-%m-%d") if uploaded else "unknown"))
     if not layout.source and not item.get("provider_label"):
@@ -161,9 +172,23 @@ def _selected_metadata(
         parts.append(f"Seeds: {int(item.get('seeders', 0) or 0)}")
     if not layout.leeches:
         parts.append(f"Leeches: {int(item.get('leechers', 0) or 0)}")
-    for line in _pack(parts, room):
+    if _tiny():
+        lines = [ellipsize_cells(" · ".join(origin + parts), room)]
+    else:
+        lines = (_pack(origin, room) if origin else []) + _pack(parts, room)
+        cap = _metadata_cap()
+        if len(lines) > cap:  # very long values (a long "From" title) stop at the cap
+            lines = lines[:cap]
+            lines[-1] = ellipsize_cells(lines[-1] + " …", room) if cell_len(lines[-1]) + 2 <= room \
+                else ellipsize_cells(lines[-1], room - 1) + "…"
+    for line in lines:
         details.append(theme.MARGIN + line + "\n", style=theme.MUTED)
     return details
+
+
+def _metadata_cap() -> int:
+    """Most metadata lines under the focused row, so results keep their rows."""
+    return max(2, min(6, console.size.height // 6))
 
 
 def _wrapped_details(item, layout):
@@ -204,12 +229,14 @@ def _table_caption(
     """Details for the focused row, then the key bar, under the left margin."""
     width = console.size.width
     caption = Text(no_wrap=False, overflow="fold")
+    tiny = _tiny()
     if not expanded and 0 <= selected_idx < len(results):
-        name = ellipsize_cells(str(results[selected_idx].get("name", "Unknown")),
-                               theme.inner_width(width))
-        caption.append("\n" + theme.MARGIN + name + "\n", style="bold")
+        if not tiny:  # the row itself shows the name; tiny windows keep rows instead
+            name = ellipsize_cells(str(results[selected_idx].get("name", "Unknown")),
+                                   theme.inner_width(width))
+            caption.append("\n" + theme.MARGIN + name + "\n", style="bold")
         caption.append_text(_selected_metadata(results, selected_idx, layout, show_from))
-    if not expanded and any(item.get("apibay_cached_at") for item in results):
+    if not expanded and not tiny and any(item.get("apibay_cached_at") for item in results):
         caption.append(theme.MARGIN + "Apibay* = cached last-known-good results\n", style=theme.WARN)
     if console.size.height >= 20:
         caption.append("\n")  # short windows keep the row for results
@@ -251,6 +278,8 @@ _METADATA_LINES = {"full": 1, "medium": 1, "compact": 2, "minimal": 3}
 
 def _details_lines(rows: list[dict], layout: _TableLayout, show_from: bool) -> int:
     """The most lines the focused-row details take on this page: name plus metadata."""
+    if _tiny():
+        return 1  # one shortened metadata line, no name line
     most = 0
     for index in range(len(rows)):
         metadata = _selected_metadata(rows, index, layout, show_from).plain.rstrip("\n")
@@ -268,13 +297,15 @@ def _visible_count(
     is measured for the tallest row, so a long wrapped "From" or provider line
     never pushes the key bar off screen; without them it is estimated.
     """
+    tiny = height < 16
     if rows is not None:
         layout = _page_layout(rows, width, show_from, indexes)
         details = _details_lines(rows, layout, show_from)
     else:
         layout = _table_layout(width, show_from, show_provider)
-        details = 1 + _METADATA_LINES[layout.mode] + (2 if show_provider else 0)
-    header = len(theme.header_lines(heading or "Results", "888–888 of 888 · page 88/88 · 888 picked", width))
+        details = 1 if tiny else 1 + _METADATA_LINES[layout.mode] + (2 if show_provider else 0)
+    header = 1 if tiny else len(theme.header_lines(
+        heading or "Results", "888–888 of 888 · page 88/88 · 888 picked", width))
     compact = height < 20
     keys = len(theme.wrap_keys(theme.parse_footer(
         Text(_result_keys(2, frozenset(range(100))))).keys, width))
@@ -282,8 +313,8 @@ def _visible_count(
         header + (0 if compact else 1)       # header lines, spacer
         + 1 + _note_line_count(note, width)  # view status, notices
         + 1                                  # table header row
-        + 1 + details                        # spacer, name and metadata
-        + 1 + (0 if compact else 1) + keys   # cached-results note, spacer, keys
+        + (0 if tiny else 1) + details       # spacer, name and metadata
+        + (0 if tiny else 1) + (0 if compact else 1) + keys  # cached note, spacer, keys
     )
     available = max(1, height - chrome)
     return min(total, available)
@@ -508,7 +539,10 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         """The whole results screen: header, view line, notices, table, details, keys."""
         status = results_status(current if expanded else scroll_offset, 1 if expanded else visible_count,
                                 total, current_page, total_pages, frozenset(picked))
-        parts: list[object] = list(theme.header_lines(heading or "Results", status, console.size.width))
+        if _tiny():
+            parts: list[object] = [theme.header(heading or "Results", status, console.size.width)]
+        else:
+            parts = list(theme.header_lines(heading or "Results", status, console.size.width))
         if console.size.height >= 20:
             parts.append(Text(""))
         order_label = SORT_ORDERS.get(view_order, view_order)
