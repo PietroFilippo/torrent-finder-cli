@@ -12,6 +12,7 @@ from babelfish import Language
 from subliminal import Video, download_best_subtitles, save_subtitles, scan_video
 from subliminal.cache import region as _subliminal_region
 
+from rich.markup import escape
 from torrent_finder.constants import console, get_download_dir
 
 # subliminal caches provider auth tokens (e.g. the OpenSubtitles.com session) in
@@ -108,7 +109,7 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
     video has already been downloaded, hash-match the real file for accurate
     sync instead of guessing from the release name.
     """
-    console.print(f"\n[info]Subtitle Search for:[/info] [highlight]{torrent_name}[/highlight]")
+    console.print(f"\n[info]Subtitle Search for:[/info] [highlight]{escape(torrent_name)}[/highlight]")
     console.print(
         "[dim]Tip: enter one or more languages separated by commas (e.g. eng, por "
         "or pt-BR). The first found becomes the primary track.[/dim]"
@@ -126,10 +127,10 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
         console.print("[warning]No valid language codes recognised. Try e.g. eng, por, pt-BR.[/warning]")
 
     if unknown:
-        console.print(f"[warning]Ignored unrecognised code(s): {', '.join(unknown)}[/warning]")
+        console.print(f"[warning]Ignored unrecognised code(s): {escape(', '.join(unknown))}[/warning]")
 
     label_list = ", ".join(_lang_label(l) for l in languages)
-    console.print(f"[info]Searching subtitles for:[/info] [highlight]{label_list}[/highlight]")
+    console.print(f"[info]Searching subtitles for:[/info] [highlight]{escape(label_list)}[/highlight]")
 
     # Per-provider credentials (if configured) unlock the best sources; without
     # them those providers still run anonymously with tighter limits.
@@ -157,7 +158,7 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
                 hash_matched = True
                 console.print(
                     f"[dim]Matching against downloaded file "
-                    f"[/dim][highlight]{os.path.basename(video_path)}[/highlight] "
+                    f"[/dim][highlight]{escape(os.path.basename(video_path))}[/highlight] "
                     f"[dim]for accurate sync.[/dim]"
                 )
             except Exception:
@@ -167,7 +168,7 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
             # subliminal treat the string as a standard video filename.
             video = Video.fromname(f"{torrent_name}.mkv")
 
-        with console.status(f"[accent]Downloading subtitles for '[highlight]{torrent_name}[/highlight]'...[/accent]", spinner="dots"):
+        with console.status(f"[accent]Downloading subtitles for '[highlight]{escape(torrent_name)}[/highlight]'...[/accent]", spinner="dots"):
             # subliminal downloads the best subtitle per requested language.
             best_subtitles = download_best_subtitles(
                 [video], set(languages),
@@ -205,9 +206,9 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
             if match:
                 if match not in ordered_paths:
                     ordered_paths.append(match)
-                console.print(f"[success]✓ {_lang_label(lang)} — {os.path.basename(match)}[/success]")
+                console.print(f"[success]✓ {escape(_lang_label(lang))} — {escape(os.path.basename(match))}[/success]")
             else:
-                console.print(f"[warning]✗ {_lang_label(lang)} — no subtitle found.[/warning]")
+                console.print(f"[warning]✗ {escape(_lang_label(lang))} — no subtitle found.[/warning]")
 
         if not ordered_paths:
             console.print("[warning]No subtitles found matching that release.[/warning]")
@@ -221,11 +222,11 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
                 )
             return []
 
-        console.print(f"\n[success]Saved to {dl_dir}.[/success]")
+        console.print(f"\n[success]Saved to {escape(dl_dir)}.[/success]")
         return ordered_paths
 
     except Exception as e:
-        console.print(f"\n[error]Subtitle download failed: {e}[/error]")
+        console.print(f"\n[error]Subtitle download failed: {escape(str(e))}[/error]")
         return []
 
 

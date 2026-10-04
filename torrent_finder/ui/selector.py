@@ -300,7 +300,7 @@ def _build_panel(
         # Position first: it is what a cut-down status should still show.
         return " · ".join(part for part in (position, status) if part)
 
-    header_count = len(theme.header_lines(title, header_status(""), width))
+    header_count = 1
 
     def chrome_for(key_segments: list[Text], context_lines: int) -> int:
         spacing = 1 + (0 if compact else 1)  # below the list; below the header
@@ -314,20 +314,28 @@ def _build_panel(
             return keys
         return keys + [theme.key_segment("PgUp/PgDn", "page")]
 
-    shown_keys = keys
-    chrome = chrome_for(shown_keys, item_lines + notice_lines)
+    def plan() -> tuple[list[Text], int]:
+        """Keys and chrome height for the current pinning, paging included."""
+        nonlocal header_count
+        header_count = len(theme.header_lines(title, header_status(""), width))
+        segments = keys
+        total = chrome_for(segments, item_lines + notice_lines)
+        if main_len > height - total:
+            segments = windowed_keys()
+            # Measure the header with a position as wide as the real one will be.
+            widest_position = f"{main_len}–{main_len} of {main_len}"
+            header_count = len(theme.header_lines(title, header_status(widest_position), width))
+            total = chrome_for(segments, item_lines + notice_lines)
+        return segments, total
+
+    shown_keys, chrome = plan()
     if always_visible_rows and chrome >= height:
         # Long help and many pinned actions can leave no room for a selectable
-        # row. Let the actions scroll with the list in that case.
+        # row, once paging has added its keys and position. Let the actions
+        # scroll with the list in that case.
         main_start, main_end, main_len = 0, n, n
         always_visible_rows = 0
-        chrome = chrome_for(shown_keys, item_lines + notice_lines)
-    if main_len > height - chrome:
-        shown_keys = windowed_keys()
-        # Measure the header with a position as wide as the real one will be.
-        widest_position = f"{main_len}–{main_len} of {main_len}"
-        header_count = len(theme.header_lines(title, header_status(widest_position), width))
-        chrome = chrome_for(shown_keys, item_lines + notice_lines)
+        shown_keys, chrome = plan()
     # A small window: shorten the focused row's help (e.g. a long folder path)
     # so a selectable row and the key bar still fit on screen.
     missing = chrome + 1 - height

@@ -280,3 +280,61 @@ class HeadingEscapeTests(unittest.TestCase):
             self.assertEqual(main._browse_results(provider, results), "back")
         header = " ".join(line.plain for line in theme.header_lines(seen["heading"], "", 120))
         self.assertIn("dune [/x], [bold]frieren", header)
+
+
+class CredentialFieldTailTests(CredentialFormTests):
+    def test_long_values_keep_their_end_and_caret_visible_in_narrow_windows(self):
+        keys = list("http://127.0.0.1:8080") + ["\x03"]
+        _, buffers, frames, meta = self.run_form(keys, width=50, height=16)
+        output = "\n".join(plain_lines(frames[-1], 50, 16))
+        self.assertIn("0.1:8080█", output)
+        self.assertTrue(all(cell_len(line) <= 50 for line in output.splitlines()))
+        self.assertEqual(buffers[meta.fields[0].env_key], "http://127.0.0.1:8080")
+
+
+class ReviewRoundOneTests(unittest.TestCase):
+    def test_spinner_advances_with_elapsed_time(self):
+        frames = {search_progress.spinner_frame(t / 10) for t in range(10)}
+        self.assertGreater(len(frames), 3)
+
+    def test_ctrl_c_during_an_acquisition_wait_cancels_the_worker(self):
+        import threading
+        from torrent_finder import acquisition
+        seen = {}
+        started = threading.Event()
+
+        def work(cancel_event):
+            seen["event"] = cancel_event
+            started.set()
+            cancel_event.wait(2)
+            return "late"
+
+        import contextlib
+        real_join = threading.Thread.join
+
+        def interrupted_join(thread, timeout=None):
+            if timeout == 0.1:  # the wait loop's poll: Ctrl+C arrives here
+                raise KeyboardInterrupt
+            return real_join(thread, timeout)
+
+        listener = threading.Event()
+        with patch("torrent_finder.utils.start_esc_listener", return_value=listener), \
+             patch.object(acquisition.console, "status", return_value=contextlib.nullcontext()), \
+             patch.object(threading.Thread, "join", interrupted_join):
+            with self.assertRaises(KeyboardInterrupt):
+                acquisition._wait_with_esc("Fetching", work)
+        self.assertTrue(started.wait(2))
+        self.assertTrue(seen["event"].is_set())  # the worker was told to stop
+        self.assertTrue(listener.is_set())
+
+    def test_menus_with_pinned_actions_fit_after_paging(self):
+        items = [SelectItem(f"History entry {i} with a long label", hint="Anime • 3d ago") for i in range(30)]
+        items += [SelectItem("Clear history", is_action=True), SelectItem("Back", is_action=True)]
+        footer = "↑/↓ navigate • Enter re-run • Esc back • P provider: All • T type: All • D date: All time"
+        for width, height in ((40, 12), (50, 12), (60, 20)):
+            with self.subTest(width=width, height=height):
+                screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
+                with patch.object(selector, "console", screen):
+                    frame = selector._build_panel(items, 31, "Search History · provider: All · type: All",
+                                                  False, footer)
+                self.assertLessEqual(len(plain_lines(frame, width, height)), height)

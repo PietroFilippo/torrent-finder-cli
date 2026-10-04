@@ -182,7 +182,7 @@ def tips_page() -> None:
 
         if action == "search":
             from torrent_finder.ui.prompts import PROMPT, get_query_with_shortcut, input_screen
-            query = get_query_with_shortcut(PROMPT, initial=state["query"], screen_renderer=input_screen(
+            query = get_query_with_shortcut(PROMPT, screen_renderer=input_screen(
                 "Search tips", "Matches categories, tip text and tags; empty clears the search."))
             if not isinstance(query, str) or query == "GO_BACK":
                 continue

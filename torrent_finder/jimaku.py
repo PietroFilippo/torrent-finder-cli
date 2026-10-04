@@ -153,10 +153,10 @@ def search_and_download(torrent_name: str) -> Optional[str]:
         return None
     chosen = file_items[idx].value
 
-    with console.status(f"[accent]Downloading {chosen['name']}...[/accent]", spinner="dots"):
+    with console.status(f"[accent]Downloading {escape(chosen['name'])}...[/accent]", spinner="dots"):
         saved = _download(chosen["url"], chosen["name"], key)
     if saved:
-        console.print(f"\n[success]Saved Jimaku subtitle to {get_download_dir()}![/success]")
+        console.print(f"\n[success]Saved Jimaku subtitle to {escape(get_download_dir())}![/success]")
     return saved
 
 

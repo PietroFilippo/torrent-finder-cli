@@ -146,6 +146,11 @@ def _wait_with_esc(message: str, work, *args):
             worker.start()
             while worker.is_alive() and not cancel.is_set():
                 worker.join(0.1)
+    except KeyboardInterrupt:
+        # Ctrl+C still goes back like before; the worker must stop too, so a
+        # late result can no longer save files the user just cancelled.
+        cancel.set()
+        raise
     finally:
         stop_listener.set()
     if worker.is_alive():

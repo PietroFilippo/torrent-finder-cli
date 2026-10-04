@@ -3,12 +3,14 @@
 import sys
 
 import readchar
+from rich.cells import cell_len
 from rich.console import Group
 from rich.text import Text
 
 from torrent_finder.constants import console
 from torrent_finder.credential_registry import CREDENTIAL_REGISTRY, CredentialField, CredentialSpec
 from torrent_finder.ui import theme
+from torrent_finder.ui.layout import ellipsize_cells
 from torrent_finder.ui.prompts import _make_banner_panel, confirm_prompt
 from torrent_finder.ui.selector import SelectItem, _render, arrow_select
 
@@ -32,7 +34,19 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
         buf = buffers.get(field.env_key, "")
         if focused:
             shown = ("*" * len(buf)) if field.secret else buf
-            return f"{field.label}: {shown}█"
+            text = f"{field.label}: {shown}█"
+            room = theme.inner_width(console.size.width) - 2  # inside the cursor gutter
+            if cell_len(text) <= room:
+                return text
+            # Too long for one row: keep a short label and the end of the value,
+            # so what is being typed and the caret stay visible.
+            prefix = ellipsize_cells(field.label, max(6, room // 3)) + ": …"
+            tail, cells = "", 0
+            for char in reversed(shown):
+                if cells + cell_len(char) > max(1, room - cell_len(prefix) - 1):
+                    break
+                tail, cells = char + tail, cells + cell_len(char)
+            return f"{prefix}{tail}█"
         if buf:
             shown = ("*" * len(buf)) if field.secret else buf
             return f"{field.label}: {shown}"
