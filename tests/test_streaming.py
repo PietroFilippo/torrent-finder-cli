@@ -1,7 +1,11 @@
 """Streaming owns its player, says how it ended, and prepares cancellably."""
 
 import io
+import json
 import os
+import shutil
+import signal
+import subprocess
 import sys
 import tempfile
 import threading
@@ -205,6 +209,93 @@ class StreamOutcomeTests(unittest.TestCase):
         downloader._trim_log(self.log, limit=100)
         self.assertLessEqual(os.path.getsize(self.log), 100)
         self.assertTrue(downloader._log_tail(self.log).endswith("newest line"))
+
+
+NPM_SHIM = r'''@ECHO off
+GOTO start
+:find_dp0
+SET dp0=%~dp0
+EXIT /b
+:start
+SETLOCAL
+CALL :find_dp0
+
+IF EXIST "%dp0%\node.exe" (
+  SET "_prog=%dp0%\node.exe"
+) ELSE (
+  SET "_prog=node"
+  SET PATHEXT=%PATHEXT:;.JS;=;%
+)
+
+endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\node_modules\fake-cli\cli.js" %*
+'''
+
+
+@unittest.skipUnless(os.name == "nt" and shutil.which("node"), "Windows npm wrappers need node")
+class NodeCliLaunchTests(unittest.TestCase):
+    """Magnets reach webtorrent / peerflix intact, never through cmd.exe."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = directory.name
+        os.makedirs(os.path.join(self.root, "node_modules", "fake-cli"))
+        with open(os.path.join(self.root, "node_modules", "fake-cli", "cli.js"), "w", encoding="utf-8") as script:
+            script.write("console.log(JSON.stringify(process.argv.slice(2)))\n")
+        self.screen = Console(file=io.StringIO(), width=200, color_system=None)
+        self.real_which = shutil.which
+
+    def command(self, wrapper):
+        with patch.object(downloader.shutil, "which",
+                          side_effect=lambda name: wrapper if name == "webtorrent" else self.real_which(name)), \
+             patch.object(downloader, "console", self.screen):
+            return downloader._cli_command("webtorrent")
+
+    def write(self, name, text):
+        path = os.path.join(self.root, name)
+        with open(path, "w", encoding="utf-8") as wrapper:
+            wrapper.write(text)
+        return path
+
+    def test_npm_and_yarn_wrappers_run_the_script_with_every_argument(self):
+        npm = self.write("webtorrent.cmd", NPM_SHIM)
+        yarn = self.write("yarn-webtorrent.cmd", '@"%~dp0\\webtorrent.cmd" %*\n')
+        magnet = MAGNET + '&dn=x"&echo INJECTED&"&tr=udp://tracker.example:1337'
+        args = ["download", magnet, "--port", "8080", "--select", "3"]
+        for wrapper in (npm, yarn):
+            with self.subTest(wrapper=os.path.basename(wrapper)):
+                command = self.command(wrapper)
+                self.assertTrue(command[-1].endswith("cli.js"))
+                out = subprocess.run([*command, *args], capture_output=True, text=True, timeout=60)
+                self.assertEqual(json.loads(out.stdout), args)
+
+    def test_unrecognised_wrapper_is_refused_instead_of_run_through_cmd(self):
+        self.assertIsNone(self.command(self.write("webtorrent.cmd", "@echo %*\n")))
+        self.assertIn("isn't a recognised npm launcher", self.screen.file.getvalue())
+
+
+class MagnetNameTests(unittest.TestCase):
+    def test_names_with_magnet_syntax_stay_one_parameter(self):
+        from urllib.parse import parse_qs, urlsplit
+        from torrent_finder.utils import build_magnet
+        name = "Tom & Jerry + [1080p] #1 100%"
+        magnet = build_magnet("a" * 40, name)
+        params = parse_qs(urlsplit(magnet).query)
+        self.assertEqual(params["dn"], [name])
+        self.assertEqual(set(params), {"xt", "dn", "tr"})
+        self.assertEqual(downloader._magnet_dn(magnet), name)
+
+
+class DownloadCancelTests(unittest.TestCase):
+    """Ctrl+C stops a terminal download within a moment, not when it finishes."""
+
+    def test_ctrl_c_cancels_a_running_download(self):
+        child = [sys.executable, "-c", "import time; time.sleep(20)"]
+        threading.Timer(0.5, signal.raise_signal, (signal.SIGINT,)).start()
+        started = time.monotonic()
+        with patch.object(downloader, "console", Console(file=io.StringIO())):
+            self.assertIsNone(downloader._run_download(child, quiet=False, status_msg="x"))
+        self.assertLess(time.monotonic() - started, 8)
 
 
 class StreamPreparationTests(unittest.TestCase):

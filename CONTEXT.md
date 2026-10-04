@@ -177,6 +177,13 @@ looked up or closed by process name. Stream adapters return `ended`, `failed`,
 `cancelled` or `unavailable`. The backend's stderr goes to a small log in the
 temp folder, so a nonzero exit is reported with its last lines.
 
+On Windows, npm's `.cmd` wrappers for webtorrent / peerflix are resolved by
+`_cli_command` and run as `node <script>`, never through cmd.exe. cmd.exe would
+split a magnet at `&`, dropping `--port`/`--select`/`--out` and running the
+pieces as commands. Terminal downloads wait in short steps
+(`_wait_interruptibly`) because a plain `proc.wait()` holds Ctrl+C back until a
+detached child exits. `build_magnet` percent-encodes the display name.
+
 ## Filters & Presets
 
 `FilterConfig` (`filters.py`) structures result filtering (size/seeders/

@@ -423,6 +423,58 @@ def has_aria2() -> bool:
     return shutil.which("aria2c") is not None
 
 
+# Shown when a Node CLI is missing.
+_NODE_CLI_INSTALL = {
+    "webtorrent": "webtorrent-cli not found. Install with: npm install -g webtorrent-cli",
+    "peerflix": "peerflix not found. Install with: npm install -g peerflix",
+}
+_SHIM_TARGET = re.compile(r'"%~?dp0%?\\([^"%]+?\.(?:[cm]?js|cmd|bat))"', re.IGNORECASE)
+
+
+def _cli_command(name: str) -> list[str] | None:
+    """The argv prefix that runs an installed Node CLI, or None (explained) when unusable.
+
+    On Windows npm installs webtorrent / peerflix as .cmd wrappers, and Windows
+    runs those through cmd.exe. cmd.exe splits an unquoted magnet link at each
+    "&" (dropping --port / --select / --out, so VLC never finds the stream) and
+    runs the pieces as commands, which a crafted torrent name could abuse. The
+    wrapped script therefore runs with node directly; an unrecognised wrapper
+    is refused rather than run through cmd.exe.
+    """
+    path = shutil.which(name)
+    if not path:
+        console.print(f"[error] {_NODE_CLI_INSTALL[name]}[/error]\n")
+        return None
+    if os.name != "nt" or not path.lower().endswith((".cmd", ".bat")):
+        return [path]
+    command = _unwrap_npm_shim(path)
+    if command is None:
+        console.print(f"[error] Can't start {name} safely: {escape(path)} isn't a recognised npm "
+                      f"launcher. Reinstall it ({_NODE_CLI_INSTALL[name].split(': ', 1)[-1]}).[/error]\n")
+    return command
+
+
+def _unwrap_npm_shim(path: str, depth: int = 0) -> list[str] | None:
+    """``[node, script]`` behind an npm / pnpm / yarn .cmd wrapper, or None."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as shim:
+            targets = _SHIM_TARGET.findall(shim.read())
+    except OSError:
+        return None
+    folder = os.path.dirname(path)
+    for target in targets:
+        resolved = os.path.normpath(os.path.join(folder, target))
+        if not os.path.isfile(resolved):
+            continue
+        if resolved.lower().endswith((".cmd", ".bat")):  # yarn: a wrapper around npm's wrapper
+            return _unwrap_npm_shim(resolved, depth + 1) if depth < 3 else None
+        node = os.path.join(folder, "node.exe")  # npm prefers a node.exe beside the wrapper
+        if not os.path.isfile(node):
+            node = shutil.which("node")
+        return [node, resolved] if node else None
+    return None
+
+
 def _spawn_detached(cmd: list[str], quiet: bool) -> subprocess.Popen:
     """Spawn a download child outside the console's Ctrl+C delivery.
 
@@ -431,7 +483,7 @@ def _spawn_detached(cmd: list[str], quiet: bool) -> subprocess.Popen:
     before Python raised its own KeyboardInterrupt — the interrupt then fired
     *after* the caller's try/except and unwound the whole program. With the
     child in its own process group (Windows) / session (POSIX), the
-    KeyboardInterrupt always lands in our ``proc.wait()`` and the child is
+    KeyboardInterrupt always lands in ``_wait_interruptibly`` and the child is
     stopped explicitly (see ``_cancel_download_proc``).
     """
     stdout_arg, stderr_arg = _quiet_streams(quiet)
@@ -468,6 +520,20 @@ def _download_dir_or_explain() -> str | None:
         return None
 
 
+def _wait_interruptibly(proc: subprocess.Popen) -> int:
+    """Wait for *proc* while letting Ctrl+C through.
+
+    On Windows a plain ``proc.wait()`` holds Ctrl+C back until the child exits,
+    and a detached child never sees Ctrl+C itself, so a download looked frozen.
+    Short timed waits let the KeyboardInterrupt land within a moment.
+    """
+    while True:
+        try:
+            return proc.wait(timeout=0.25)
+        except subprocess.TimeoutExpired:
+            pass
+
+
 def _run_download(cmd: list[str], quiet: bool, status_msg: str) -> int | None:
     """Run one download subprocess to completion. Returns its exit code, or
     None when the user cancelled with Ctrl+C. In quiet mode the child's native
@@ -476,8 +542,8 @@ def _run_download(cmd: list[str], quiet: bool, status_msg: str) -> int | None:
     try:
         if quiet:
             with console.status(status_msg, spinner="dots"):
-                return proc.wait()
-        return proc.wait()
+                return _wait_interruptibly(proc)
+        return _wait_interruptibly(proc)
     except KeyboardInterrupt:
         _cancel_download_proc(proc)
         return None
@@ -602,9 +668,8 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
     over the provided 1-based indexes. Returns True on normal completion;
     False on cancellation or failure.
     """
-    wt_path = shutil.which("webtorrent")
-    if not wt_path:
-        console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
+    wt_cmd = _cli_command("webtorrent")
+    if wt_cmd is None:
         return False
 
     dl_dir = _download_dir_or_explain()
@@ -631,7 +696,7 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
         for n, idx in enumerate(targets, 1):
             if len(targets) > 1:
                 console.print(f"[info]Session {n}/{len(targets)} — file index {idx}[/info]")
-            cmd = [wt_path, "download", magnet_link, "--out", dl_dir]
+            cmd = [*wt_cmd, "download", magnet_link, "--out", dl_dir]
             if idx is not None:
                 cmd.extend(["--select", str(idx - 1)])  # webtorrent is 0-based
             rc = _run_download(
@@ -668,9 +733,8 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
     single-process multi-file download. Returns True on normal completion;
     False on cancellation or failure.
     """
-    pf_path = shutil.which("peerflix")
-    if not pf_path:
-        console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
+    pf_cmd = _cli_command("peerflix")
+    if pf_cmd is None:
         return False
 
     dl_dir = _download_dir_or_explain()
@@ -697,7 +761,7 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
         for n, idx in enumerate(targets, 1):
             if len(targets) > 1:
                 console.print(f"[info]Session {n}/{len(targets)} — file index {idx}[/info]")
-            cmd = [pf_path, magnet_link, "--path", dl_dir]
+            cmd = [*pf_cmd, magnet_link, "--path", dl_dir]
             if idx is not None:
                 cmd.extend(["-i", str(idx - 1)])  # peerflix is 0-based
             rc = _run_download(
@@ -1004,9 +1068,8 @@ def stream_with_webtorrent(session: "TorrentSession") -> str:
     Returns "ended", "failed" (nonzero exit, explained with its log),
     "cancelled" or "unavailable" (nothing could be streamed).
     """
-    wt_path = shutil.which("webtorrent")
-    if not wt_path:
-        console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
+    wt_cmd = _cli_command("webtorrent")
+    if wt_cmd is None:
         return "unavailable"
 
     magnet_link = session.magnet
@@ -1074,7 +1137,7 @@ def stream_with_webtorrent(session: "TorrentSession") -> str:
                 filesize_bytes=_file_info.size_bytes if _file_info else 0,
             )
 
-            cmd = [wt_path, "download", magnet_link, "--port", "8080"]
+            cmd = [*wt_cmd, "download", magnet_link, "--port", "8080"]
             if idx is not None:
                 cmd.extend(["--select", str(idx - 1)])
 
@@ -1116,9 +1179,8 @@ def stream_with_peerflix(session: "TorrentSession") -> str:
     precedence + metadata + sub paths off the session. Returns the same
     outcomes as ``stream_with_webtorrent``.
     """
-    pf_path = shutil.which("peerflix")
-    if not pf_path:
-        console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
+    pf_cmd = _cli_command("peerflix")
+    if pf_cmd is None:
         return "unavailable"
 
     magnet_link = session.magnet
@@ -1170,7 +1232,7 @@ def stream_with_peerflix(session: "TorrentSession") -> str:
                 filesize_bytes=_file_info.size_bytes if _file_info else 0,
             )
 
-            cmd = [pf_path, magnet_link, "--port", "8888"]
+            cmd = [*pf_cmd, magnet_link, "--port", "8888"]
             if idx is not None:
                 cmd.extend(["-i", str(idx - 1)])
 

@@ -25,7 +25,7 @@ class MagnetForContractTests(unittest.TestCase):
 
         self.assertIsNotNone(magnet)
         self.assertTrue(magnet.startswith("magnet:?xt=urn:btih:" + "a" * 40))
-        self.assertIn("&dn=Direct Result&", magnet)
+        self.assertIn("&dn=Direct%20Result&", magnet)
 
     def test_magnet_for_non_magnet_sources_returns_none(self):
         self.assertIsNone(
@@ -49,7 +49,7 @@ class MagnetForContractTests(unittest.TestCase):
 
         resolve.assert_called_once_with("987")
         self.assertTrue(magnet.startswith("magnet:?xt=urn:btih:" + resolved))
-        self.assertIn("&dn=Ru Result&", magnet)
+        self.assertIn("&dn=Ru%20Result&", magnet)
 
     def test_magnet_for_fitgirl_resolves_lazy_hash_from_post_url(self):
         resolved = "c" * 40
@@ -65,7 +65,7 @@ class MagnetForContractTests(unittest.TestCase):
 
         resolve.assert_called_once_with("https://fitgirl.example/post")
         self.assertTrue(magnet.startswith("magnet:?xt=urn:btih:" + resolved))
-        self.assertIn("&dn=FitGirl Result&", magnet)
+        self.assertIn("&dn=FitGirl%20Result&", magnet)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 import re
 import threading
 import time
+from urllib.parse import quote
 
 from torrent_finder.constants import TRACKERS
 
@@ -124,6 +125,10 @@ def marquee(text: str, width: int, tick: int, sep: str = "   •   ") -> str:
 
 
 def build_magnet(info_hash: str, name: str) -> str:
-    """Build a magnet URI from an info hash."""
+    """Build a magnet URI from an info hash.
+
+    The name is percent-encoded: a raw "&", "#" or "+" in a torrent name would
+    otherwise end or alter the display-name parameter for every client.
+    """
     trackers = "&".join(f"tr={t}" for t in TRACKERS)
-    return f"magnet:?xt=urn:btih:{info_hash}&dn={name}&{trackers}"
+    return f"magnet:?xt=urn:btih:{info_hash}&dn={quote(name, safe='')}&{trackers}"

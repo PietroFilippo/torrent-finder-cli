@@ -1375,7 +1375,7 @@ def download_method_prompt(
     if show_streaming:
         items.append(_section("Stream to VLC"))
         items.append(SelectItem(
-            label="▶  webtorrent",
+            label="▶  Stream with webtorrent",
             value="stream_w",
             passive=not wt_available,
             hint=(
@@ -1386,7 +1386,7 @@ def download_method_prompt(
             description="Stream via webtorrent — good streaming default",
         ))
         items.append(SelectItem(
-            label="▶  peerflix",
+            label="▶  Stream with peerflix",
             value="stream_p",
             passive=not pf_available,
             hint=(
@@ -1415,7 +1415,7 @@ def download_method_prompt(
         items.append(SelectItem("🧲 Send to qBittorrent WebUI", "qbittorrent",
                                 description="Choose client folder/category and view real progress. Adds the full torrent; manage file selection in qBittorrent."))
     items.append(SelectItem(
-        label="⬇  aria2c",
+        label="⬇  Download with aria2c",
         value="aria",
         passive=not aria_available,
         hint=(
@@ -1425,7 +1425,7 @@ def download_method_prompt(
         description="Best downloader — native multi-file, resumes, fastest for batches",
     ))
     items.append(SelectItem(
-        label="⬇  webtorrent",
+        label="⬇  Download with webtorrent",
         value="d",
         passive=not wt_available,
         hint=(
@@ -1440,7 +1440,7 @@ def download_method_prompt(
         ),
     ))
     items.append(SelectItem(
-        label="⬇  peerflix",
+        label="⬇  Download with peerflix",
         value="p",
         passive=not pf_available,
         hint=(
