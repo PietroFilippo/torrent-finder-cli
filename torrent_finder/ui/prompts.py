@@ -1101,6 +1101,25 @@ def download_dir_ready() -> bool:
         download_dir_prompt()
 
 
+def _unpack_label(on: bool) -> str:
+    return f"📦 Unpack page archives: [{'✓' if on else ' '}] {'ON' if on else 'OFF'}"
+
+
+_UNPACK_DESCRIPTION = (
+    "Unpack downloaded manga/comic archives (.zip, .cbz, .rar, .cbr, .7z holding only images) into a "
+    "folder of pages beside them, then delete the archive. Applies to Madokami files and to aria2c / "
+    "webtorrent / peerflix downloads, not to your torrent client. Other archives are left alone."
+)
+
+
+def _toggle_unpack(item) -> None:
+    from torrent_finder.state import load_setting, save_setting
+    from torrent_finder.unpack import SETTING
+    on = not bool(load_setting(SETTING, False))
+    save_setting(SETTING, on)
+    item.label = _unpack_label(on)
+
+
 def download_dir_prompt() -> None:
     """Pick the default download directory. Persists via ``save_setting`` and
     returns to the caller — no return value. Applies to aria2, webtorrent /
@@ -1110,6 +1129,8 @@ def download_dir_prompt() -> None:
     import os
     from torrent_finder.constants import DOWNLOADS_DIR
     from torrent_finder.state import load_setting, save_setting
+
+    from torrent_finder.unpack import SETTING as UNPACK_SETTING
 
     home_downloads = os.path.expanduser("~/Downloads")
     current = load_setting("download_dir", None)
@@ -1131,8 +1152,20 @@ def download_dir_prompt() -> None:
             is_action=True,
             description="Type or paste an absolute path. Will be created if it doesn't exist.",
         ),
+        SelectItem(
+            label=_unpack_label(bool(load_setting(UNPACK_SETTING, False))),
+            value="__unpack__",
+            is_action=True,
+            description=_UNPACK_DESCRIPTION,
+        ),
         SelectItem(label="↩ Back", value="back", is_action=True),
     ]
+
+    def toggle(idx, items):
+        if items[idx].value != "__unpack__":
+            return False
+        _toggle_unpack(items[idx])
+        return True  # stay: it is a setting beside the folder choice
 
     # Start cursor on the current selection when possible.
     start = 0
@@ -1146,6 +1179,7 @@ def download_dir_prompt() -> None:
         title="Download Folder",
         banner=_make_banner_panel(),
         start_index=start,
+        on_action=toggle,
     )
 
     if result is None:
@@ -1527,6 +1561,13 @@ def download_method_prompt(
             "a minimal spinner instead. Persists across runs."
         ),
     ))
+    from torrent_finder.unpack import SETTING as UNPACK_SETTING
+    items.append(SelectItem(
+        label=_unpack_label(bool(load_setting(UNPACK_SETTING, False))),
+        value="toggle_unpack",
+        is_action=True,
+        description=_UNPACK_DESCRIPTION,
+    ))
 
     # --- Trailing actions ---
     items.append(SelectItem(
@@ -1559,6 +1600,9 @@ def download_method_prompt(
             except Exception:
                 items[idx].hint = "⚠  Could not open browser"
             return True  # Stay in menu
+        if items[idx].value == "toggle_unpack":
+            _toggle_unpack(items[idx])
+            return True
         if items[idx].value == "toggle_quiet":
             from torrent_finder.state import load_setting, save_setting
             new_state = not bool(load_setting("hide_stream_output", False))
@@ -1895,7 +1939,8 @@ def provider_select_prompt(
             is_action=True,
             description=(
                 f"Current: {get_download_dir()}\nThe default folder for aria2c / webtorrent / "
-                "peerflix downloads, subtitle saves, and Online-Fix / Madokami / Libgen / F-Droid files."
+                "peerflix downloads, subtitle saves, and Online-Fix / Madokami / Libgen / F-Droid files.\n"
+                "Also here: unpack downloaded manga archives into folders of pages."
             ),
         )
         items = (

@@ -28,12 +28,13 @@ the chosen files — never crawls.
 import os
 import re
 import threading
+from collections import Counter
 from html import unescape
 from urllib.parse import unquote, urlsplit
 
 import requests
 
-from torrent_finder.direct_download import Cancelled, save_response
+from torrent_finder.direct_download import Cancelled, safe_filename, save_response
 from torrent_finder.result_view import title_score
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
@@ -289,6 +290,28 @@ def _listing_sizes(html: str) -> dict[str, int]:
             path = unescape(link.group(1)).split("?")[0].rstrip("/")
             sizes[path] = _size_bytes(_strip_tags(cells[1]))
     return sizes
+
+
+def save_folder(file_path: str, download_dir: str) -> str:
+    """The folder a library file is saved in when grouped, named after the
+    library folders holding it: "Naki no Ryuu", "One Piece/One Piece [Viz]".
+    Areas outside the main index are named too: "Naki no Ryuu [Raws]"."""
+    chain, area = describe(file_path.rsplit("/", 1)[0])
+    parts = [safe_filename(part, "Madokami") for part in chain]
+    if area and parts:
+        parts[0] = safe_filename(area if parts[0].lstrip("_") == area else f"{parts[0]} [{area}]")
+    return os.path.join(download_dir, *parts)
+
+
+def download_folders(paths, download_dir: str) -> dict:
+    """Where each picked library file is saved. Files sharing a library folder
+    with another picked file go into that folder (``save_folder``), and so does
+    a file whose folder an earlier download created; a lone file goes straight
+    into *download_dir*."""
+    folders = {path: save_folder(path, download_dir) for path in paths}
+    shared = Counter(folders.values())
+    return {path: folder if shared[folder] > 1 or os.path.isdir(folder) else download_dir
+            for path, folder in folders.items()}
 
 
 def download_file(path: str, dest_dir: str, cancel_event=None, progress_cb=None) -> str | None:

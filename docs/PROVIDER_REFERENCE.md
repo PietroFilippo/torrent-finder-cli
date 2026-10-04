@@ -584,6 +584,13 @@ broken source or automatically expand to unrelated catalogs.
 - The site search finds nothing when the query has punctuation such as `:`
   (`Mahjong Hishoden: Naki no Ryuu` was empty; without the colon it finds the
   series folder). An empty search is retried once without it.
+- Picked files used to land loose in the download folder, among unrelated
+  downloads (a user report: 19 Naki no Ryuu chapters). Two or more files from
+  one library folder now share a folder named after it (`Naki no Ryuu/`,
+  `One Piece/One Piece [Viz]/`, `Naki no Ryuu [Raws]/`); a later single file
+  joins that folder when it exists. The optional "Unpack page archives"
+  setting turns each chapter or volume archive into a folder of pages; RAR
+  chapters such as `Naki no Ryuu Chapter 1.rar` open with Windows' own tar.
 
 ## Books
 

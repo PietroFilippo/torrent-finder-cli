@@ -22,13 +22,26 @@ Interface:
   ``BatchItemOutcome`` the batch loop aggregates into its summary panel.
 """
 
+import os
 import threading
 
 import readchar
 from rich.markup import escape
 
+from torrent_finder import unpack
 from torrent_finder.constants import console
 from torrent_finder.utils import build_magnet
+
+
+def _unpack_saved(paths) -> list[str]:
+    """Unpack the page archives among saved library files when the setting is
+    on; summary lines for the result panel ([] when nothing to say)."""
+    if not paths or not unpack.enabled():
+        return []
+    with console.status("[bold cyan]Unpacking…[/bold cyan]", spinner="dots") as status:
+        report = unpack.unpack_all(paths, expect_pages=True,
+                                   status=lambda text: status.update(f"[bold cyan]{escape(text)}[/bold cyan]"))
+    return unpack.summary_lines(report)
 
 
 class PickOutcome:
@@ -53,17 +66,19 @@ class BatchItemOutcome:
     handoff), which the caller excludes from the magnet-dispatch stat.
     ``manual_url`` is a page the user must visit when automation failed (or
     the item can't be batched). ``password`` is surfaced once in the batch
-    summary (Online-Fix archive password).
+    summary (Online-Fix archive password). ``note`` is a plain-text line for
+    the summary (a downloaded archive that stayed packed).
     """
 
-    __slots__ = ("ok", "saved_direct", "manual_url", "password")
+    __slots__ = ("ok", "saved_direct", "manual_url", "password", "note")
 
     def __init__(self, ok: bool, saved_direct: bool = False,
-                 manual_url: str = "", password: str = "") -> None:
+                 manual_url: str = "", password: str = "", note: str = "") -> None:
         self.ok = ok
         self.saved_direct = saved_direct
         self.manual_url = manual_url
         self.password = password
+        self.note = note
 
 
 class MagnetDirect:
@@ -330,6 +345,9 @@ class MadokamiAcquisition:
             TransferSpeedColumn,
         )
 
+        # Two or more files from one library folder are saved together in a
+        # folder named after it ("Naki no Ryuu/"), not loose among other downloads.
+        folders = madokami.download_folders(dl_paths, get_download_dir())
         saved: list[str] = []
         failed: list[str] = []
         cancel_event = threading.Event()
@@ -366,7 +384,7 @@ class MadokamiAcquisition:
                         progress.update(_task, completed=done, total=total)
 
                     dest = madokami.download_file(
-                        p, get_download_dir(),
+                        p, folders[p],
                         cancel_event=cancel_event, progress_cb=_on_progress,
                     )
                     if dest:
@@ -376,15 +394,20 @@ class MadokamiAcquisition:
         finally:
             stop_listener.set()
 
+        # Finished files are unpacked even after Esc: each one is complete.
+        unpacked = _unpack_saved(saved)
         lines = []
         if cancel_event.is_set():
             lines.append(f"[warning] Stopped after {len(saved)} of {len(dl_paths)}.[/warning]")
         elif saved:
-            lines.append(f"[success]✓ {len(saved)} file(s) saved to {escape(get_download_dir())}[/success]")
+            where = {os.path.dirname(s) for s in saved}
+            shown = where.pop() if len(where) == 1 else get_download_dir()
+            lines.append(f"[success]✓ {len(saved)} file(s) saved to {escape(shown)}[/success]")
         for s in saved[:6]:
             lines.append(f"[dim]{escape(os.path.basename(s))}[/dim]")
         if len(saved) > 6:
             lines.append(f"[dim]… +{len(saved) - 6} more[/dim]")
+        lines += unpacked
         if failed:
             lines.append(f"[warning] Couldn't download {len(failed)}:[/warning] " + escape(", ".join(failed[:4])))
             lines.append(f"[dim]Grab manually: {escape(page_url)}[/dim]")
@@ -504,11 +527,17 @@ class MadokamiAcquisition:
                     if total else f"{done / 1048576:.1f} MB")
             set_status(size)
 
-        if madokami.download_file(
+        dest = madokami.download_file(
             mpath, download_dir,
             cancel_event=cancel_event, progress_cb=_on_progress,
-        ):
-            return BatchItemOutcome(ok=True, saved_direct=True)
+        )
+        if dest:
+            note = ""
+            if unpack.enabled():
+                set_status("unpacking")
+                kept = unpack.unpack_all([dest], expect_pages=True).kept
+                note = "; ".join(f"Kept {os.path.basename(path)} packed: {problem}" for path, problem in kept)
+            return BatchItemOutcome(ok=True, saved_direct=True, note=note)
         return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
 
 
@@ -758,6 +787,15 @@ _BY_SOURCE = {
 def for_result(result):
     """The acquisition adapter for one result, chosen by its ``source``."""
     return _BY_SOURCE.get(result.get("source") or "", _DEFAULT)
+
+
+def batch_download_dir(result, selection, download_dir: str) -> str:
+    """Where one batch item is saved: Madokami files are grouped like a pick's
+    (``madokami.download_folders``) across the selected Madokami files."""
+    from torrent_finder import madokami
+
+    files = [r.get("mdk_path") for r in selection if madokami.is_file_path(r.get("mdk_path") or "")]
+    return madokami.download_folders(files, download_dir).get(result.get("mdk_path"), download_dir)
 
 
 def magnet_for(result) -> str | None:

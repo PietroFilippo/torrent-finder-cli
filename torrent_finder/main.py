@@ -187,6 +187,8 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
     # Madokami file, a live MB counter — so a multi-minute batch isn't a blind
     # spinner. Titles are markup-escaped (manga names carry brackets).
     status = console.status("[bold cyan]Opening torrents…  (Esc to stop)[/bold cyan]", spinner="dots")
+    selection = [results[gi] for gi in idxs if 0 <= gi < len(results)]
+    notes: list[str] = []
     try:
         with status:
             for k, gi in enumerate(idxs, 1):
@@ -206,7 +208,7 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
                 outcome = None
                 try:
                     outcome = acquisition.for_result(r).batch_item(
-                        r, download_dir=get_download_dir(),
+                        r, download_dir=acquisition.batch_download_dir(r, selection, get_download_dir()),
                         cancel_event=cancel_event, set_status=_set_status,
                     )
                 except Exception:
@@ -217,6 +219,8 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
                         saved_direct += 1
                     if outcome.password:
                         ofix_pw = outcome.password
+                    if outcome.note:
+                        notes.append(outcome.note)
                     record_torrent_picked(provider_for_result(r, provider).slug, int(r.get("seeders", 0) or 0))
                     if not outcome.saved_direct:  # a saved file isn't a magnet dispatch
                         record_magnet_dispatch()
@@ -240,6 +244,7 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
         lines = [f"[success]✓ {sent} of {n} handed to your torrent client.[/success]"]
     if ofix_pw:
         lines.append(f"[cyan]Online-Fix archive password:[/cyan] {escape(ofix_pw)}")
+    lines += [f"[warning]{escape(note)}[/warning]" for note in notes[:4]]
     if failed:
         shown = ", ".join(failed[:6]) + (" …" if len(failed) > 6 else "")
         lines.append(f"[warning] Couldn't open {len(failed)}:[/warning] {escape(shown)}")
@@ -336,8 +341,13 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
         console.print("[dim]Press any key to return to download options...[/dim]")
         readchar.readkey()
         return "back"
-    return download_complete_prompt("Batch download finished",
-                                    summary=f"{len(picked)} torrent(s) downloaded; {skipped} skipped (no magnet).")
+    from torrent_finder import unpack
+    from torrent_finder.constants import get_download_dir
+    summary = f"{len(picked)} torrent(s) downloaded; {skipped} skipped (no magnet)."
+    if unpack.enabled():
+        paths = [path for magnet in magnets for path in unpack.torrent_files(get_download_dir(), magnet=magnet)]
+        summary = "\n".join(filter(None, (summary, _unpack_downloaded(paths))))
+    return download_complete_prompt("Batch download finished", summary=summary)
 
 
 def _batch_flow(provider, results: list, idxs: list[int]) -> str:
@@ -389,6 +399,30 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
         # "back" or None (Esc) → step back to the results table
         clear_screen()
         return "back"
+
+
+def _unpack_downloaded(paths) -> str:
+    """Unpack the page archives among a finished download's files (callers
+    check the setting); summary text for the finished prompt ("" when none)."""
+    from torrent_finder import unpack
+    from rich.markup import escape
+
+    if not any(unpack.is_archive(path) for path in paths):
+        return ""
+    with console.status("[bold cyan]Unpacking…[/bold cyan]", spinner="dots") as status:
+        report = unpack.unpack_all(paths, status=lambda text: status.update(f"[bold cyan]{escape(text)}[/bold cyan]"))
+    return "\n".join(unpack.summary_lines(report))
+
+
+def _unpack_torrent(session) -> str:
+    """``_unpack_downloaded`` for the torrent just downloaded in the app."""
+    from torrent_finder import unpack
+    from torrent_finder.constants import get_download_dir
+
+    if not unpack.enabled():
+        return ""
+    return _unpack_downloaded(unpack.torrent_files(get_download_dir(), session.files_meta,
+                                                   session.download_indexes, session.magnet))
 
 
 def _fetch_session_files(session) -> tuple[bool, object]:
@@ -637,7 +671,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                     console.print("\n[dim]Press any key to return to download options...[/dim]")
                     readchar.readkey()
                     continue
-                if download_complete_prompt("Download finished") == "next":
+                if download_complete_prompt("Download finished", summary=_unpack_torrent(session)) == "next":
                     return "next"
                 continue
             elif method == "p":
@@ -649,7 +683,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                     console.print("\n[dim]Press any key to return to download options...[/dim]")
                     readchar.readkey()
                     continue
-                if download_complete_prompt("Download finished") == "next":
+                if download_complete_prompt("Download finished", summary=_unpack_torrent(session)) == "next":
                     return "next"
                 continue
             elif method == "d":
@@ -661,7 +695,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                     console.print("\n[dim]Press any key to return to download options...[/dim]")
                     readchar.readkey()
                     continue
-                if download_complete_prompt("Download finished") == "next":
+                if download_complete_prompt("Download finished", summary=_unpack_torrent(session)) == "next":
                     return "next"
                 continue
             elif method == "s":

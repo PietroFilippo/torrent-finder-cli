@@ -162,6 +162,15 @@ in `acquisition.py` behind one interface
    download folder (Madokami, login required; Libgen; F-Droid, whose APKs come
    only from `https://f-droid.org/repo/`).
 
+Madokami saves two or more files from one library folder together in a folder
+named after it (`madokami.download_folders`; batch items through
+`acquisition.batch_download_dir`). With the `unpack_page_archives` setting on,
+`unpack.py` turns downloaded archives that hold only images into folders of
+pages after Madokami downloads and in-app torrent downloads (`torrent_files`
+finds what a torrent wrote from its file list or the magnet's name). Unpacking
+works in a scratch folder and deletes the archive only once the pages are in
+place; any other archive is left alone.
+
 The adapter is chosen by `result.source` via `acquisition.for_result()` —
 keyed per source, not per provider, because one provider merges engines with
 different styles (Games mixes Apibay, Online-Fix, and FitGirl rows). Every
