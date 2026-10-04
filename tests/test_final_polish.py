@@ -73,7 +73,7 @@ class CompactScreenTests(unittest.TestCase):
         self.assertIn("Enter download 2", two)
         self.assertIn("Esc back", two)
         controls = two.splitlines()[-3:]  # below the selected row's (wrapping) metadata
-        self.assertTrue(all(len(line) <= 36 for line in controls), controls)
+        self.assertTrue(all(len(line) <= 38 for line in controls), controls)  # inside the right margin
 
     def test_empty_bookmarks_explain_how_to_save_one(self):
         isolate_store(self)

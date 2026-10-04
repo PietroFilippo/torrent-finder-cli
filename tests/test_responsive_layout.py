@@ -176,25 +176,33 @@ class ResponsiveTableTests(unittest.TestCase):
     def test_table_uses_progressive_columns(self):
         self.assertEqual(
             [column.header for column in self._table(140).columns],
-            ["Sel", "#", "Source", "From", "Name", "Size", "Seeds", "Leeches"],
+            ["#", "Source", "From", "Name", "Size", "Seeds", "Leeches"],
         )
         self.assertEqual(
-            [column.header for column in self._table(100).columns],
-            ["Sel", "#", "Source", "Name", "Size", "Seeds"],
+            [column.header for column in self._table(90).columns],
+            ["#", "Source", "Name", "Size", "Seeds"],
         )
         self.assertEqual(
-            [column.header for column in self._table(72).columns],
-            ["Sel", "#", "Name", "Seeds"],
+            [column.header for column in self._table(60).columns],
+            ["#", "Name", "Seeds"],
         )
         self.assertEqual(
-            [column.header for column in self._table(46).columns],
+            [column.header for column in self._table(40).columns],
             ["Result"],
         )
 
-    def test_narrow_table_preserves_hidden_selected_metadata(self):
-        responsive_table = self._table(72)
+    def test_age_column_appears_only_when_rows_have_upload_dates(self):
+        dated = [dict(self.RESULTS[0], uploaded_at=1_700_000_000)]
+        sized_console = Console(width=140, height=30, color_system=None)
+        with patch.object(table, "console", sized_console):
+            with_dates = table.build_table(dated, 0, 0, 1, 1, show_from=True)
+        self.assertEqual([c.header for c in with_dates.columns][-1], "Age")
+        self.assertNotIn("Age", [c.header for c in self._table(140).columns])
 
-        output = _render(responsive_table, 72)
+    def test_narrow_table_preserves_hidden_selected_metadata(self):
+        responsive_table = self._table(60)
+
+        output = _render(responsive_table, 60)
         self.assertIn("Source: Nyaa", output)
         self.assertIn("From: Example Work", output)
         self.assertIn("Leeches: 7", output)
@@ -221,7 +229,7 @@ class ResponsiveTableTests(unittest.TestCase):
                 self.assertNotIn("Apibay", output)
 
     def test_each_table_layout_stays_inside_its_terminal_width(self):
-        for width in (140, 100, 72, 46):
+        for width in (140, 100, 90, 72, 60, 46, 40):
             with self.subTest(width=width):
                 _render(self._table(width), width)
 

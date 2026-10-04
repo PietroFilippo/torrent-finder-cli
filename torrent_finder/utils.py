@@ -89,10 +89,8 @@ def parse_size_to_bytes(size_str: str) -> int:
 
 
 def seed_style(seeds: int) -> str:
-    """Return a rich color tag based on seed count."""
-    if seeds >= 50:
-        return "bold green"
-    elif seeds >= 10:
+    """Seed-health colour: green from 10 seeds, yellow below, red at none."""
+    if seeds >= 10:
         return "green"
     elif seeds >= 1:
         return "yellow"
@@ -100,9 +98,9 @@ def seed_style(seeds: int) -> str:
 
 
 def leech_style(leeches: int) -> str:
-    """Return a rich color tag based on leech count."""
+    """Leech colour: grey when few (readable on light and dark themes), then yellow, red."""
     if leeches <= 5:
-        return "dim white"
+        return "bright_black"
     elif leeches <= 50:
         return "yellow"
     return "red"

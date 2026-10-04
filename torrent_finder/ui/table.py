@@ -14,6 +14,7 @@ from rich.table import Table
 from rich.text import Text
 
 from torrent_finder.constants import RESULTS_PER_PAGE, console
+from torrent_finder.ui import theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 from torrent_finder.utils import format_size, leech_style, seed_style
 from torrent_finder.result_view import SORT_ORDERS, result_indices, timestamp
@@ -42,29 +43,94 @@ class _TableLayout:
     seeds: bool
     leeches: bool
     provider: bool = False
+    age: bool = False
 
 
-def _table_layout(width: int, show_from: bool, show_provider: bool = False) -> _TableLayout:
+# Borderless columns: widths in cells. Rich pads every cell by one, so
+# neighbouring cells are two apart and the table edges carry one cell each:
+# with the gutter's own space the left margin is two cells, and the right
+# margin reserves two (the edge cell plus one).
+_GUTTER_W, _SOURCE_W, _PROVIDER_W, _FROM_W = 3, 9, 14, 12
+_SIZE_W, _SEEDS_W, _LEECHES_W, _AGE_W = 9, 6, 7, 4
+_RIGHT_MARGIN = 3
+
+
+def _fixed(*widths: int) -> int:
+    """Cells used by the given fixed columns, the name's padding and the right margin."""
+    return sum(widths) + 2 * len(widths) + _RIGHT_MARGIN
+
+
+def _lead_width(digits: int) -> int:
+    """The first column: a space, cursor bar, check mark, a space, the row number."""
+    return _GUTTER_W + 1 + digits
+
+
+def _index_digits(indexes) -> int:
+    return len(str(max(indexes))) if indexes else 1
+
+
+def _table_layout(width: int, show_from: bool, show_provider: bool = False,
+                  show_age: bool = False, digits: int = 2) -> _TableLayout:
     """Choose progressively smaller result columns for the terminal width."""
-    full_min = 128 if show_from else 112
-    if width >= full_min:
-        fixed = 84 if show_from else 69
-        if show_provider:
-            fixed += 17
+    lead = _lead_width(digits)
+    full = [lead, _SOURCE_W, _SIZE_W, _SEEDS_W, _LEECHES_W]
+    if show_provider:
+        full.append(_PROVIDER_W)
+    if show_from:
+        full.append(_FROM_W)
+    if show_age:
+        full.append(_AGE_W)
+    if width - _fixed(*full) >= 36:
         return _TableLayout(
-            "full", max(18, min(46, width - fixed)), True, show_from, True, True, True, show_provider
+            "full", width - _fixed(*full), True, show_from, True, True, True, show_provider, show_age
         )
-    if width >= 80:
-        return _TableLayout(
-            "medium", max(12, min(46, width - 57)), True, False, True, True, False
-        )
-    if width >= 52:
-        return _TableLayout(
-            "compact", max(10, width - 32), False, False, False, True, False
-        )
+    medium = _fixed(lead, _SOURCE_W, _SIZE_W, _SEEDS_W)
+    if width - medium >= 29:
+        return _TableLayout("medium", width - medium, True, False, True, True, False)
+    compact = _fixed(lead, _SEEDS_W)
+    if width - compact >= 25:
+        return _TableLayout("compact", width - compact, False, False, False, True, False)
     return _TableLayout(
-        "minimal", max(8, width - 6), False, False, False, False, False
+        "minimal", max(8, width - _RIGHT_MARGIN - lead - 2), False, False, False, False, False
     )
+
+
+def _page_layout(rows: list[dict], width: int, show_from: bool, indexes=()) -> _TableLayout:
+    """The layout build_table draws for these rows; marquee and detail scrolling share it.
+
+    *indexes* are the row numbers the page shows; they set the number column's width.
+    """
+    return _table_layout(width, show_from, any(r.get("provider_slug") for r in rows),
+                         any(timestamp(r.get("uploaded_at")) for r in rows), _index_digits(indexes))
+
+
+def _pack(parts: list[str], width: int) -> list[str]:
+    """Join *parts* with " · " into lines of *width* cells; a part never splits."""
+    lines: list[str] = []
+    for part in parts:
+        if lines and cell_len(lines[-1]) + 3 + cell_len(part) <= width:
+            lines[-1] += " · " + part
+        else:
+            lines.append(part)
+    return lines
+
+
+def _age(uploaded: int, now: float | None = None) -> str:
+    """Compact upload age: 5h, 3d, 2w, 7mo, 1y; empty when unknown."""
+    if not uploaded:
+        return ""
+    seconds = max(0, (now if now is not None else time.time()) - uploaded)
+    hours = seconds / 3600
+    if hours < 24:
+        return f"{max(1, int(hours))}h"
+    days = hours / 24
+    if days < 14:
+        return f"{int(days)}d"
+    if days < 60:
+        return f"{int(days // 7)}w"
+    if days < 730:
+        return f"{int(days // 30)}mo"
+    return f"{int(days // 365)}y"
 
 
 def _selected_metadata(
@@ -76,9 +142,11 @@ def _selected_metadata(
         return details
 
     item = results[selected_idx]
+    room = theme.inner_width(console.size.width)
     parts: list[str] = []
     if item.get("provider_label"):
-        details.append(f"  Provider: {item['provider_label']}  |  Source: {_source_label(item)}\n", style="dim")
+        for line in _pack([f"Provider: {item['provider_label']}", f"Source: {_source_label(item)}"], room):
+            details.append(f"{theme.MARGIN}{line}\n", style=theme.MUTED)
     uploaded = timestamp(item.get("uploaded_at"))
     parts.append("Uploaded: " + (datetime.fromtimestamp(uploaded, timezone.utc).strftime("%Y-%m-%d") if uploaded else "unknown"))
     if not layout.source and not item.get("provider_label"):
@@ -93,19 +161,35 @@ def _selected_metadata(
         parts.append(f"Seeds: {int(item.get('seeders', 0) or 0)}")
     if not layout.leeches:
         parts.append(f"Leeches: {int(item.get('leechers', 0) or 0)}")
-    if parts:
-        details.append("  " + "  |  ".join(parts) + "\n", style="dim")
+    for line in _pack(parts, room):
+        details.append(theme.MARGIN + line + "\n", style=theme.MUTED)
     return details
 
 
 def _wrapped_details(item, layout):
-    width = max(8, console.size.width - 6) if layout.mode == "minimal" else layout.name_width
+    width = max(8, console.size.width - 12) if layout.mode == "minimal" else layout.name_width
     return Text("\n".join(detail_lines(item))).wrap(console, width)
 
 
 def _detail_count():
     # Leave a line for the compact search-notice banner, including bookmarks.
     return max(2, min(8, console.size.height // 4) - 1)
+
+
+def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = False) -> str:
+    """The results key bar as plain text (it contains "[/]"), most frequent keys first."""
+    if expanded:
+        return "i close • [/] scroll details • b bookmark • Esc back"
+    enter = f"Enter download {len(picked)} selected" if picked else "Enter open"
+    if console.size.width < 52:
+        enter = f"Enter download {len(picked)}" if picked else "Enter open"
+        keys = f"↑/↓ move • Space pick • {enter} • i details • b save • f refine"
+    else:
+        keys = f"↑/↓ navigate • Space select • {enter} • i details • f refine/sort • b bookmark"
+    keys += " • a all • c clear"
+    if total_pages > 1:
+        keys += " • ←/→ page"
+    return keys + " • Esc back"
 
 
 def _table_caption(
@@ -117,31 +201,19 @@ def _table_caption(
     picked: "frozenset[int]",
     expanded: bool = False,
 ) -> Text:
-    caption = Text() if expanded else _selected_metadata(results, selected_idx, layout, show_from)
-    if expanded:
-        caption.append("i close • [/] scroll details • b bookmark • Esc back", style="dim")
-        return caption
-    if console.size.width < 52:
-        enter = f"Enter download {len(picked)}" if picked else "Enter open"  # what Enter really does
-        caption.append(f"↑/↓ move • Space pick • i details\n{enter} • b save • f refine\n", style="dim")
-        caption.append("←/→ page • Esc back" if total_pages > 1 else "Esc back • a all • c clear", style="dim")
-        return caption
-    if any(item.get("apibay_cached_at") for item in results):
-        caption.append(
-            "  Apibay* = cached last-known-good results\n",
-            style="yellow",
-        )
-    controls = " ↑/↓ navigate  |  Space select  |  a all  |  c clear"
-    if total_pages > 1:
-        controls += "  |  ←/→ page"
-    controls += (
-        f"  |  Enter download {len(picked)} selected"
-        if picked
-        else "  |  Enter open"
-    )
-    controls += "  |  i details  |  b bookmark  |  f refine/sort  |  Esc back"
-    caption.append(controls, style="dim")
-    caption.overflow = "fold"
+    """Details for the focused row, then the key bar, under the left margin."""
+    width = console.size.width
+    caption = Text(no_wrap=False, overflow="fold")
+    if not expanded and 0 <= selected_idx < len(results):
+        name = ellipsize_cells(str(results[selected_idx].get("name", "Unknown")),
+                               theme.inner_width(width))
+        caption.append("\n" + theme.MARGIN + name + "\n", style="bold")
+        caption.append_text(_selected_metadata(results, selected_idx, layout, show_from))
+    if not expanded and any(item.get("apibay_cached_at") for item in results):
+        caption.append(theme.MARGIN + "Apibay* = cached last-known-good results\n", style=theme.WARN)
+    caption.append("\n")
+    caption.append_text(Text("\n").join(theme.wrap_keys(
+        theme.parse_footer(Text(_result_keys(total_pages, picked, expanded))).keys, width)))
     return caption
 
 
@@ -149,20 +221,22 @@ def _note_preview(note: str) -> Text:
     """Keep partial-search notices from crowding results out of short windows."""
     count = len(note.splitlines())
     if console.size.height < 28 or count > 2:
-        return Text(f"⚠ {count} search notice{'s' if count != 1 else ''} — n to read", style="yellow",
-                    no_wrap=True, overflow="ellipsis")
-    return Text(note + "\nn: read search notices", style="yellow", overflow="fold")
+        return Text(f"{theme.MARGIN}{count} search notice{'s' if count != 1 else ''} — n to read",
+                    style=theme.WARN, no_wrap=True, overflow="ellipsis")
+    preview = Text(style=theme.WARN, overflow="fold")
+    for line in note.splitlines():
+        preview.append(theme.MARGIN + line + "\n")
+    preview.append(theme.MARGIN + "n: read search notices")
+    return preview
 
 
 def _show_search_notices(note: str) -> None:
     from rich.markup import escape
-    from torrent_finder.ui.prompts import _make_banner_panel
     from torrent_finder.ui.selector import SelectItem, arrow_select
     items = [SelectItem(line.split(":", 1)[0], description=escape(line), passive=True)
              for line in note.splitlines() if line.strip()]
     items.append(SelectItem("Back to results", is_action=True))
-    arrow_select(items, title="Search notices", banner=_make_banner_panel(),
-                 footer="↑/↓ read notices • Esc back to results")
+    arrow_select(items, title="Search notices", footer="↑/↓ read notices • Esc back to results")
 
 
 def _note_line_count(note: str, width: int) -> int:
@@ -171,14 +245,27 @@ def _note_line_count(note: str, width: int) -> int:
     return max(1, len(_note_preview(note).wrap(console, max(8, width))))
 
 
+_METADATA_LINES = {"full": 1, "medium": 1, "compact": 2, "minimal": 3}
+
+
 def _visible_count(
-    total: int, height: int, width: int, note: str, show_from: bool, show_provider: bool = False
+    total: int, height: int, width: int, note: str, show_from: bool, show_provider: bool = False,
+    heading: str = "",
 ) -> int:
-    """Return rows that fit after responsive caption and metadata lines."""
-    layout = _table_layout(width, show_from)
-    extra = {"full": 0, "medium": 1, "compact": 2, "minimal": 4}[layout.mode]
-    chrome = 10 if height < 28 else 16
-    available = max(1, height - chrome - _note_line_count(note, width) - extra - (2 if show_provider else 0))
+    """Return rows that fit after the header, notices, details and key bar."""
+    layout = _table_layout(width, show_from, show_provider)
+    header = len(theme.header_lines(heading or "Results", "888–888 of 888 · page 88/88 · 888 picked", width))
+    compact = height < 20
+    keys = len(theme.wrap_keys(theme.parse_footer(
+        Text(_result_keys(2, frozenset(range(100))))).keys, width))
+    chrome = (
+        header + (0 if compact else 1)       # header lines, spacer
+        + 1 + _note_line_count(note, width)  # view status, notices
+        + 1                                  # table header row
+        + 1 + 1 + _METADATA_LINES[layout.mode] + (2 if show_provider else 0)  # spacer, name, metadata
+        + 1 + 1 + keys                       # cached-results note, spacer, keys
+    )
+    available = max(1, height - chrome)
     return min(total, available)
 
 
@@ -198,64 +285,52 @@ def build_table(
     expanded: bool = False,
     detail_offset: int = 0,
 ) -> Table:
-    """Build a result table whose columns progressively collapse by width."""
+    """Build a borderless result table whose columns collapse by width."""
     width = console.size.width
-    layout = _table_layout(width, show_from, any(r.get("provider_slug") for r in results))
+    page_indexes = (original_indices if original_indices is not None
+                    else range(global_offset, global_offset + max(total, 1)))
+    digits = _index_digits(page_indexes)
+    layout = _page_layout(results, width, show_from, page_indexes)
     end_idx = min(scroll_offset + visible_count, total)
-    scroll_info = f"[dim]({scroll_offset + 1}-{end_idx} of {total})[/dim]" if total else "[dim](No matching results — f to refine)[/dim]"
-    page_info = (
-        f"  [bold cyan]Page {current_page + 1}/{total_pages}[/bold cyan]"
-        if total_pages > 1
-        else ""
-    )
-    selected_info = (
-        f"  [bold green]✓ {len(picked)} selected[/bold green]" if picked else ""
-    )
-
-    title = f"Torrent Results {scroll_info}{page_info}{selected_info}"
-    if width < 52:
-        title = f"Results {scroll_info}" if total else "No matching results"
-        if total_pages > 1:
-            title += f" • p{current_page + 1}/{total_pages}"
-        if picked:
-            title += f" • ✓{len(picked)}"
     table = Table(
-        title=title,
-        title_style="bold magenta",
-        border_style="bright_blue",
-        header_style="bold cyan",
-        show_lines=False,
+        box=None,
+        show_edge=False,
+        pad_edge=False,
         padding=(0, 1),
-        width=width if layout.mode == "minimal" else None,
+        header_style=f"bold {theme.MUTED}",
+        show_lines=False,
+        width=width - 1 if layout.mode == "minimal" else None,
         caption=_table_caption(
             results, selected_idx, layout, show_from, total_pages, picked, expanded
         ),
-        caption_style="dim",
+        caption_justify="left",
     )
+    if not total:
+        notice = Text(f"\n{theme.MARGIN}No matching results — f to refine\n", style=theme.WARN)
+        notice.append_text(table.caption)
+        table.caption = notice
 
     if layout.mode == "minimal":
-        table.add_column("Result", style="white", no_wrap=not expanded, overflow="fold" if expanded else "ellipsis")
+        table.add_column("Result", no_wrap=not expanded, overflow="fold" if expanded else "ellipsis")
     else:
-        table.add_column("Sel", justify="center", width=5)
-        table.add_column("#", style="bold white", justify="right", width=7)
+        table.add_column("#", justify="right", width=_lead_width(digits), no_wrap=True)
         if layout.source:
-            table.add_column("Source", style="magenta", width=9)
+            table.add_column("Source", style=theme.MUTED, width=_SOURCE_W, no_wrap=True, overflow="ellipsis")
         if layout.provider:
-            table.add_column("Provider", style="green", width=14, no_wrap=True, overflow="ellipsis")
+            table.add_column("Provider", width=_PROVIDER_W, no_wrap=True, overflow="ellipsis")
         if layout.from_work:
-            table.add_column(
-                "From", style="green", width=12, no_wrap=True, overflow="ellipsis"
-            )
-        table.add_column(
-            "Name", style="white", width=layout.name_width, no_wrap=not expanded
-        )
+            table.add_column("From", width=_FROM_W, no_wrap=True, overflow="ellipsis")
+        table.add_column("Name", width=layout.name_width, no_wrap=not expanded)
         if layout.size:
-            table.add_column("Size", style="cyan", justify="right", width=10)
+            table.add_column("Size", justify="right", width=_SIZE_W, no_wrap=True)
         if layout.seeds:
-            table.add_column("Seeds", justify="right", width=7)
+            table.add_column("Seeds", justify="right", width=_SEEDS_W, no_wrap=True)
         if layout.leeches:
-            table.add_column("Leeches", justify="right", width=9)
+            table.add_column("Leeches", justify="right", width=_LEECHES_W, no_wrap=True)
+        if layout.age:
+            table.add_column("Age", justify="right", style=theme.MUTED, width=_AGE_W, no_wrap=True)
 
+    now = time.time()
     for visible_idx, item in enumerate(results[scroll_offset:end_idx]):
         index = scroll_offset + visible_idx
         global_index = original_indices[index] if original_indices is not None else global_offset + index
@@ -266,46 +341,41 @@ def build_table(
         if item.get("provider_label") and not layout.provider:
             name = f"{item['provider_label']} · {name}"
         is_selected = index == selected_idx
+        checked = global_index in picked
 
         display_name = (
             marquee_cells(name, layout.name_width, tick)
             if is_selected and cell_len(name) > layout.name_width
             else ellipsize_cells(name, layout.name_width)
         )
-
-        if is_selected:
-            # Reverse fills every cell to the expanded row's full height.
-            # Details keep the normal background; the arrow still marks focus.
-            row_style = "bold" if expanded else "bold reverse"
-            number = f">> {global_index}"
-            seed_text = str(seeds)
-            leech_text = str(leeches)
-        else:
-            row_style = "" if index % 2 == 0 else "dim"
-            number = str(global_index)
-            seed_text = f"[{seed_style(seeds)}]{seeds}[/{seed_style(seeds)}]"
-            leech_text = f"[{leech_style(leeches)}]{leeches}[/{leech_style(leeches)}]"
+        lead = Text(" ")
+        lead.append(theme.CURSOR if is_selected else " ", style=theme.ACCENT)
+        lead.append(theme.CHECK if checked else " ", style=theme.GOOD)
+        lead.append(f" {global_index:>{digits}}")
 
         name_cell = Text(display_name)
         if expanded and is_selected:
             lines = _wrapped_details(item, layout)
             count = _detail_count()
             offset = min(detail_offset, max(0, len(lines) - count))
-            name_cell.append(f"\nDetails {offset + 1}-{min(len(lines), offset + count)}/{len(lines)} ([/])", style="cyan")
+            name_cell.append(f"\nDetails {offset + 1}-{min(len(lines), offset + count)}/{len(lines)} ([/])",
+                             style=theme.ACCENT)
             for line in lines[offset:offset + count]:
                 name_cell.append("\n")
                 name_cell.append(line)
-        checked = global_index in picked
+        row_style = theme.FOCUS if is_selected else ""
+        seed_text = Text(str(seeds), style=seed_style(seeds))
+        leech_text = Text(str(leeches), style=leech_style(leeches))
+
         if layout.mode == "minimal":
             result_cell = Text()
-            result_cell.append("[✓]" if checked else "[ ]", style="green" if checked else "dim")
-            result_cell.append(f"  {number}  ")
-            result_cell.append(name_cell)
+            result_cell.append_text(lead)
+            result_cell.append("  ")
+            result_cell.append_text(name_cell)
             table.add_row(result_cell, style=row_style)
             continue
 
-        check_text = "[green][✓][/green]" if checked else "[dim][ ][/dim]"
-        cells: list[object] = [check_text, number]
+        cells: list[object] = [lead]
         if layout.source:
             cells.append(Text(_source_label(item)))
         if layout.provider:
@@ -319,9 +389,25 @@ def build_table(
             cells.append(seed_text)
         if layout.leeches:
             cells.append(leech_text)
+        if layout.age:
+            cells.append(_age(timestamp(item.get("uploaded_at")), now))
         table.add_row(*cells, style=row_style)
 
     return table
+
+
+def results_status(scroll_offset: int, visible_count: int, total: int, current_page: int,
+                   total_pages: int, picked: "frozenset[int]") -> str:
+    """Header status: visible rows, page and picks."""
+    if not total:
+        return "no matching results"
+    end_idx = min(scroll_offset + visible_count, total)
+    parts = [f"{scroll_offset + 1}–{end_idx} of {total}"]
+    if total_pages > 1:
+        parts.append(f"page {current_page + 1}/{total_pages}")
+    if picked:
+        parts.append(f"{len(picked)} picked")
+    return " · ".join(parts)
 
 
 def _pick_result(picked: set[int]) -> tuple:
@@ -335,7 +421,7 @@ def _pick_result(picked: set[int]) -> tuple:
 
 
 def interactive_select(results: list[dict], note: str = "", *, initial_order: str = "relevance",
-                       search_summary: str = "", on_bookmark=None) -> "tuple | None":
+                       search_summary: str = "", on_bookmark=None, heading: str = "") -> "tuple | None":
     """Interactive torrent results table with multi-select.
 
     Navigate with arrows; Left/Right switch pages; type a number to jump.
@@ -378,9 +464,9 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     total = len(page_items)
     global_offset = current_page * RESULTS_PER_PAGE
 
-    # Reserve room for the banner, wrapping caption, and hidden metadata line.
+    # Reserve room for the header, notices, details and key bar.
     visible_count = _visible_count(
-        total, console.size.height, console.size.width, note, show_from, show_provider
+        total, console.size.height, console.size.width, note, show_from, show_provider, heading=heading
     )
 
     scroll_offset = 0
@@ -394,31 +480,36 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     }
     stop_event = threading.Event()
 
-    # Render the app banner inside the alt-screen frame, with a 1-line spacer
-    # between it and the table (lazy import avoids a circular import).
-    from torrent_finder.ui.prompts import _make_banner_panel
-    banner = _make_banner_panel()
-
     def framed(tbl):
-        heading = Text("Torrent Search CLI", style="bold magenta") if console.size.height < 28 else banner
+        """The whole results screen: header, view line, notices, table, details, keys."""
+        status = results_status(current if expanded else scroll_offset, 1 if expanded else visible_count,
+                                total, current_page, total_pages, frozenset(picked))
+        parts: list[object] = list(theme.header_lines(heading or "Results", status, console.size.width))
+        if console.size.height >= 20:
+            parts.append(Text(""))
         order_label = SORT_ORDERS.get(view_order, view_order)
         if view_order != "relevance":
             order_label += " (overrides preferences)"
-        view_status = Text(f"Sort: {order_label} • {view_mode}: {view_query or 'all names'}"
+        view_status = Text(theme.MARGIN + f"Sort: {order_label} • {view_mode}: {view_query or 'all names'}"
                            + (f" • {search_summary}" if search_summary else ""),
-                           style="dim", no_wrap=True, overflow="ellipsis")
+                           style=theme.MUTED, no_wrap=True, overflow="ellipsis")
         if feedback:
-            view_status = Text(feedback, style="yellow", no_wrap=True, overflow="ellipsis")
+            view_status = Text(theme.MARGIN + feedback, style=theme.WARN, no_wrap=True, overflow="ellipsis")
         if session is not None:
             failures = sum(d.retryable for d in session.diagnostics)
             retry_label = f"r retry ({failures})" if failures else "r retry"
-            controls = Text(f"n diagnostics • {retry_label} • m more", style="cyan", no_wrap=True, overflow="ellipsis")
+            controls = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
+            for i, segment in enumerate(theme.parse_footer(f"n diagnostics • {retry_label} • m more").keys):
+                if i:
+                    controls.append(theme.KEY_GAP)
+                controls.append_text(segment)
             if not results and not feedback:
-                view_status = Text("No results • n explains the search", style="yellow", no_wrap=True, overflow="ellipsis")
-            return Group(heading, view_status, controls, tbl)
+                view_status = Text(theme.MARGIN + "No results • n explains the search", style=theme.WARN,
+                                   no_wrap=True, overflow="ellipsis")
+            return Group(*parts, view_status, controls, tbl)
         if note:
-            return Group(heading, view_status, _note_preview(note), tbl)
-        return Group(heading, view_status, tbl)
+            return Group(*parts, view_status, _note_preview(note), tbl)
+        return Group(*parts, view_status, tbl)
 
     # screen=True renders into the terminal's alternate-screen buffer — a fixed
     # viewport that never scrolls. Without it, Live updates (e.g. the marquee on
@@ -461,13 +552,15 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         note,
                         show_from,
                         show_provider,
+                        heading=heading,
                     )
                     if cur < scroll_offset:
                         scroll_offset = cur
                     elif cur >= scroll_offset + visible_count:
                         scroll_offset = max(0, cur - visible_count + 1)
 
-                layout = _table_layout(current_size.width, show_from, show_provider)
+                layout = _page_layout(page_items, current_size.width, show_from,
+                                      view_indexes[global_offset:global_offset + total])
                 name = str(page_items[cur].get("name", "")) if has_current else ""
                 if has_current and show_provider and not layout.provider:
                     name = f"{page_items[cur].get('provider_label', '')} · {name}"
@@ -532,6 +625,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                             note,
                             show_from,
                             show_provider,
+                            heading=heading,
                         )
                     num_buffer = ""
                 elif key == readchar.key.RIGHT:
@@ -549,6 +643,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                             note,
                             show_from,
                             show_provider,
+                            heading=heading,
                         )
                     num_buffer = ""
                 elif key == " ":
@@ -580,7 +675,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     else:
                         scroll_offset = saved_scroll
                 elif key in ("[", "]") and expanded:
-                    layout = _table_layout(console.size.width, show_from, show_provider)
+                    layout = _page_layout(page_items, console.size.width, show_from,
+                                          view_indexes[global_offset:global_offset + total])
                     limit = max(0, len(_wrapped_details(page_items[current], layout)) - _detail_count())
                     detail_offset = min(limit, max(0, min(limit, detail_offset) + (1 if key == "]" else -1)))
                 elif key in ("b", "B") and on_bookmark and total:
@@ -626,7 +722,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     total = len(page_items)
                     show_from = len({r.get("from_work") for r in all_results if r.get("from_work")}) > 1
                     show_provider = any(r.get("provider_slug") for r in all_results)
-                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider)
+                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider, heading=heading)
                     scroll_offset = min(scroll_offset, max(0, total - visible_count))
                     num_buffer = ""
                     # These are identity-preserving changes, not a user move.
@@ -643,7 +739,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         _show_search_notices(note)
                     except KeyboardInterrupt:
                         pass
-                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider)
+                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider, heading=heading)
                     live.start()
                     stop_event.clear()
                     ticker_thread = threading.Thread(target=ticker, daemon=True)
@@ -666,7 +762,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     current_page = current = scroll_offset = global_offset = 0
                     page_items = page_results()
                     total = len(page_items)
-                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider)
+                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider, heading=heading)
                     marquee_state["tick"] = 0
                     marquee_state["cursor_changed_at"] = time.monotonic()
                     live.start()
@@ -693,7 +789,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                             page_items = page_results()
                             total = len(page_items)
                             global_offset = current_page * RESULTS_PER_PAGE
-                            visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider)
+                            visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider, heading=heading)
                             if current_page != prev_page:
                                 scroll_offset = 0
                     except ValueError:

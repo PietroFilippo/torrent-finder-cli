@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 from rich.console import Console
 from torrent_finder import main
-from torrent_finder.ui import prompts, selector, table
+from torrent_finder.ui import prompts, selector, table, theme
 from isolation import isolate_store
 
 
@@ -163,7 +163,7 @@ class GlobalActionsTests(unittest.TestCase):
                 segments = list(output.render(rendered))
             self.assertTrue(any("Details" in seg.text for seg in segments))
             self.assertFalse(any(seg.style and seg.style.reverse for seg in segments))
-            self.assertTrue(any(">> 0" in seg.text for seg in segments))
+            self.assertTrue(any(theme.CURSOR in seg.text for seg in segments))
 
 
 if __name__ == "__main__":
