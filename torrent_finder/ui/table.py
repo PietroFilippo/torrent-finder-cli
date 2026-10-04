@@ -249,12 +249,31 @@ def _note_line_count(note: str, width: int) -> int:
 _METADATA_LINES = {"full": 1, "medium": 1, "compact": 2, "minimal": 3}
 
 
+def _details_lines(rows: list[dict], layout: _TableLayout, show_from: bool) -> int:
+    """The most lines the focused-row details take on this page: name plus metadata."""
+    most = 0
+    for index in range(len(rows)):
+        metadata = _selected_metadata(rows, index, layout, show_from).plain.rstrip("\n")
+        most = max(most, len(metadata.split("\n")) if metadata else 0)
+    return 1 + most
+
+
 def _visible_count(
     total: int, height: int, width: int, note: str, show_from: bool, show_provider: bool = False,
-    heading: str = "",
+    heading: str = "", rows: list[dict] | None = None, indexes=(),
 ) -> int:
-    """Return rows that fit after the header, notices, details and key bar."""
-    layout = _table_layout(width, show_from, show_provider)
+    """Return rows that fit after the header, notices, details and key bar.
+
+    With the page's *rows* (and their numbers in *indexes*) the details block
+    is measured for the tallest row, so a long wrapped "From" or provider line
+    never pushes the key bar off screen; without them it is estimated.
+    """
+    if rows is not None:
+        layout = _page_layout(rows, width, show_from, indexes)
+        details = _details_lines(rows, layout, show_from)
+    else:
+        layout = _table_layout(width, show_from, show_provider)
+        details = 1 + _METADATA_LINES[layout.mode] + (2 if show_provider else 0)
     header = len(theme.header_lines(heading or "Results", "888–888 of 888 · page 88/88 · 888 picked", width))
     compact = height < 20
     keys = len(theme.wrap_keys(theme.parse_footer(
@@ -263,7 +282,7 @@ def _visible_count(
         header + (0 if compact else 1)       # header lines, spacer
         + 1 + _note_line_count(note, width)  # view status, notices
         + 1                                  # table header row
-        + 1 + 1 + _METADATA_LINES[layout.mode] + (2 if show_provider else 0)  # spacer, name, metadata
+        + 1 + details                        # spacer, name and metadata
         + 1 + (0 if compact else 1) + keys   # cached-results note, spacer, keys
     )
     available = max(1, height - chrome)
@@ -465,10 +484,14 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     total = len(page_items)
     global_offset = current_page * RESULTS_PER_PAGE
 
+    def _fit_rows() -> int:
+        """Result rows that fit now, measuring this page's tallest details block."""
+        return _visible_count(total, console.size.height, console.size.width, note, show_from,
+                              show_provider, heading=heading, rows=page_items,
+                              indexes=view_indexes[global_offset:global_offset + total])
+
     # Reserve room for the header, notices, details and key bar.
-    visible_count = _visible_count(
-        total, console.size.height, console.size.width, note, show_from, show_provider, heading=heading
-    )
+    visible_count = _fit_rows()
 
     scroll_offset = 0
     expanded, detail_offset, saved_scroll = False, 0, 0
@@ -546,15 +569,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                 has_current = 0 <= cur < len(page_items)
 
                 if size_changed:
-                    visible_count = _visible_count(
-                        total,
-                        current_size.height,
-                        current_size.width,
-                        note,
-                        show_from,
-                        show_provider,
-                        heading=heading,
-                    )
+                    visible_count = _fit_rows()
                     if cur < scroll_offset:
                         scroll_offset = cur
                     elif cur >= scroll_offset + visible_count:
@@ -619,15 +634,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         global_offset = current_page * RESULTS_PER_PAGE
                         current = 0
                         scroll_offset = 0
-                        visible_count = _visible_count(
-                            total,
-                            console.size.height,
-                            console.size.width,
-                            note,
-                            show_from,
-                            show_provider,
-                            heading=heading,
-                        )
+                        visible_count = _fit_rows()
                     num_buffer = ""
                 elif key == readchar.key.RIGHT:
                     if current_page < total_pages - 1:
@@ -637,15 +644,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         global_offset = current_page * RESULTS_PER_PAGE
                         current = 0
                         scroll_offset = 0
-                        visible_count = _visible_count(
-                            total,
-                            console.size.height,
-                            console.size.width,
-                            note,
-                            show_from,
-                            show_provider,
-                            heading=heading,
-                        )
+                        visible_count = _fit_rows()
                     num_buffer = ""
                 elif key == " ":
                     if not total:
@@ -723,7 +722,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     total = len(page_items)
                     show_from = len({r.get("from_work") for r in all_results if r.get("from_work")}) > 1
                     show_provider = any(r.get("provider_slug") for r in all_results)
-                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider, heading=heading)
+                    visible_count = _fit_rows()
                     scroll_offset = min(scroll_offset, max(0, total - visible_count))
                     num_buffer = ""
                     # These are identity-preserving changes, not a user move.
@@ -740,7 +739,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         _show_search_notices(note)
                     except KeyboardInterrupt:
                         pass
-                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider, heading=heading)
+                    visible_count = _fit_rows()
                     live.start()
                     stop_event.clear()
                     ticker_thread = threading.Thread(target=ticker, daemon=True)
@@ -763,7 +762,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     current_page = current = scroll_offset = global_offset = 0
                     page_items = page_results()
                     total = len(page_items)
-                    visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider, heading=heading)
+                    visible_count = _fit_rows()
                     marquee_state["tick"] = 0
                     marquee_state["cursor_changed_at"] = time.monotonic()
                     live.start()
@@ -790,7 +789,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                             page_items = page_results()
                             total = len(page_items)
                             global_offset = current_page * RESULTS_PER_PAGE
-                            visible_count = _visible_count(total, console.size.height, console.size.width, note, show_from, show_provider, heading=heading)
+                            visible_count = _fit_rows()
                             if current_page != prev_page:
                                 scroll_offset = 0
                     except ValueError:

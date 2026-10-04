@@ -338,3 +338,29 @@ class ReviewRoundOneTests(unittest.TestCase):
                     frame = selector._build_panel(items, 31, "Search History · provider: All · type: All",
                                                   False, footer)
                 self.assertLessEqual(len(plain_lines(frame, width, height)), height)
+
+
+class ResultsBudgetTests(unittest.TestCase):
+    def test_long_details_never_push_the_keys_off_screen(self):
+        from rich.console import Group
+        from torrent_finder.ui import table
+        works = ["The Lord of the Rings: The Fellowship of the Ring (2001)", "Dune", "Alien"]
+        rows = [dict(name=f"Release {i} 1080p WEB-DL", source="Apibay", seeders=10 + i, leechers=3,
+                     size=1_000_000_000, uploaded_at=1_700_000_000, from_work=works[i % 3],
+                     apibay_cached_at=1.0) for i in range(20)]  # cached rows add a note line
+        heading = "Movies & Series › lord of the rings, dune, alien"
+        for width, height in ((80, 24), (60, 20), (100, 30)):
+            for focus in range(0, 20, 3):
+                with self.subTest(width=width, height=height, focus=focus):
+                    screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
+                    with patch.object(table, "console", screen):
+                        count = table._visible_count(len(rows), height, width, "", True, False,
+                                                     heading=heading, rows=rows, indexes=range(20))
+                        scroll = max(0, focus - count + 1)
+                        frame = Group(*theme.header_lines(heading, "1–13 of 20 · page 1/2", width), Text(""),
+                                      Text("  Sort: Recommended • contains: all names"),
+                                      table.build_table(rows, focus, scroll, count, len(rows), show_from=True,
+                                                        original_indices=list(range(20))))
+                        lines = plain_lines(frame, width, height)
+                    self.assertLessEqual(len(lines), height)
+                    self.assertIn("Esc back", "\n".join(lines))
