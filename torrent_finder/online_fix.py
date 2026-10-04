@@ -28,13 +28,16 @@ below are best-effort.
 import os
 import re
 import threading
+import time
+from contextlib import contextmanager
 from html import unescape
 from urllib.parse import urljoin, unquote
 
 import requests
 
+from torrent_finder.search_errors import SearchError
 from torrent_finder.search_result import SearchResult
-from torrent_finder.search_control import search_request
+from torrent_finder.search_control import SearchInterrupted, search_request, search_stopped, search_wait
 from torrent_finder.result_view import matches_name
 
 _BASE = "https://online-fix.me"
@@ -65,7 +68,28 @@ _TORRENT_DIR_RE = re.compile(
     r'href="(https?://[^"]*uploads\.online-fix\.me[^"]*/torrents/[^"]+)"', re.I)
 _ALT_ATTR_RE = re.compile(r'\salt="([^"]+)"')      # cover image alt = clean title
 _TITLE_ATTR_RE = re.compile(r'title="([^"]+)"')
+_H2_TITLE_RE = re.compile(r'<h2 class="title">(.*?)</h2>', re.S)
 _TAG_RE = re.compile(r"<[^>]+>")
+
+# The search page lists each hit in a "news news-search" block. Every page also
+# carries a sidebar of popular games (horizontal slider), so scanning the whole
+# page can turn a sidebar link into a "result", e.g. on a cooldown page.
+_RESULT_BLOCK_RE = re.compile(r'<div class="news news-search"')
+_RESULTS_END_RE = re.compile(r'class="horizontal-slider"|<aside')
+# Rendered on every search page, including ones with no results; absent from
+# cooldown and error pages.
+_SEARCH_FORM = 'id="fullsearch"'
+# DLE flood control: "Вы сможете воспользоваться поиском через 10 секунд."
+_COOLDOWN_RE = re.compile(r"(?:поиском|search)[^<]{0,60}?(\d+)\s*(?:секунд|second)", re.I)
+
+# The site refuses searches closer together than this (per session). Both game
+# providers search it, so searches go through one gate: spaced out, and an
+# identical query within _REUSE_SECONDS reuses the rows instead of asking again.
+_SEARCH_INTERVAL = 10.0
+_REUSE_SECONDS = 30.0
+_search_gate = threading.Lock()
+_last_search = 0.0  # time.monotonic() of the latest search request
+_recent: dict[str, tuple[float, list]] = {}
 
 
 def _strip_tags(html: str) -> str:
@@ -147,37 +171,104 @@ def search(query: str) -> list[SearchResult]:
     ``resolve_torrent``). Search and download are public — no login needed.
     Empty list on network failure.
 
+    Raises ``SearchError`` (shown as a retryable failure, not as "no results")
+    for a cooldown that doesn't fit in the search's remaining time, an HTTP
+    error, or a page that is neither results nor a search page.
+
     Results carry no seeders / size — the DLE listing exposes neither, so those
     are zero-filled and the table just won't differentiate on them.
     """
-    # The site's search form is a GET to /index.php with do/subaction/story.
-    session = _anon_http()
-    try:
-        r = search_request(session.get,
-            _BASE + "/index.php",
-            params={"do": "search", "subaction": "search", "story": query},
-            headers={"Referer": _BASE + "/"},
-            timeout=30,
-        )
-        html = r.text
-    except requests.RequestException:
-        return []
+    key = " ".join(query.casefold().split())
+    with _one_search_at_a_time():
+        reused = _recent.get(key)
+        if reused and time.monotonic() - reused[0] < _REUSE_SECONDS:
+            return list(reused[1])
+        html = _search_page(query)
+        if html is None:
+            return []
+        rows = _parse_results(html, query)
+        _recent[key] = (time.monotonic(), rows)
+        return list(rows)
 
+
+@contextmanager
+def _one_search_at_a_time():
+    """Hold the search gate; waiting for it ends early if the search stops."""
+    while not _search_gate.acquire(timeout=0.1):
+        if search_stopped():
+            raise SearchInterrupted()
+    try:
+        yield
+    finally:
+        _search_gate.release()
+
+
+def _cooldown_seconds(html: str) -> int | None:
+    """Seconds the site asks to wait before searching again, or None."""
+    if _RESULT_BLOCK_RE.search(html):
+        return None
+    match = _COOLDOWN_RE.search(html)
+    return int(match.group(1)) if match else None
+
+
+def _search_page(query: str) -> str | None:
+    """The search page's HTML, paced and retried once after a cooldown; None on network failure."""
+    global _last_search
+    wait = _SEARCH_INTERVAL - (time.monotonic() - _last_search)
+    for _attempt in range(2):
+        if wait > 0 and not search_wait(wait):
+            raise SearchError(f"Online-Fix allows one search every {_SEARCH_INTERVAL:.0f} seconds and "
+                              "this one ran out of time waiting. Press r to retry.")
+        # The site's search form is a GET to /index.php with do/subaction/story.
+        session = _anon_http()
+        try:
+            r = search_request(session.get,
+                _BASE + "/index.php",
+                params={"do": "search", "subaction": "search", "story": query},
+                headers={"Referer": _BASE + "/"},
+                timeout=30,
+            )
+        except requests.RequestException:
+            return None
+        finally:
+            _last_search = time.monotonic()
+        if r.status_code != 200:
+            raise SearchError(f"Online-Fix returned HTTP {r.status_code}. Press r to retry.")
+        cooldown = _cooldown_seconds(r.text)
+        if cooldown is None:
+            if not _RESULT_BLOCK_RE.search(r.text) and _SEARCH_FORM not in r.text:
+                raise SearchError("Online-Fix returned an unrecognized page (site layout or "
+                                  "protection may have changed). Press r to retry.")
+            return r.text
+        wait = cooldown + 0.5
+    raise SearchError("Online-Fix is still asking to wait between searches. Press r to retry in a few seconds.")
+
+
+def _result_blocks(html: str):
+    """Each result block of a search page, ending before the sidebar."""
+    starts = [m.start() for m in _RESULT_BLOCK_RE.finditer(html)]
+    for i, start in enumerate(starts):
+        end = starts[i + 1] if i + 1 < len(starts) else len(html)
+        sidebar = _RESULTS_END_RE.search(html, start, end)
+        yield html[start:sidebar.start() if sidebar else end]
+
+
+def _parse_results(html: str, query: str) -> list[SearchResult]:
+    """Rows from the search page's result blocks only, never from its sidebar."""
     results: list[SearchResult] = []
     seen: set[str] = set()
-    for m in _GAME_HREF_RE.finditer(html):
+    for block in _result_blocks(html):
+        m = _GAME_HREF_RE.search(block)
+        if not m:
+            continue
         path, post_id = m.group(1), m.group(2)
         if post_id in seen:
             continue
         seen.add(post_id)
         url = _BASE + path
-        # Title: the cover <img alt="…"> carries the clean name; fall back to a
-        # title="…" attribute, then the de-slugified URL (the primary result
-        # anchor itself is empty).
-        anchor_start = html.rfind("<a", 0, m.start())
-        anchor_end = html.find("</a>", m.end())
-        window = html[max(0, anchor_start):anchor_end] if anchor_end != -1 else ""
-        title_m = _ALT_ATTR_RE.search(window) or _TITLE_ATTR_RE.search(window)
+        # Title: the block's <h2 class="title">, else the cover <img alt="…">
+        # or a title="…" attribute, then the de-slugified URL.
+        title_m = _H2_TITLE_RE.search(block) or _ALT_ATTR_RE.search(block) or _TITLE_ATTR_RE.search(block)
         name = _strip_tags(title_m.group(1)) if title_m else ""
         name = name or _deslug(path)
         if not matches_name(name, query):

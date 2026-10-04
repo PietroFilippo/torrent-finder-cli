@@ -57,9 +57,14 @@ class SearchRefinementTests(unittest.TestCase):
             self.assertEqual([r.name for r in fitgirl.search("Saki")], ["Saki Game"])
 
     def test_online_fix_does_not_borrow_neighbor_title_or_keep_sidebar_noise(self):
-        html = '<a href="/games/action/1-saki.html"></a><a href="/games/action/2-other.html"><img alt="Unrelated Game"></a>'
+        html = ('<form id="fullsearch"></form>'
+                '<div class="news news-search"><a class="big-link" href="/games/action/1-saki.html"></a></div>'
+                '<div class="horizontal-slider"><a href="/games/action/2-other.html"><img alt="Unrelated Game"></a>'
+                '<a href="/games/action/3-saki-sidebar.html"><img alt="Saki Sidebar"></a></div>')
         session = Mock()
         session.get.return_value.text = html
-        with patch.object(online_fix, "_anon_http", return_value=session):
+        session.get.return_value.status_code = 200
+        with patch.object(online_fix, "_anon_http", return_value=session), \
+             patch.object(online_fix, "_last_search", 0.0), patch.object(online_fix, "_recent", {}):
             rows = online_fix.search("Saki")
         self.assertEqual([r.name for r in rows], ["Saki"])

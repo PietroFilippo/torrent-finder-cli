@@ -13,6 +13,7 @@ import requests
 
 
 _ENGINE_SECONDS = 12.0
+_MIN_REQUEST_SECONDS = 2.0  # a pause must leave at least this long for the request after it
 _request_budget = ContextVar("search_request_budget", default=None)
 
 
@@ -52,6 +53,34 @@ def search_request(send, *args, **kwargs):
         if budget is not None and isinstance(error, requests.Timeout):
             budget.timed_out = True
         raise
+
+
+def search_stopped() -> bool:
+    """True when the current search was cancelled, finished early or ran out of time."""
+    budget = _request_budget.get()
+    return budget is not None and (budget.control.stopped() or time.monotonic() >= budget.deadline)
+
+
+def search_wait(seconds: float) -> bool:
+    """Pause the current engine for *seconds* (e.g. a source's required spacing).
+
+    Inside a search session, returns False without pausing when the pause plus
+    a request would not fit in the engine's remaining time, and raises
+    ``SearchInterrupted`` if the search is cancelled or finished meanwhile.
+    Outside a session it simply sleeps.
+    """
+    budget = _request_budget.get()
+    if budget is None:
+        time.sleep(seconds)
+        return True
+    end = time.monotonic() + seconds
+    if end + _MIN_REQUEST_SECONDS > budget.deadline:
+        return False
+    while (left := end - time.monotonic()) > 0:
+        if budget.control.stopped():
+            raise SearchInterrupted()
+        time.sleep(min(0.1, left))
+    return True
 
 
 class SearchControl:

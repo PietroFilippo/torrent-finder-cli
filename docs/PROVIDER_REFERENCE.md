@@ -171,6 +171,23 @@ outcomes.
 Evidence: [cooldown replay](audits/2026-10-03/cooldown-evidence.json) and
 [source comparisons](audits/2026-10-03/source-comparisons.json.gz).
 
+**Status (2026-10-03): error handling, parsing and pacing implemented.**
+- Rows come only from the search page's `news news-search` result blocks, never
+  from the sidebar. Replaying the saved Palworld cooldown page now gives no rows
+  instead of the sidebar entry.
+- The DLE flood-control box (`поиском через N секунд`) is waited out once when
+  the engine's time allows. Otherwise it is a retryable failure (`r`).
+- HTTP errors and pages that are neither result pages nor search pages are
+  retryable failures too.
+- Online-Fix searches from both game providers pass through one gate. It keeps
+  them 10 seconds apart, and an identical query within 30 seconds reuses the
+  rows instead of a second request.
+- A live zero-result search confirmed that empty searches still render the
+  search form, so they stay "no results".
+- The shorter-title fallback and deeper retrieval remain open. With a 10-second
+  spacing and a 12-second engine budget, each extra automatic search would need
+  its own retry.
+
 ## FitGirl
 
 **Scope:** dedicated FitGirl game posts. The engine is also reused by General
