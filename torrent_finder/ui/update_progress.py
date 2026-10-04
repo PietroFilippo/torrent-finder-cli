@@ -52,7 +52,7 @@ def update_panel(view: UpdateView, elapsed: float, width: int = 72):
         versions = f"{view.current or 'Installed version'} → {view.latest or 'Latest version'}"
     parts: list = list(theme.header_lines("Update", Text(versions), width))
     parts.extend([
-        Text(""),
+        theme.rule(width),
         Text(theme.MARGIN + _HEADINGS.get(view.stage, "Updating"), style=f"bold {color}"),
         Text(""),
         Padding(ProgressBar(total=100 if done else None, completed=100 if view.stage == "succeeded" else 0,

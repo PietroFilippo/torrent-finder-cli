@@ -116,12 +116,12 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
             selectable = selectable[first:first + visible]
             guide = []
 
-        blank = Text("")
+        blank, rule = Text(""), theme.rule(width)
         fields_part = selectable[:max(0, n - first)]
         actions_part = selectable[max(0, n - first):]
-        lines = list(top) + ([blank] if gaps[0] else []) + guide + ([blank] if gaps[1] and guide else [])
+        lines = list(top) + ([rule] if gaps[0] else []) + guide + ([blank] if gaps[1] and guide else [])
         lines += fields_part + ([blank] if gaps[2] and fields_part and actions_part else []) + actions_part
-        lines += ([blank] if gaps[3] and prose else []) + prose + ([blank] if gaps[4] else []) + keys_lines
+        lines += ([blank] if gaps[3] and prose else []) + prose + ([rule] if gaps[4] else []) + keys_lines
         return Group(*lines)
 
     sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")

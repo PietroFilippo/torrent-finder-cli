@@ -600,3 +600,33 @@ class RoundThreeTests(unittest.TestCase):
             legend = [line for line in caption.plain.split("\n") if "cached" in line]
             self.assertEqual(len(legend), 1)
             self.assertLessEqual(cell_len(legend[0]), width - 2)
+
+
+class ContrastTests(unittest.TestCase):
+    def test_frames_are_framed_by_rules_and_keys_read_clearly(self):
+        items = [SelectItem("Search again", hint="R"), SelectItem("Change provider", hint="P"),
+                 SelectItem("Terminal command", hint="setup needed")]
+        screen = Console(file=io.StringIO(), width=80, height=24, color_system=None)  # inline hints need 72+
+        with patch.object(selector, "console", screen):
+            frame = selector._build_panel(items, 0, "What's Next?", False, "↑/↓ navigate • Esc back")
+        lines = plain_lines(frame, 80, 24)
+        self.assertTrue(set(lines[1].strip()) == {theme.RULE})   # under the header
+        self.assertTrue(set(lines[-2].strip()) == {theme.RULE})  # above the key bar
+        def row(label):
+            return next(line for line in frame.renderables if isinstance(line, Text) and label in line.plain)
+
+        def hint_style(line, hint):
+            return next(str(span.style) for span in line.spans if line.plain[span.start:span.end].strip() == hint)
+
+        self.assertEqual(hint_style(row("Search again"), "R"), theme.KEY)                   # a shortcut letter
+        self.assertEqual(hint_style(row("Terminal command"), "setup needed"), theme.MUTED)  # other hints stay quiet
+        segment = theme.key_segment("Esc", "back")
+        self.assertFalse(any(str(span.style) == theme.MUTED for span in segment.spans))
+
+    def test_compact_frames_keep_their_height(self):
+        items = [SelectItem(f"Row {i}") for i in range(30)]
+        for height in (12, 16, 19, 20, 24):
+            screen = Console(file=io.StringIO(), width=50, height=height, color_system=None)
+            with patch.object(selector, "console", screen):
+                lines = plain_lines(selector._build_panel(items, 0, "Menu", False), 50, height)
+            self.assertLessEqual(len(lines), height)

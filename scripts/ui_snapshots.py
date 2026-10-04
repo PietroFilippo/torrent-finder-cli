@@ -120,10 +120,10 @@ def _scenarios():
         def run():
             renderer = prompts.make_search_screen_renderer(
                 ", ".join(e.name for e in provider.effective_engines) or "None",
-                provider.filter_summary(), has_history=True, notice=notice,
+                provider.filter_summary(), has_history=True, notice=notice, title=provider.name,
             )
             prompts.get_query_with_shortcut(
-                f"[title] Search {provider.name}:[/title] ", initial="dune", history=["dune"],
+                prompts.PROMPT, initial="dune", history=["dune"],
                 filters_shortcut=True, multi=True, screen_renderer=renderer)
         return run
 

@@ -182,7 +182,8 @@ def _selected_metadata(
             lines[-1] = ellipsize_cells(lines[-1] + " …", room) if cell_len(lines[-1]) + 2 <= room \
                 else ellipsize_cells(lines[-1], room - 1) + "…"
     for line in lines:
-        details.append(theme.MARGIN + line + "\n", style=theme.MUTED)
+        details.append_text(theme.labelled(line, theme.MARGIN))
+        details.append("\n")
     return details
 
 
@@ -242,8 +243,9 @@ def _table_caption(
         if cell_len(legend) > room:  # one line, always: the row budget counts one
             legend = ellipsize_cells("Apibay* = cached results", room)
         caption.append(theme.MARGIN + legend + "\n", style=theme.WARN)
-    if console.size.height >= 20:
-        caption.append("\n")  # short windows keep the row for results
+    if console.size.height >= 20:  # short windows keep the row for results
+        caption.append_text(theme.rule(width))
+        caption.append("\n")
     caption.append_text(Text("\n").join(theme.wrap_keys(
         theme.parse_footer(Text(_result_keys(total_pages, picked, expanded))).keys, width)))
     return caption
@@ -352,7 +354,7 @@ def build_table(
         show_edge=False,
         pad_edge=False,
         padding=(0, 1),
-        header_style=f"bold {theme.MUTED}",
+        header_style="bold",
         show_lines=False,
         width=width - 1 if layout.mode == "minimal" else None,
         caption=_table_caption(
@@ -370,7 +372,7 @@ def build_table(
     else:
         table.add_column("#", justify="right", width=_lead_width(digits), no_wrap=True)
         if layout.source:
-            table.add_column("Source", style=theme.MUTED, width=_SOURCE_W, no_wrap=True, overflow="ellipsis")
+            table.add_column("Source", width=_SOURCE_W, no_wrap=True, overflow="ellipsis")
         if layout.provider:
             table.add_column("Provider", width=_PROVIDER_W, no_wrap=True, overflow="ellipsis")
         if layout.from_work:
@@ -548,13 +550,12 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         else:
             parts = list(theme.header_lines(heading or "Results", status, console.size.width))
         if console.size.height >= 20:
-            parts.append(Text(""))
+            parts.append(theme.rule(console.size.width))
         order_label = SORT_ORDERS.get(view_order, view_order)
         if view_order != "relevance":
             order_label += " (overrides preferences)"
-        view_status = Text(theme.MARGIN + f"Sort: {order_label} • {view_mode}: {view_query or 'all names'}"
-                           + (f" • {search_summary}" if search_summary else ""),
-                           style=theme.MUTED, no_wrap=True, overflow="ellipsis")
+        view_status = theme.labelled(f"Sort: {order_label} • {view_mode.capitalize()}: {view_query or 'all names'}"
+                                     + (f" • {search_summary}" if search_summary else ""), theme.MARGIN)
         if feedback:
             view_status = Text(theme.MARGIN + feedback, style=theme.WARN, no_wrap=True, overflow="ellipsis")
         if session is not None:

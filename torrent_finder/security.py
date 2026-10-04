@@ -131,7 +131,8 @@ def show_security_warning(force: bool = False) -> bool:
         # rank 0 = always shown (Public IP), 1 = ISP, 2 = optional (Org / ASN / Location)
         detail = []
         for index, (label, value, optional) in enumerate(rows):
-            line = Text(theme.MARGIN + label.ljust(label_width), style=theme.MUTED, no_wrap=True, overflow="ellipsis")
+            line = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
+            line.append(label.ljust(label_width), style=theme.MUTED)
             line.append(value, style="bold")
             line.truncate(room + len(theme.MARGIN), overflow="ellipsis")
             detail.append((line, 2 if optional else min(index, 1)))
@@ -140,11 +141,12 @@ def show_security_warning(force: bool = False) -> bool:
 
         def assemble(max_rank: int, spacing: bool, header: list[Text], parts: list[list[Text]]) -> list[Text]:
             blank = [Text("")] if spacing else []
-            lines = list(header) + blank
+            rule = [theme.rule(width)] if spacing else []
+            lines = list(header) + rule
             lines += [line for line, rank in detail if rank <= max_rank]
             for part in parts:
                 lines += blank + part
-            return lines + blank + keys_lines
+            return lines + rule + keys_lines
 
         # The verdict, the warning text and the keys always show. In a short
         # window the optional rows go first, then the spacing, the header's

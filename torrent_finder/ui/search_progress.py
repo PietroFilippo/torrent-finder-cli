@@ -80,7 +80,8 @@ def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: 
                 last.append("…")
 
     blank = [Text("")] if spaced else []
-    return Group(*top, *blank, *info, *blank, status, *waiting, *blank, *keys)
+    rule = [theme.rule(width)] if spaced else []
+    return Group(*top, *rule, *info, *blank, status, *waiting, *rule, *keys)
 
 
 class ProgressScreen:

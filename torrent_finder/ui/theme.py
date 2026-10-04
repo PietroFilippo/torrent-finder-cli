@@ -30,8 +30,11 @@ MUTED = "bright_black"
 GOOD = "green"
 WARN = "yellow"
 BAD = "red"
-SECTION = "bold bright_black"
-FOCUS = "bold"
+SECTION = "bold"
+FOCUS = f"bold {ACCENT}"
+BRAND = f"bold {ACCENT}"  # the app name in every header
+SCREEN = "bold"           # the screen name after it
+RULE = "─"
 
 # Rich theme entries; constants.custom_theme registers these so markup such as
 # "[muted]…[/muted]" works in every console that renders the app.
@@ -85,15 +88,20 @@ def _as_text(value: str | Text) -> Text:
 
 def _header_left(title: str | Text) -> Text:
     left = Text(MARGIN)
-    left.append(APP_NAME, style="bold")
+    left.append(APP_NAME, style=BRAND)
     if title:
         crumb = _as_text(title)
         if crumb.plain.strip():
             left.append(CRUMB, style=MUTED)
-            styled = Text(style=ACCENT)  # base colour; the title's own markup still wins
+            styled = Text(style=SCREEN)  # base style; the title's own markup still wins
             styled.append_text(crumb)
             left.append_text(styled)
     return left
+
+
+def rule(width: int, margin: str = MARGIN) -> Text:
+    """A thin muted line across the content width: under headers, above key bars."""
+    return Text(margin + RULE * max(1, width - 2 * len(margin)), style=MUTED, no_wrap=True)
 
 
 def _cut_index(plain: str, limit: int, floor: int) -> int:
@@ -205,8 +213,37 @@ def key_segment(key: str, action: str) -> Text:
     segment = Text(no_wrap=True)
     segment.append(key, style=KEY)
     segment.append(" ")
-    segment.append(action, style=MUTED)
+    segment.append(action)  # the terminal's normal text colour: readable, not grey
     return segment
+
+
+_KEY_ONLY = None
+
+
+def is_key(text: str) -> bool:
+    """True when *text* is just a key name (``U``, ``Tab``, ``Ctrl+F``, ``a/i``)."""
+    global _KEY_ONLY
+    if _KEY_ONLY is None:
+        _KEY_ONLY = re.compile(rf"^{_ATOM}(?:\s?/\s?{_ATOM})*$")
+    return bool(text) and bool(_KEY_ONLY.match(text.strip()))
+
+
+_LABEL = re.compile(r"(?:(?<=^)|(?<=· )|(?<=• ))([A-Z][A-Za-z ]{0,24}:)(?= )")
+_SEPARATOR_MARK = re.compile(r" [·•] ")
+
+
+def labelled(line: str, margin: str = "", wrap: bool = False) -> Text:
+    """``Label: value · Label: value`` with grey labels and separators, values in normal text.
+
+    One line cut with "…" unless *wrap* is set.
+    """
+    text = Text(margin + line, no_wrap=not wrap, overflow="fold" if wrap else "ellipsis")
+    offset = len(margin)
+    for match in _LABEL.finditer(line):
+        text.stylize(MUTED, offset + match.start(1), offset + match.end(1))
+    for match in _SEPARATOR_MARK.finditer(line):
+        text.stylize(MUTED, offset + match.start(), offset + match.end())
+    return text
 
 
 def strip_text(text: Text) -> Text:
@@ -307,12 +344,12 @@ def wrap_block(text: Text, width: int, console, margin: str = MARGIN) -> list[Te
 def log_header(title: str | Text = "", width: int = 80) -> Text:
     """``torrent-finder › Title`` at column 0, for screens that print a log."""
     line = Text(no_wrap=True, overflow="ellipsis")
-    line.append(APP_NAME, style="bold")
+    line.append(APP_NAME, style=BRAND)
     if title:
         crumb = _as_text(title)
         if crumb.plain.strip():
             line.append(CRUMB, style=MUTED)
-            styled = Text(style=ACCENT)
+            styled = Text(style=SCREEN)
             styled.append_text(crumb)
             line.append_text(styled)
     if cell_len(line.plain) > width:

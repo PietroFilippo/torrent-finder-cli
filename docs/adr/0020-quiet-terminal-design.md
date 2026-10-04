@@ -25,12 +25,14 @@ drew their own panels and did not follow the menus' conventions.
   line: `torrent-finder › <screen>` with an optional right-aligned status, such
   as a list position, result counts or a version change. A long screen name
   continues on a second, indented line instead of being cut. Content sits under
-  a two-cell margin on both sides. No boxes or panels.
+  a two-cell margin on both sides. No boxes or panels: in windows with room, a
+  thin muted rule replaces the spacer line under the header and the one above
+  the key bar, so frames gain structure without growing.
 - **Rows** keep one physical line. A cursor bar `▍` in a gutter marks focus;
   multi-select states (`On`/`Auto`/`Off`, `Off`/`Require`/`Prefer`, `✓`/`•`)
   share one fixed-width column; inline hints line up within each run of
   consecutive hinted rows. Shortcut letters live in the hint column, not in
-  labels. Section headers are uppercase muted labels.
+  labels, and are drawn like keys. Section headers are bold uppercase labels.
 - **Footers stay strings.** `parse_footer` splits each line on `•`/`|`; a
   segment that starts with a key name (`Enter`, `Ctrl+F`, `↑/↓`, a single
   letter…) followed by its action becomes a key-bar segment, anything else is
@@ -41,10 +43,14 @@ drew their own panels and did not follow the menus' conventions.
   titled report blocks and one pause-line style.
 - **Colours** are the terminal's named colours (accent `bright_blue`, muted
   `bright_black`, green / yellow / red for good / warn / bad), so light and dark
-  themes stay readable. Theme names (`accent`, `muted`, `key`, `success`,
-  `warning`, `error`, …) are registered in `constants.custom_theme`, including
-  Rich's spinner and progress-bar styles; consoles that render app markup must
-  use that theme.
+  themes stay readable. Contrast follows the hierarchy: the app name and the
+  focused row in bold accent, the screen name and section headers in bold,
+  content, descriptions and key actions in the terminal's normal text colour,
+  and only labels, separators, rules and secondary hints in muted grey
+  (`theme.labelled` greys the `Label:` part of `Label: value` lines). Theme
+  names (`accent`, `muted`, `key`, `success`, `warning`, `error`, …) are
+  registered in `constants.custom_theme`, including Rich's spinner and
+  progress-bar styles; consoles that render app markup must use that theme.
 - **No emoji in menus.** Provider, engine and credential icons remain data.
 - Random tips appear only in windows at least 30 rows tall, so they never cost
   list rows. Search progress is a frame on the alternate screen, redrawn in

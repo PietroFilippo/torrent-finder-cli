@@ -238,7 +238,8 @@ def _row(item: "SelectItem", index: int, is_cursor: bool, multi: bool, geometry:
         if column is not None:
             prefix = _prefix_width(item, multi, geometry.badge_width)
             row.append(" " * max(0, min(column, prefix + available) - prefix - cell_len(label)))
-        row.append(f"  {item.hint}", style=theme.MUTED)
+        # Shortcut letters read as keys; other hints stay quiet.
+        row.append(f"  {item.hint}", style=theme.KEY if theme.is_key(item.hint) else theme.MUTED)
     return row
 
 
@@ -272,7 +273,7 @@ def _build_panel(
     if current_item and current_item.hint and not _inline_hint(current_item):
         item_blocks.append(Text(current_item.hint, style=theme.MUTED, overflow="fold"))
     if current_item and current_item.description:
-        description = Text.from_markup(current_item.description, style=theme.MUTED)
+        description = Text.from_markup(current_item.description)
         description.overflow = "fold"
         item_blocks.append(description)
     item_lines = sum(_wrapped_line_count(block, inner_width) for block in item_blocks)
@@ -369,7 +370,7 @@ def _build_panel(
     )
     lines: list[Text] = theme.header_lines(title, header_status(position), width)
     if not compact:
-        lines.append(Text(""))
+        lines.append(theme.rule(width))
 
     for i, item in enumerate(items):
         in_main = main_start <= i < main_end
@@ -385,11 +386,13 @@ def _build_panel(
             continue
         lines.append(_row(item, i, i == cursor, multi, geometry, tick))
 
-    lines.append(Text(""))
+    # The line above the key bar is a rule in roomy windows; spacing stays the same.
+    has_context = bool(item_lines or notice_lines)
+    lines.append(theme.rule(width) if not compact and not has_context else Text(""))
     for block in item_blocks + context:
         lines.extend(theme.wrap_block(block, width, console))
-    if (item_lines or notice_lines) and not compact:
-        lines.append(Text(""))
+    if has_context and not compact:
+        lines.append(theme.rule(width))
     lines.extend(theme.wrap_keys(shown_keys, width))
     return Group(*lines)
 
