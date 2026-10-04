@@ -2,9 +2,9 @@
 
 Screens draw no boxes. A header line names the app and the current screen,
 content sits under a two-cell margin, and one key bar lists the keys as
-``key action`` pairs. Colours are the terminal's own named colours, so light
-and dark themes both stay readable. See
-docs/adr/0020-quiet-terminal-design.md.
+``key action`` pairs. The terminal's own bright blue carries focus, keys and
+the brand; three fixed shades of blue give headings, secondary text and rules
+their own weight. See docs/adr/0020-quiet-terminal-design.md.
 """
 
 from __future__ import annotations
@@ -24,17 +24,26 @@ MARKER = "◆"
 CRUMB = " › "
 KEY_GAP = "   "
 
-ACCENT = "bright_blue"
-KEY = "bold bright_blue"
-MUTED = "bright_black"
+# One blue scale, each shade with one job. The accent is the terminal's own
+# bright blue so it matches the user's palette; the three fixed shades sit
+# around it (tuned to Windows Terminal's Campbell blue) and degrade to the
+# nearest named colour on terminals without true colour.
+ACCENT = "bright_blue"    # focus: the cursor bar, the focused row, keys, the brand
+SKY = "#7DAEFF"           # light: section and column headings, the subject of a screen
+STEEL = "#6A86B3"         # blue-grey: labels, hints, separators, Off, disabled rows
+DEEP = "#3A5A8C"          # dark: rules
+KEY = f"bold {ACCENT}"
+MUTED = STEEL
 GOOD = "green"
 WARN = "yellow"
 BAD = "red"
-SECTION = "bold"
+SECTION = f"bold {SKY}"   # uppercase section headers and table column headers
 FOCUS = f"bold {ACCENT}"
 BRAND = f"bold {ACCENT}"  # the app name in every header
 SCREEN = "bold"           # the screen name after it
+SUBJECT = f"not bold {SKY}"  # what the screen is about: the query, torrent or provider after the name
 RULE = "─"
+RULE_STYLE = DEEP
 
 # Rich theme entries; constants.custom_theme registers these so markup such as
 # "[muted]…[/muted]" works in every console that renders the app.
@@ -42,6 +51,7 @@ STYLES = {
     "accent": ACCENT,
     "key": KEY,
     "muted": MUTED,
+    "sky": SKY,
     "good": GOOD,
     "warn": WARN,
     "bad": BAD,
@@ -86,6 +96,24 @@ def _as_text(value: str | Text) -> Text:
     return value.copy() if isinstance(value, Text) else Text.from_markup(value)
 
 
+def _title_text(title: str | Text) -> Text:
+    """``Screen › subject``: the screen name bold, what it is about in the light blue.
+
+    Later crumbs (a query, a torrent name, a provider, a folder path) are the
+    subject; the separators between them are muted like the one after the app
+    name.
+    """
+    crumb = _as_text(title)
+    styled = Text(style=SCREEN)  # base style; the title's own markup still wins
+    styled.append_text(crumb)
+    first = crumb.plain.find(CRUMB)
+    if first >= 0:
+        styled.stylize(SUBJECT, first + len(CRUMB))
+        for match in re.finditer(re.escape(CRUMB), crumb.plain):
+            styled.stylize(f"not bold {MUTED}", match.start(), match.end())
+    return styled
+
+
 def _header_left(title: str | Text) -> Text:
     left = Text(MARGIN)
     left.append(APP_NAME, style=BRAND)
@@ -93,15 +121,13 @@ def _header_left(title: str | Text) -> Text:
         crumb = _as_text(title)
         if crumb.plain.strip():
             left.append(CRUMB, style=MUTED)
-            styled = Text(style=SCREEN)  # base style; the title's own markup still wins
-            styled.append_text(crumb)
-            left.append_text(styled)
+            left.append_text(_title_text(crumb))
     return left
 
 
 def rule(width: int, margin: str = MARGIN) -> Text:
-    """A thin muted line across the content width: under headers, above key bars."""
-    return Text(margin + RULE * max(1, width - 2 * len(margin)), style=MUTED, no_wrap=True)
+    """A thin dark-blue line across the content width: under headers, above key bars."""
+    return Text(margin + RULE * max(1, width - 2 * len(margin)), style=RULE_STYLE, no_wrap=True)
 
 
 def _cut_index(plain: str, limit: int, floor: int) -> int:
@@ -233,7 +259,7 @@ _SEPARATOR_MARK = re.compile(r" [·•] ")
 
 
 def labelled(line: str, margin: str = "", wrap: bool = False) -> Text:
-    """``Label: value · Label: value`` with grey labels and separators, values in normal text.
+    """``Label: value · Label: value`` with steel-blue labels and separators, values in normal text.
 
     One line cut with "…" unless *wrap* is set.
     """
@@ -349,9 +375,7 @@ def log_header(title: str | Text = "", width: int = 80) -> Text:
         crumb = _as_text(title)
         if crumb.plain.strip():
             line.append(CRUMB, style=MUTED)
-            styled = Text(style=SCREEN)
-            styled.append_text(crumb)
-            line.append_text(styled)
+            line.append_text(_title_text(crumb))
     if cell_len(line.plain) > width:
         line.truncate(max(1, width), overflow="ellipsis")
     return line

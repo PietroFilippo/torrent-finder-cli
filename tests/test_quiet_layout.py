@@ -630,3 +630,58 @@ class ContrastTests(unittest.TestCase):
             with patch.object(selector, "console", screen):
                 lines = plain_lines(selector._build_panel(items, 0, "Menu", False), 50, height)
             self.assertLessEqual(len(lines), height)
+
+
+class BlueScaleTests(unittest.TestCase):
+    """Each shade of blue has one job; off-screen frames keep the terminal's colours."""
+
+    def test_rules_headings_and_subjects_take_their_own_shades(self):
+        self.assertEqual(str(theme.rule(40).style), theme.RULE_STYLE)
+        self.assertNotEqual(theme.RULE_STYLE, theme.MUTED)
+        self.assertIn(theme.SKY, theme.SECTION)
+
+        def style_of(text, word):
+            start = text.plain.index(word)
+            return [str(span.style) for span in text.spans if span.start <= start < span.end]
+
+        for line in (theme.header("Download › Frieren › 3 picked", "", 80), theme.log_header("Download › Frieren › 3 picked")):
+            self.assertIn(theme.SCREEN, style_of(line, "Download"))
+            self.assertNotIn(theme.SUBJECT, style_of(line, "Download"))
+            self.assertIn(theme.SUBJECT, style_of(line, "Frieren"))
+            self.assertIn(theme.SUBJECT, style_of(line, "3 picked"))
+            self.assertTrue(any(theme.MUTED in style for style in style_of(line, "› Frieren")))
+        plain = theme.header("Settings", "", 80)
+        self.assertNotIn(theme.SUBJECT, style_of(plain, "Settings"))
+
+        from torrent_finder.utils import leech_style
+        self.assertEqual(leech_style(0), theme.MUTED)
+
+        items = [SelectItem("─── Download ───", value="section_header", enabled=False, is_action=True),
+                 SelectItem("Open in client")]
+        screen = Console(file=io.StringIO(), width=80, height=24, color_system=None)
+        with patch.object(selector, "console", screen):
+            frame = selector._build_panel(items, 1, "Download", False)
+        section = next(line for line in frame.renderables if isinstance(line, Text) and "DOWNLOAD" in line.plain)
+        self.assertEqual(str(section.style), theme.SECTION)
+
+    def test_offscreen_frames_render_with_the_terminal_colours(self):
+        from rich.color import ColorSystem
+        from torrent_finder import constants
+        with patch.object(constants.console, "_color_system", ColorSystem.TRUECOLOR):
+            self.assertEqual(constants.buffer_console(io.StringIO(), 80).color_system, "truecolor")
+            out = io.StringIO()
+            with patch("sys.stdout", out):
+                # A colour no earlier test rendered: Rich caches a style's escape codes on first use.
+                selector._render(None, Text("x", style="#7daefe"), width=40)
+            self.assertIn("38;2;125;174;254", out.getvalue())  # true colour reaches the terminal
+        with patch.object(constants.console, "_color_system", None):
+            self.assertEqual(constants.buffer_console(io.StringIO(), 80, 24).color_system, "standard")
+
+    def test_results_table_headings_use_the_section_shade(self):
+        from torrent_finder.ui.table import build_table
+        screen = Console(file=io.StringIO(), width=100, height=30, color_system="truecolor", force_terminal=True)
+        rows = [{"name": "Dune", "size": 1000, "seeders": 5, "leechers": 1, "provider_label": "Apibay"}]
+        with patch("torrent_finder.ui.table.console", screen):
+            table = build_table(rows, 0, 0, 1, 1, 1)
+        screen.print(table)
+        self.assertIn("38;2;125;174;255", screen.file.getvalue())

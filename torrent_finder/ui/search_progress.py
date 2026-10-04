@@ -12,11 +12,11 @@ import io
 import sys
 
 from rich.cells import cell_len
-from rich.console import Console, Group
+from rich.console import Group
 from rich.spinner import SPINNERS
 from rich.text import Text
 
-from torrent_finder.constants import console, custom_theme
+from torrent_finder.constants import buffer_console, console
 from torrent_finder.ui import theme
 
 KEYS = "Enter view results so far  •  Esc cancel"
@@ -96,8 +96,7 @@ class ProgressScreen:
     def draw(self, frame) -> None:
         size = console.size
         buffer = io.StringIO()
-        Console(file=buffer, width=size.width, height=size.height, force_terminal=True,
-                theme=custom_theme).print(frame)
+        buffer_console(buffer, size.width, size.height).print(frame)
         lines = buffer.getvalue().rstrip("\n").split("\n")[: size.height]
         # A resize needs a clean slate; otherwise overwrite in place.
         prefix = "\033[2J\033[H" if size != self._last_size else "\033[H"

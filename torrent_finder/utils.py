@@ -6,6 +6,7 @@ import time
 from urllib.parse import quote
 
 from torrent_finder.constants import TRACKERS
+from torrent_finder.ui.theme import MUTED
 
 
 def start_esc_listener(cancel_event: "threading.Event", *, finish_event=None) -> "threading.Event":
@@ -98,9 +99,9 @@ def seed_style(seeds: int) -> str:
 
 
 def leech_style(leeches: int) -> str:
-    """Leech colour: grey when few (readable on light and dark themes), then yellow, red."""
+    """Leech colour: muted when few, then yellow, red."""
     if leeches <= 5:
-        return "bright_black"
+        return MUTED
     elif leeches <= 50:
         return "yellow"
     return "red"

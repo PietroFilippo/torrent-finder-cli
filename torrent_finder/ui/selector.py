@@ -10,7 +10,7 @@ from rich.cells import cell_len
 from rich.console import Group
 from rich.text import Text
 
-from torrent_finder.constants import console, custom_theme
+from torrent_finder.constants import buffer_console, console
 from torrent_finder.ui import theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 
@@ -432,17 +432,10 @@ def _render(
     callers and ignored.
     """
     from io import StringIO
-    from rich.console import Console as _Console
 
     # Pre-render all content into a string
     buf = StringIO()
-    tmp = _Console(
-        file=buf,
-        width=width if width is not None else console.size.width,
-        force_terminal=True,
-        theme=custom_theme,
-    )
-    tmp.print(panel)
+    buffer_console(buf, width if width is not None else console.size.width).print(panel)
     # A final newline scrolls a frame that exactly fills the viewport, hiding
     # its heading in short terminals. The next redraw already homes the cursor.
     content = buf.getvalue().rstrip("\n")

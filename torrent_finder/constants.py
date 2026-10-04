@@ -16,6 +16,18 @@ custom_theme = Theme(STYLES)
 
 console = Console(theme=custom_theme)
 
+
+def buffer_console(file, width: int, height: int | None = None) -> Console:
+    """An off-screen console for frames the app writes to the terminal itself.
+
+    It renders with the colours the terminal console supports, so the fixed
+    shades of the palette survive; without a terminal (tests, piped output)
+    it falls back to the 16 standard colours.
+    """
+    return Console(file=file, width=max(1, width), height=max(1, height) if height else None,
+                   theme=custom_theme, force_terminal=True, legacy_windows=False,
+                   color_system=console.color_system or "standard")
+
 # --- User data directory ------------------------------------------------------
 # Downloads default to the platform user-data directory. Credentials and state
 # use machine_state_dir() so Store Python cannot split them across runtimes.

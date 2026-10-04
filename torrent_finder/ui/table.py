@@ -354,7 +354,7 @@ def build_table(
         show_edge=False,
         pad_edge=False,
         padding=(0, 1),
-        header_style="bold",
+        header_style=theme.SECTION,
         show_lines=False,
         width=width - 1 if layout.mode == "minimal" else None,
         caption=_table_caption(

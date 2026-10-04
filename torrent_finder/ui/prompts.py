@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.markup import escape
 from rich.text import Text
 
-from torrent_finder.constants import console, custom_theme
+from torrent_finder.constants import buffer_console, console
 from torrent_finder.downloader import (
     detect_torrent_client,
     download_with_webtorrent,
@@ -147,8 +147,7 @@ def make_search_screen_renderer(
 def _capture_lines(render: Callable[[Console], None], width: int, height: int) -> list[str]:
     """Run *render* against an off-screen console; return its ANSI lines."""
     buffer = io.StringIO()
-    target = Console(file=buffer, width=max(1, width), height=max(1, height), theme=custom_theme,
-                     force_terminal=True, color_system="standard")
+    target = buffer_console(buffer, width, height)
     render(target)
     lines = buffer.getvalue().split("\n")
     if lines and lines[-1] == "":
@@ -179,8 +178,7 @@ def _fold(line: Text, width: int) -> tuple[list[Text], list[int]]:
 
 def _ansi(row: Text, width: int) -> str:
     buffer = io.StringIO()
-    Console(file=buffer, width=max(1, width), theme=custom_theme, force_terminal=True,
-            color_system="standard").print(row, no_wrap=True, overflow="crop", end="")
+    buffer_console(buffer, width).print(row, no_wrap=True, overflow="crop", end="")
     return buffer.getvalue()
 
 
