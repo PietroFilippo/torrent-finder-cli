@@ -5,6 +5,7 @@ import sys
 
 import readchar
 import requests
+from rich.cells import cell_len
 from rich.console import Group
 from rich.text import Text
 
@@ -126,28 +127,42 @@ def show_security_warning(force: bool = False) -> bool:
             theme.wrap_block(warning, width, console),
         ]
         label_width = max((len(label) for label, _, _ in rows), default=0) + 2
-        detail = [(Text(theme.MARGIN + label.ljust(label_width), style=theme.MUTED).append(value, style="bold"),
-                   optional) for label, value, optional in rows]
+        room = theme.inner_width(width)
+        # rank 0 = always shown (Public IP), 1 = ISP, 2 = optional (Org / ASN / Location)
+        detail = []
+        for index, (label, value, optional) in enumerate(rows):
+            line = Text(theme.MARGIN + label.ljust(label_width), style=theme.MUTED, no_wrap=True, overflow="ellipsis")
+            line.append(value, style="bold")
+            line.truncate(room + len(theme.MARGIN), overflow="ellipsis")
+            detail.append((line, 2 if optional else min(index, 1)))
         spaced = height >= 20
+        one_line_header = [theme.header("Network exposure warning", "", width)]
 
-        def assemble(include_optional: bool, spacing: bool, header: list[Text]) -> list[Text]:
+        def assemble(max_rank: int, spacing: bool, header: list[Text], parts: list[list[Text]]) -> list[Text]:
             blank = [Text("")] if spacing else []
             lines = list(header) + blank
-            lines += [line for line, optional in detail if include_optional or not optional]
-            for part in middle_parts:
+            lines += [line for line, rank in detail if rank <= max_rank]
+            for part in parts:
                 lines += blank + part
             return lines + blank + keys_lines
 
-        # The warning text and keys always show. In a short window the optional
-        # Org / ASN / Location rows go first, then the spacing, then the
-        # header's second line.
-        lines = assemble(True, spaced, top)
-        if len(lines) > height:
-            lines = assemble(False, spaced, top)
-        if len(lines) > height:
-            lines = assemble(False, False, top)
-        if len(lines) > height and len(top) > 1:
-            lines = assemble(False, False, [theme.header("Network exposure warning", "", width)])
+        # The verdict, the warning text and the keys always show. In a short
+        # window the optional rows go first, then the spacing, the header's
+        # second line and the ISP row; only then is the warning text cut short.
+        for max_rank, spacing, header in ((2, spaced, top), (1, spaced, top), (1, False, top),
+                                          (1, False, one_line_header), (0, False, one_line_header)):
+            lines = assemble(max_rank, spacing, header, middle_parts)
+            if len(lines) <= height:
+                break
+        else:
+            verdict_lines, warning_lines = middle_parts
+            keep = max(1, height - (len(lines) - len(warning_lines)))
+            if keep < len(warning_lines):
+                warning_lines = warning_lines[:keep]
+                last = warning_lines[-1]
+                last.truncate(max(1, cell_len(last.plain) - 1))
+                last.append("…")
+            lines = assemble(0, False, one_line_header, [verdict_lines, warning_lines])
         return Group(*[line.copy() for line in lines])
 
     dismissed = False

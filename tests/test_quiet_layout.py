@@ -283,7 +283,9 @@ class HeadingEscapeTests(unittest.TestCase):
         self.assertIn("dune [/x], [bold]frieren", header)
 
 
-class CredentialFieldTailTests(CredentialFormTests):
+class CredentialFieldTailTests(unittest.TestCase):
+    run_form = CredentialFormTests.run_form
+
     def test_long_values_keep_their_end_and_caret_visible_in_narrow_windows(self):
         keys = list("http://127.0.0.1:8080") + ["\x03"]
         _, buffers, frames, meta = self.run_form(keys, width=50, height=16)
@@ -515,3 +517,19 @@ class CancellationTests(unittest.TestCase):
                 cancel_event.set()
                 return "magnet"
             self.assertEqual(acquisition._wait_with_esc("Fetching", finished), ("magnet", False))
+
+
+class SecurityTinyTests(unittest.TestCase):
+    INFO = SecurityWarningTests.INFO
+    frames = SecurityWarningTests.frames
+
+    def test_startup_warning_fits_40x12_with_a_long_isp(self):
+        for isp in ("Example ISP", "Comcast Cable Communications, LLC"):
+            with self.subTest(isp=isp), patch.dict(self.INFO, {"isp": isp}):
+                result, frames, _ = self.frames(40, 12, ["\r"])
+                lines = plain_lines(frames[-1], 40, 12)
+                output = " ".join(line.strip() for line in lines)
+                self.assertTrue(result)
+                self.assertLessEqual(len(lines), 12)
+                for text in ("203.0.113.7", "no VPN", "Esc abort", "don't show again"):
+                    self.assertIn(text, output)
