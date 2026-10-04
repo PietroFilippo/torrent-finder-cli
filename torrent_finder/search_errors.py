@@ -2,7 +2,15 @@
 
 
 class SearchError(Exception):
-    pass
+    """A failure to show instead of "no results".
+
+    *status* names the diagnostic status (e.g. "blocked", "rejected_login")
+    when the message alone would be ambiguous.
+    """
+
+    def __init__(self, message: str = "", status: str | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 def login_required(provider: str) -> SearchError:

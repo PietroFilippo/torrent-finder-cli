@@ -58,6 +58,10 @@ def observe_request():
         trace.requests += 1
 
 
+# Access problems are shown by their own message, without a provider prefix.
+ACCESS_STATUSES = {"missing_login", "rejected_login", "login_error", "blocked"}
+
+
 @dataclass(frozen=True)
 class Diagnostic:
     provider: str
@@ -78,6 +82,7 @@ class Diagnostic:
 
     @property
     def retryable(self):
+        # "blocked" (an anti-bot check) is left out: retrying right away can't pass it.
         return self.status in {"error", "timeout", "interrupted", "missing_login", "rejected_login", "login_error"}
 
     def describe(self):

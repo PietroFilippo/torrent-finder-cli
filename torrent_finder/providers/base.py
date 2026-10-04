@@ -17,7 +17,7 @@ from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
 from torrent_finder.search_result import SearchResult, normalize_result
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_control import search_request
-from torrent_finder.search_diagnostics import record_failure
+from torrent_finder.search_diagnostics import ACCESS_STATUSES, record_failure
 from torrent_finder.result_view import title_score
 
 
@@ -517,8 +517,8 @@ class BaseProvider(ABC):
         # searches use search_many and retain a diagnostics screen when empty.
         if not results:
             for diagnostic in results.session.diagnostics:
-                if diagnostic.status in {"missing_login", "rejected_login", "login_error"}:
-                    raise SearchError(diagnostic.message)
+                if diagnostic.status in ACCESS_STATUSES:
+                    raise SearchError(diagnostic.message, status=diagnostic.status)
         return results
 
     def filter_with_reasons(self, rows, cli_filters=None, result_filter=None):

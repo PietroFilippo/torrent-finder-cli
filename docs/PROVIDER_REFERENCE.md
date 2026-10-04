@@ -293,6 +293,18 @@ rejected credentials, stop repeated blocked attempts, and retain other sources'
 partial results. Reassess catalog coverage when ordinary access is working;
 do not bypass the challenge or infer missing titles from it.
 
+**Status (2026-10-04): diagnostics implemented; access still blocked.**
+- A scripted request to `login.php` returns HTTP 403 "Just a moment…", which is
+  Cloudflare's browser check; the forum index itself loads.
+- The app now separates Cloudflare's check, rejected credentials, RuTracker's
+  own captcha, an unreachable site and unexpected pages.
+- A blocked login is reported as an access problem ("blocked"; not a password
+  problem, and not counted as retryable). It is not attempted again for five
+  minutes. A rejected login or captcha is not retried until the credentials
+  change.
+- Other providers' results are kept, and the challenge is not bypassed. Catalog
+  coverage stays unknown until ordinary access works.
+
 ## Anime
 
 **Scope:** anime torrents. Nyaa defaults to `1_2` (English-translated anime);

@@ -86,10 +86,15 @@ class CredentialRecoveryTests(unittest.TestCase):
                          {"username": "fixture", "password": "second"}, None]), \
                      patch.object(module.requests, "Session", side_effect=[first, second]), \
                      patch.object(rutracker, "_session_credentials", None), \
-                     patch.object(rutracker, "_post_login", side_effect=[first, second]):
+                     patch.object(rutracker, "_blocked_until", 0.0), patch.object(rutracker, "_failed_login", ""), \
+                     patch.object(rutracker, "_login", side_effect=[(first, "ok"), (second, "ok")]):
                     self.assertIs(module._get_session(), first)
                     self.assertIs(module._get_session(), second)
-                    self.assertIsNone(module._get_session())
+                    if module is rutracker:  # RuTracker explains a missing login instead of returning None
+                        with self.assertRaises(SearchError):
+                            module._get_session()
+                    else:
+                        self.assertIsNone(module._get_session())
                 first.close.assert_called_once()
                 second.close.assert_called_once()
 
