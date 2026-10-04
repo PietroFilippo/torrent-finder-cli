@@ -10,6 +10,7 @@ from torrent_finder import libgen
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.resolvers import CreatorFacet, openlibrary
+from torrent_finder.result_view import book_title_score
 from torrent_finder.search_result import SearchResult
 
 
@@ -26,6 +27,10 @@ class BookProvider(BaseProvider):
     apibay_fallback_categories = (601, 102)
     knaben_categories = (9_000_000,)  # Books parent category
     solidtorrents_category = "eBook"
+    # Rank by how well a listing matches the requested work, and let Knaben (Auto)
+    # help when Libgen answers with other books only ("Tomorrow and Tomorrow").
+    prefer_title_matches = True
+    auto_needs_relevant_rows = True
 
     # Direct downloads / document torrents — no video features apply, but the
     # file picker does: Apibay book torrents are often bundles ("500 EPUBs",
@@ -67,6 +72,9 @@ class BookProvider(BaseProvider):
                 enabled=False,
             ),
         ]
+
+    def title_relevance(self, name: str, query: str) -> int:
+        return book_title_score(name, query)
 
     def _search_libgen(self, query: str) -> list[SearchResult]:
         return libgen.search(query)

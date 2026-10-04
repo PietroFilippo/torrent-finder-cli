@@ -126,11 +126,18 @@ class SearchSession:
             primary = [t for t in tasks if t.diagnostic.status not in {"auto", "off", "skipped"}]
             if any(t.diagnostic.status == "pending" for t in primary):
                 continue
+            provider, query = self.groups[group]
+            if provider.prefer_title_matches and provider.auto_needs_relevant_rows:
+                answered = any(provider.title_relevance(row.name, query) >= 1 for t in primary for row in t.rows)
+                reason = "On engines returned rows matching the title; Auto was not needed."
+            else:
+                answered = any(t.rows for t in primary)
+                reason = "On engines returned rows before local filters; Auto was not needed."
             for task in tasks:
                 if task.diagnostic.status != "auto":
                     continue
-                if any(t.rows for t in primary):
-                    task.diagnostic = replace(task.diagnostic, status="skipped", message="On engines returned rows before local filters; Auto was not needed.")
+                if answered:
+                    task.diagnostic = replace(task.diagnostic, status="skipped", message=reason)
                 else:
                     task.diagnostic = replace(task.diagnostic, status="pending")
                     ready.append(task)
@@ -251,7 +258,10 @@ class SearchSession:
         if not self.combined and self.providers:
             ordered = self.providers[0].rank_preferences(self.providers[0]._sort_results(ordered))
         if self.queries and self.providers and (self.combined or self.providers[0].prefer_title_matches):
-            ordered.sort(key=lambda r: (max(title_score(r.name, q) for q in self.queries),
+            relevance = {p.slug: p.title_relevance for p in self.providers}
+            fallback = self.providers[0].title_relevance if not self.combined else title_score
+            ordered.sort(key=lambda r: (max(relevance.get(r.get("provider_slug"), fallback)(r.name, q)
+                                            for q in self.queries),
                                         r.get("preference_score", 0)), reverse=True)
         notices = list(dict.fromkeys(d.message if d.status in ACCESS_STATUSES
                                     else f"{d.provider} / {d.engine}: {d.message}"

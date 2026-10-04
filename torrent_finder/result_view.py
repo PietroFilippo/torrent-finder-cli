@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+from collections import Counter
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
@@ -45,6 +46,49 @@ def title_score(name: str, query: str) -> int:
     if title[:len(wanted)] == wanted:
         return 2
     return int(all(word in title for word in wanted))
+
+
+# Book listings: "Title — Author [epub, English]", "Author - Title (Edition)",
+# "Title by Author.epub", "Title / Translated title".
+_BOOK_PARTS = re.compile(r"\s+(?:—|–|-|/)\s+")
+_BOOK_BY = re.compile(r"\s+by\s+", re.I)  # "Title by Author", but also "Stand by Me"
+_BOOK_FORMATS = ("epub", "mobi", "pdf", "azw", "azw3", "fb2", "djvu", "cbz", "cbr",
+                 "audiobook", "unabridged", "ebook")
+_BOOK_NOISE = re.compile(r"\([^()]*\)|\{[^{}]*\}|\.(?:" + "|".join(_BOOK_FORMATS) + r")$"
+                         r"|\b(?:" + "|".join(_BOOK_FORMATS) + r")\b", re.I)
+
+
+def book_title_score(name: str, query: str) -> int:
+    """``title_score`` for book listings, 0-3.
+
+    Each part of a name can be its title, the rest author or extra details.
+    Word counts matter ("Tomorrow and Tomorrow" is a different book from
+    "Tomorrow, and Tomorrow, and Tomorrow"), and author words in the query may
+    sit beside an exact title, so the original work outranks titles that merely
+    contain it ("A Pride and Prejudice Variation"). Format words ("Dune
+    audiobook", "... epub") are filters, not part of the title.
+    """
+    wanted_list = tuple(word for word in words(query) if word not in _BOOK_FORMATS) or words(query)
+    wanted = Counter(wanted_list)
+    if not wanted:
+        return 0
+    text = _BOOK_NOISE.sub(" ", media_title(name))
+    every = Counter(words(text))
+    parts = []
+    for part in _BOOK_PARTS.split(text):
+        pieces = _BOOK_BY.split(part)
+        parts += [words(part)] + ([words(piece) for piece in pieces] if len(pieces) > 1 else [])
+    parts = [part for part in parts if part]
+    best = 0
+    for part in parts:
+        title = Counter(part)
+        if not title - wanted and not (wanted - title) - (every - title):
+            return 3  # exactly this title, plus any author words the query names
+        if part[:len(wanted_list)] == wanted_list:
+            best = 2  # the title with a subtitle or edition after it
+    if best or wanted - every:
+        return best
+    return 1  # every query word, counting repeats, appears somewhere
 
 
 def matches_name(name: str, query: str, mode: str = "contains") -> bool:

@@ -430,6 +430,22 @@ carefully. A manual search with Knaben On is already a workaround. This is an
 intentional fallback tradeoff, not a newly introduced regression; preserve
 approximate matches and useful editions while improving ranking.
 
+**Status (2026-10-04): implemented for Books only.**
+- `book_title_score` reads "Title — Author", "Author - Title", "Title by Author"
+  and "A / B" names. It compares word counts, allows author words in the query,
+  and ignores format words ("epub", "audiobook").
+- Books rank by it, and Libgen still leads among equally good matches. Nothing
+  is filtered out.
+- Knaben (Auto) now also runs when the On engines returned rows but none
+  matches the title.
+- Replaying the audit's rows: Austen's original editions now lead "Pride and
+  Prejudice", ahead of "Variation" spin-offs. For "Tomorrow and Tomorrow and
+  Tomorrow", Libgen's 16 rows score 0 and Apibay was empty, so Knaben runs, and
+  its first row is Zevin's novel.
+- Known limits: same-title different books ("The Name of the Rosé") and works
+  named after the original can tie with it. Other providers keep the raw-row
+  Auto rule.
+
 **Optional catalogs:** Gutenberg supplied verified originals for five sampled
 works already observed through existing searches, plus a German Metamorphosis
 route missed by `Die Verwandlung`. It is useful for a clean classics/language

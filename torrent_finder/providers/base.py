@@ -167,6 +167,9 @@ class BaseProvider(ABC):
     creator_facets: list = []
     apibay_cache_enabled: bool = True
     prefer_title_matches: bool = False
+    # With prefer_title_matches: Auto fallbacks also run when On engines returned
+    # rows but none matches the title (title_relevance >= 1).
+    auto_needs_relevant_rows: bool = False
 
     # Optional one-line caveat shown when this provider is selected/searched
     # (e.g. Mobile noting it's Android-only). Empty = no note.
@@ -572,13 +575,17 @@ class BaseProvider(ABC):
                 unique.append(item)
         ordered = self.rank_preferences(self._sort_results(unique))
         if self.prefer_title_matches:
-            ordered.sort(key=lambda row: title_score(row.name, query), reverse=True)
+            ordered.sort(key=lambda row: self.title_relevance(row.name, query), reverse=True)
         return ordered
 
     @property
     def search_presets(self) -> list[FilterPreset]:
         """Required and preferred presets can both request bounded extra queries."""
         return self.active_presets + [p for p in self.preferred_presets if p not in self.active_presets]
+
+    def title_relevance(self, name: str, query: str) -> int:
+        """0-3: how well a result's title matches the searched title (see title_score)."""
+        return title_score(name, query)
 
     def preference_score(self, row) -> int:
         return sum(bool(apply_filters([row], p.config)) for p in self.preferred_presets
