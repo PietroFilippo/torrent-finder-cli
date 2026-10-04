@@ -5,6 +5,7 @@ from torrent_finder import fitgirl, online_fix
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.result_view import matches_name, result_indices, title_score, timestamp
 from torrent_finder.nyaa import discovery_query
+from torrent_finder.search_control import SharedResults
 from torrent_finder.search_result import SearchResult
 
 
@@ -53,7 +54,8 @@ class SearchRefinementTests(unittest.TestCase):
         html = ''.join(f'<article id="post-{i}" class="category-lossless-repack"><h1 class="entry-title"><a href="https://fitgirl-repacks.site/{i}">{name}</a></h1>mentions Saki</article>' for i,name in [(1,"Saki Game"),(2,"Unrelated Game")])
         session = Mock()
         session.get.return_value.text = html
-        with patch.object(fitgirl, "_http", return_value=session):
+        with patch.object(fitgirl, "_http", return_value=session), \
+             patch.object(fitgirl, "_shared", SharedResults(30.0)):
             self.assertEqual([r.name for r in fitgirl.search("Saki")], ["Saki Game"])
 
     def test_online_fix_does_not_borrow_neighbor_title_or_keep_sidebar_noise(self):

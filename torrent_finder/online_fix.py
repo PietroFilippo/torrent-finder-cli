@@ -38,7 +38,7 @@ import requests
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import SearchInterrupted, search_request, search_stopped, search_wait
-from torrent_finder.result_view import matches_name
+from torrent_finder.result_view import game_title_query, matches_name
 
 _BASE = "https://online-fix.me"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -178,6 +178,7 @@ def search(query: str) -> list[SearchResult]:
     Results carry no seeders / size — the DLE listing exposes neither, so those
     are zero-filled and the table just won't differentiate on them.
     """
+    query = game_title_query(query)  # "Palworld online-fix" → "Palworld"
     key = " ".join(query.casefold().split())
     with _one_search_at_a_time():
         reused = _recent.get(key)

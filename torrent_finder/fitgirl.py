@@ -29,8 +29,8 @@ from html import unescape
 import requests
 
 from torrent_finder.search_result import SearchResult
-from torrent_finder.search_control import search_request
-from torrent_finder.result_view import matches_name
+from torrent_finder.search_control import SharedResults, search_request
+from torrent_finder.result_view import game_title_query, matches_name, number_variant, possessive_variant
 
 _BASE = "https://fitgirl-repacks.site"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -82,8 +82,9 @@ def _parse_size(article: str) -> str:
     return str(int(num * _UNIT_BYTES.get(m.group(2).upper(), 1)))
 
 
-def _parse_page(html: str, results: list[SearchResult], seen: set[str], query: str = "") -> None:
-    """Append one search page's repack posts to ``results`` (dedup on post id).
+def _parse_page(html: str, results: list[SearchResult], seen: set[str], wanted: tuple[str, ...] = ("",)) -> None:
+    """Append one search page's repack posts matching a *wanted* title to
+    ``results`` (dedup on post id).
 
     Only ``category-lossless-repack`` articles are repacks — the search also
     returns site news / digest posts (``category-uncategorized`` etc.), which
@@ -102,7 +103,7 @@ def _parse_page(html: str, results: list[SearchResult], seen: set[str], query: s
         seen.add(post_id)
         url = title_m.group(1)
         name = _strip_tags(title_m.group(2)) or "Unknown"
-        if not matches_name(name, query):
+        if not any(matches_name(name, title) for title in wanted):
             continue
         published = None
         for tag in re.findall(r'<time\b[^>]*>', article):
@@ -125,25 +126,51 @@ def _parse_page(html: str, results: list[SearchResult], seen: set[str], query: s
         ))
 
 
+# Both game providers search FitGirl; one request set serves the same query.
+_shared = SharedResults(30.0)
+
+
 def search(query: str) -> list[SearchResult]:
     """Search fitgirl-repacks.site. Returns SearchResult rows with a placeholder
     ``info_hash`` (resolve the real one with ``resolve_info_hash`` on select).
-    No login needed. Empty list on any error.
+    No login needed. A failed first request raises (a retryable failure).
 
-    WordPress paginates search at 10 posts, so when page 1 is full and links a
-    next page, page 2 is fetched too (capped there — 20 results is plenty).
+    Source/platform words are dropped first ("Cyberpunk 2077 fitgirl"): post
+    titles never contain them. When nothing matches, at most two other spellings
+    are tried: the final number in its other form ("Dying Light Two" → "Dying
+    Light 2"), then without possessive endings ("Baldurs Gate 3" → "Baldur Gate 3",
+    which the site matches to "Baldur’s Gate 3"; rows must still match the title).
     """
+    title = game_title_query(query)
+    return _shared.run(title, _search_with_fallback)
+
+
+def _search_with_fallback(title: str) -> list[SearchResult]:
+    rows = _search_once(title, (title,))
+    number = number_variant(title)
+    if not rows and number:
+        rows = _search_once(number, (number,))
+    stem = possessive_variant(title)
+    if not rows and stem:
+        rows = _search_once(stem, (title, number) if number else (title,))
+    return rows
+
+
+def _search_once(query: str, wanted: tuple[str, ...]) -> list[SearchResult]:
+    """One WordPress search, keeping posts that match a *wanted* title. It
+    paginates at 10 posts, so when page 1 is full and links a next page, page 2
+    is fetched too (capped there — 20 is plenty)."""
     session = _http()
     results: list[SearchResult] = []
     seen: set[str] = set()
-    try:
-        r = search_request(session.get, f"{_BASE}/", params={"s": query}, timeout=30)
-        _parse_page(r.text, results, seen, query)
-        if _NEXT_PAGE_RE.search(r.text):
+    r = search_request(session.get, f"{_BASE}/", params={"s": query}, timeout=30)
+    _parse_page(r.text, results, seen, wanted)
+    if _NEXT_PAGE_RE.search(r.text):
+        try:
             r2 = search_request(session.get, f"{_BASE}/page/2/", params={"s": query}, timeout=30)
-            _parse_page(r2.text, results, seen, query)
-    except requests.RequestException:
-        return results  # keep whatever page 1 yielded
+            _parse_page(r2.text, results, seen, wanted)
+        except requests.RequestException:
+            pass  # keep what page 1 yielded
     return results
 
 

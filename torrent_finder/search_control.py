@@ -130,6 +130,41 @@ def _retry_after_seconds(value) -> float:
         return Cooldown.DEFAULT_SECONDS
 
 
+class SharedResults:
+    """Rows of one source, shared between searches of the same query.
+
+    Both game providers search FitGirl and Online-Fix: an identical query asked
+    again within *seconds* reuses the rows, and a concurrent identical search
+    waits for the first instead of sending its own requests. A search that
+    raises is not remembered, so a retry asks the source again.
+    """
+
+    def __init__(self, seconds: float) -> None:
+        self.seconds = seconds
+        self._lock = threading.Lock()
+        self._keys: dict[str, threading.Lock] = {}
+        self._recent: dict[str, tuple[float, list]] = {}
+
+    def run(self, query: str, search):
+        key = " ".join(query.casefold().split())
+        with self._lock:
+            key_lock = self._keys.setdefault(key, threading.Lock())
+        while not key_lock.acquire(timeout=0.1):
+            if search_stopped():
+                raise SearchInterrupted()
+        try:
+            reused = self._recent.get(key)
+            if reused and time.monotonic() - reused[0] < self.seconds:
+                return list(reused[1])
+            rows = search(query)
+            now = time.monotonic()
+            self._recent = {k: v for k, v in self._recent.items() if now - v[0] < self.seconds}
+            self._recent[key] = (now, list(rows))
+            return list(rows)
+        finally:
+            key_lock.release()
+
+
 class SearchControl:
     def __init__(self, seconds, cancel_event=None, finish_event=None):
         self.deadline = time.monotonic() + seconds

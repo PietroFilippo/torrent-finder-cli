@@ -148,6 +148,18 @@ this is not a normal interactive performance estimate.
 canonical names to adding source/platform words to the title. Additional general
 game indexes are not a demonstrated priority.
 
+**Status (2026-10-04): the dedicated engines search the title; FitGirl shares requests.**
+- FitGirl and Online-Fix drop source and platform words (`fitgirl`, `repack`,
+  `dodi`, `online-fix`, `linux`, `pc`, …) before searching. The general indexes
+  still receive them, because torrent names there often contain those words.
+- Live after the change: `Cyberpunk 2077 fitgirl` and `Stardew Valley linux`
+  return their FitGirl posts. `Portal Two` still finds nothing: FitGirl has no
+  Portal 2 post, and the existing Apibay number-word retry is unchanged.
+- FitGirl searches from both game providers are shared: a concurrent identical
+  search waits for the first, and the same title within 30 seconds reuses its
+  rows. A failed search is not reused. Online-Fix already worked this way.
+- See FitGirl below for its spelling fallbacks.
+
 ## Online-Fix
 
 **Scope:** dedicated game listings for the source's multiplayer/co-op offerings.
@@ -226,6 +238,22 @@ queries; this audit did not establish their absence from the whole catalog.
 fallback could help punctuation/modifier cases. There is no reason to add other
 catalogs inside a provider specifically named FitGirl; use General Games when
 broader discovery is wanted.
+
+**Status (2026-10-04): spelling fallbacks implemented.**
+- The site did return the `Baldur’s Gate 3` post for `Baldurs Gate 3`; the
+  app's own title check dropped it over the curly apostrophe. Title checks now
+  ignore apostrophes, so `Baldurs`, `Baldur's` and `Baldur’s` match each other
+  (FitGirl, Online-Fix and the result-list search).
+- When the title finds no matching post, at most two more searches run:
+  1. the final number written the other way (`Dying Light Two` → `Dying Light
+     2`, `Civilization VI` → `Civilization 6`, `Final Fantasy 7` → `Final
+     Fantasy VII`);
+  2. possessive endings dropped (`Baldurs Gate 3` → `Baldur Gate 3`). Posts
+     from this broader search must still match the typed title.
+- Live checks: `Dying Light Two` and `Civilization VI` (titled `Civilization
+  6` on the site) find their posts with four requests in about 3 seconds.
+- A failed first request is now a retryable failure instead of an empty
+  result.
 
 ## Desktop Software
 

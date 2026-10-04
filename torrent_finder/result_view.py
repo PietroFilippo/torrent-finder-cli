@@ -129,9 +129,9 @@ _RELEASE_TAGS = re.compile(
 _NUMBER_WORDS = ("zero one two three four five six seven eight nine ten eleven twelve thirteen "
                  "fourteen fifteen sixteen seventeen eighteen nineteen twenty").split()
 _ROMAN = ("ii iii iv vi vii viii ix xi xii xiii xiv xv xvi xvii xviii xix xx").split()
+_ROMAN_VALUES = dict(zip(_ROMAN, (2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)))
 _NUMBERS = {**{str(n): word for n, word in enumerate(_NUMBER_WORDS)},
-            **{roman: _NUMBER_WORDS[value] for roman, value in zip(_ROMAN, (2, 3, 4, 6, 7, 8, 9, 11, 12, 13,
-                                                                             14, 15, 16, 17, 18, 19, 20))}}
+            **{roman: _NUMBER_WORDS[value] for roman, value in _ROMAN_VALUES.items()}}
 _YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 
 
@@ -183,6 +183,54 @@ def movie_title_score(name: str, query: str) -> int:
     return score
 
 
+# Source and platform words people add to a game title; dedicated game sites
+# search their own catalog, where these words only hide the game.
+_GAME_EXTRAS = re.compile(r"\b(?:fit\s?girl|dodi|elamigos|online[- ]?fix|repacks?|linux|windows|win(?:32|64)?"
+                          r"|macos|mac|osx|pc)\b", re.I)
+
+
+def game_title_query(query: str) -> str:
+    """The game title in a query, without source/platform words:
+    "Cyberpunk 2077 fitgirl" → "Cyberpunk 2077", "Stardew Valley linux" → "Stardew Valley"."""
+    return " ".join(_GAME_EXTRAS.sub(" ", query).split()) or query
+
+
+def number_variant(query: str) -> "str | None":
+    """The query with its final number written the other common way: words and
+    Roman numerals as digits ("Dying Light Two" → "Dying Light 2", "Civilization
+    VI" → "Civilization 6"), digits as Roman numerals ("Final Fantasy 7" → "Final
+    Fantasy VII"). None when the query does not end in such a number."""
+    parts = query.split()
+    if len(parts) < 2:
+        return None
+    last = parts[-1].casefold()
+    if last in _NUMBER_WORDS[1:]:
+        swapped = str(_NUMBER_WORDS.index(last))
+    elif last in _ROMAN_VALUES:
+        swapped = str(_ROMAN_VALUES[last])
+    elif last.isdigit() and int(last) in _ROMAN_VALUES.values():
+        swapped = _ROMAN[list(_ROMAN_VALUES.values()).index(int(last))].upper()
+    else:
+        return None
+    return " ".join([*parts[:-1], swapped])
+
+
+_POSSESSIVE = re.compile(r"\b([^\W\d_]{3,})(?:['’]s|s)\b")
+
+
+def possessive_variant(query: str) -> "str | None":
+    """The query with possessive and plural endings dropped ("Baldur's Gate 3",
+    "Baldurs Gate 3" → "Baldur Gate 3"), or None when nothing changes. A site that
+    matches text fragments then finds "Baldur’s" however the apostrophe was typed."""
+    stem = _POSSESSIVE.sub(r"\1", query)
+    return stem if stem != query else None
+
+
+def _compact_words(text: str) -> tuple[str, ...]:
+    """``words`` that ignore apostrophes: "Baldur’s" and "Baldurs" are one word."""
+    return words(re.sub(r"['’`´]", "", text))
+
+
 def matches_name(name: str, query: str, mode: str = "contains") -> bool:
     if not query.strip():
         return True
@@ -190,7 +238,10 @@ def matches_name(name: str, query: str, mode: str = "contains") -> bool:
         return words(media_title(name)) == words(query)
     if mode == "filename":
         return name.strip().casefold() == query.strip().casefold()
-    return all(word in words(name) for word in words(query))
+    # "Baldurs" finds "Baldur’s", and "Baldur's" still finds "Baldur.s".
+    found = set(words(name)) | set(_compact_words(name))
+    return (all(word in found for word in _compact_words(query))
+            or all(word in found for word in words(query)))
 
 
 def timestamp(value) -> int:
