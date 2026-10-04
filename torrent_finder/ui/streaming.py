@@ -10,18 +10,20 @@ generic terminal toolkit.
 import os
 import sys
 
+from rich.console import Group
 from rich.markup import escape
-from rich.panel import Panel
 from rich.text import Text
 
 from torrent_finder.constants import console
+from torrent_finder.ui import theme
 from torrent_finder.ui.layout import ellipsize_cells
 from torrent_finder.torrent_meta import format_size
 
 
-# Minimum header height keeps the normal-width stream panel stable. Narrow
-# terminals may wrap it taller; the scroll region then starts below the actual
-# rendered panel instead of overlapping child-process output.
+# Minimum header height keeps the normal-width stream header stable (header
+# line, file, size, subtitles, VLC hint, keys, spacer). Narrow terminals may
+# wrap it taller; the scroll region then starts below the actual rendered
+# header instead of overlapping child-process output.
 _STREAM_HEADER_LINES = 7
 
 
@@ -53,10 +55,10 @@ def _print_stream_header(
     filename: str = "",
     filesize_bytes: int = 0,
 ) -> None:
-    """Pin a Rich Panel summary at the top of the terminal for this stream session.
+    """Pin a summary at the top of the terminal for this stream session.
 
-    Replaces the legacy line-by-line print with a bordered panel showing file
-    name + size + backend + subtitle status + keybinds. The normal header
+    The Quiet header shows the file name, size, backend, subtitle status, the
+    VLC retry hint and the keys under the shared header line. The normal header
     keeps a stable minimum height; wrapped narrow headers reserve their actual
     rendered height before the child-process scroll region begins.
 
@@ -78,61 +80,53 @@ def _print_stream_header(
     elif file_idx is not None:
         _set_terminal_title(f"Streaming file {file_idx} | v: VLC  Ctrl+C: cancel")
 
-    # Panel sizing: leave room for borders (2 cols) + padding (2 cols) + icon (3 chars).
-    inner_width = max(8, console.size.width - 8)
+    # Content sits inside the two-cell margins.
+    inner_width = theme.inner_width(console.size.width)
 
     # Escape user-supplied strings — torrent filenames often contain bracketed
     # tags like ``[x265]`` that Rich's markup parser would interpret as styles.
     file_display = escape(_truncate(filename or "(unknown file)", inner_width))
 
     size_str = format_size(filesize_bytes) if filesize_bytes else "size unknown"
-    backend_str = f"  •  via {escape(backend)}" if backend else ""
-    idx_str = f"  •  file index {file_idx}" if file_idx is not None else ""
+    backend_str = f" · via {escape(backend)}" if backend else ""
+    idx_str = f" · file index {file_idx}" if file_idx is not None else ""
 
     if sub_paths:
         primary = escape(
             _truncate(os.path.basename(sub_paths[0]), max(4, inner_width - 20))
         )
         extras = f"  (+{len(sub_paths) - 1} more)" if len(sub_paths) > 1 else ""
-        sub_line = f"📝  [success]Subtitles:[/success] [highlight]{primary}[/highlight]{extras}"
+        sub_line = f"[success]Subtitles:[/success] [highlight]{primary}[/highlight]{extras}"
     else:
-        sub_line = "[dim]📝  No subtitles attached[/dim]"
+        sub_line = "[muted]No subtitles attached[/muted]"
 
-    binds: list[str] = ["[bold red]Ctrl+C[/bold red] cancel"]
+    binds: list[str] = ["Ctrl+C cancel"]
     if vlc_url:
-        binds.append("[bold yellow]v[/bold yellow] reopen VLC")
+        binds.append("v reopen VLC")
     if multi:
-        binds.append("[bold yellow]n[/bold yellow] next")
+        binds.append("n next")
         if ep_idx > 0:
-            binds.append("[bold yellow]b[/bold yellow] previous")
+            binds.append("b previous")
 
     # Persistent warning row — surfaces the VLC "cannot open MRL" race that
     # can hit multi-file webtorrent streams (the HTTP server may need a moment
     # to register the file route after the TCP port comes up). Always shown
     # so the user knows the recovery key without having to remember it.
     warning_line = (
-        '💡  [info]If VLC errors with "cannot open MRL":[/info] press '
-        '[bold yellow]v[/bold yellow] [info]to retry[/info] '
-        '[dim](stream route may still be warming up)[/dim]'
+        '[muted]If VLC errors with "cannot open MRL": press [/muted][key]v[/key] '
+        '[muted]to retry (stream route may still be warming up)[/muted]'
     )
 
-    body_lines = [
-        f"📁  [highlight]{file_display}[/highlight]",
-        f"💾  [info]{size_str}{backend_str}{idx_str}[/info]",
-        sub_line,
-        "⌨   " + "  •  ".join(binds),
-        warning_line,
-    ]
-
-    title_text = f"📺  Streaming — Episode {n}/{total}" if multi else "📺  Streaming"
-
-    panel = Panel(
-        Text.from_markup("\n".join(body_lines)),
-        title=title_text,
-        title_align="left",
-        border_style="cyan",
-        padding=(0, 1),
-    )
+    width = console.size.width
+    title_text = f"Streaming — Episode {n}/{total}" if multi else "Streaming"
+    lines: list[Text] = list(theme.header_lines(title_text, "", width))
+    for markup in (f"[highlight]{file_display}[/highlight]",
+                   f"[muted]{size_str}{backend_str}{idx_str}[/muted]",
+                   sub_line,
+                   warning_line):
+        lines.extend(theme.wrap_block(Text.from_markup(markup), width, console))
+    lines.extend(theme.wrap_keys(theme.parse_footer("  •  ".join(binds)).keys, width))
+    panel = Group(*lines)
     rendered_lines = len(
         console.render_lines(
             panel,
