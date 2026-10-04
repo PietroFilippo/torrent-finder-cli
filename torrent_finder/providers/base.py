@@ -16,7 +16,7 @@ from torrent_finder.constants import API_URL, console
 from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
 from torrent_finder.search_result import SearchResult, normalize_result
 from torrent_finder.search_errors import SearchError
-from torrent_finder.search_control import search_request
+from torrent_finder.search_control import Cooldown, search_request
 from torrent_finder.search_diagnostics import ACCESS_STATUSES, record_failure
 from torrent_finder.result_view import title_score
 
@@ -37,6 +37,8 @@ _APIBAY_NUMBER_WORDS = {
 # One search already costs engines x retries; query expansion multiplies that.
 # Keep both bounded so a preset stack stays polite to the indexers.
 _MAX_QUERY_EXPANSIONS = 4
+# Every provider that searches SolidTorrents shares its rate-limit pause.
+_SOLIDTORRENTS_COOLDOWN = Cooldown("SolidTorrents")
 
 _APIBAY_FALLBACK_IGNORED = {
     "a",
@@ -364,14 +366,17 @@ class BaseProvider(ABC):
         return results
 
     def _search_solidtorrents(self, query: str) -> list[SearchResult]:
-        """Search SolidTorrents API for the query."""
+        """Search SolidTorrents API for the query. A rate limit pauses it app-wide
+        for its Retry-After (see ``_SOLIDTORRENTS_COOLDOWN``) and is reported."""
         results: list[SearchResult] = []
+        _SOLIDTORRENTS_COOLDOWN.check()
         try:
             response = search_request(requests.get,
                 "https://solidtorrents.to/api/v1/search",
                 params={"q": query, "category": self.solidtorrents_category},
                 timeout=10
             )
+            _SOLIDTORRENTS_COOLDOWN.note(response)
             response.raise_for_status()
             data = response.json()
             for r in data.get("results", []):
@@ -386,6 +391,8 @@ class BaseProvider(ABC):
                     source="SolidTorrents",
                     page_url=f"https://solidtorrents.to/torrents/t/{rid}" if rid else "",
                 ))
+        except SearchError:
+            raise
         except Exception as error:
             record_failure(error)
         return results

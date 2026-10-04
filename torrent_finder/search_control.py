@@ -83,6 +83,53 @@ def search_wait(seconds: float) -> bool:
     return True
 
 
+class Cooldown:
+    """A source's request to slow down (HTTP 429 with optional Retry-After),
+    honoured by every search in the app until it has passed."""
+
+    DEFAULT_SECONDS = 60.0
+    MAX_SECONDS = 900.0
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.until = 0.0
+        self._lock = threading.Lock()
+
+    def check(self) -> None:
+        """Raise ``SearchError`` instead of asking the source again too soon."""
+        with self._lock:
+            remaining = self.until - time.monotonic()
+        if remaining > 0:
+            from torrent_finder.search_errors import SearchError
+            raise SearchError(f"{self.name} asked the app to slow down; it is searched again in "
+                              f"{max(1, round(remaining))} s.")
+
+    def note(self, response) -> None:
+        """Start the cooldown when *response* is a rate limit, then raise via ``check``."""
+        if getattr(response, "status_code", 200) != 429:
+            return
+        seconds = _retry_after_seconds(getattr(response, "headers", {}).get("Retry-After"))
+        with self._lock:
+            self.until = time.monotonic() + min(self.MAX_SECONDS, max(1.0, seconds))
+        self.check()
+
+
+def _retry_after_seconds(value) -> float:
+    """Seconds from a Retry-After header (delay or HTTP date); the default when absent."""
+    if not value:
+        return Cooldown.DEFAULT_SECONDS
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        pass
+    try:
+        from datetime import datetime, timezone
+        from email.utils import parsedate_to_datetime
+        return (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
+    except (TypeError, ValueError, IndexError):
+        return Cooldown.DEFAULT_SECONDS
+
+
 class SearchControl:
     def __init__(self, seconds, cancel_event=None, finish_event=None):
         self.deadline = time.monotonic() + seconds

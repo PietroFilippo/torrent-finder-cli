@@ -448,6 +448,10 @@ pacing and must not be sold as normal UI performance.
 two timed out, one hit a rate limit and 177 were skipped. A later Matrix control
 worked again. Keep it optional, honor cooldown/Retry-After, and do not grade its
 unknown cells as misses. Its configured endpoint redirected through BitSearch.
+**Status (2026-10-04):** an HTTP 429 now pauses SolidTorrents for every
+provider for its `Retry-After` (seconds or date; 60 s when absent, at most 15
+minutes). During the pause it is not asked again, and the search says when it
+will be.
 
 **Knaben:** fourteen v2 requests over seven queries succeeded. It is the same
 meta-index, with substantial overlap, not a new catalog. Its new defaults exclude
