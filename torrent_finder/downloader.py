@@ -5,6 +5,7 @@ import platform
 import re
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -98,14 +99,39 @@ def _build_vlc_cmd(url: str, sub_paths: list[str] | None) -> list[str] | None:
 
 
 def _launch_vlc(url: str, sub_paths: list[str] | None) -> subprocess.Popen | None:
-    """Start a VLC window for the stream (+ optional subs); None if VLC can't start."""
+    """Start a VLC window for the stream (+ optional subs); None if VLC can't start.
+
+    On Linux/macOS VLC gets its own session: closing it kills its process group,
+    which would otherwise be the app's own."""
     cmd = _build_vlc_cmd(url, sub_paths)
     if cmd is None:
         return None
     try:
-        return subprocess.Popen(cmd)
+        if platform.system() == "Windows":
+            return subprocess.Popen(cmd)
+        return subprocess.Popen(cmd, start_new_session=True)
     except Exception:
         return None
+
+
+def _stream_port(preferred: int) -> int:
+    """*preferred* when nothing listens there, else a free port from the system.
+
+    webtorrent and peerflix quietly move to another port when theirs is taken,
+    so VLC would open whatever else runs on 8080/8888 (a dev server, Jupyter)."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.settimeout(0.2)
+    try:
+        in_use = probe.connect_ex(("127.0.0.1", preferred)) == 0
+    except OSError:
+        in_use = True
+    finally:
+        probe.close()
+    if not in_use:
+        return preferred
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as free:
+        free.bind(("127.0.0.1", 0))
+        return free.getsockname()[1]
 
 
 def _open_with_default_player(url: str) -> bool:
@@ -507,7 +533,7 @@ def _cancel_download_proc(proc: subprocess.Popen) -> None:
             proc.send_signal(signal.CTRL_BREAK_EVENT)
             proc.wait(timeout=5)
             return
-        except Exception:
+        except BaseException:  # including a second Ctrl+C: still make sure it stops
             pass
     _kill_process_tree(proc)
 
@@ -802,11 +828,20 @@ def _kill_process_tree(proc: subprocess.Popen) -> None:
     """
     pid = proc.pid
     if platform.system() == "Windows":
-        subprocess.run(
+        # Its own process group, and waited for through a second Ctrl+C: an
+        # interrupted taskkill would leave the backend running and drawing.
+        killer = subprocess.Popen(
             ["taskkill", "/T", "/F", "/PID", str(pid)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         )
+        while True:
+            try:
+                killer.wait()
+                break
+            except KeyboardInterrupt:
+                continue
     else:
         # On Unix, kill the process group
         try:
@@ -828,6 +863,7 @@ def _run_stream(
     sub_paths: list[str] | None = None,
     launch_vlc_when_ready: tuple[str, int] | None = None,
     log_path: str = "",
+    allow_back: bool = True,
 ) -> tuple[int, str]:
     """Run a streaming subprocess with native TTY (no stdout piping).
 
@@ -842,8 +878,9 @@ def _run_stream(
     launches after it ends, and ending it (Ctrl+C, 'n'/'b', the backend
     exiting) closes only that window.
     When allow_navigate is True, 'n'/'b' terminate the subprocess so the
-    caller can advance or go back in a multi-ep flow. Returns (returncode,
-    nav_action) where nav_action is 'next', 'back', or 'none'.
+    caller can advance or go back in a multi-ep flow ('b' only with
+    allow_back: on the first episode there is nothing before it). Returns
+    (returncode, nav_action) where nav_action is 'next', 'back', or 'none'.
 
     When quiet is True, subprocess stdout is discarded (full-screen UI
     suppressed) and a rich spinner renders in its place. log_path, when set,
@@ -851,7 +888,7 @@ def _run_stream(
     """
     player = _StreamPlayer(vlc_url, sub_paths)
     advance_event = threading.Event() if allow_navigate else None
-    back_event = threading.Event() if allow_navigate else None
+    back_event = threading.Event() if allow_navigate and allow_back else None
     stop_event = _start_vlc_hotkey_thread(player, advance_event, back_event)
     nav_action = "none"
     log = None
@@ -1128,7 +1165,8 @@ def stream_with_webtorrent(session: "TorrentSession") -> str:
             else:
                 file_path = None
 
-            vlc_url = _webtorrent_vlc_url(magnet_link, torrent_name, file_path, is_multi_file)
+            port = _stream_port(8080)
+            vlc_url = _webtorrent_vlc_url(magnet_link, torrent_name, file_path, is_multi_file, port=port)
 
             # Subs for this episode: prefer per-video map entry, fall back to
             # sentinel index (-1) used by external-mode single-file torrents.
@@ -1150,15 +1188,16 @@ def stream_with_webtorrent(session: "TorrentSession") -> str:
                 filesize_bytes=_file_info.size_bytes if _file_info else 0,
             )
 
-            cmd = [*wt_cmd, "download", magnet_link, "--port", "8080"]
+            cmd = [*wt_cmd, "download", magnet_link, "--port", str(port)]
             if idx is not None:
                 cmd.extend(["--select", str(idx - 1)])
 
             rc, nav = _run_stream(
                 cmd, vlc_url, allow_navigate=multi, quiet=quiet,
                 sub_paths=ep_subs,
-                launch_vlc_when_ready=("127.0.0.1", 8080),
+                launch_vlc_when_ready=("127.0.0.1", port),
                 log_path=log_path,
+                allow_back=ep_idx > 0,
             )
 
             if nav in ("next", "back"):
@@ -1215,7 +1254,6 @@ def stream_with_peerflix(session: "TorrentSession") -> str:
     targets: list[int | None] = list(session.stream_indexes) if session.stream_indexes else [None]
 
     multi = len(targets) > 1
-    vlc_url = "http://127.0.0.1:8888/"
     quiet = is_quiet_mode()
     log_path = _new_stream_log("peerflix")
     failed_rc = 0
@@ -1234,6 +1272,8 @@ def stream_with_peerflix(session: "TorrentSession") -> str:
             else:
                 ep_subs = None
 
+            port = _stream_port(8888)
+            vlc_url = f"http://127.0.0.1:{port}/"
             # Quiet mode suppresses subprocess UI — no need for a scroll
             # region since nothing scrolls below the header.
             _file_info = next((f for f in file_list if f.index == idx), None) if idx is not None else None
@@ -1245,15 +1285,16 @@ def stream_with_peerflix(session: "TorrentSession") -> str:
                 filesize_bytes=_file_info.size_bytes if _file_info else 0,
             )
 
-            cmd = [*pf_cmd, magnet_link, "--port", "8888"]
+            cmd = [*pf_cmd, magnet_link, "--port", str(port)]
             if idx is not None:
                 cmd.extend(["-i", str(idx - 1)])
 
             rc, nav = _run_stream(
                 cmd, vlc_url, allow_navigate=multi, quiet=quiet,
                 sub_paths=ep_subs,
-                launch_vlc_when_ready=("127.0.0.1", 8888),
+                launch_vlc_when_ready=("127.0.0.1", port),
                 log_path=log_path,
+                allow_back=ep_idx > 0,
             )
 
             if nav in ("next", "back"):

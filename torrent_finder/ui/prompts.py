@@ -461,7 +461,7 @@ def get_query_with_shortcut(
                 buffer.insert(pos, key)
                 pos += 1
                 repaint(prev_col, prev_len)
-    except KeyboardInterrupt:  # typed Ctrl+C (raised above) or one raised by readkey
+    except (KeyboardInterrupt, EOFError):  # typed Ctrl+C / Ctrl+D (raised above) or readkey's
         if propagate_interrupt:
             raise
         if screen_renderer is None:
@@ -1063,7 +1063,7 @@ def subtitle_source_prompt(current: dict | None = None) -> dict:
         if not path:
             return current
         if not os.path.exists(path):
-            console.print(f"[warning] File not found: {path}[/warning]")
+            console.print(f"[warning] File not found: {escape(path)}[/warning]")
             console.print("[dim]Press any key to continue...[/dim]")
             readchar.readkey()
             return current

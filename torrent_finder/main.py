@@ -239,12 +239,12 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
     else:
         lines = [f"[success]✓ {sent} of {n} handed to your torrent client.[/success]"]
     if ofix_pw:
-        lines.append(f"[cyan]Online-Fix archive password:[/cyan] {ofix_pw}")
+        lines.append(f"[cyan]Online-Fix archive password:[/cyan] {escape(ofix_pw)}")
     if failed:
         shown = ", ".join(failed[:6]) + (" …" if len(failed) > 6 else "")
-        lines.append(f"[warning] Couldn't open {len(failed)}:[/warning] {shown}")
+        lines.append(f"[warning] Couldn't open {len(failed)}:[/warning] {escape(shown)}")
         for u in manual_urls[:6]:
-            lines.append(f"[dim]Grab manually: {u}[/dim]")
+            lines.append(f"[dim]Grab manually: {escape(u)}[/dim]")
     return download_complete_prompt("Batch handoff finished", summary="\n".join(lines))
 
 
@@ -1330,11 +1330,12 @@ def _main_loop(args=None) -> None:
         if combined:
             # CLI -q can reach this screen before the lazy profile is loaded.
             count = sum(p.slug in provider.selected_slugs for p in provider.children)
-            console.print(f"[info]Searching {count} provider{'s' if count != 1 else ''} for:[/info] [highlight]{shown}[/highlight]")
+            console.print(f"[info]Searching {count} provider{'s' if count != 1 else ''} for:[/info] "
+                          f"[highlight]{escape(shown)}[/highlight]")
             console.print("[dim]Results appear when the search finishes or after 30 seconds.[/dim]")
             console.print("[dim]Press Enter to view results so far, or Esc to cancel.[/dim]")
         else:
-            console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{shown}[/highlight]...")
+            console.print(f"[info]Searching {provider.name} for:[/info] [highlight]{escape(shown)}[/highlight]...")
         if not combined and getattr(provider, "search_note", ""):
             console.print(f"[dim]{provider.search_note}[/dim]")
         if not combined:

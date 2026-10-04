@@ -58,7 +58,12 @@ share a filename. The completion screen shows the name actually saved.
 
 - Operations must be deterministic and tolerate the shapes they may meet on
   disk; values such as timestamps and IDs are computed before the operation.
-  `store.section()` creates or repairs a dict subtree.
+  `store.section()` creates or repairs a dict subtree. A pending operation that
+  still fails on what another window or a hand edit wrote is dropped rather than
+  blocking every later save; an explicit save that fails this way raises
+  `ValueError`. The first migration takes the file lock and adopts a file
+  another window created meanwhile. Search profiles replay a window's own
+  changes by profile ID instead of replacing the collection.
 - No single-instance restriction or database is needed for concurrent windows.
 - Tests import `tests/isolation.py`, which redirects saved settings, credentials
   and the Apibay cache for the whole run. `isolate_store(case)` gives a test its
