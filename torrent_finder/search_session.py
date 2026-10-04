@@ -175,8 +175,10 @@ class SearchSession:
         kept, removed = provider.filter_with_reasons(rows, self.cli_filters, self.result_filter)
         if rows and not kept and status == "results":
             status = "filtered"
+        hint = ""
         if not rows and status == "empty":
             message = "No matching rows returned by this search; source coverage is not established."
+            hint = task.engine.empty_hint(task.query) if task.engine.empty_hint else ""
         descriptions = [provider.filter_summary()]
         for label, config in (("Defaults", provider.default_filters), ("CLI", self.cli_filters)):
             if config:
@@ -189,7 +191,7 @@ class SearchSession:
                              removed=tuple(removed), seconds=time.monotonic() - started, message=message,
                              cached=sum(bool(r.get("apibay_cached_at")) for r in rows),
                              requests=trace.requests, attempt=task.diagnostic.attempt + 1,
-                             filters="; ".join(descriptions))
+                             filters="; ".join(descriptions), hint=hint)
         return rows, more, diagnostic
 
     def _commit(self, task, outcome):
@@ -253,6 +255,8 @@ class SearchSession:
         notices = list(dict.fromkeys(d.message if d.status in {"missing_login", "rejected_login", "login_error"}
                                     else f"{d.provider} / {d.engine}: {d.message}"
                                     for d in self.diagnostics if d.retryable))
+        if not ordered:  # source advice only when nothing at all was found
+            notices += list(dict.fromkeys(d.hint for d in self.diagnostics if d.hint))
         return SearchResults(ordered, notices, session=self)
 
     def run(self, action="initial", *, cancel_event=None, finish_event=None,

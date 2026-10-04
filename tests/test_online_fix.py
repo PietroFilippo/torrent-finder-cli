@@ -3,6 +3,7 @@
 import threading
 import time
 import unittest
+from contextlib import ExitStack
 from unittest.mock import Mock, patch
 
 from torrent_finder import online_fix, search_control
@@ -103,6 +104,35 @@ class OnlineFixSearchTests(unittest.TestCase):
         online_fix.search("Valheim")  # a different game right after: waits for the site's spacing
         self.assertEqual(self.session.get.call_count, 2)
         self.assertGreater(self.waits.call_args.args[0], 9)
+
+
+class EmptySearchHintTests(unittest.TestCase):
+    """A nothing-found multi-word Online-Fix search suggests one distinctive word."""
+
+    def run_search(self, provider_class, query, online_fix_rows=(), other_rows=()):
+        from torrent_finder.search_result import SearchResult
+        from torrent_finder.search_session import search_many
+        rows = [SearchResult(name=name, info_hash=str(n) * 40, source="Apibay") for n, name in enumerate(other_rows, 1)]
+        with patch.object(online_fix, "search", return_value=list(online_fix_rows)), ExitStack() as stack:
+            # search_many builds a fresh provider, so the other sources are stubbed on the class.
+            for name in ("_search_apibay", "_search_fitgirl", "_search_knaben", "_search_solidtorrents"):
+                if hasattr(provider_class, name):
+                    stack.enter_context(patch.object(provider_class, name,
+                                                     return_value=rows if name == "_search_apibay" else []))
+            return search_many(provider_class(), [query])
+
+    def test_hint_only_when_nothing_was_found_for_a_multi_word_title(self):
+        from torrent_finder.providers.game_provider import GameProvider
+        from torrent_finder.providers.online_fix_provider import OnlineFixProvider
+        hint = "try one distinctive word"
+        for provider_class in (OnlineFixProvider, GameProvider):
+            with self.subTest(provider=provider_class.__name__):
+                results = self.run_search(provider_class, "Don't Starve Together")
+                self.assertEqual(len(results), 0)
+                self.assertTrue(any(hint in notice for notice in results.notices))
+                self.assertFalse(any(hint in n for n in self.run_search(provider_class, "Starve").notices))
+        with_other = self.run_search(GameProvider, "Don't Starve Together", other_rows=["Don't Starve Together"])
+        self.assertFalse(any(hint in n for n in with_other.notices))  # other sources answered
 
 
 class SearchWaitTests(unittest.TestCase):

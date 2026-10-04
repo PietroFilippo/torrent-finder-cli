@@ -95,6 +95,8 @@ class SearchEngine:
     explicitly_disabled: bool = False
     page_fn: Callable | None = None
     initial_page: int = 0
+    # Advice shown when a whole search finds nothing and this engine had no rows.
+    empty_hint: Callable[[str], str] | None = None
 
     @property
     def available_modes(self) -> tuple[str, ...]:

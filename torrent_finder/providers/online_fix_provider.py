@@ -29,7 +29,8 @@ class OnlineFixProvider(BaseProvider):
     supports_episode_picker = False
 
     def _init_engines(self) -> list[SearchEngine]:
-        return [SearchEngine("Online-Fix", "🔧", self._search_online_fix, enabled=True)]
+        return [SearchEngine("Online-Fix", "🔧", self._search_online_fix, enabled=True,
+                             empty_hint=online_fix.empty_search_hint)]
 
     def _search_online_fix(self, query: str) -> list[SearchResult]:
         return online_fix.search(query)

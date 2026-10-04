@@ -74,6 +74,7 @@ class Diagnostic:
     cached: int = 0
     requests: int | None = 0
     filters: str = ""
+    hint: str = ""  # the engine's advice for an empty result
 
     @property
     def retryable(self):

@@ -191,6 +191,15 @@ def search(query: str) -> list[SearchResult]:
         return list(rows)
 
 
+def empty_search_hint(query: str) -> str:
+    """Advice when a multi-word title finds nothing: the site matches title text
+    literally, so punctuation or extra words can hide a game it has."""
+    if len(query.split()) < 2:
+        return ""
+    return ("Online-Fix matches title text literally: try one distinctive word "
+            "(e.g. Starve for Don't Starve Together).")
+
+
 @contextmanager
 def _one_search_at_a_time():
     """Hold the search gate; waiting for it ends early if the search stops."""

@@ -64,7 +64,8 @@ class GameProvider(BaseProvider):
         FitGirl → lazy magnet resolve)."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
-            SearchEngine("Online-Fix", "🔧", self._search_online_fix, enabled=True),
+            SearchEngine("Online-Fix", "🔧", self._search_online_fix, enabled=True,
+                         empty_hint=self._online_fix_hint),
             SearchEngine("FitGirl", "🧚", self._search_fitgirl, enabled=True),
             SearchEngine(
                 "Knaben", "🧭", self._search_knaben,
@@ -75,6 +76,10 @@ class GameProvider(BaseProvider):
                 enabled=False,
             ),
         ]
+
+    def _online_fix_hint(self, query: str) -> str:
+        from torrent_finder import online_fix
+        return online_fix.empty_search_hint(query)
 
     def _search_online_fix(self, query: str) -> list[SearchResult]:
         """Anonymous online-fix.me search (same backend as the standalone provider)."""
