@@ -47,7 +47,7 @@ def show_progress(client, hashes=()):
                             description=escape(progress_text(r))) for r in rows]
         if not rows:
             items.append(SelectItem("No torrents reported by the client", passive=True))
-        items += [SelectItem("🔄 Refresh progress", value="refresh"), SelectItem("↩ Back", value=None)]
+        items += [SelectItem("Refresh progress", value="refresh", hint="R"), SelectItem("Back", value=None)]
         while True:
             index = arrow_select(items, title=f"qBittorrent · read at {stamp}",
                                  footer="Enter details • R refresh • Esc back",
@@ -68,9 +68,9 @@ def client_menu():
     from torrent_finder.credential_registry import get_credential_spec
     from torrent_finder.ui.credentials import _manage_credentials
     while True:
-        items = [SelectItem("⚙ Configure / verify WebUI connection", "setup"),
-                 SelectItem("📊 Download progress in qBittorrent", "progress", enabled=configured()),
-                 SelectItem("↩ Back", None)]
+        items = [SelectItem("Configure / verify WebUI connection", "setup"),
+                 SelectItem("Download progress in qBittorrent", "progress", enabled=configured()),
+                 SelectItem("Back", None)]
         index = arrow_select(items, title="qBittorrent", footer="Optional WebUI integration • Esc back")
         if index is None or items[index].value is None:
             return
@@ -105,11 +105,11 @@ def send_results(results, *, magnet=None):
             return False
         save_path, category = "", ""
         while True:
-            items = [SelectItem("📁 Save folder on client", "folder", description=escape(save_path or "qBittorrent default folder")),
-                     SelectItem("🏷 Category", "category", description=escape(category or "No category")),
-                     SelectItem(f"🧲 Send {len(eligible)} torrent(s) to qBittorrent", "send",
+            items = [SelectItem("Save folder on client", "folder", description=escape(save_path or "qBittorrent default folder")),
+                     SelectItem("Category", "category", description=escape(category or "No category")),
+                     SelectItem(f"Send {len(eligible)} torrent(s) to qBittorrent", "send",
                                 description=f"Full torrents; file selection is managed in qBittorrent. {skipped} direct-download result(s) skipped."),
-                     SelectItem("↩ Back", None)]
+                     SelectItem("Back", None)]
             index = arrow_select(items, title="Send to qBittorrent", footer="Choose destination, then Send • Esc back")
             if index is None or items[index].value is None:
                 return False

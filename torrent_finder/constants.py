@@ -9,17 +9,10 @@ import tempfile
 from rich.console import Console
 from rich.theme import Theme
 
-# Theme & Console
-custom_theme = Theme(
-    {
-        "title": "bold magenta",
-        "info": "dim cyan",
-        "success": "bold green",
-        "warning": "bold yellow",
-        "error": "bold red",
-        "highlight": "bold white",
-    }
-)
+from torrent_finder.ui.theme import STYLES
+
+# Theme & Console: the Quiet palette (ui/theme.py) by name, for markup everywhere.
+custom_theme = Theme(STYLES)
 
 console = Console(theme=custom_theme)
 

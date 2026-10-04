@@ -225,7 +225,8 @@ class BaseProvider(ABC):
 
     @property
     def label(self) -> str:
-        return f"{self.icon} {self.name}"
+        """Menu label. Icons stay as data (``icon``) but menus show names only."""
+        return self.name
 
     def _apibay_retry_queries(self, query: str) -> Iterator[str]:
         # APIBay's query cache is case-sensitive. Preserve the user's spelling

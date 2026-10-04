@@ -22,7 +22,11 @@ from torrent_finder.downloader import (
     open_magnet,
 )
 from torrent_finder.providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
+from torrent_finder.ui import theme
 from torrent_finder.ui.selector import SelectItem, arrow_select
+
+# Random tips share the footer only in tall windows, so they never cost list rows.
+_TIP_MIN_HEIGHT = 30
 
 _ARIA2_INSTALL_URL = "https://aria2.github.io/"
 _WEBTORRENT_INSTALL_URL = "https://www.npmjs.com/package/webtorrent-cli"
@@ -38,19 +42,60 @@ MULTI_ADD_KEY_LABEL = "Ctrl+N"
 
 
 def search_shortcuts_line(has_history: bool) -> str:
-    """Build the search-screen shortcut line in display-priority order."""
-    history = (
-        "  •  [/dim][bold]↑/↓[/bold] [dim]past searches"
-        if has_history
-        else ""
-    )
+    """Build the search-screen key line in display-priority order."""
+    history = "  •  ↑/↓ past searches" if has_history else ""
     return (
-        "[dim]Type to search  •  [/dim][bold]Ctrl+F[/bold] [dim]filters"
-        f"  •  [/dim][bold]{MULTI_ADD_KEY_LABEL}[/bold] "
-        "[dim]add another title  •  [/dim][bold]Tab[/bold] [dim]actions "
-        f"(bookmarks, backup, history, more){history}  •  [/dim]"
-        "[bold]Esc[/bold] [dim]back / undo title[/dim]"
+        "Enter search  •  Ctrl+F filters"
+        f"  •  {MULTI_ADD_KEY_LABEL} add another title  •  Tab actions "
+        f"(bookmarks, backup, history, more){history}  •  "
+        "Esc back / undo title"
     )
+
+
+# The prompt marker every text field uses.
+PROMPT = "[accent]›[/accent] "
+
+
+def _print_lines(target: Console, block: Text) -> None:
+    for line in theme.wrap_block(block, target.size.width, target):
+        target.print(line)
+
+
+def _print_keys(target: Console, footer: str) -> None:
+    for line in theme.wrap_keys(theme.parse_footer(footer).keys, target.size.width):
+        target.print(line)
+
+
+def input_screen(
+    title: str,
+    *lines: str,
+    keys: str = "Enter confirm  •  Esc cancel",
+    status: str = "",
+) -> Callable[[Console], None]:
+    """Renderer for a text field in the Quiet layout: header, help, field, keys.
+
+    *lines* are help or error lines (Rich markup) shown above the field. The
+    returned renderer draws the part above the field; its ``footer`` draws the
+    key bar below it.
+    """
+
+    def render(target: Console) -> None:
+        target.print(theme.header(title, status, target.size.width))
+        if target.size.height >= 12:
+            target.print()
+        for line in lines:
+            if line:
+                _print_lines(target, Text.from_markup(line, style=theme.MUTED))
+        if lines and any(lines) and target.size.height >= 12:
+            target.print()
+
+    def footer(target: Console) -> None:
+        if target.size.height >= 12:
+            target.print()
+        _print_keys(target, keys)
+
+    render.footer = footer
+    return render
 
 
 def make_search_screen_renderer(
@@ -59,41 +104,41 @@ def make_search_screen_renderer(
     has_history: bool,
     notice: str = "",
     scope_label: str = "Engines",
+    title: str = "Search",
 ) -> Callable[[Console], None]:
-    """Return the responsive header renderer used by the search editor."""
+    """Return the responsive renderer used by the search editor.
+
+    The header names the provider; engines and filters sit on its right when
+    they fit, else on their own line. Keys go below the field.
+    """
     from rich.markup import escape
-    status = (
-        f"[dim]{scope_label}:[/dim] [cyan]{escape(engine_names)}[/cyan]   "
-        f"[dim]Filters:[/dim] [cyan]{escape(active_filters)}[/cyan]"
-    )
+    status = f"{scope_label}: {escape(engine_names)} · Filters: {escape(active_filters)}"
     compact_shortcuts = (
-        "[bold]Ctrl+F[/bold] [dim]filters  |  [/dim]"
-        f"[bold]{MULTI_ADD_KEY_LABEL}[/bold] [dim]add title  |  [/dim]"
-        "[bold]Tab[/bold] [dim]actions  |  [/dim]"
-        "[bold]Esc[/bold] [dim]back[/dim]"
+        f"Enter search  •  Ctrl+F filters  •  {MULTI_ADD_KEY_LABEL} add title  •  "
+        "Tab actions  •  Esc back"
     )
     full_shortcuts = search_shortcuts_line(has_history)
-    notice_rows = 2 if notice else 0
 
     def render(target: Console) -> None:
-        height = target.size.height
-        if height >= 11 + notice_rows:
-            target.print(_make_banner_panel())
-            if height >= 20 + notice_rows:
-                target.print()
-        else:
-            target.print("[title]Torrent Search CLI[/title]")
-
-        if height >= 15 + notice_rows:
-            target.print(status)
-        target.print(
-            full_shortcuts
-            if height >= 18 + notice_rows
-            else compact_shortcuts
-        )
+        width, height = target.size.width, target.size.height
+        status_plain = Text.from_markup(status).plain
+        in_header = cell_len(theme.APP_NAME) + cell_len(title) + cell_len(status_plain) + 12 <= width
+        target.print(theme.header(title, status if in_header else "", width))
+        if height >= 14:
+            target.print()
+        if not in_header and height >= 12:
+            _print_lines(target, Text.from_markup(status, style=theme.MUTED))
         if notice:
-            target.print(notice)
+            _print_lines(target, Text.from_markup(notice.strip()))
+        if height >= 12 and (notice or not in_header):
+            target.print()
 
+    def footer(target: Console) -> None:
+        if target.size.height >= 12:
+            target.print()
+        _print_keys(target, full_shortcuts if target.size.height >= 18 else compact_shortcuts)
+
+    render.footer = footer
     return render
 
 
@@ -103,13 +148,20 @@ def _emit_query_frame(
     prompt_str: str,
     committed: list[str],
     current_text: str,
+    with_footer: bool = True,
 ) -> None:
     screen_renderer(target)
     for title in committed:
-        target.print(prompt_str, end="")
-        target.print(Text(title))
-    target.print(prompt_str, end="")
-    target.print(Text(current_text), end="")
+        line = Text.from_markup(theme.MARGIN + prompt_str)
+        line.append(title)
+        target.print(line)
+    line = Text.from_markup(theme.MARGIN + prompt_str)
+    line.append(current_text)
+    target.print(line, end="")
+    render_footer = getattr(screen_renderer, "footer", None)
+    if with_footer and render_footer is not None:
+        target.print()
+        render_footer(target)
 
 
 def _render_query_frame(
@@ -154,6 +206,7 @@ def _render_query_frame(
         prompt_str,
         committed,
         "".join(buffer[:pos]),
+        with_footer=False,
     )
     before_cursor = cursor_buffer.getvalue()
     lines = before_cursor.split("\n")
@@ -164,7 +217,7 @@ def _render_query_frame(
         cursor_col = 1
 
     return (
-        content_buffer.getvalue(),
+        content_buffer.getvalue().rstrip("\n"),
         max(1, min(height, cursor_row)),
         max(1, min(width, cursor_col)),
     )
@@ -487,22 +540,22 @@ def quick_actions_menu(update_available: bool = False, provider=None) -> "str | 
     """
     items: list[SelectItem] = []
     if update_available:
-        items.append(SelectItem(label="⬆ Install update", value="update", is_action=True, hint="U"))
+        items.append(SelectItem(label="Install update", value="update", is_action=True, hint="U"))
     base = [
-        ("🔍 Filters & engines", "filter", "F"),
-        ("🔤 Alternate-title search", "titles", "A"),
-        ("🧭 Discover by topic / genre", "discover", "D"),
-        ("🕑 Search history", "history", "H"),
-        ("🔖 Bookmarks / download later", "bookmarks", "B"),
-        ("📌 Bookmark current search", "save_search", "L"),
-        ("💾 Settings backup / import", "backup", "E"),
-        ("🧲 qBittorrent connection / progress", "qbittorrent", "Q"),
-        ("📊 Usage stats", "stats", "S"),
-        ("💡 Tips & shortcuts", "tips", "T"),
+        ("Filters & engines", "filter", "F"),
+        ("Alternate-title search", "titles", "A"),
+        ("Discover by topic / genre", "discover", "D"),
+        ("Search history", "history", "H"),
+        ("Bookmarks / download later", "bookmarks", "B"),
+        ("Bookmark current search", "save_search", "L"),
+        ("Settings backup / import", "backup", "E"),
+        ("qBittorrent connection / progress", "qbittorrent", "Q"),
+        ("Usage stats", "stats", "S"),
+        ("Tips & shortcuts", "tips", "T"),
     ]
     for label, value, key in base:
         items.append(SelectItem(label=label, value=value, is_action=True, hint=key))
-    items.append(SelectItem(label="↩  Back", value=None, is_action=True))
+    items.append(SelectItem(label="Back", value=None, is_action=True))
 
     def _pick(index: int):
         return lambda cursor, items_list: index
@@ -534,11 +587,12 @@ def action_provider_prompt(action):
     """A global search action chooses its scope without opening another menu."""
     from torrent_finder.providers import PROVIDERS
     from torrent_finder.providers.combined_provider import provider_label
-    items = [SelectItem(f"{p.icon} {provider_label(p)}", value=p,
+    items = [SelectItem(provider_label(p), value=p,
                         description=getattr(p, "search_note", "")) for p in PROVIDERS]
-    items.append(SelectItem("↩ Back", value=None, is_action=True))
+    items.append(SelectItem("Back", value=None, is_action=True))
     index = arrow_select(items, title=f"{action} · choose provider", banner=_make_banner_panel(),
-                         footer="All / selected providers uses its current profile. Esc back.")
+                         footer="All / selected providers uses its current profile.\n"
+                                "↑/↓ navigate  •  Enter select  •  Esc back")
     return None if index is None else items[index].value
 
 
@@ -570,7 +624,7 @@ def filter_menu(provider, on_save=None) -> None:
         ))
         for engine in provider.engines:
             items.append(SelectItem(
-                label=f"{engine.icon} {engine.name}",
+                label=engine.name,
                 value=("engine", engine),
                 toggle_states=tuple(
                     mode.title() for mode in engine.available_modes
@@ -619,9 +673,9 @@ def filter_menu(provider, on_save=None) -> None:
     items.append(SelectItem(label=f"Result order: {SORT_ORDERS[draft_sort]}", value="sort", is_action=True,
                             description="Saved for this provider. In a combined profile, its overall result order takes precedence."))
     sort_idx = len(items) - 1
-    items.append(SelectItem(label="Clear preset filters  [c]", value="clear", is_action=True))
-    items.append(SelectItem(label="✅ Confirm  [w]", value="confirm", is_action=True))
-    items.append(SelectItem(label="↩ Go Back", value="back", is_action=True))
+    items.append(SelectItem(label="Clear preset filters", value="clear", is_action=True, hint="c"))
+    items.append(SelectItem(label="Confirm", value="confirm", is_action=True, hint="w"))
+    items.append(SelectItem(label="Back", value="back", is_action=True))
 
     # Index of Confirm action — returned when `w` is pressed
     confirm_idx = len(items) - 2
@@ -677,7 +731,7 @@ def filter_menu(provider, on_save=None) -> None:
         if anchor["idx"] is not None and 0 <= anchor["idx"] < len(items_list):
             items_list[anchor["idx"]].marker = ""
         anchor["idx"] = cursor
-        items_list[cursor].marker = "📍"
+        items_list[cursor].marker = theme.MARKER
         return True
 
     def _range_toggle(cursor, items_list):
@@ -836,8 +890,8 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
     items.append(SelectItem(label="Select all  [a]", value="all", is_action=True))
     items.append(SelectItem(label="Invert selection  [i]", value="invert", is_action=True))
     items.append(SelectItem(label="Clear  [c]", value="clear", is_action=True))
-    items.append(SelectItem(label="✅ Confirm  [w]", value="confirm", is_action=True))
-    items.append(SelectItem(label="↩ Cancel", value="cancel", is_action=True))
+    items.append(SelectItem(label="Confirm", value="confirm", is_action=True, hint="w"))
+    items.append(SelectItem(label="Cancel", value="cancel", is_action=True))
 
     # Index of the Confirm action — returned when `w` is pressed
     confirm_idx = len(items) - 2
@@ -876,7 +930,7 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
         if anchor["idx"] is not None and 0 <= anchor["idx"] < len(items):
             items[anchor["idx"]].marker = ""
         anchor["idx"] = cursor
-        items[cursor].marker = "📍"
+        items[cursor].marker = theme.MARKER
         return True
 
     def _range_toggle(cursor, items):
@@ -933,10 +987,8 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
         on_action=on_action,
         key_actions=key_actions,
         footer=(
-            "↑/↓ nav  •  Space/Enter toggle  •  "
-            "[bold yellow]v[/bold yellow] anchor  •  [bold yellow]shift + v or V[/bold yellow] range  •  "
-            "[bold yellow]a[/bold yellow]ll/[bold yellow]i[/bold yellow]nvert/[bold yellow]c[/bold yellow]lear  •  "
-            "[bold green]w[/bold green] save  •  Esc cancel"
+            "↑/↓ nav  •  Space/Enter toggle  •  v anchor  •  Shift+V range  •  "
+            "a all  •  i invert  •  c clear  •  w save  •  Esc cancel"
         ),
     )
 
@@ -949,15 +1001,9 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
     return [items[i].value[1].index for i in file_item_indexes if items[i].toggled]
 
 
-def _make_banner_panel() -> Panel:
-    """Return the app banner as a Rich Panel renderable."""
-    banner = Text()
-    banner.append("Torrent Search CLI", style="bold magenta")
-    return Panel(
-        banner,
-        border_style="bright_blue",
-        padding=(1, 2),
-    )
+def _make_banner_panel() -> Text:
+    """The app's one-line header (kept under its old name for existing callers)."""
+    return theme.header(width=console.size.width)
 
 
 def subtitle_source_prompt(current: dict | None = None) -> dict:
@@ -973,22 +1019,22 @@ def subtitle_source_prompt(current: dict | None = None) -> dict:
 
     items = [
         SelectItem(
-            label="🔍 Auto-detect from torrent",
+            label="Auto-detect from torrent",
             value="auto",
             description="Scan the torrent for .srt/.ass files alongside each video and attach them automatically.",
         ),
         SelectItem(
-            label="📁 Use external subtitle file…",
+            label="Use external subtitle file…",
             value="external",
             description="Pick a .srt/.ass file from your downloads folder or type a custom path.",
             is_action=True,
         ),
         SelectItem(
-            label="🚫 No subtitles",
+            label="No subtitles",
             value="off",
             description="Stream without attaching any subtitles.",
         ),
-        SelectItem(label="↩ Back", value="back", is_action=True),
+        SelectItem(label="Back", value="back", is_action=True),
     ]
 
     mode_to_index = {"auto": 0, "external": 1, "off": 2}
@@ -1029,7 +1075,7 @@ def subtitle_source_prompt(current: dict | None = None) -> dict:
 
     picker_items: list[SelectItem] = []
     for label, path in sub_files:
-        picker_items.append(SelectItem(label=f"📄 {label}", value=path))
+        picker_items.append(SelectItem(label=label, value=path))
     if not sub_files:
         picker_items.append(SelectItem(
             label="[no .srt/.ass files found in downloads folder]",
@@ -1038,12 +1084,12 @@ def subtitle_source_prompt(current: dict | None = None) -> dict:
             is_action=True,
         ))
     picker_items.append(SelectItem(
-        label="✍️  Type custom path…",
+        label="Type custom path…",
         value="__type__",
         is_action=True,
         description="Type or paste the absolute path to a subtitle file.",
     ))
-    picker_items.append(SelectItem(label="↩ Back", value="back", is_action=True))
+    picker_items.append(SelectItem(label="Back", value="back", is_action=True))
 
     pick = arrow_select(
         picker_items,
@@ -1102,7 +1148,7 @@ def download_dir_ready() -> bool:
 
 
 def _unpack_label(on: bool) -> str:
-    return f"📦 Unpack page archives: [{'✓' if on else ' '}] {'ON' if on else 'OFF'}"
+    return f"Unpack page archives: {'ON' if on else 'OFF'}"
 
 
 _UNPACK_DESCRIPTION = (
@@ -1137,17 +1183,17 @@ def download_dir_prompt() -> None:
 
     items = [
         SelectItem(
-            label=f"📂 Default ({os.path.basename(DOWNLOADS_DIR)}/)",
+            label=f"Default ({os.path.basename(DOWNLOADS_DIR)}/)",
             value="__default__",
             description=f"Save into the project's downloads/ folder.\nPath: {DOWNLOADS_DIR}",
         ),
         SelectItem(
-            label="🏠 ~/Downloads",
+            label="~/Downloads",
             value=home_downloads,
             description=f"Save into your user Downloads folder.\nPath: {home_downloads}",
         ),
         SelectItem(
-            label="✍️  Type custom path…",
+            label="Type custom path…",
             value="__type__",
             is_action=True,
             description="Type or paste an absolute path. Will be created if it doesn't exist.",
@@ -1158,7 +1204,7 @@ def download_dir_prompt() -> None:
             is_action=True,
             description=_UNPACK_DESCRIPTION,
         ),
-        SelectItem(label="↩ Back", value="back", is_action=True),
+        SelectItem(label="Back", value="back", is_action=True),
     ]
 
     def toggle(idx, items):
@@ -1239,7 +1285,7 @@ def confirm_prompt(message: str, title: str = "Confirm") -> bool:
 
 
 def print_banner() -> None:
-    """Display the app banner."""
+    """Display the app's header line and a spacer, as every screen starts."""
     console.print(_make_banner_panel())
     console.print()
 
@@ -1296,20 +1342,20 @@ def torrent_info_screen(result: dict) -> None:
     field("Embedded subs", info.embedded_subs)
 
     if info.description:
-        add(); add("  ── Description ──")
+        add(); rows.append(SelectItem("Description", value="section_header", enabled=False))
         add_wrapped(info.description, indent="  ")
 
     if info.files:
-        add(); add(f"  ── Files ({len(info.files)}) ──")
+        add(); rows.append(SelectItem(f"Files ({len(info.files)})", value="section_header", enabled=False))
         for name, size in info.files:
             add(f"    {name}  ({size})" if size else f"    {name}")
 
-    items = rows + [SelectItem(label="↩  Back", value="back", is_action=True)]
+    items = rows + [SelectItem(label="Back", value="back", is_action=True)]
     arrow_select(
         items,
-        title=f"ℹ Torrent info — {info.source}",
+        title=f"Torrent info — {info.source}",
         banner=_make_banner_panel(),
-        footer="↑/↓ scroll  •  Esc / Back to return",
+        footer="↑/↓ scroll  •  Esc back",
     )
 
 
@@ -1356,9 +1402,9 @@ def download_method_prompt(
         items.append(_section("Torrent & files"))
         if show_episode_picker:
             ep_label = (
-                f"📂 Change selection ({n_sel} picked)"
+                f"Change selection ({n_sel} picked)"
                 if has_selection
-                else "📂 Browse torrent files… (Episode Selection, useful for animes/series)"
+                else "Browse torrent files… (episode selection, useful for anime/series)"
             )
             items.append(SelectItem(
                 label=ep_label,
@@ -1376,7 +1422,7 @@ def download_method_prompt(
             ))
         if _info_available:
             items.append(SelectItem(
-                label=f"ℹ  Torrent info (from {info_source})",
+                label=f"Torrent info (from {info_source})",
                 value="torrent_info",
                 is_action=True,
                 description=(
@@ -1405,7 +1451,7 @@ def download_method_prompt(
             sub_label = f"{len(paths)} tracks: {_os.path.basename(paths[0])} +{len(paths) - 1}"
         items.append(_section("Subtitles"))
         items.append(SelectItem(
-            label=f"📝 Source: {sub_label}",
+            label=f"Subtitles: {sub_label}",
             value="set_subs",
             is_action=True,
             description=(
@@ -1416,7 +1462,7 @@ def download_method_prompt(
         # Co-located with Source: searching downloads a .srt and auto-promotes it
         # to external source-mode, so the two subtitle rows belong together.
         items.append(SelectItem(
-            label="📝 Search & download subtitles",
+            label="Search & download subtitles",
             value="s",
             description="Find a matching .srt via OpenSubtitles and save it next to the video",
         ))
@@ -1425,7 +1471,7 @@ def download_method_prompt(
     if show_streaming:
         items.append(_section("Stream to VLC"))
         items.append(SelectItem(
-            label="▶  Stream with webtorrent",
+            label="Stream with webtorrent",
             value="stream_w",
             passive=not wt_available,
             hint=(
@@ -1436,7 +1482,7 @@ def download_method_prompt(
             description="Stream via webtorrent — good streaming default",
         ))
         items.append(SelectItem(
-            label="▶  Stream with peerflix",
+            label="Stream with peerflix",
             value="stream_p",
             passive=not pf_available,
             hint=(
@@ -1455,17 +1501,17 @@ def download_method_prompt(
     items.append(_section("Download"))
     default_focus = len(items)  # index of the row the cursor should start on
     items.append(SelectItem(
-        label=f"🧲 Open in {client_name}",
+        label=f"Open in {client_name}",
         value="t",
-        hint=("⚠  uncheck unwanted files in the client's dialog" if has_selection else ""),
+        hint=("uncheck unwanted files in the client's dialog" if has_selection else ""),
         description="Hand magnet to your desktop client — use to seed or manage in a GUI",
     ))
     from torrent_finder.qbittorrent import configured
     if configured():
-        items.append(SelectItem("🧲 Send to qBittorrent WebUI", "qbittorrent",
+        items.append(SelectItem("Send to qBittorrent WebUI", "qbittorrent",
                                 description="Choose client folder/category and view real progress. Adds the full torrent; manage file selection in qBittorrent."))
     items.append(SelectItem(
-        label="⬇  Download with aria2c",
+        label="Download with aria2c",
         value="aria",
         passive=not aria_available,
         hint=(
@@ -1475,32 +1521,32 @@ def download_method_prompt(
         description="Best downloader — native multi-file, resumes, fastest for batches",
     ))
     items.append(SelectItem(
-        label="⬇  Download with webtorrent",
+        label="Download with webtorrent",
         value="d",
         passive=not wt_available,
         hint=(
             f"(not installed — {_WEBTORRENT_INSTALL_URL})" if not wt_available
-            else f"⚠  may ignore selection ({n_sel} picked) — can pull full torrent" if has_selection
+            else f"may ignore selection ({n_sel} picked) — can pull full torrent" if has_selection
             else "slower, won't seed"
         ),
         description=(
             "Plain download via webtorrent — one file per run, no seeding. "
-            "⚠  --select is not strict; webtorrent-cli often downloads the whole torrent anyway. "
+            "--select is not strict; webtorrent-cli often downloads the whole torrent anyway. "
             "Use aria2c if you need strict file picking."
         ),
     ))
     items.append(SelectItem(
-        label="⬇  Download with peerflix",
+        label="Download with peerflix",
         value="p",
         passive=not pf_available,
         hint=(
             f"(not installed — {_PEERFLIX_INSTALL_URL})" if not pf_available
-            else f"⚠  ignores file selection ({n_sel} picked) — downloads full torrent" if has_selection
+            else f"ignores file selection ({n_sel} picked) — downloads full torrent" if has_selection
             else "slower, won't seed"
         ),
         description=(
             "Plain download via peerflix — slower than aria2, no seeding. "
-            "⚠  Does NOT honor file selection: peerflix always downloads the whole torrent. "
+            "Does NOT honor file selection: peerflix always downloads the whole torrent. "
             "Use aria2c if you need strict file picking."
         ),
     ))
@@ -1508,7 +1554,7 @@ def download_method_prompt(
     # --- Other ---
     items.append(_section("Other"))
     items.append(SelectItem(
-        label="📋 Copy magnet link",
+        label="Copy magnet link",
         value="l",
         is_action=True,
         description="Copies the magnet URI to your clipboard",
@@ -1517,7 +1563,7 @@ def download_method_prompt(
         from urllib.parse import urlparse as _urlparse
         _page_domain = _urlparse(page_url).netloc or page_url
         items.append(SelectItem(
-            label="🌐 Open torrent page",
+            label="Open torrent page",
             value="open_page",
             is_action=True,
             hint=_page_domain,
@@ -1534,7 +1580,7 @@ def download_method_prompt(
     _dl_dir = get_download_dir()
     _dl_basename = _os_dir.path.basename(_dl_dir.rstrip(_os_dir.sep)) or _dl_dir
     items.append(SelectItem(
-        label=f"📁 Save to: {_dl_basename}",
+        label=f"Save to: {_dl_basename}",
         value="set_download_dir",
         is_action=True,
         description=(
@@ -1550,7 +1596,7 @@ def download_method_prompt(
     quiet_on = bool(load_setting("hide_stream_output", False))
 
     def _quiet_label(on: bool) -> str:
-        return f"🔇 Quiet mode: [{'✓' if on else ' '}] {'ON' if on else 'OFF'}"
+        return f"Quiet mode: {'ON' if on else 'OFF'}"
 
     items.append(SelectItem(
         label=_quiet_label(quiet_on),
@@ -1571,12 +1617,12 @@ def download_method_prompt(
 
     # --- Trailing actions ---
     items.append(SelectItem(
-        label="↩  Go back to results",
+        label="Back to results",
         value="back",
         is_action=True,
         description="Return to the search results list",
     ))
-    items.append(SelectItem(label="✕  Cancel", value="cancel", is_action=True))
+    items.append(SelectItem(label="Cancel", value="cancel", is_action=True))
 
     def handle_download_action(idx, items):
         if items[idx].value == "l" and magnet:
@@ -1588,17 +1634,17 @@ def download_method_prompt(
                     subprocess.run("pbcopy", input=magnet.encode(), check=True)
                 else:
                     subprocess.run(["xclip", "-selection", "clipboard"], input=magnet.encode(), check=True)
-                items[idx].hint = "✅ Copied!"
+                items[idx].hint = "✓ copied"
             except Exception:
-                items[idx].hint = "⚠  Could not copy"
+                items[idx].hint = "could not copy"
             return True  # Stay in menu
         if items[idx].value == "open_page" and page_url:
             try:
                 import webbrowser
                 webbrowser.open(page_url)
-                items[idx].hint = "✅ Opened!"
+                items[idx].hint = "✓ opened"
             except Exception:
-                items[idx].hint = "⚠  Could not open browser"
+                items[idx].hint = "could not open the browser"
             return True  # Stay in menu
         if items[idx].value == "toggle_unpack":
             _toggle_unpack(items[idx])
@@ -1647,16 +1693,16 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
     from torrent_finder.downloader import detect_torrent_client
 
     client = detect_torrent_client()
-    copy_label = "📋 Copy all magnet links"
+    copy_label = "Copy all magnet links"
     if copyable != count:
         copy_label += f" ({copyable})"
     aria_ok = has_aria2()
-    aria_label = "⬇  Download all with aria2c"
+    aria_label = "Download all with aria2c"
     if copyable != count:
         aria_label += f" ({copyable})"
     items = [
         SelectItem(
-            label=f"🧲 Open all {count} in {client}",
+            label=f"Open all {count} in {client}",
             value="open",
             is_action=True,
             description=(
@@ -1692,17 +1738,17 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
             ),
         ),
         SelectItem(
-            label="↩  Back to results",
+            label="Back to results",
             value="back",
             is_action=True,
             description="Return to the results list to change your selection.",
         ),
-        SelectItem(label="✕  Cancel", value="cancel", is_action=True),
+        SelectItem(label="Cancel", value="cancel", is_action=True),
     ]
 
     from torrent_finder.qbittorrent import configured
     if configured():
-        items.insert(1, SelectItem("🧲 Send selection to qBittorrent WebUI", "qbittorrent",
+        items.insert(1, SelectItem("Send selection to qBittorrent WebUI", "qbittorrent",
                                    description="Magnets and Online-Fix torrent files. Direct downloads are skipped."))
     idx = arrow_select(
         items,
@@ -1733,7 +1779,7 @@ def _provider_group_menu(group) -> object | None:
         SelectItem(label=p.label, value=p, description=getattr(p, "search_note", ""))
         for p in group.children
     ]
-    items.append(SelectItem(label="↩  Back", value="__back__", is_action=True))
+    items.append(SelectItem(label="Back", value="__back__", is_action=True))
 
     _filter_request = {"target": None}
 
@@ -1749,7 +1795,7 @@ def _provider_group_menu(group) -> object | None:
         _filter_request["target"] = None
         result = arrow_select(
             items,
-            title=f"{group.icon} {group.name} — choose a source",
+            title=f"{group.name} — choose a source",
             footer=(
                 "↑/↓ navigate  •  Enter select  •  "
                 "[bold yellow]F[/bold yellow] filters  •  Esc back"
@@ -1792,7 +1838,7 @@ def _provider_source_menu(provider, facets=None) -> "str | object | None":
     items = [
         SelectItem(label="─── Search ───", value="section_header", enabled=False, is_action=True),
         SelectItem(
-            label=f"{provider.icon} {provider.name} — keyword search",
+            label="Keyword search",
             value="__search__",
             description="Type a query and search the enabled engines, as usual.",
         ),
@@ -1805,15 +1851,15 @@ def _provider_source_menu(provider, facets=None) -> "str | object | None":
     items.append(SelectItem(label=f"─── {header} ───", value="section_header", enabled=False, is_action=True))
     for f in facets:
         items.append(SelectItem(
-            label=f"{f.icon or '🎬'} By {f.label.lower()}",
+            label=f"By {f.label.lower()}",
             value=("facet", f),
             description=f.note,
         ))
-    items.append(SelectItem(label="↩  Back", value="__back__", is_action=True))
+    items.append(SelectItem(label="Back", value="__back__", is_action=True))
 
     idx = arrow_select(
         items,
-        title=f"{provider.icon} {provider.name} — choose how to search",
+        title=f"{provider.name} — choose how to search",
         banner=_make_banner_panel(),
         footer="↑/↓ navigate  •  Enter select  •  Esc back",
         start_index=1,  # land on the keyword-search row, skipping the header
@@ -1876,23 +1922,23 @@ def provider_select_prompt(
         is_action=True,
     )
     info_item = SelectItem(
-        label="🔒 Network exposure info",
+        label="Network exposure info",
         value="__network_info__",
         is_action=True,
     )
     tips_item = SelectItem(
-        label="💡 Tips & shortcuts",
+        label="Tips & shortcuts",
         value="__tips__",
         is_action=True,
     )
     creds_item = SelectItem(
-        label="🔑 Credentials — subtitles, provider logins, creator-search keys",
+        label="Credentials — subtitles, provider logins, creator-search keys",
         value="__credentials__",
         is_action=True,
         description="Manage subtitle logins (OpenSubtitles / Addic7ed / Jimaku), search-provider logins (RuTracker / Online-Fix / Madokami), and the optional TMDB / IGDB creator-search upgrades.",
     )
     update_item = SelectItem(
-        label="⬆ Install update",
+        label="Install update",
         value="__update__",
         is_action=True,
         hint="U",
@@ -1924,7 +1970,7 @@ def provider_select_prompt(
 
         command_status = current_status()
         command_item = SelectItem(
-            label=f"⌨ Terminal command: {command_status.name}",
+            label=f"Terminal command: {command_status.name}",
             value="__terminal_command__",
             is_action=True,
             hint="ready" if command_status.available else "setup needed",
@@ -1934,7 +1980,7 @@ def provider_select_prompt(
             ),
         )
         dir_item = SelectItem(
-            label="📁 Download folder",
+            label="Download folder",
             value="__download_dir__",
             is_action=True,
             description=(
@@ -1947,7 +1993,7 @@ def provider_select_prompt(
             provider_items
             + [separator]
             + ([update_item] if update_available else [])
-            + [SelectItem("⚡ Quick actions", value="__actions__", hint="Tab", is_action=True),
+            + [SelectItem("Quick actions", value="__actions__", hint="Tab", is_action=True),
                tips_item, info_item, creds_item, command_item, dir_item]
         )
 
@@ -1960,14 +2006,11 @@ def provider_select_prompt(
             # between the full footer (with the tip) and a compact one.
             if console.size.height < 24 or console.size.width < 60:
                 return ((notice + "\n" if notice else "")
-                        + "↑/↓ Enter • Tab actions • Esc\nF filters • H history • S stats")
+                        + "↑/↓ move • Enter select • Tab actions • Esc cancel\nF filters • H history • S stats")
             return ((notice + "\n" if notice else "")
-                    + "↑/↓ navigate  •  Enter select  •  "
-                    "[bold yellow]F[/bold yellow] filters  •  "
-                    "[bold yellow]H[/bold yellow] history  •  "
-                    "[bold yellow]S[/bold yellow] stats  •  "
-                    "[bold yellow]T[/bold yellow] tips  •  Tab actions • Esc cancel"
-                    + (f"\n\n   {tip_line}" if tip_line else ""))
+                    + "↑/↓ navigate  •  Enter select  •  F filters  •  H history  •  "
+                    "S stats  •  T tips  •  Tab actions  •  Esc cancel"
+                    + (f"\n\n{tip_line}" if tip_line and console.size.height >= _TIP_MIN_HEIGHT else ""))
 
         result = arrow_select(
             items,
@@ -2066,8 +2109,8 @@ def provider_select_prompt(
 def download_complete_prompt(message: str = "Download action finished", *, summary: str = "") -> str:
     """Leave a completed action or revisit its choices without repeating it."""
     items = [
-        SelectItem("➡ Continue to What's Next", value="next", description=summary),
-        SelectItem("↩ Back to download options", value="back",
+        SelectItem("Continue to What's Next", value="next", description=summary),
+        SelectItem("Back to download options", value="back",
                    description=(summary + "\n" if summary else "")
                    + "Keep this selection. Returning does not repeat the download or handoff."),
     ]
@@ -2087,15 +2130,15 @@ def search_again_prompt() -> str | tuple | None:
         - ``None`` when Esc or Ctrl+C cancels the menu.
     """
     choices = [
-        ("🔍 Search Again", "search", "R"),
-        ("🔄 Change Provider", "provider", "P"),
-        ("🏠 Main menu", "main", "M"),
-        ("⚡ Quick actions", "actions", "Tab"),
-        ("📜 Search History", "history", "H"),
-        ("📊 Usage Stats", "stats", "S"),
-        ("💡 Tips & shortcuts", "tips", "T"),
-        ("🔑 Credentials", "credentials", "C"),
-        ("👋 Exit", "exit", "Q"),
+        ("Search again", "search", "R"),
+        ("Change provider", "provider", "P"),
+        ("Main menu", "main", "M"),
+        ("Quick actions", "actions", "Tab"),
+        ("Search history", "history", "H"),
+        ("Usage stats", "stats", "S"),
+        ("Tips & shortcuts", "tips", "T"),
+        ("Credentials", "credentials", "C"),
+        ("Exit", "exit", "Q"),
     ]
     items = [SelectItem(label=label, value=value, hint=key) for label, value, key in choices]
     hotkeys = {}
@@ -2115,9 +2158,9 @@ def search_again_prompt() -> str | tuple | None:
 
         def footer():
             if console.size.height < 24 or console.size.width < 60:
-                return "↑/↓ Enter • Esc exit\nR/P/M/Tab/H/S/T/C/Q jump"
+                return "↑/↓ move • Enter select • Esc exit\nR/P/M/Tab/H/S/T/C/Q jump"
             return ("↑/↓ navigate • Enter select • R/P/M/Tab/H/S/T/C/Q jump • Esc request exit"
-                    + (f"\n\n   {tip_line}" if tip_line else ""))
+                    + (f"\n\n{tip_line}" if tip_line and console.size.height >= _TIP_MIN_HEIGHT else ""))
 
         idx = arrow_select(
             items,

@@ -78,7 +78,7 @@ class GlobalActionsTests(unittest.TestCase):
             prompts.search_again_prompt()
         rendered = output.getvalue()
         self.assertNotIn("Long tip", rendered)
-        self.assertIn("Usage Stats", rendered)
+        self.assertIn("Usage stats", rendered)
         self.assertLessEqual(len(rendered.splitlines()), 15)
 
     def test_main_option_clears_provider(self):

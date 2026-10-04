@@ -465,12 +465,12 @@ class MadokamiAcquisition:
                 continue
             items = []
             if files:
-                items.append(SelectItem(f"📄 Choose from the {len(files)} file(s) here", "files",
+                items.append(SelectItem(f"Choose from the {len(files)} file(s) here", "files",
                                         description="Volumes or chapters stored directly in this folder."))
-            items += [SelectItem(f"📁 {folder['name']}", folder["path"], description="Open this folder.")
+            items += [SelectItem(f"{folder['name']}/", folder["path"], description="Open this folder.")
                       for folder in folders]
-            items.append(SelectItem("↩ Back", "back", is_action=True))
-            choice = arrow_select(items, title=f"📕 {escape(here)}", start_index=cursors.get(current, 0),
+            items.append(SelectItem("Back", "back", is_action=True))
+            choice = arrow_select(items, title=f"Madokami › {escape(here)}", start_index=cursors.get(current, 0),
                                   footer="Enter open • Esc back")
             if choice is None or items[choice].value == "back":
                 if not trail:

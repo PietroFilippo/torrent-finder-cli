@@ -139,13 +139,13 @@ def _build_items(stats: dict) -> list[SelectItem]:
 
     # Trailing actions
     items.append(SelectItem(
-        label="🔄 Reset all stats",
+        label="Reset all stats",
         value="reset",
         is_action=True,
         description="Wipes every counter (asks for confirmation)",
     ))
     items.append(SelectItem(
-        label="↩ Go Back",
+        label="Back",
         value="back",
         is_action=True,
     ))
@@ -180,7 +180,7 @@ def stats_page() -> None:
 
         result = arrow_select(
             items,
-            title="📊 Usage Stats",
+            title="Usage stats",
             banner=_make_banner_panel(),
             on_action=on_action,
             footer=lambda: (notice + "\n" if notice else "") + "↑/↓ scroll  •  Enter on action  •  Esc back",

@@ -161,7 +161,7 @@ def _banner(headline: str, action: str) -> str:
     barely readable on the yellow background.
     """
     return (
-        f"[not dim black on yellow] ⬆ {headline} [/not dim black on yellow] "
+        f"[not dim black on yellow] {headline} [/not dim black on yellow] "
         f"[not dim bold yellow]{action}[/not dim bold yellow]"
     )
 
@@ -175,21 +175,21 @@ def notice_line(info: "dict | None") -> str:
         s = "s" if n != 1 else ""
         return _banner(
             f"UPDATE AVAILABLE — {n} commit{s} behind",
-            "Press [not dim bold white]U[/not dim bold white] on the menu to update, "
-            "or run [not dim bold white]git pull[/not dim bold white].",
+            "Press [not dim bold]U[/not dim bold] on the menu to update, "
+            "or run [not dim bold]git pull[/not dim bold].",
         )
     latest = info.get("latest")
     if info["kind"] == "pip":
         cmd = "pipx upgrade torrent-finder-cli" if _pipx_install() else "pip install -U torrent-finder-cli"
         return _banner(
             f"UPDATE AVAILABLE — v{latest}",
-            "Press [not dim bold white]U[/not dim bold white] on the menu to update, "
-            f"or run [not dim bold white]{cmd}[/not dim bold white].",
+            "Press [not dim bold]U[/not dim bold] on the menu to update, "
+            f"or run [not dim bold]{cmd}[/not dim bold].",
         )
     return _banner(
         f"UPDATE AVAILABLE — v{latest}",
-        "Press [not dim bold white]U[/not dim bold white] on the menu to open "
-        f"[not dim bold white]{_RELEASES_URL}[/not dim bold white].",
+        "Press [not dim bold]U[/not dim bold] on the menu to open "
+        f"[not dim bold]{_RELEASES_URL}[/not dim bold].",
     )
 
 

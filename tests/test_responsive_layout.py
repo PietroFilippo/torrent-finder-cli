@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-from torrent_finder.ui import prompts, selector, streaming, table
+from torrent_finder.ui import prompts, selector, streaming, table, theme
 from torrent_finder.ui.selector import SelectItem
 
 
@@ -44,11 +44,13 @@ class ResponsiveSelectorTests(unittest.TestCase):
             ),
         ]
 
-        panel = selector._build_panel(items, 0, "Engines", True)
+        narrow = Console(width=48, height=20, color_system=None)
+        with patch.object(selector, "console", narrow):
+            panel = selector._build_panel(items, 0, "Engines", True)
         output = _render(panel, 48, 20)
 
-        self.assertIn("[Auto]", output)
-        self.assertNotIn("[✓]", output)
+        self.assertRegex(output, r"Auto\s+Knaben")
+        self.assertNotIn(theme.CHECK, output)
 
     def test_resize_requests_an_immediate_coherent_redraw(self):
         resize = selector._ResizeRedraw((120, 30))
@@ -123,7 +125,7 @@ class ResponsiveSearchPromptTests(unittest.TestCase):
                 )
                 plain = Text.from_ansi(content).plain
 
-                self.assertEqual(plain.count("Torrent Search CLI"), 1)
+                self.assertEqual(plain.count(theme.APP_NAME), 1)
                 self.assertLessEqual(len(plain.splitlines()), height)
                 self.assertTrue(
                     all(cell_len(line) <= width for line in plain.splitlines())

@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 from torrent_finder.constants import console
-from torrent_finder.providers import PROVIDERS, display_name_for, icon_for
+from torrent_finder.providers import PROVIDERS, display_name_for
 from torrent_finder.state import clear_history, load_history
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.ui.prompts import _make_banner_panel, confirm_prompt
@@ -172,10 +172,9 @@ def history_select_prompt() -> dict | None:
                 prov = entry.get("provider", "")
                 ts = entry.get("timestamp", "")
                 presets = entry.get("presets", [])
-                icon = icon_for(prov)
                 display = display_name_for(prov)
                 time_str = _relative_time(ts)
-                label = f"{icon}  {query}"
+                label = query
                 hint = f"{display}  •  {time_str}" if time_str else display
                 if presets:
                     hint += f"  •  filters: {', '.join(presets)}"
@@ -185,9 +184,9 @@ def history_select_prompt() -> dict | None:
                 items.append(SelectItem(label=label, value=entry, hint=hint,
                                         description="Replays saved names; n in results lists them." if aliases else ""))
 
-            items.append(SelectItem(label="🗑  Clear history", value="clear", is_action=True))
+            items.append(SelectItem(label="Clear history", value="clear", is_action=True))
 
-        items.append(SelectItem(label="↩  Go Back", value="back", is_action=True))
+        items.append(SelectItem(label="Back", value="back", is_action=True))
 
     # --- dynamic title / footer (callables resolved each render) ---
 
@@ -195,7 +194,7 @@ def history_select_prompt() -> dict | None:
         prov_filter, date_filter, sort_order, type_filter = _current_filters()
         tags = []
         if prov_filter is not None:
-            tags.append(f"{icon_for(prov_filter)} {_option_label(prov_filter)}")
+            tags.append(_option_label(prov_filter))
         if type_filter != "All":
             tags.append(type_filter)
         if date_filter != "All time":

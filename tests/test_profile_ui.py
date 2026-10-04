@@ -2,8 +2,7 @@ import io
 import unittest
 from unittest.mock import patch
 
-from rich.console import Console, Group
-from rich.text import Text
+from rich.console import Console
 
 from torrent_finder import store
 from torrent_finder.providers.anime_provider import AnimeProvider
@@ -132,9 +131,7 @@ class ProfileUITests(unittest.TestCase):
                     with self.subTest(width=width, height=height, item=item.label):
                         screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
                         with patch.object(selector, "console", screen), patch.object(prompts, "console", screen):
-                            panel = selector._build_panel(items, cursor, kwargs["title"], kwargs.get("multi", False), footer=kwargs["footer"])
-                            heading = Text("Torrent Search CLI") if height < 28 else Group(prompts._make_banner_panel(), Text(""))
-                            screen.print(Group(heading, panel))
+                            screen.print(selector._build_panel(items, cursor, kwargs["title"], kwargs.get("multi", False), footer=kwargs["footer"]))
                         self.assertLessEqual(len(screen.file.getvalue().splitlines()), height)
 
 

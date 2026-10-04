@@ -258,4 +258,4 @@ TIPS: list[str] = [tip.text for tip in iter_tips(rotating_only=True)]
 def random_tip() -> str:
     """Return a randomly-picked tip rendered as Rich markup."""
     text = random.choice(TIPS)
-    return f"[bold cyan]💡 Tip:[/bold cyan] [italic]{escape(text)}[/italic]"
+    return f"[accent]Tip[/accent]  {escape(text)}"

@@ -106,7 +106,8 @@ class ProviderGroup:
 
     @property
     def label(self) -> str:
-        return f"{self.icon} {self.name}"
+        """Menu label. Icons stay as data (``icon``) but menus show names only."""
+        return self.name
 
 
 # The "Games" umbrella collects the game sources. Picking it drills into General

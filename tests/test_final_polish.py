@@ -7,13 +7,12 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from rich.console import Console, Group
-from rich.text import Text
+from rich.console import Console
 
 from torrent_finder import acquisition, bookmarks, downloader, main, state
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.torrent_meta import TorrentFile, TorrentMetadata
-from torrent_finder.ui import bookmarks as bookmarks_ui, prompts, selector, table
+from torrent_finder.ui import bookmarks as bookmarks_ui, prompts, selector, table, theme
 from isolation import isolate_store
 
 MAGNET = "magnet:?xt=urn:btih:" + "a" * 40
@@ -101,9 +100,7 @@ class CompactScreenTests(unittest.TestCase):
         screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
         with patch.object(selector, "console", screen), patch.object(prompts, "console", screen):
             footer = kw["footer"]()
-            panel = selector._build_panel(items, focus, kw["title"], False, footer=footer)
-            heading = Text("Torrent Search CLI") if height < 28 else Group(prompts._make_banner_panel(), Text(""))
-            screen.print(Group(heading, panel))
+            screen.print(selector._build_panel(items, focus, kw["title"], False, footer=footer))
         return footer, screen.file.getvalue()
 
     def test_resizing_the_open_main_menu_keeps_the_focused_row_on_screen(self):
@@ -116,7 +113,7 @@ class CompactScreenTests(unittest.TestCase):
                     footer, rendered = self.frame(items, kw, focus, width, height)
                     lines = rendered.splitlines()
                     self.assertLessEqual(len(lines), height)
-                    self.assertIn("❯", rendered)
+                    self.assertIn(theme.CURSOR, rendered)
                     if height < 24:
                         self.assertNotIn("\n\n", footer)  # no tip in compact windows
                     else:

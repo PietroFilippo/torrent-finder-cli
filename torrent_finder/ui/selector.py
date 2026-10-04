@@ -8,10 +8,10 @@ from typing import Callable
 import readchar
 from rich.cells import cell_len
 from rich.console import Group
-from rich.panel import Panel
 from rich.text import Text
 
-from torrent_finder.constants import console
+from torrent_finder.constants import console, custom_theme
+from torrent_finder.ui import theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 
 
@@ -44,7 +44,7 @@ class SelectItem:
     hint: str = ""        # Dim subtext shown next to the label
     is_action: bool = False  # Action buttons: Enter returns instead of toggling
     description: str = ""  # Dim context-help shown above the footer when cursor on this item
-    marker: str = ""      # Inline marker (e.g. 📍 for range-select anchor)
+    marker: str = ""      # Inline marker (e.g. theme.MARKER for a range-select anchor)
     passive: bool = False  # Navigable but Enter is a no-op (for read-only rows in a scroll view)
     # Named states are appended to preserve the positional constructor order
     # used by older SelectItem call sites.
@@ -67,9 +67,14 @@ class SelectItem:
 
 
 def _toggle_badge(item: "SelectItem") -> str:
+    """The state shown before a multi-select label: a named state or a check mark."""
     if item.toggle_states:
-        return f"[{item.toggle_state}]"
-    return f"[{'✓' if item.toggled else ' '}]"
+        return item.toggle_state
+    return theme.CHECK if item.toggled else theme.UNCHECKED
+
+
+def _is_section_header(item: "SelectItem") -> bool:
+    return not item.enabled and isinstance(item.value, str) and item.value == "section_header"
 
 
 def _compute_window(n: int, cursor: int, max_visible: int) -> tuple[int, int]:
@@ -88,9 +93,14 @@ def _compute_window(n: int, cursor: int, max_visible: int) -> tuple[int, int]:
     return start, end
 
 
+# Rows below this height drop the spacer lines around the list.
+_COMPACT_HEIGHT = 20
+_GUTTER = 2  # cursor bar + space
+
+
 def _inner_width() -> int:
-    """Return usable selector content width after panel border and padding."""
-    return max(8, console.size.width - 6)
+    """Usable content width inside the left and right margins."""
+    return theme.inner_width(console.size.width)
 
 
 def _inline_hint(item: "SelectItem") -> bool:
@@ -103,24 +113,56 @@ def _inline_hint(item: "SelectItem") -> bool:
     )
 
 
-def _label_avail_width(item: "SelectItem", multi: bool) -> int:
-    """Return terminal cells available for an item's one-line label."""
+def _badge_width(items: list["SelectItem"]) -> int:
+    """One width for every state badge in the list, so labels line up."""
+    widths = [cell_len(state) for item in items for state in item.toggle_states]
+    return max(widths, default=1)
+
+
+def _prefix_width(item: "SelectItem", multi: bool, badge_width: int) -> int:
+    width = _GUTTER
     if multi and not item.is_action:
-        prefix_len = cell_len(f"  ❯ {_toggle_badge(item)} ")
-    else:
-        prefix_len = cell_len("  ❯ ")
-    hint_len = cell_len(f"  {item.hint}") if _inline_hint(item) else 0
-    marker_len = cell_len(f"{item.marker} ") if item.marker else 0
-    return max(4, _inner_width() - prefix_len - hint_len - marker_len)
+        width += badge_width + 1
+    if item.marker:
+        width += cell_len(item.marker) + 1
+    return width
+
+
+@dataclass(frozen=True)
+class _Geometry:
+    badge_width: int
+    hint_column: int | None  # common label width when inline hints line up
+
+
+def _geometry(items: list["SelectItem"], multi: bool) -> _Geometry:
+    badge_width = _badge_width(items) if multi else 1
+    hinted = [item for item in items if _inline_hint(item) and not _is_section_header(item)]
+    column = None
+    if len(hinted) >= 2:
+        label_width = max(cell_len(item.label) for item in hinted)
+        hint_width = max(cell_len(item.hint) for item in hinted)
+        prefix = max(_prefix_width(item, multi, badge_width) for item in hinted)
+        if prefix + label_width + 2 + hint_width <= _inner_width():
+            column = label_width
+    return _Geometry(badge_width, column)
+
+
+def _label_avail_width(item: "SelectItem", multi: bool, geometry: _Geometry | None = None) -> int:
+    """Return terminal cells available for an item's one-line label."""
+    geometry = geometry or _Geometry(1, None)
+    available = _inner_width() - _prefix_width(item, multi, geometry.badge_width)
+    if _inline_hint(item):
+        available -= cell_len(item.hint) + 2
+    return max(4, available)
 
 
 def _cursor_overflows(items: list["SelectItem"], cursor: int, multi: bool) -> bool:
     if not (0 <= cursor < len(items)):
         return False
     item = items[cursor]
-    if isinstance(item.value, str) and item.value == "section_header":
+    if _is_section_header(item):
         return False
-    return cell_len(item.label) > _label_avail_width(item, multi)
+    return cell_len(item.label) > _label_avail_width(item, multi, _geometry(items, multi))
 
 
 def _wrapped_line_count(text: Text, width: int) -> int:
@@ -138,6 +180,48 @@ def _clip_lines(blocks: list[Text], limit: int, width: int) -> Text:
     return Text("\n").join(kept)
 
 
+def _default_footer(multi: bool) -> str:
+    if multi:
+        return "↑/↓ navigate  •  Enter toggle/select  •  Esc cancel"
+    return "↑/↓ navigate  •  Enter select  •  Esc cancel"
+
+
+def _row(item: "SelectItem", is_cursor: bool, multi: bool, geometry: _Geometry, tick: int) -> Text:
+    """One selectable row: margin, cursor bar, state, marker, label, inline hint."""
+    row = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
+    row.append(theme.CURSOR if is_cursor else " ", style=theme.ACCENT)
+    row.append(" ")
+    if multi and not item.is_action:
+        badge = _toggle_badge(item)
+        if item.toggle_states:
+            badge_style = theme.state_style(badge)
+        else:
+            badge_style = theme.GOOD if item.toggled else theme.MUTED
+        row.append(badge, style=badge_style if item.enabled else theme.MUTED)
+        row.append(" " * (geometry.badge_width - cell_len(badge) + 1))
+    if item.marker:
+        row.append(f"{item.marker} ", style=theme.ACCENT)
+
+    if not item.enabled:
+        style = theme.MUTED
+    elif is_cursor:
+        style = theme.FOCUS
+    else:
+        style = ""
+    available = _label_avail_width(item, multi, geometry)
+    label = (
+        marquee_cells(item.label, available, tick)
+        if is_cursor
+        else ellipsize_cells(item.label, available)
+    )
+    row.append(label, style=style)
+    if _inline_hint(item):
+        if geometry.hint_column is not None:
+            row.append(" " * max(0, min(geometry.hint_column, available) - cell_len(label)))
+        row.append(f"  {item.hint}", style=theme.MUTED)
+    return row
+
+
 def _build_panel(
     items: list[SelectItem],
     cursor: int,
@@ -145,39 +229,34 @@ def _build_panel(
     multi: bool,
     footer: str = "",
     tick: int = 0,
-) -> Panel:
-    """Render a height-windowed selector with responsive context text."""
-    body = Text(no_wrap=True, overflow="ellipsis")
-    has_actions = any(item.is_action for item in items)
-    inner_width = _inner_width()
+    status: str = "",
+) -> Group:
+    """Render one complete selector frame: header, windowed list, context, keys.
 
-    if not footer:
-        if multi:
-            footer = "↑/↓ navigate  •  Enter toggle/select  •  Esc cancel"
-        else:
-            footer = "↑/↓ navigate  •  Enter select  •  Esc cancel"
+    Every selectable row stays one physical line so the window is stable;
+    descriptions, notices and the key bar wrap and are measured, and the list
+    gets whatever height is left.
+    """
+    width = console.size.width
+    height = console.size.height
+    inner_width = _inner_width()
+    compact = height < _COMPACT_HEIGHT
+    has_actions = any(item.is_action for item in items)
+    geometry = _geometry(items, multi)
+
+    parsed = theme.parse_footer(footer or _default_footer(multi))
+    keys = parsed.keys or theme.parse_footer(_default_footer(multi)).keys
 
     current_item = items[cursor] if 0 <= cursor < len(items) else None
-    context_blocks: list[Text] = []
+    item_blocks: list[Text] = []
     if current_item and current_item.hint and not _inline_hint(current_item):
-        context_blocks.append(
-            Text(f" {current_item.hint}", style="dim yellow", overflow="fold")
-        )
+        item_blocks.append(Text(current_item.hint, style=theme.MUTED, overflow="fold"))
     if current_item and current_item.description:
-        description = Text.from_markup(
-            f" {current_item.description}", style="dim italic"
-        )
+        description = Text.from_markup(current_item.description, style=theme.MUTED)
         description.overflow = "fold"
-        context_blocks.append(description)
-    if not context_blocks:
-        context_blocks.append(Text(" "))
-
-    footer_text = Text.from_markup(f" {footer}", style="dim")
-    footer_text.overflow = "fold"
-    context_lines = sum(
-        _wrapped_line_count(block, inner_width) for block in context_blocks
-    )
-    footer_lines = _wrapped_line_count(footer_text, inner_width)
+        item_blocks.append(description)
+    item_lines = sum(_wrapped_line_count(block, inner_width) for block in item_blocks)
+    notice_lines = sum(_wrapped_line_count(block, inner_width) for block in parsed.context)
 
     # Partition into leading actions, a windowed main list, and trailing actions.
     n = len(items)
@@ -189,105 +268,93 @@ def _build_panel(
         main_end -= 1
     main_len = main_end - main_start
 
-    # Banner, panel borders/padding, indicators, context separator, and margin.
     always_visible_rows = main_start + (n - main_end)
-    compact = console.size.height < 28
-    if not main_len or always_visible_rows > max(3, console.size.height // 3):
+    if not main_len or always_visible_rows > max(3, height // 3):
         # Action-only menus (credentials, provider picker) need scrolling too.
         main_start, main_end, main_len = 0, n, n
         always_visible_rows = 0
     separators = sum(
-        item.is_action and item.value != "section_header" and not items[i - 1].is_action
+        item.is_action and not _is_section_header(item) and not items[i - 1].is_action
         for i, item in enumerate(items) if i > 0
     ) if multi and has_actions else 0
-    if always_visible_rows and (5 if compact else 12) + always_visible_rows + separators + context_lines + footer_lines >= console.size.height:
-        # Long preset help and additional actions can leave no room for a
-        # selectable row. Let the actions scroll with the list in that case.
+
+    def header_status(position: str) -> str:
+        return " · ".join(part for part in (status, position) if part)
+
+    header_count = len(theme.header_lines(title, header_status(""), width))
+
+    def chrome_for(key_segments: list[Text], context_lines: int) -> int:
+        spacing = 1 + (0 if compact else 1)  # below the list; below the header
+        if context_lines and not compact:
+            spacing += 1  # between the context and the keys
+        return (header_count + spacing + always_visible_rows + separators + context_lines
+                + len(theme.wrap_keys(key_segments, width)))
+
+    def windowed_keys() -> list[Text]:
+        if theme.has_key(keys, "PgUp/PgDn"):
+            return keys
+        return keys + [theme.key_segment("PgUp/PgDn", "page")]
+
+    shown_keys = keys
+    chrome = chrome_for(shown_keys, item_lines + notice_lines)
+    if always_visible_rows and chrome >= height:
+        # Long help and many pinned actions can leave no room for a selectable
+        # row. Let the actions scroll with the list in that case.
         main_start, main_end, main_len = 0, n, n
         always_visible_rows = 0
-    chrome = (5 if compact else 12) + always_visible_rows + separators + context_lines + footer_lines
+        chrome = chrome_for(shown_keys, item_lines + notice_lines)
+    if main_len > height - chrome:
+        shown_keys = windowed_keys()
+        # Measure the header with a position as wide as the real one will be.
+        widest_position = f"{main_len}–{main_len} of {main_len}"
+        header_count = len(theme.header_lines(title, header_status(widest_position), width))
+        chrome = chrome_for(shown_keys, item_lines + notice_lines)
     # A small window: shorten the focused row's help (e.g. a long folder path)
-    # so a selectable row and the footer's controls still fit on screen.
-    missing = chrome + 1 - console.size.height
-    if missing > 0 and context_lines > 1:
-        keep = max(1, context_lines - missing)
-        context_blocks = [_clip_lines(context_blocks, keep, inner_width)]
-        chrome -= context_lines - keep
-        context_lines = keep
-    max_visible = max(1, console.size.height - chrome)
+    # so a selectable row and the key bar still fit on screen.
+    missing = chrome + 1 - height
+    if missing > 0 and item_lines > 1:
+        keep = max(1, item_lines - missing)
+        item_blocks = [_clip_lines(item_blocks, keep, inner_width)]
+        chrome -= item_lines - keep
+        item_lines = keep
+    max_visible = max(1, height - chrome)
 
     win_start_rel, win_end_rel = _compute_window(
         main_len, cursor - main_start, max_visible
     )
-    win_start = main_start + win_start_rel
-    win_end = main_start + win_end_rel
     if cursor < main_start or cursor >= main_end:
         win_start_rel, win_end_rel = _compute_window(main_len, 0, max_visible)
-        win_start = main_start + win_start_rel
-        win_end = main_start + win_end_rel
+    win_start = main_start + win_start_rel
+    win_end = main_start + win_end_rel
+
+    position = (
+        f"{win_start_rel + 1}–{win_end_rel} of {main_len}" if main_len > max_visible else ""
+    )
+    lines: list[Text] = theme.header_lines(title, header_status(position), width)
+    if not compact:
+        lines.append(Text(""))
 
     for i, item in enumerate(items):
         in_main = main_start <= i < main_end
         if in_main and (i < win_start or i >= win_end):
             continue
-
-        is_cursor = i == cursor
-        is_section_header = (
-            not item.enabled
-            and isinstance(item.value, str)
-            and item.value == "section_header"
-        )
-
-        if multi and has_actions and item.is_action and not is_section_header:
+        if multi and has_actions and item.is_action and not _is_section_header(item):
             previous = items[i - 1] if i > 0 else None
             if previous and not previous.is_action:
-                body.append(
-                    "  " + "─" * max(1, inner_width - 2) + "\n", style="dim"
-                )
-
-        if is_section_header:
-            body.append(
-                "    " + ellipsize_cells(item.label, inner_width - 4) + "\n",
-                style="dim bold",
-            )
+                lines.append(Text(""))
+        if _is_section_header(item):
+            label = theme.section_label(item.label)
+            lines.append(Text(theme.MARGIN + ellipsize_cells(label, inner_width), style=theme.SECTION))
             continue
+        lines.append(_row(item, i == cursor, multi, geometry, tick))
 
-        if multi and not item.is_action:
-            badge = _toggle_badge(item)
-            prefix = f"  ❯ {badge} " if is_cursor else f"    {badge} "
-        else:
-            prefix = "  ❯ " if is_cursor else "    "
-
-        if not item.enabled:
-            style = "dim"
-        elif is_cursor:
-            style = "bold cyan"
-        else:
-            style = "white"
-
-        body.append(prefix, style=style)
-        if item.marker:
-            body.append(f"{item.marker} ", style="bold yellow")
-
-        available = _label_avail_width(item, multi)
-        label = (
-            marquee_cells(item.label, available, tick)
-            if is_cursor
-            else ellipsize_cells(item.label, available)
-        )
-        body.append(label, style=style)
-
-        if _inline_hint(item):
-            body.append(f"  {item.hint}", style="dim yellow")
-        body.append("\n")
-
-    return Panel(
-        Group(body, Text(""), *context_blocks, footer_text),
-        title=f"[bold magenta]{title}[/bold magenta]",
-        border_style="bright_blue",
-        padding=(0, 2) if compact else (1, 2),
-        subtitle=(f"[dim]↑ {win_start_rel + 1}–{win_end_rel} / {main_len} ↓  •  PgUp/PgDn[/dim]" if main_len > max_visible else None),
-    )
+    lines.append(Text(""))
+    for block in item_blocks + parsed.context:
+        lines.extend(theme.wrap_block(block, width, console))
+    if (item_lines or notice_lines) and not compact:
+        lines.append(Text(""))
+    lines.extend(theme.wrap_keys(shown_keys, width))
+    return Group(*lines)
 
 
 def _next_enabled(items: list[SelectItem], current: int, direction: int) -> int:
@@ -313,14 +380,16 @@ def _valid_cursor(items: list[SelectItem], cursor: int) -> int:
 
 def _render(
     banner: object,
-    panel: Panel,
+    panel: object,
     width: int | None = None,
     expected_size: object | None = None,
 ) -> bool:
     """Redraw inside the alternate screen buffer.
 
     Clears the viewport first (cheap inside an alt-screen) so a previous
-    render that overflowed and scrolled can't leave ghost borders behind.
+    render that overflowed and scrolled can't leave ghost rows behind. The
+    frame carries its own header line, so *banner* is accepted for older
+    callers and ignored.
     """
     from io import StringIO
     from rich.console import Console as _Console
@@ -331,21 +400,15 @@ def _render(
         file=buf,
         width=width if width is not None else console.size.width,
         force_terminal=True,
+        theme=custom_theme,
     )
-    if banner:
-        if console.size.height < 28:
-            tmp.print("Torrent Search CLI", style="bold magenta")
-        else:
-            tmp.print(banner)
-            tmp.print()
     tmp.print(panel)
     # A final newline scrolls a frame that exactly fills the viewport, hiding
     # its heading in short terminals. The next redraw already homes the cursor.
     content = buf.getvalue().rstrip("\n")
 
     # Home + clear entire screen + write content. The 2J clear avoids
-    # ghost borders when a prior render overflowed and scrolled the
-    # viewport (which was leaving leftover top borders visible).
+    # ghost rows when a prior render overflowed and scrolled the viewport.
     if expected_size is not None and console.size != expected_size:
         return False
     sys.stdout.write("\033[H\033[2J" + content)
@@ -368,6 +431,7 @@ def arrow_select(
     on_action: Callable[[int, list[SelectItem]], bool] | None = None,
     hotkeys: dict[str, str] | None = None,
     key_actions: dict[str, Callable[[int, list[SelectItem]], object]] | None = None,
+    status: str | Callable[[], str] = "",
 ) -> int | list[int] | tuple | None:
     """Interactive arrow-key selector.
 
@@ -380,7 +444,7 @@ def arrow_select(
 
     Args:
         items: List of SelectItem to display.
-        title: Panel title.
+        title: Screen name shown in the header line after the app name.
         multi: If True, enables toggle mode with checkboxes.
                Enter on regular items toggles them.
                Enter on action items (is_action=True) returns that index.
@@ -388,7 +452,8 @@ def arrow_select(
                If False, Enter returns the index of the highlighted item.
         footer: Custom footer text (overrides default).
         start_index: Initial cursor position.
-        banner: Optional Rich renderable displayed above the panel.
+        banner: Accepted for older callers; every frame draws its own header.
+        status: Optional right-aligned header text (str or callable).
         on_action: Optional callback for action items. Called with
                    (index, items). Return True to stay in the menu,
                    False to exit and return the index.
@@ -428,6 +493,7 @@ def arrow_select(
                     multi,
                     _resolve(footer),
                     tick=tick,
+                    status=_resolve(status),
                 )
                 if _render(
                     banner,

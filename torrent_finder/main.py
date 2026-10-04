@@ -47,6 +47,7 @@ from torrent_finder.ui.prompts import (
     episode_select_prompt,
     filter_menu,
     get_query_with_shortcut,
+    PROMPT,
     make_search_screen_renderer,
     print_banner,
     provider_select_prompt,
@@ -507,8 +508,8 @@ def _browse_results(provider, results, note: str = "") -> str:
         from torrent_finder.qbittorrent import configured
         if configured() and acquisition.for_result(selected).style == "torrent-file-handoff":
             from torrent_finder.ui.selector import SelectItem, arrow_select
-            options = [SelectItem("🧲 Send to qBittorrent WebUI", "qbittorrent"),
-                       SelectItem("🧲 Open with default client", "default"), SelectItem("↩ Back", None)]
+            options = [SelectItem("Send to qBittorrent WebUI", "qbittorrent"),
+                       SelectItem("Open with default client", "default"), SelectItem("Back", None)]
             while True:
                 picked = arrow_select(options, title="Torrent client", footer="Enter select • Esc back")
                 if picked is None or options[picked].value != "qbittorrent":
@@ -1282,13 +1283,13 @@ def _main_loop(args=None) -> None:
                 has_history=bool(prov_history),
                 notice=notice_msg or "",
                 scope_label="Providers" if getattr(provider, "is_combined", False) else "Engines",
+                title=provider.name,
             )
             notice_msg = None
             initial, pending_query = pending_query, ""
             try:
                 query = get_query_with_shortcut(
-                    "[title] Search selected providers:[/title] " if getattr(provider, "is_combined", False)
-                    else f"[title] Search {provider.name}:[/title] ",
+                    PROMPT,
                     initial=initial, history=prov_history, filters_shortcut=True,
                     multi=True, screen_renderer=screen_renderer, propagate_interrupt=True,
                 )
@@ -1464,7 +1465,7 @@ def _main_loop(args=None) -> None:
             if missing:
                 cap = 4
                 more = f" +{len(missing) - cap} more" if len(missing) > cap else ""
-                note = (f"⚠  No torrents for {len(missing)} of {len(queries)} titles: "
+                note = (f"No torrents for {len(missing)} of {len(queries)} titles: "
                         + ", ".join(missing[:cap]) + more)
         if notices:
             note = "\n".join(filter(None, [note, *notices]))

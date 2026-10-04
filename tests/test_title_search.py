@@ -145,7 +145,7 @@ class TitleSearchTests(unittest.TestCase):
                     panel = selector._build_panel(items, index, kwargs["title"], False, kwargs["footer"])
                     lines = sized.render_lines(panel, sized.options)
                     captured.append(len(lines))
-                    self.assertLessEqual(len(lines), 15)  # plus the compact one-line banner
+                    self.assertLessEqual(len(lines), 16)  # the frame carries its own header line
             return None
         sized = Console(file=io.StringIO(), width=40, height=16)
         with patch("torrent_finder.ui.search_diagnostics.console", sized), \

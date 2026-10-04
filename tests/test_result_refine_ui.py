@@ -3,8 +3,7 @@ import unittest
 from unittest.mock import patch
 
 import readchar
-from rich.console import Console, Group
-from rich.text import Text
+from rich.console import Console
 from torrent_finder.ui import table, selector, prompts
 from torrent_finder.ui.selector import SelectItem
 
@@ -41,10 +40,10 @@ class ResultRefineUITests(unittest.TestCase):
                     screen.print(selector._build_panel(items, 25, "Options", False))
                 rendered = screen.file.getvalue()
                 self.assertIn("Action 25", rendered)
-                self.assertIn("/ 40", rendered)
-                self.assertLessEqual(len(rendered.splitlines()), height - 1)
+                self.assertIn("of 40", rendered)
+                self.assertLessEqual(len(rendered.splitlines()), height)
 
-    def test_compact_selector_uses_border_position_instead_of_extra_rows(self):
+    def test_compact_selector_uses_header_position_instead_of_extra_rows(self):
         screen = Console(file=io.StringIO(), width=60, height=20, color_system=None)
         items = [SelectItem(f"Option {i}", i) for i in range(40)]
         with patch.object(selector, "console", screen):
@@ -53,17 +52,15 @@ class ResultRefineUITests(unittest.TestCase):
         text = screen.file.getvalue()
         self.assertNotIn("more below", text)
         self.assertNotIn("more above", text)
-        self.assertIn("/ 40", text)
-        self.assertLessEqual(len(text.splitlines()), 19)
+        self.assertIn("of 40", text)
+        self.assertLessEqual(len(text.splitlines()), 20)
 
-    def test_complete_multiselect_frame_reserves_banner_and_action_separator(self):
+    def test_complete_multiselect_frame_reserves_header_and_action_separator(self):
         for width, height in [(40, 16), (60, 20), (80, 24), (100, 30)]:
             with self.subTest(width=width, height=height):
                 screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
                 items = [SelectItem(f"Option {i}", i) for i in range(40)]
                 items.extend([SelectItem("Confirm", "done", is_action=True), SelectItem("Back", "back", is_action=True)])
                 with patch.object(selector, "console", screen), patch.object(prompts, "console", screen):
-                    panel = selector._build_panel(items, 20, "Options", True)
-                    banner = Text("Torrent Search CLI") if height < 28 else Group(prompts._make_banner_panel(), Text(""))
-                    screen.print(Group(banner, panel))
+                    screen.print(selector._build_panel(items, 20, "Options", True))
                 self.assertLessEqual(len(screen.file.getvalue().splitlines()), height)

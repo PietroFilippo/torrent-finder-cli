@@ -153,7 +153,7 @@ class FolderBrowsingTests(unittest.TestCase):
     def test_a_series_of_release_folders_opens_in_place(self):
         chosen = self.browse(SERIES, ["Deluxe"], [[1, 2]])
         self.assertEqual(chosen, [DELUXE + "/v01.cbz", DELUXE + "/v02.cbz"])
-        self.assertEqual(self.menu_titles, ["📕 Series"])
+        self.assertEqual(self.menu_titles, ["Madokami › Series"])
         self.assertEqual(self.picker_files, [[("Series v01.cbz", 10), ("Series v02.cbz", 0)]])
 
     def test_esc_goes_up_one_level_to_the_same_row_then_back_to_results(self):
@@ -167,7 +167,7 @@ class FolderBrowsingTests(unittest.TestCase):
         library = dict(LIBRARY, **{DELUXE: [child("Series v01.cbz", DELUXE + "/v01.cbz"),
                                             child("chapters", DELUXE + "/%21chapters", True)]})
         self.assertEqual(self.browse(SERIES, ["Deluxe", None, None], [], library=library), [])
-        self.assertEqual(self.menu_titles, ["📕 Series", "📕 Series › Deluxe", "📕 Series"])
+        self.assertEqual(self.menu_titles, ["Madokami › Series", "Madokami › Series › Deluxe", "Madokami › Series"])
 
     def test_a_folder_of_files_goes_straight_to_the_picker(self):
         self.assertEqual(self.browse(DELUXE, [], [[2]]), [DELUXE + "/v02.cbz"])

@@ -21,6 +21,7 @@ from torrent_finder.search_errors import SearchError
 from torrent_finder.state import add_history_entry, creator_history
 from torrent_finder.stats import record_creator_search
 from torrent_finder.ui.prompts import _make_banner_panel, clear_screen, filter_menu, get_query_with_shortcut
+from torrent_finder.ui import theme
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.utils import start_esc_listener
 
@@ -88,7 +89,7 @@ def _pick_entity(entities, facet):
     if len(entities) == 1:
         return entities[0]
     items = [SelectItem(label=e.name, value=e, description=e.detail) for e in entities]
-    items.append(SelectItem(label="↩  Back", value="__back__", is_action=True))
+    items.append(SelectItem(label="Back", value="__back__", is_action=True))
     idx = arrow_select(
         items,
         title=f"Select {facet.label.lower()}",
@@ -125,9 +126,9 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
         description = ""
         if note:
             any_partial = True
-            hint = f"{w.subtitle}  ⚠  {note}" if w.subtitle else f"⚠  {note}"
+            hint = f"{w.subtitle}  ◐ {note}" if w.subtitle else f"◐ {note}"
             description = (
-                f"⚠  {entity.name} directed only specific episodes: {note}. "
+                f"◐ {entity.name} directed only specific episodes: {note}. "
                 "The torrent search still covers the whole title."
             )
         items.append(SelectItem(
@@ -136,30 +137,30 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
         ))
         work_item_indexes.append(len(items) - 1)
 
-    items.append(SelectItem(label="Select all  [a]", value="all", is_action=True))
-    items.append(SelectItem(label="Invert selection  [i]", value="invert", is_action=True))
-    items.append(SelectItem(label="Clear  [c]", value="clear", is_action=True))
+    items.append(SelectItem(label="Select all", value="all", is_action=True, hint="a"))
+    items.append(SelectItem(label="Invert selection", value="invert", is_action=True, hint="i"))
+    items.append(SelectItem(label="Clear", value="clear", is_action=True, hint="c"))
     prev_idx = next_idx = None
     if has_prev:
         items.append(SelectItem(
-            label="◀  Previous page  [p]", value="prev", is_action=True,
+            label="Previous page", value="prev", is_action=True, hint="p",
             description="Go back to the previous page of titles.",
         ))
         prev_idx = len(items) - 1
     if has_next:
         items.append(SelectItem(
-            label="▶  Next page  [n]", value="next", is_action=True,
+            label="Next page", value="next", is_action=True, hint="n",
             description="Load the next page of titles (ordered by popularity).",
         ))
         next_idx = len(items) - 1
     items.append(SelectItem(
-        label="⚙  Filters  [f]", value="filters", is_action=True,
+        label="Filters", value="filters", is_action=True, hint="f",
         description="Set quality/preset filters — applied when the torrents are fetched.",
     ))
     filters_idx = len(items) - 1
-    items.append(SelectItem(label="✅ Confirm  [w]", value="confirm", is_action=True))
+    items.append(SelectItem(label="Confirm", value="confirm", is_action=True, hint="w"))
     confirm_idx = len(items) - 1
-    items.append(SelectItem(label="↩ Back", value="cancel", is_action=True))
+    items.append(SelectItem(label="Back", value="cancel", is_action=True))
 
     anchor = {"idx": None}
 
@@ -199,7 +200,7 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
         if anchor["idx"] is not None and 0 <= anchor["idx"] < len(items_list):
             items_list[anchor["idx"]].marker = ""
         anchor["idx"] = cursor
-        items_list[cursor].marker = "📍"
+        items_list[cursor].marker = theme.MARKER
         return True
 
     def _range_toggle(cursor, items_list):
@@ -249,13 +250,12 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
         nav_bits.append("[bold yellow]n[/bold yellow] next")
     nav = ("  •  " + " / ".join(nav_bits) + " page") if nav_bits else ""
     footer = (
-        "↑/↓ nav  •  Space/Enter toggle  •  "
-        "[bold yellow]a[/bold yellow]ll/[bold yellow]i[/bold yellow]nvert/[bold yellow]c[/bold yellow]lear  •  "
-        "[bold green]w[/bold green] confirm" + nav + "  •  [bold yellow]f[/bold yellow] filters  •  Esc back\n"
+        "↑/↓ nav  •  Space/Enter toggle  •  a all  •  i invert  •  c clear  •  "
+        "w confirm" + nav + "  •  f filters  •  Esc back\n"
         "Pick titles to search (none selected by default; a/i/c act on this page)."
     )
     if any_partial:
-        footer += "\n[bold yellow]⚠  = director handled only some episodes (highlight a title for details)[/bold yellow]"
+        footer += "\n[warn]◐ = director handled only some episodes (highlight a title for details)[/warn]"
 
     page_label = f"page {page_no}" + (f"/{total_pages}" if total_pages else "")
     result = arrow_select(
