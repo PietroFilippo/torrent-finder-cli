@@ -101,7 +101,7 @@ def _read_document(path: str, *, patient: bool = False) -> dict | None:
                 raise _Unreadable(error.strerror or str(error), damaged=False) from error
             time.sleep(delay)
     try:
-        data = json.loads(raw.decode("utf-8"))
+        data = json.loads(raw.decode("utf-8-sig"))  # an editor may have added a BOM
     except (UnicodeError, ValueError) as error:
         raise _Unreadable("the file is not valid settings data", damaged=True) from error
     if not isinstance(data, dict):
@@ -245,7 +245,15 @@ def _initial_load(target_path: str, legacy_paths: list[str]):
 
     merged = _merge_state_copies(copies)
     try:
-        atomic_json(target_path, merged)
+        with _file_lock(target_path, LOCK_TIMEOUT):
+            # Another window may have created the file since the first read.
+            try:
+                current = _read_document(target_path, patient=True)
+            except _Unreadable as error:
+                return {}, StorageProblem(target_path, error.reason, error.damaged), None
+            if current is not None:
+                return current, None, None
+            atomic_json(target_path, merged)
     except OSError:
         return merged, None, merged
     return merged, None, None
@@ -295,13 +303,26 @@ def _refresh_if_changed() -> None:
         return
     try:
         fresh = _read_document(STATE_PATH)
-        if fresh is None:
-            return
-        for op in _pending:
-            op(fresh)
     except Exception:
         return  # keep the current view; a later read tries again
+    if fresh is None:
+        return
+    _apply_pending(fresh)
     _cache, _signature = fresh, signature
+
+
+def _apply_pending(document: dict) -> None:
+    """Re-apply this session's pending changes to *document*. A change that fails
+    on its shape (another window or a hand edit changed it) is dropped instead of
+    blocking every later save."""
+    kept = []
+    for op in _pending:
+        try:
+            op(document)
+        except Exception:
+            continue
+        kept.append(op)
+    _pending[:] = kept
 
 
 def section(data: dict, key: str) -> dict:
@@ -432,10 +453,12 @@ def _save(extra_op, timeout: float):
             document = _read_document(STATE_PATH, patient=True) or {}
         except _Unreadable as error:
             raise ValueError("Existing settings cannot be read; the file was preserved.") from error
-        for op in _pending:
-            op(document)
+        _apply_pending(document)
         if extra_op is not None:
-            extra_op(document)
+            try:
+                extra_op(document)
+            except (AttributeError, KeyError, TypeError) as error:
+                raise ValueError("Saved settings have an unexpected shape; nothing was changed.") from error
         atomic_json(STATE_PATH, document)
         return document, _file_signature(STATE_PATH)
 
@@ -490,8 +513,7 @@ def retry_load() -> bool:
         except _Unreadable as error:
             _problem = StorageProblem(STATE_PATH, error.reason, error.damaged)
             return False
-        for op in _pending:
-            op(data)
+        _apply_pending(data)
         _cache, _signature, _problem = data, signature, None
         return True
 
@@ -508,7 +530,6 @@ def set_aside_unreadable() -> str:
         with _file_lock(STATE_PATH, LOCK_TIMEOUT):
             os.rename(STATE_PATH, aside)
         data = {}
-        for op in _pending:
-            op(data)
+        _apply_pending(data)
         _cache, _signature, _problem = data, None, None
         return aside

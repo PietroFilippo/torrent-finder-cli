@@ -148,7 +148,16 @@ def save_state(providers) -> None:
 
 def load_setting(key: str, default=None):
     """Read a value from the `settings` subtree of the state file."""
-    return store.read().get("settings", {}).get(key, default)
+    settings = store.read().get("settings")
+    return settings.get(key, default) if isinstance(settings, dict) else default
+
+
+def commit_setting(key: str, value) -> None:
+    """Set one value in the `settings` subtree and save it now (an explicit
+    choice): raises ``ValueError`` / ``store.SaveError`` when that fails."""
+    def change(data):
+        store.section(data, "settings")[key] = deepcopy(value)
+    store.commit(change)
 
 
 def save_setting(key: str, value) -> None:

@@ -191,7 +191,7 @@ def _check_import(data, mode):
 def _apply_import(result, data, mode):
     """Apply *data* to the settings document *result* in place; return the preview lines."""
     incoming = deepcopy(data)
-    previous = result.setdefault("settings", {})
+    previous = store.section(result, "settings")
     changes = ["Merge: imported provider/preferences win; other settings stay." if mode == "merge"
                else "Replace: replace portable provider/preferences; keep machine settings, stats and bookmarks."]
     if mode == "replace":
@@ -199,7 +199,7 @@ def _apply_import(result, data, mode):
         for key in PREFERENCES:
             previous.pop(key, None)
     else:
-        result.setdefault("providers", {}).update(incoming.get("providers", {}))
+        store.section(result, "providers").update(incoming.get("providers", {}))
     settings = incoming.get("settings", {})
     if "combined_search" in settings and "search_profiles" not in settings:
         settings["search_profiles"] = {"version": 1, "active": "default", "profiles": [

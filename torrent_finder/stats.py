@@ -24,11 +24,15 @@ def _record(change) -> None:
 
 
 def _bump(stats: dict, *path: str, by: int = 1) -> None:
-    """Increment an int at stats[path[0]][path[1]]...[path[-1]] by `by`."""
+    """Increment an int at stats[path[0]][path[1]]...[path[-1]] by `by`.
+    A part of the path that isn't the expected kind (a hand-edited file) is reset."""
     d = stats
     for k in path[:-1]:
-        d = d.setdefault(k, {})
-    d[path[-1]] = d.get(path[-1], 0) + by
+        if not isinstance(d.get(k), dict):
+            d[k] = {}
+        d = d[k]
+    current = d.get(path[-1], 0)
+    d[path[-1]] = (current if isinstance(current, int) and not isinstance(current, bool) else 0) + by
 
 
 # ---------------------------------------------------------------------------

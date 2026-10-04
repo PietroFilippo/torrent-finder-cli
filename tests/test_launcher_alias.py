@@ -76,8 +76,7 @@ class LauncherLifecycleTests(unittest.TestCase):
 
         with patch.object(launcher_alias, "_find_command", side_effect=find), \
              patch.object(launcher_alias, "load_setting", return_value=None), \
-             patch.object(launcher_alias, "save_setting") as save, \
-             patch.object(launcher_alias.store, "flush"):
+             patch.object(launcher_alias, "commit_setting") as save:
             status = launcher_alias.set_terminal_command("torrent")
 
         self.assertFalse(status.managed)
@@ -112,8 +111,7 @@ class LauncherLifecycleTests(unittest.TestCase):
             }
 
             with patch.object(launcher_alias, "load_setting", return_value=saved), \
-                 patch.object(launcher_alias, "save_setting") as save, \
-                 patch.object(launcher_alias.store, "flush"), \
+                 patch.object(launcher_alias, "commit_setting") as save, \
                  patch.object(launcher_alias, "_find_command", return_value=None):
                 status = launcher_alias.set_terminal_command(
                     "tf",
@@ -137,8 +135,7 @@ class LauncherLifecycleTests(unittest.TestCase):
             saved = {"name": "tf", "path": external, "managed": True}
 
             with patch.object(launcher_alias, "load_setting", return_value=saved), \
-                 patch.object(launcher_alias, "save_setting") as save, \
-                 patch.object(launcher_alias.store, "flush"):
+                 patch.object(launcher_alias, "commit_setting") as save:
                 status = launcher_alias.reset_terminal_command()
 
             self.assertTrue(os.path.isfile(external))

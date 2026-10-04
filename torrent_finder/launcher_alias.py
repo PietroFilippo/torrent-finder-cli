@@ -15,8 +15,7 @@ import subprocess
 import sys
 import sysconfig
 
-from torrent_finder import store
-from torrent_finder.state import load_setting, save_setting
+from torrent_finder.state import commit_setting, load_setting
 from torrent_finder.updates import install_kind
 
 
@@ -188,11 +187,15 @@ def _remove_previous(setting, keep_path: str = "") -> None:
 
 
 def _save_status(name: str, path: str, managed: bool) -> None:
-    save_setting(
-        SETTING_KEY,
-        {"name": name, "path": path, "managed": managed},
-    )
-    store.flush()
+    _commit_setting({"name": name, "path": path, "managed": managed})
+
+
+def _commit_setting(value) -> None:
+    """Save the launcher choice now; a failed save is reported, not hidden."""
+    try:
+        commit_setting(SETTING_KEY, value)
+    except (OSError, ValueError) as error:
+        raise LauncherError(f"The command changed, but saving that choice failed: {error}") from error
 
 
 def set_terminal_command(
@@ -247,8 +250,7 @@ def reset_terminal_command() -> LauncherStatus:
     """Remove the current managed alias and restore the canonical command."""
     previous = load_setting(SETTING_KEY, None)
     _remove_previous(previous)
-    save_setting(SETTING_KEY, None)
-    store.flush()
+    _commit_setting(None)
     canonical = _find_command(DEFAULT_COMMAND) or ""
     return LauncherStatus(
         DEFAULT_COMMAND,

@@ -17,9 +17,15 @@ class ProfileError(ValueError):
     """User-facing validation failure; preserve the saved collection."""
 
 
+def _by_id(data) -> dict:
+    """Profiles of a collection by ID."""
+    return {entry["id"]: entry for entry in (data or {}).get("profiles", []) if isinstance(entry, dict)}
+
+
 class ProfileLibrary:
     def __init__(self, data):
         self.data = deepcopy(data)
+        self._loaded = deepcopy(data)  # what this draft started from (see save)
         if not isinstance(self.data, dict) or self.data.get("version") != 1:
             raise ProfileError("Unsupported search profile data; saved profiles were not changed.")
         entries = self.data.get("profiles")
@@ -103,11 +109,40 @@ class ProfileLibrary:
         for entry in self.entries:
             if entry["settings"].get("selected") == []:
                 raise ProfileError(f"Choose at least one provider for {entry['name']} before saving.")
-        profiles, current = deepcopy(self.data), deepcopy(self.current["settings"])
+        mine, loaded = deepcopy(self.data), _by_id(self._loaded)
+        changed = [entry for entry in mine["profiles"] if loaded.get(entry["id"]) != entry]
+        deleted = set(loaded) - {entry["id"] for entry in mine["profiles"]}
+        active_changed = mine["active"] != self._loaded.get("active")
+        saved = []
 
         def change(data):
+            # Replay this draft's own edits onto the collection as saved now, so
+            # another window's additions, edits and deletions are not undone.
             settings = store.section(data, "settings")
-            settings["search_profiles"] = deepcopy(profiles)
+            current = settings.get("search_profiles")
+            merged = mine
+            if isinstance(current, dict) and current.get("version") == 1 and isinstance(current.get("profiles"), list):
+                merged = deepcopy(current)
+                entries = [e for e in merged["profiles"] if not isinstance(e, dict) or e.get("id") not in deleted]
+                for entry in changed:
+                    index = next((i for i, e in enumerate(entries)
+                                  if isinstance(e, dict) and e.get("id") == entry["id"]), None)
+                    if index is None:
+                        entries.append(deepcopy(entry))
+                    else:
+                        entries[index] = deepcopy(entry)
+                merged["profiles"] = entries
+                ids = [e.get("id") for e in entries if isinstance(e, dict)]
+                if active_changed or merged.get("active") not in ids:
+                    merged["active"] = mine["active"] if mine["active"] in ids else (ids[0] if ids else None)
+            try:
+                library = ProfileLibrary(merged)
+            except ProfileError as error:
+                raise ProfileError("Another window changed the profiles in a conflicting way (for example the "
+                                   "same new name). Reopen the profiles to see them; nothing was saved.") from error
+            settings["search_profiles"] = deepcopy(merged)
             # Keep the single-profile representation usable by previous versions.
-            settings["combined_search"] = deepcopy(current)
+            settings["combined_search"] = deepcopy(library.current["settings"])
+            saved[:] = [merged]
         store.commit(change)
+        self.data, self._loaded = deepcopy(saved[0]), deepcopy(saved[0])
