@@ -16,7 +16,7 @@ from torrent_finder.search_control import SearchControl, SearchInterrupted
 from torrent_finder.search_diagnostics import ACCESS_STATUSES, Diagnostic, RequestTrace
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_result import SearchResult, normalize_result
-from torrent_finder.result_view import release_tag_hits, title_score
+from torrent_finder.result_view import digit_spelling, release_tag_hits, title_score
 import requests
 
 # Once the searches finish, wait at most this long for the Books author lookup.
@@ -67,7 +67,7 @@ class SearchSession:
         self._slots = threading.BoundedSemaphore(workers)
         self.tasks = []
         self.groups = []
-        # Other names searched because a title found nothing: alias -> typed query.
+        # Other spellings searched because a title found nothing: spelling -> typed query.
         self.alias_of = {}
         self.notes = []
         self._busy = threading.Lock()
@@ -370,13 +370,13 @@ class SearchSession:
                     return position
                 selected.sort(key=fair_order)
                 pending = {executor.submit(self._execute, t, control, slots): t for t in selected}
-            alias_round = action == "initial" and any(p.looks_up_aliases for p in self.providers)
+            spelling_round = action == "initial"
             while not control.stopped():
                 if not pending:
-                    if not alias_round:
+                    if not spelling_round:
                         break
-                    alias_round = False  # one round: aliases are not looked up again
-                    for task in self._alias_tasks(control):
+                    spelling_round = False  # one round: other spellings are not respelled
+                    for task in self._other_spelling_tasks(control):
                         pending[executor.submit(self._execute, task, control, slots)] = task
                     if not pending:
                         break
@@ -406,53 +406,68 @@ class SearchSession:
         publish()
         return self.snapshot()
 
-    def _alias_tasks(self, control):
-        """Searches for other names of titles that found nothing matching.
+    def _other_spelling_tasks(self, control):
+        """Searches for other spellings of titles that found nothing matching.
 
-        For providers that look up aliases (General Manga): when a title's
-        sources answered but no row matches it, the catalog's names for the work
-        are searched too ("Yokohama Shopping Log" → "Yokohama Kaidashi Kikou").
-        At most three titles are looked up, with one catalog request each.
+        When a title's sources answered but no row matches it: its spelled-out
+        numbers in digits, for every provider ("Twenty First Century Boys" →
+        "21st Century Boys"), and the catalog's names for the work, for
+        providers that look up aliases ("Yokohama Shopping Log" → "Yokohama
+        Kaidashi Kikou"). One round. At most three titles are looked up, one
+        catalog request each, shared by providers using the same catalog.
         """
         wanted = []
         for group, (provider, query) in enumerate(list(self.groups)):
-            if not provider.looks_up_aliases or query in self.alias_of:
+            if query in self.alias_of:
                 continue
             tasks = [t for t in self.tasks if t.group == group]
             if not any(t.diagnostic.status in {"results", "empty", "filtered"} for t in tasks):
-                continue  # the sources failed; other names would not help
-            if any(provider.title_relevance(row, query) >= 1 for t in tasks for row in t.rows):
-                continue
-            wanted.append((provider, query))
-        wanted = wanted[:3]
-        if not wanted:
-            return []
+                continue  # the sources failed; other spellings would not help
+            spelling = digit_spelling(query)
+            if any(provider.title_relevance(row, wanted_title) >= 1 for wanted_title in filter(None, (query, spelling))
+                   for t in tasks for row in t.rows):
+                continue  # found already, possibly under the digits
+            if spelling or provider.looks_up_aliases:
+                wanted.append((provider, query, spelling))
+        lookups = {}
+        for provider, query, _spelling in wanted:
+            if provider.looks_up_aliases and len(lookups) < 3:
+                lookups.setdefault((provider.alias_catalog or provider.slug, query), provider)
         found = {}
 
         def look_up():
-            for provider, query in wanted:
+            for (catalog, query), provider in lookups.items():
                 try:
-                    found[provider.slug, query] = tuple(provider.lookup_aliases(query))
+                    found[catalog, query] = tuple(provider.lookup_aliases(query))
                 except Exception:
                     continue  # the search simply ends without other names
 
-        thread = threading.Thread(target=look_up, daemon=True)
-        thread.start()
-        while thread.is_alive() and not control.stopped():
-            thread.join(0.05)
+        if lookups:
+            thread = threading.Thread(target=look_up, daemon=True)
+            thread.start()
+            while thread.is_alive() and not control.stopped():
+                thread.join(0.05)
         if control.stopped():
             return []
         added = []
-        for provider, query in wanted:
-            aliases = [a for a in found.get((provider.slug, query), ()) if a not in self.queries]
-            for alias in aliases:
-                self.queries.append(alias)
-                self.alias_of[alias] = query
-                group = self._add_group(provider, alias)
+        searched = {(p.slug, q) for p, q in self.groups}
+        for provider, query, spelling in wanted:
+            aliases = found.get((provider.alias_catalog or provider.slug, query), ())
+            names = [name for name in dict.fromkeys(filter(None, (spelling, *aliases)))
+                     if (provider.slug, name) not in searched]
+            for name in names:
+                if name not in self.queries:
+                    self.queries.append(name)
+                self.alias_of.setdefault(name, query)
+                searched.add((provider.slug, name))
+                group = self._add_group(provider, name)
                 added += [t for t in self.tasks if t.group == group and t.diagnostic.status == "pending"]
-            if aliases:
-                self.notes.append(f"Nothing matched “{query}”, so its catalog title was searched too: "
-                                  + ", ".join(f"“{alias}”" for alias in aliases) + ".")
+            for note, shown in ((f"Nothing matched “{query}”, so “{spelling}” was searched too.", spelling in names),
+                                (f"Nothing matched “{query}”, so its catalog title was searched too: "
+                                 + ", ".join(f"“{alias}”" for alias in aliases) + ".",
+                                 any(alias in names for alias in aliases))):
+                if shown and note not in self.notes:
+                    self.notes.append(note)
         return added
 
     def _start_author_lookup(self):

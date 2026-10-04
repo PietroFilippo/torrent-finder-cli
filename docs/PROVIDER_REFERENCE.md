@@ -475,6 +475,12 @@ currently supported by a measured unique target.
   carry the tag. Live, Nyaa's Non-English Berserk releases were Italian,
   Spanish, French and Arabic, and none was Portuguese; the notice says so.
 - Result ordering is otherwise unchanged (seeders first), as is paging.
+- Spelled-out numbers (added later the same day, for every provider): when
+  nothing matches, the digit spelling is searched too. No catalog listed
+  `Twenty First Century Boys` or `Mob Psycho Hundred` (AniList, MangaDex,
+  MangaUpdates and Kitsu were compared on 16 alternate titles; Jikan's API was
+  down), but Nyaa has both under digits. Live, they now return 6 and 12 rows. AniList
+  resolved all 11 ordinary English/romaji swaps, so no catalog was added.
 
 ## Madokami
 
@@ -518,6 +524,10 @@ broken source or automatically expand to unrelated catalogs.
   level. Each folder is listed at most once per pick.
 - Folder listings carry file sizes into the picker. The listing's "Back" link
   is no longer offered as a sub-folder.
+- A title matching nothing is retried under AniList's names, like General
+  Manga. Live, `Yokohama Shopping Log` (empty in the audit) now finds the
+  `Yokohama Kaidashi Kikou` series folder. A combined search with General
+  Manga makes one AniList request for both.
 
 ## Books
 

@@ -179,8 +179,10 @@ class BaseProvider(ABC):
     # Look up the requested work's authors for plain searches (Books).
     looks_up_authors: bool = False
     # When a search finds nothing matching the title, search the work's other
-    # names from its catalog too (General Manga, see lookup_aliases).
+    # names from its catalog too (Manga, see lookup_aliases). alias_catalog is
+    # the AniList catalog ("manga"); providers sharing one share its lookups.
     looks_up_aliases: bool = False
+    alias_catalog: str = ""
     # Words typed after a title that ask for one of this provider's presets for
     # that search ("Berserk português", "Photoshop mac"): preset name -> words,
     # lowercase and without accents. See typed_split.
@@ -614,7 +616,10 @@ class BaseProvider(ABC):
 
     def lookup_aliases(self, query: str) -> tuple:
         """Other names of the work *query* names, or () (see looks_up_aliases)."""
-        return ()
+        if not self.alias_catalog:
+            return ()
+        from torrent_finder.resolvers.titles import known_aliases
+        return known_aliases(self.alias_catalog, query)
 
     def typed_split(self, query: str):
         """(title, preset) when the query ends in a word from ``typed_presets``

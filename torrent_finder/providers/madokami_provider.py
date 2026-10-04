@@ -28,6 +28,10 @@ class MadokamiProvider(BaseProvider):
     # The search also matches other names and authors; the series named as
     # searched comes first, before its spin-offs and those looser matches.
     prefer_title_matches = True
+    # Yet "Yokohama Shopping Log" found nothing: titles that match nothing are
+    # retried under AniList's names (folders use the romaji title).
+    looks_up_aliases = True
+    alias_catalog = "manga"
 
     def _init_engines(self) -> list[SearchEngine]:
         return [SearchEngine("Madokami", "📕", self._search_madokami, enabled=True)]

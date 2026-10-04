@@ -280,6 +280,77 @@ def product_title_score(name: str, query: str) -> int:
     return 1 if all(word in have for word in wanted) else 0
 
 
+_UNIT_WORDS = {word: n for n, word in enumerate(_NUMBER_WORDS[:20])}
+_TEN_WORDS = {word: 10 * n for n, word in enumerate("twenty thirty forty fifty sixty seventy eighty ninety".split(), 2)}
+_UNIT_ORDINALS = {word: n for n, word in enumerate(
+    ("zeroth first second third fourth fifth sixth seventh eighth ninth tenth eleventh twelfth thirteenth "
+     "fourteenth fifteenth sixteenth seventeenth eighteenth nineteenth").split())}
+_TEN_ORDINALS = {word: 10 * n for n, word in enumerate(
+    "twentieth thirtieth fortieth fiftieth sixtieth seventieth eightieth ninetieth".split(), 2)}
+_LARGE_NUMBERS = {"thousand", "million", "billion"}
+
+
+def _ordinal(n: int) -> str:
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def _number_at(words, i):
+    """(digits, length) of a spelled-out number starting at words[i], or None."""
+    value, j = 0, i
+
+    def word(k):
+        return words[k] if k < len(words) else ""
+
+    if word(j) in _UNIT_WORDS and 0 < _UNIT_WORDS[word(j)] < 10 and word(j + 1) in ("hundred", "hundredth"):
+        value, j = _UNIT_WORDS[word(j)] * 100, j + 1
+    if word(j) == "hundredth":
+        return _ordinal(value or 100), j + 1 - i
+    if word(j) == "hundred":
+        value, j = value or 100, j + 1
+        later = word(j + 1)
+        if word(j) == "and" and (later in _UNIT_WORDS or later in _TEN_WORDS
+                                 or later in _UNIT_ORDINALS or later in _TEN_ORDINALS):
+            j += 1
+    if word(j) in _TEN_WORDS:
+        value, j = value + _TEN_WORDS[word(j)], j + 1
+        if word(j) in _UNIT_WORDS and 0 < _UNIT_WORDS[word(j)] < 10:
+            return str(value + _UNIT_WORDS[word(j)]), j + 1 - i
+        if word(j) in _UNIT_ORDINALS and 0 < _UNIT_ORDINALS[word(j)] < 10:
+            return _ordinal(value + _UNIT_ORDINALS[word(j)]), j + 1 - i
+        return str(value), j - i
+    if word(j) in _TEN_ORDINALS:
+        return _ordinal(value + _TEN_ORDINALS[word(j)]), j + 1 - i
+    if word(j) in _UNIT_WORDS:
+        return str(value + _UNIT_WORDS[word(j)]), j + 1 - i
+    if word(j) in _UNIT_ORDINALS:
+        return _ordinal(value + _UNIT_ORDINALS[word(j)]), j + 1 - i
+    return (str(value), j - i) if j > i else None
+
+
+def digit_spelling(query: str) -> "str | None":
+    """The query with spelled-out numbers in digits ("Twenty First Century Boys"
+    → "21st Century Boys", "Mob Psycho Hundred" → "Mob Psycho 100", "Catch-
+    Twenty-Two" → "Catch-22"), or None when it has none. A number before
+    "thousand" or "million" stays as typed."""
+    pieces = re.findall(r"(^|\s+|-)([^\s-]+)", query)  # (separator, token), hyphens split too
+    words = [token.casefold().strip(".,:;!?()[]") for _sep, token in pieces]
+    out, i, changed = [], 0, False
+    while i < len(pieces):
+        found = _number_at(words, i)
+        if found and i + found[1] < len(words) and words[i + found[1]] in _LARGE_NUMBERS:
+            found = None
+        if found:
+            digits, length = found
+            last = pieces[i + length - 1][1]
+            tail = last[len(last.rstrip(".,:;!?)]")):]
+            out.append(pieces[i][0] + digits + tail)
+            i, changed = i + length, True
+        else:
+            out.append(pieces[i][0] + pieces[i][1])
+            i += 1
+    return "".join(out).strip() if changed else None
+
+
 def same_title(first: str, second: str) -> bool:
     """Equal titles, ignoring case, accents, punctuation and apostrophes."""
     return bool(_compact_words(first)) and _compact_words(first) == _compact_words(second)

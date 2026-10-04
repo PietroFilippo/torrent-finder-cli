@@ -64,6 +64,7 @@ class MangaProvider(BaseProvider):
     # An English or alternate title the sources don't use ("Yokohama Shopping
     # Log") is retried under AniList's titles when nothing matched.
     looks_up_aliases = True
+    alias_catalog = "manga"
 
     # Search by creator. AniList resolves the writer/author to their manga; Jikan
     # resolves a Japanese serialization magazine to the manga it ran. Each picked
@@ -95,10 +96,6 @@ class MangaProvider(BaseProvider):
                 enabled=False, emergency_fallback=True,
             ),
         ]
-
-    def lookup_aliases(self, query: str) -> tuple:
-        from torrent_finder.resolvers.titles import known_aliases
-        return known_aliases("manga", query)
 
     def _search_nyaa_raw(self, query: str) -> list[SearchResult]:
         """Nyaa Literature - Raw, c=3_3. Off by default."""

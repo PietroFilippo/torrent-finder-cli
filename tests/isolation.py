@@ -33,9 +33,11 @@ constants.DOWNLOADS_DIR = os.path.join(_RUN_DIRECTORY, "downloads")
 # searches that find nothing look up other titles on AniList; tests that cover
 # them switch these back on with a stubbed lookup.
 from torrent_finder.providers.book_provider import BookProvider  # noqa: E402
+from torrent_finder.providers.madokami_provider import MadokamiProvider  # noqa: E402
 from torrent_finder.providers.manga_provider import MangaProvider  # noqa: E402
 BookProvider.looks_up_authors = False
 MangaProvider.looks_up_aliases = False
+MadokamiProvider.looks_up_aliases = False
 
 
 def isolate_store(case, data=None, path=None) -> Path:
