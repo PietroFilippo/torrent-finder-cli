@@ -4,6 +4,7 @@ import sys
 
 import readchar
 from rich.cells import cell_len
+from rich.markup import escape
 from rich.console import Group
 from rich.text import Text
 
@@ -196,11 +197,11 @@ def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) ->
     except Exception as error:  # a verifier bug must not end the app
         ok, message = None, f"Couldn't verify ({type(error).__name__})"
     if ok is True:
-        console.print(f"[success]✓ Verified: {message}[/success]")
+        console.print(f"[success]✓ Verified: {escape(message)}[/success]")
     elif ok is None:
-        console.print(f"[warning]⚠  {message}[/warning]")
+        console.print(f"[warning]{escape(message)}[/warning]")
     else:
-        console.print(f"[error]✗ Verification failed: {message}[/error]")
+        console.print(f"[error]✗ Verification failed: {escape(message)}[/error]")
         if not _inline_confirm(
             "Save these credentials anyway? — Y/Yes to save, anything else cancels:"
         ):

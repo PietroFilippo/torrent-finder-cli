@@ -115,7 +115,7 @@ def search_and_download(torrent_name: str) -> Optional[str]:
         "comma-separated language option doesn't apply here.[/dim]"
     )
     query = _clean_title(torrent_name)
-    console.print(f"[info]Searching Jimaku for:[/info] [highlight]{query}[/highlight]")
+    console.print(f"[info]Searching Jimaku for:[/info] [highlight]{escape(query)}[/highlight]")
 
     with console.status("[accent]Querying Jimaku...[/accent]", spinner="dots"):
         entries = _search_entries(query, key)

@@ -1211,12 +1211,12 @@ def download_dir_prompt() -> None:
         SelectItem(
             label=f"Default ({os.path.basename(DOWNLOADS_DIR)}/)",
             value="__default__",
-            description=f"Save into the project's downloads/ folder.\nPath: {DOWNLOADS_DIR}",
+            description=f"Save into the project's downloads/ folder.\nPath: {escape(DOWNLOADS_DIR)}",
         ),
         SelectItem(
             label="~/Downloads",
             value=home_downloads,
-            description=f"Save into your user Downloads folder.\nPath: {home_downloads}",
+            description=f"Save into your user Downloads folder.\nPath: {escape(home_downloads)}",
         ),
         SelectItem(
             label="Type custom path…",
@@ -1279,7 +1279,7 @@ def download_dir_prompt() -> None:
     try:
         os.makedirs(path, exist_ok=True)
     except OSError as e:
-        console.print(f"[error] Could not create directory: {e}[/error]")
+        console.print(f"[error] Could not create directory: {escape(str(e))}[/error]")
         console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         return
@@ -1340,7 +1340,7 @@ def torrent_info_screen(result: dict) -> None:
         return
 
     if info is None:
-        console.print(f"[warning]{err}[/warning]")
+        console.print(f"[warning]{escape(str(err))}[/warning]")
         console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
         readchar.readkey()
         return
@@ -1597,7 +1597,7 @@ def download_method_prompt(
             value="open_page",
             is_action=True,
             hint=_page_domain,
-            description=f"Open this torrent's page on its source site in your browser.\n{page_url}",
+            description=f"Open this torrent's page on its source site in your browser.\n{escape(page_url)}",
         ))
 
     # --- Settings (persistent across runs, unlike the one-shot actions above) ---
@@ -1615,7 +1615,7 @@ def download_method_prompt(
         is_action=True,
         description=(
             f"Choose where non-magnet downloads + subtitles save to. "
-            f"Default: the project's downloads/ folder.\nCurrent: {_dl_dir}"
+            f"Default: the project's downloads/ folder.\nCurrent: {escape(_dl_dir)}"
         ),
     ))
 
@@ -2023,7 +2023,7 @@ def provider_select_prompt(
             value="__download_dir__",
             is_action=True,
             description=(
-                f"Current: {get_download_dir()}\nThe default folder for aria2c / webtorrent / "
+                f"Current: {escape(get_download_dir())}\nThe default folder for aria2c / webtorrent / "
                 "peerflix downloads, subtitle saves, and Online-Fix / Madokami / Libgen / F-Droid files.\n"
                 "Also here: unpack downloaded manga archives into folders of pages."
             ),

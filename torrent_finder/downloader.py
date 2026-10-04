@@ -594,7 +594,7 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
     dl_dir = _download_dir_or_explain()
     if dl_dir is None:
         return False
-    console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
+    console.print(f"[info]Downloading to:[/info] [highlight]{escape(dl_dir)}[/highlight]")
     if select_indexes:
         console.print(f"[info]Selected files:[/info] [highlight]{compact_ranges(select_indexes)}[/highlight] ({len(select_indexes)} file(s))")
     console.print("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n")
@@ -624,7 +624,7 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
         console.print()
         if rc == 0:
             console.print("[success] Download complete![/success]")
-            console.print(f"[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n")
+            console.print(f"[info]Files saved to:[/info] [highlight]{escape(dl_dir)}[/highlight]\n")
             return True
         console.print(f"[error] Download failed (exit code {rc}).[/error]\n")
         return False
@@ -653,7 +653,7 @@ def download_many_with_aria2(magnets: list[str]) -> bool:
     dl_dir = _download_dir_or_explain()
     if dl_dir is None:
         return False
-    console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
+    console.print(f"[info]Downloading to:[/info] [highlight]{escape(dl_dir)}[/highlight]")
     console.print(f"[info]Torrents:[/info] [highlight]{len(magnets)}[/highlight] (downloaded in parallel)")
     console.print("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n")
 
@@ -676,7 +676,7 @@ def download_many_with_aria2(magnets: list[str]) -> bool:
         console.print()
         if rc == 0:
             console.print("[success] Downloads complete![/success]")
-            console.print(f"[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n")
+            console.print(f"[info]Files saved to:[/info] [highlight]{escape(dl_dir)}[/highlight]\n")
             return True
         console.print(f"[error] Some downloads failed (exit code {rc}).[/error]\n")
         return False
@@ -704,7 +704,7 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
     dl_dir = _download_dir_or_explain()
     if dl_dir is None:
         return False
-    console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
+    console.print(f"[info]Downloading to:[/info] [highlight]{escape(dl_dir)}[/highlight]")
     if select_indexes:
         console.print(
             "[warning] webtorrent-cli's --select does NOT always limit download to the picked "
@@ -743,7 +743,7 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
 
         console.print()
         console.print("[success] Download complete![/success]")
-        console.print(f"[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n")
+        console.print(f"[info]Files saved to:[/info] [highlight]{escape(dl_dir)}[/highlight]\n")
         return True
 
     except KeyboardInterrupt:
@@ -769,7 +769,7 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
     dl_dir = _download_dir_or_explain()
     if dl_dir is None:
         return False
-    console.print(f"[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]")
+    console.print(f"[info]Downloading to:[/info] [highlight]{escape(dl_dir)}[/highlight]")
     if select_indexes:
         console.print(
             "[warning] peerflix is a streaming tool — its -i flag only picks which file is "
@@ -808,7 +808,7 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
 
         console.print()
         console.print("[success] Download complete![/success]")
-        console.print(f"[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n")
+        console.print(f"[info]Files saved to:[/info] [highlight]{escape(dl_dir)}[/highlight]\n")
         return True
 
     except KeyboardInterrupt:

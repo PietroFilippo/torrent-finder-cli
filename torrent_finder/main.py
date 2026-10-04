@@ -15,6 +15,8 @@ import warnings
 warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
+from rich.markup import escape as markup_escape  # _main_loop imports `escape` locally further down
+
 from torrent_finder import __version__, acquisition, store
 from torrent_finder.constants import console
 import readchar
@@ -736,19 +738,19 @@ def _browse_results(provider, results, note: str = "") -> str:
                     if extra > 0:
                         console.print(
                             f"[success]Saved. Next stream will use[/success] "
-                            f"[highlight]{primary}[/highlight] "
+                            f"[highlight]{escape(primary)}[/highlight] "
                             f"[success]as primary, plus {extra} more track(s).[/success]"
                         )
                     else:
                         console.print(
                             f"[success]Saved. Next stream will use[/success] "
-                            f"[highlight]{primary}[/highlight] "
+                            f"[highlight]{escape(primary)}[/highlight] "
                             f"[success]as the subtitle source.[/success]"
                         )
                 elif sub_paths:
                     console.print(
                         f"[success]Saved[/success] "
-                        f"[highlight]{_os.path.basename(sub_paths[0])}[/highlight]"
+                        f"[highlight]{escape(_os.path.basename(sub_paths[0]))}[/highlight]"
                         f"[success].[/success]"
                     )
                 console.print("\n[muted]Press [key]any key[/key] to continue…[/muted]")
@@ -1088,7 +1090,7 @@ def _main_loop(args=None) -> None:
     if args.type:
         initial_provider = get_provider(args.type)
         if not initial_provider:
-            console.print(f"[warning] Unknown provider type '{args.type}'. Falling back to Movies.[/warning]")
+            console.print(f"[warning] Unknown provider type '{markup_escape(args.type)}'. Falling back to Movies.[/warning]")
             initial_provider = PROVIDERS[0]
     elif query or args.by:
         # If -q or --by is passed without -t, default to Movies.
@@ -1121,7 +1123,8 @@ def _main_loop(args=None) -> None:
         )
         if cli_facet is None:
             avail = ", ".join(f.key for f in getattr(current_provider, "creator_facets", [])) or "none"
-            console.print(f"[warning] {current_provider.name} has no '--by {args.by}' option (available: {avail}).[/warning]")
+            console.print(f"[warning] {markup_escape(current_provider.name)} has no '--by {markup_escape(args.by)}' "
+                          f"option (available: {markup_escape(avail)}).[/warning]")
         elif not args.name:
             console.print('[warning] --by requires --name "<creator>".[/warning]')
             cli_facet = None

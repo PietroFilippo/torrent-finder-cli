@@ -533,3 +533,17 @@ class SecurityTinyTests(unittest.TestCase):
                 self.assertLessEqual(len(lines), 12)
                 for text in ("203.0.113.7", "no VPN", "Esc abort", "don't show again"):
                     self.assertIn(text, output)
+
+
+class EscapedMessageTests(unittest.TestCase):
+    def test_verifier_messages_with_brackets_print_literally(self):
+        from torrent_finder.ui import credentials as credentials_ui
+        meta = SimpleNamespace(name="Jimaku", effective_values=lambda entered: entered,
+                               missing_required=lambda values: [],
+                               verify=lambda values: (None, "Gateway [/x] timed out"), save=lambda entered: None)
+        out = io.StringIO()
+        screen = Console(file=out, width=80, color_system=None)
+        with patch.object(credentials_ui, "console", screen), \
+             patch.object(credentials_ui.readchar, "readkey", return_value="x"):
+            self.assertTrue(credentials_ui._finalize_credentials_save(meta, {"JIMAKU_API_KEY": "k"}))
+        self.assertIn("Gateway [/x] timed out", out.getvalue())
