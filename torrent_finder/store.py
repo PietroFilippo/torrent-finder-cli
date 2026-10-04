@@ -12,7 +12,8 @@ therefore never overwritten by a stale in-memory copy (see ADR-0019).
 
 - ``read()`` — the current view; picks up changes another window saved.
 - ``update(op)`` — best-effort change (stats, history, update checks), saved
-  by ``flush()`` at exit.
+  in the background about a second later (closing the console window skips
+  exit handlers) and by ``flush()`` at exit.
 - ``commit(op)`` — explicit user action (Save, Clear, bookmark, import): saved
   immediately. On failure ``ValueError`` / ``SaveError`` is raised and the view
   is unchanged, so the caller can keep its draft and offer a retry.
@@ -43,10 +44,15 @@ _pending: list = []        # operations applied to _cache but not yet on disk
 _signature = None          # identity of the file version _cache is based on
 _problem = None            # StorageProblem while saved settings are unreadable
 _atexit_registered: bool = False
+_save_scheduled: bool = False
 _mutex = threading.RLock()
 
 LOCK_TIMEOUT = 5.0         # explicit saves wait this long for another window
 _FLUSH_LOCK_TIMEOUT = 3.0  # exit never hangs longer than this
+# Best-effort changes are saved this long after the first unsaved one, so a
+# burst (one search records history and several counters) is one write. None
+# disables the background save (tests flush explicitly).
+SAVE_DELAY: float | None = 1.0
 # Windows antivirus/sync tools and another window's reader briefly hold files open.
 _RETRY_DELAYS = (0.05, 0.1, 0.2, 0.4, 0.8)
 
@@ -314,11 +320,24 @@ def read() -> dict:
 
 
 def update(op) -> None:
-    """Apply a best-effort change now; ``flush()`` replays it onto the saved file."""
+    """Apply a best-effort change now; it is saved shortly in the background."""
+    global _save_scheduled
     with _mutex:
         read()
         op(_cache)
         _pending.append(op)
+        if SAVE_DELAY is not None and not _save_scheduled:
+            _save_scheduled = True
+            timer = threading.Timer(SAVE_DELAY, _background_flush)
+            timer.daemon = True
+            timer.start()
+
+
+def _background_flush() -> None:
+    global _save_scheduled
+    with _mutex:
+        _save_scheduled = False  # a change made after this point schedules another save
+        flush()
 
 
 def problem() -> StorageProblem | None:

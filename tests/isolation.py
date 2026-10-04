@@ -22,6 +22,7 @@ atexit.register(shutil.rmtree, _RUN_DIRECTORY, ignore_errors=True)
 store.STATE_PATH = os.path.join(_RUN_DIRECTORY, "filter_state.json")
 store.LEGACY_STATE_PATHS = []
 store._atexit_registered = True  # never save leftover test changes at exit
+store.SAVE_DELAY = None  # no background saves racing a later test; tests flush explicitly
 credentials._CRED_FILE = Path(_RUN_DIRECTORY) / "credentials.json"
 credentials._LEGACY_CRED_PATHS = []
 credentials._file_cache = None
@@ -43,7 +44,7 @@ def isolate_store(case, data=None, path=None) -> Path:
         path.write_text(json.dumps(data), encoding="utf-8")
     for name, value in (("STATE_PATH", str(path)), ("LEGACY_STATE_PATHS", []),
                         ("_cache", None), ("_pending", []), ("_signature", None),
-                        ("_problem", None)):
+                        ("_problem", None), ("_save_scheduled", False)):
         patcher = patch.object(store, name, value)
         patcher.start()
         case.addCleanup(patcher.stop)

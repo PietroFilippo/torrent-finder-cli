@@ -37,7 +37,10 @@ immediately, and the view changes only after it reaches the disk. Failure raises
 `ValueError` (unreadable settings) or `store.SaveError` (write failed or the
 lock is busy for five seconds), and the UI says so while keeping the draft for a
 retry. Session-scoped changes (stats, history additions, update checks, ordinary
-settings) remain best-effort and are saved at exit, never raising.
+settings) remain best-effort and never raise. They are saved in the background
+about a second after the first unsaved change, and again at exit. Closing the
+console window skips exit handlers, so an exit-only save would lose the
+session's searches.
 
 A file that exists but cannot be read after short retries makes the store
 *unavailable*. The session runs on defaults, nothing is written, and explicit

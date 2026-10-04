@@ -298,7 +298,8 @@ provides offline listing metadata and separately labelled filename hints.
 legacy-copy consolidation, in-memory view, inter-process lock and saving.
 Everything above it (`state.py` engine modes/settings/history, `stats.py`
 counters, bookmarks, profiles, imports) changes state through operations and
-never touches the file. `store.update(op)` is best-effort and saved at exit;
+never touches the file. `store.update(op)` is best-effort, saved in the
+background about a second later and at exit;
 `store.commit(op)` is an explicit action saved at once. Each save locks, re-reads
 the file, replays this session's operations onto it, writes/fsyncs a sibling
 temporary file and atomically replaces it. Another window's changes are kept,

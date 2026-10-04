@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -190,6 +191,40 @@ class UnreadableStateTests(unittest.TestCase):
              patch.object(main, "show_security_warning", return_value=False), patch.object(main, "console"):
             main._main_loop(main._build_parser().parse_args([]))
         self.assertEqual(calls, ["prompt", "load"])
+
+
+class BackgroundSaveTests(unittest.TestCase):
+    """Closing the console window skips exit handlers, so session changes save on their own."""
+
+    def setUp(self):
+        self.path = isolate_store(self, {"stats": {"session_count": 1}})
+        delay = patch.object(store, "SAVE_DELAY", 0.1)
+        delay.start()
+        self.addCleanup(delay.stop)
+
+    def saved(self):
+        return json.loads(self.path.read_text(encoding="utf-8"))
+
+    def wait_for_save(self):
+        deadline = time.monotonic() + 5
+        while (store._pending or store._save_scheduled) and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.assertEqual((store._pending, store._save_scheduled), ([], False))
+
+    def test_a_search_burst_is_saved_once_without_exiting(self):
+        with patch.object(store, "atomic_json", wraps=store.atomic_json) as writes:
+            stats.record_session_start()
+            state.add_history_entry("Saki", "anime")
+            stats.record_search("anime", "Saki", [])
+            self.wait_for_save()
+            self.assertEqual(writes.call_count, 1)
+            self.assertEqual(self.saved()["stats"]["session_count"], 2)
+            self.assertEqual([e["query"] for e in self.saved()["history"]], ["Saki"])
+
+            state.add_history_entry("Next search", "anime")  # after a save: saved again
+            self.wait_for_save()
+            self.assertEqual(writes.call_count, 2)
+        self.assertEqual(self.saved()["history"][0]["query"], "Next search")
 
 
 class ConcurrentWindowTests(unittest.TestCase):
