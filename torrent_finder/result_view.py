@@ -91,6 +91,68 @@ def book_title_score(name: str, query: str) -> int:
     return 1  # every query word, counting repeats, appears somewhere
 
 
+# Release details people type after a title: "Finding Nemo 1080p", "... pt-br", "Dark S02".
+_RELEASE_TAGS = re.compile(
+    r"\b(?:\d{3,4}p|4k|uhd|x26[45]|h\.?26[45]|hevc|av1|blu-?ray|web-?(?:dl|rip)|remux|hdtv"
+    r"|bdrip|dvdrip|hdr(?:10)?|dolby vision|dual[- ]audio|multi[- ]audio|pt-?br|dublado|legendado"
+    r"|dubbed|subbed|s\d{1,2}(?:e\d{1,3})?)\b", re.I)
+_NUMBER_WORDS = ("zero one two three four five six seven eight nine ten eleven twelve thirteen "
+                 "fourteen fifteen sixteen seventeen eighteen nineteen twenty").split()
+_ROMAN = ("ii iii iv vi vii viii ix xi xii xiii xiv xv xvi xvii xviii xix xx").split()
+_NUMBERS = {**{str(n): word for n, word in enumerate(_NUMBER_WORDS)},
+            **{roman: _NUMBER_WORDS[value] for roman, value in zip(_ROMAN, (2, 3, 4, 6, 7, 8, 9, 11, 12, 13,
+                                                                             14, 15, 16, 17, 18, 19, 20))}}
+_YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+
+
+def split_release_tags(query: str) -> tuple[str, tuple[str, ...]]:
+    """The title part of a query and the release tags typed with it:
+    "Finding Nemo 1080p" → ("Finding Nemo", ("1080p",))."""
+    tags = tuple(match.group(0) for match in _RELEASE_TAGS.finditer(query))
+    title = " ".join(_RELEASE_TAGS.sub(" ", query).split())
+    return (title or query), tags
+
+
+def release_tag_hits(name: str, query: str) -> int:
+    """How many of the release tags typed in *query* the listing *name* carries."""
+    name_words = words(name)
+    hits = 0
+    for tag in split_release_tags(query)[1]:
+        tag_words = words(tag)
+        span = len(tag_words)
+        hits += any(name_words[i:i + span] == tag_words for i in range(len(name_words) - span + 1))
+    return hits
+
+
+def movie_title_score(name: str, query: str) -> int:
+    """``title_score`` for movie and TV listings, 0-3.
+
+    Release tags typed with the title don't count against it ("Finding Nemo
+    1080p"), numbers match their word or roman form ("Dune Part 2" = "Dune Part
+    Two"), and a year in the query must match the listing's year: a remake or
+    another film with the same title scores one lower. The original outranks its
+    sequels ("The Matrix" over "The Matrix Reloaded").
+    """
+    title_query = split_release_tags(query)[0]
+    wanted_year = next((y for y in _YEAR.findall(title_query) if words(title_query)[:1] != (y,)), None)
+    if wanted_year:
+        title_query = " ".join(title_query.replace(wanted_year, " ").split()) or title_query
+    wanted = tuple(_NUMBERS.get(word, word) for word in words(title_query))
+    if not wanted:
+        return 0
+    title = tuple(_NUMBERS.get(word, word) for word in words(media_title(name)))
+    if title == wanted:
+        score = 3
+    elif title[:len(wanted)] == wanted:
+        score = 2
+    else:
+        score = int(all(word in title for word in wanted))
+    years = _YEAR.findall(name)
+    if wanted_year and score and years and wanted_year not in years:
+        score -= 1
+    return score
+
+
 def matches_name(name: str, query: str, mode: str = "contains") -> bool:
     if not query.strip():
         return True

@@ -7,6 +7,7 @@ import requests
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.language_tags import has_brazilian_audio, has_portuguese_subtitles
 from torrent_finder.providers.base import BaseProvider, SearchEngine
+from torrent_finder.result_view import movie_title_score, split_release_tags
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
 from torrent_finder.resolvers import CreatorFacet, movies
@@ -55,6 +56,8 @@ class MovieProvider(BaseProvider):
     knaben_categories = (2_000_000, 3_000_000)
     solidtorrents_category = "Movie"
     nyaa_category = "4_1"  # Live Action - English-translated (J-dramas, Asian films/TV)
+    # Rank the requested film above sequels, remakes and franchise bundles.
+    prefer_title_matches = True
 
     supports_subtitles = True
     supports_episode_picker = True
@@ -112,6 +115,18 @@ class MovieProvider(BaseProvider):
                  "Add a TMDB key (Credentials) for richer results.",
         ),
     ]
+
+    def title_relevance(self, name: str, query: str) -> int:
+        return movie_title_score(name, query)
+
+    def expand_queries(self, query: str) -> list[str]:
+        """Also search the bare title when release tags were typed with it:
+        sources often find nothing for "Finding Nemo pt-br" or "... 1080p"."""
+        queries = super().expand_queries(query)
+        title, tags = split_release_tags(query)
+        if tags and title not in queries:
+            queries.insert(1, title)
+        return queries
 
     def _init_engines(self) -> list[SearchEngine]:
         """APIBay + Nyaa on, Knaben auto, noisier engines manually off."""

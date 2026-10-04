@@ -170,6 +170,9 @@ class BaseProvider(ABC):
     # With prefer_title_matches: Auto fallbacks also run when On engines returned
     # rows but none matches the title (title_relevance >= 1).
     auto_needs_relevant_rows: bool = False
+    # Nyaa RSS only holds the latest uploads; look up popular matches too when a
+    # short title has no exact row (Anime).
+    nyaa_title_discovery: bool = False
 
     # Optional one-line caveat shown when this provider is selected/searched
     # (e.g. Mobile noting it's Android-only). Empty = no note.
@@ -477,7 +480,7 @@ class BaseProvider(ABC):
             record_failure(error)
         # RSS is fixed to the latest 75 uploads and ignores sort parameters.
         # A short title like Saki can be buried by a current unrelated series.
-        if self.prefer_title_matches and 0 < len(query.split()) <= 2 and not any(
+        if self.nyaa_title_discovery and 0 < len(query.split()) <= 2 and not any(
             title_score(row.name, query) == 3 for row in results
         ):
             from torrent_finder.nyaa import discovery_query, popular

@@ -15,7 +15,7 @@ from torrent_finder.search_control import SearchControl, SearchInterrupted
 from torrent_finder.search_diagnostics import ACCESS_STATUSES, Diagnostic, RequestTrace
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_result import SearchResult, normalize_result
-from torrent_finder.result_view import title_score
+from torrent_finder.result_view import release_tag_hits, title_score
 import requests
 
 MAX_PAGE = 10
@@ -260,8 +260,11 @@ class SearchSession:
         if self.queries and self.providers and (self.combined or self.providers[0].prefer_title_matches):
             relevance = {p.slug: p.title_relevance for p in self.providers}
             fallback = self.providers[0].title_relevance if not self.combined else title_score
+            # Equally good titles: releases carrying the tags typed with the
+            # title first ("Finding Nemo pt-br"), then preferred presets.
             ordered.sort(key=lambda r: (max(relevance.get(r.get("provider_slug"), fallback)(r.name, q)
                                             for q in self.queries),
+                                        max(release_tag_hits(r.name, q) for q in self.queries),
                                         r.get("preference_score", 0)), reverse=True)
         notices = list(dict.fromkeys(d.message if d.status in ACCESS_STATUSES
                                     else f"{d.provider} / {d.engine}: {d.message}"

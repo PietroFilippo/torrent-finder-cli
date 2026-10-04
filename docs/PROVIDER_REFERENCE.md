@@ -99,6 +99,21 @@ indexers.
 target/sequel ranking where helpful. No broad new movie source is justified by
 this sample alone.
 
+**Status (2026-10-04): ranking and typed tags implemented; engines unchanged.**
+- Movies rank by `movie_title_score`. Release tags typed with the title don't
+  count against it, numbers match words and roman numerals ("Part 2" = "Part
+  Two"), and a year in the query must match.
+- Replaying the audit's Matrix rows moves the first sequel from position 5 to
+  34, with the original first. "Dune Part 2" and "Finding Nemo 1080p" now match
+  their films.
+- A tagged query ("Finding Nemo pt-br") also searches the bare title, and
+  releases carrying the typed tags lead among equally good titles.
+- PT-BR releases are usually named with the Portuguese title ("Procurando
+  Nemo"). Searching that, or adding it through Identify title, stays the way to
+  find them.
+- The raw-row Auto rule stays for Movies: in the audit, the primary engines'
+  rows already matched whenever they existed.
+
 ## General Games
 
 **Scope:** game discovery across general indexes and dedicated release sites.

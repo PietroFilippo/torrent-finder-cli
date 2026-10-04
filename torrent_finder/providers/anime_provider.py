@@ -17,6 +17,7 @@ class AnimeProvider(BaseProvider):
     nyaa_categories = {"1_2": "English-translated", "1_3": "Non-English-translated",
                        "1_4": "Raw", "1_0": "All Anime (including music videos)"}
     prefer_title_matches = True
+    nyaa_title_discovery = True
 
     supports_subtitles = True
     supports_episode_picker = True
