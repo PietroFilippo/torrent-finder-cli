@@ -481,7 +481,9 @@ def _browse_results(provider, results, note: str = "") -> str:
         clear_screen()
         from torrent_finder.bookmarks import save_results
         queries = getattr(getattr(results, "session", None), "queries", None) or []
-        crumbs = [getattr(provider, "name", "") or "Results", ", ".join(queries)]
+        from rich.markup import escape
+        # Headers are Rich markup; queries are user text and may hold brackets.
+        crumbs = [escape(getattr(provider, "name", "") or "Results"), escape(", ".join(queries))]
         choice = interactive_select(results, note=note, initial_order=provider.result_sort,
                                     search_summary=provider.filter_summary(),
                                     on_bookmark=lambda rows: save_results(provider, rows),
@@ -1415,7 +1417,7 @@ def _main_loop(args=None) -> None:
         stop_listener = start_esc_listener(cancel_event, finish_event=finish_event)
         started = time.monotonic()
         waiting_label = "Contacting selected providers…" if combined else f"Searching {provider.name}…"
-        title = f"{provider.name} › {shown}"
+        title = f"{escape(provider.name)} › {escape(shown)}"
         try:
             with ProgressScreen() as screen:
                 drawn_at = 0.0

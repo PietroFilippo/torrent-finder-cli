@@ -50,7 +50,7 @@ def update_panel(view: UpdateView, elapsed: float, width: int = 72):
     versions = ""
     if view.current or view.latest:
         versions = f"{view.current or 'Installed version'} → {view.latest or 'Latest version'}"
-    parts: list = list(theme.header_lines("Update", versions, width))
+    parts: list = list(theme.header_lines("Update", Text(versions), width))
     parts.extend([
         Text(""),
         Text(theme.MARGIN + _HEADINGS.get(view.stage, "Updating"), style=f"bold {color}"),

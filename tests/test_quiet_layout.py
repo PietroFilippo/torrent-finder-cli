@@ -261,3 +261,22 @@ class DownloadMenuHeaderTests(unittest.TestCase):
         self.assertIn("Big Buck Bunny [1080p]", title)
         self.assertIn("2 episode(s) selected [1-2]", title)
         self.assertIn("12 seeds", captured["status"])
+
+
+class HeadingEscapeTests(unittest.TestCase):
+    def test_queries_with_brackets_render_literally_in_the_results_header(self):
+        from torrent_finder import main
+        from torrent_finder.search_session import SearchResults
+        session = SimpleNamespace(queries=["dune [/x]", "[bold]frieren"])
+        results = SearchResults([{"name": "Dune", "source": "Nyaa"}], session=session)
+        provider = SimpleNamespace(name="Anime", slug="anime", result_sort="relevance",
+                                   filter_summary=lambda: "No presets")
+        seen = {}
+        def capture(rows, **kwargs):
+            seen.update(kwargs)
+            return None
+        with patch.object(main, "interactive_select", side_effect=capture), \
+             patch.object(main, "clear_screen"):
+            self.assertEqual(main._browse_results(provider, results), "back")
+        header = " ".join(line.plain for line in theme.header_lines(seen["heading"], "", 120))
+        self.assertIn("dune [/x], [bold]frieren", header)
