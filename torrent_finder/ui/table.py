@@ -237,7 +237,11 @@ def _table_caption(
             caption.append("\n" + theme.MARGIN + name + "\n", style="bold")
         caption.append_text(_selected_metadata(results, selected_idx, layout, show_from))
     if not expanded and not tiny and any(item.get("apibay_cached_at") for item in results):
-        caption.append(theme.MARGIN + "Apibay* = cached last-known-good results\n", style=theme.WARN)
+        room = theme.inner_width(width)
+        legend = "Apibay* = cached last-known-good results"
+        if cell_len(legend) > room:  # one line, always: the row budget counts one
+            legend = ellipsize_cells("Apibay* = cached results", room)
+        caption.append(theme.MARGIN + legend + "\n", style=theme.WARN)
     if console.size.height >= 20:
         caption.append("\n")  # short windows keep the row for results
     caption.append_text(Text("\n").join(theme.wrap_keys(

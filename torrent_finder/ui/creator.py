@@ -51,7 +51,7 @@ def _run_cancellable(fn, message: str, cancel: "threading.Event | None" = None):
     threading.Thread(target=work, daemon=True).start()
     stop = start_esc_listener(cancel)
     try:
-        with console.status(f"[accent]{message}[/accent]", spinner="dots"):
+        with console.status(f"[accent]{escape(message)}[/accent]", spinner="dots"):
             while not out.get("done") and not cancel.is_set():
                 time.sleep(0.05)
     except KeyboardInterrupt:

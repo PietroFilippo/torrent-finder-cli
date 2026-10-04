@@ -547,3 +547,56 @@ class EscapedMessageTests(unittest.TestCase):
              patch.object(credentials_ui.readchar, "readkey", return_value="x"):
             self.assertTrue(credentials_ui._finalize_credentials_save(meta, {"JIMAKU_API_KEY": "k"}))
         self.assertIn("Gateway [/x] timed out", out.getvalue())
+
+
+class RoundThreeTests(unittest.TestCase):
+    def test_online_fix_batch_passes_the_cancel_event_and_opens_nothing_after_esc(self):
+        import threading
+        from torrent_finder import acquisition, online_fix
+        cancel = threading.Event()
+
+        def fetch(page_url, dest_dir, cancel_event=None):
+            self.assertIs(cancel_event, cancel)
+            cancel.set()  # Esc during the transfer
+            return "D:/dl/game.torrent"
+
+        with patch.object(online_fix, "fetch_torrent_for", side_effect=fetch), \
+             patch("torrent_finder.downloader.open_torrent_file") as opened:
+            outcome = acquisition.OnlineFixAcquisition().batch_item(
+                {"name": "Game", "source": "Online-Fix", "page_url": "https://online-fix.me/x"},
+                download_dir="D:/dl", cancel_event=cancel, set_status=lambda text: None)
+        self.assertFalse(outcome.ok)
+        opened.assert_not_called()
+
+    def test_a_cancel_during_a_locked_rename_retry_publishes_nothing(self):
+        import tempfile
+        import threading
+        from torrent_finder import direct_download
+        cancel = threading.Event()
+        calls = []
+
+        def locked(source, target):
+            calls.append(target)
+            cancel.set()  # Esc arrives while the file is locked
+            raise PermissionError("locked")
+
+        with tempfile.TemporaryDirectory() as folder:
+            temporary = os.path.join(folder, "x.part")
+            open(temporary, "wb").close()
+            with patch.object(direct_download.os, "name", "nt"), \
+                 patch.object(direct_download.os, "rename", side_effect=locked), \
+                 patch.object(direct_download.time, "sleep"):
+                with self.assertRaises(direct_download.Cancelled):
+                    direct_download._promote(temporary, os.path.join(folder, "x.torrent"), cancel)
+        self.assertEqual(len(calls), 1)
+
+    def test_the_cached_results_legend_stays_one_line(self):
+        from torrent_finder.ui import table
+        rows = [dict(name=f"Release {i}", source="Apibay", seeders=3, apibay_cached_at=1.0) for i in range(30)]
+        for width in (40, 41, 42, 60):
+            screen = Console(file=io.StringIO(), width=width, height=16, color_system=None)
+            with patch.object(table, "console", screen):
+                caption = table._table_caption(rows, 0, table._table_layout(width, False), False, 2, frozenset())
+            legend = [line for line in caption.plain.split("\n") if "cached" in line]
+            self.assertEqual(len(legend), 1)
+            self.assertLessEqual(cell_len(legend[0]), width - 2)

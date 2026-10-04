@@ -288,8 +288,9 @@ class OnlineFixAcquisition:
         from torrent_finder.downloader import open_torrent_file
 
         page_url = result.get("page_url") or result.get("of_post_url") or ""
-        path = online_fix.fetch_torrent_for(page_url, download_dir)
-        if path and open_torrent_file(path):
+        # Esc during the batch stops this item: nothing is saved or opened.
+        path = online_fix.fetch_torrent_for(page_url, download_dir, cancel_event=cancel_event)
+        if path and not (cancel_event is not None and cancel_event.is_set()) and open_torrent_file(path):
             return BatchItemOutcome(ok=True, password=online_fix.ARCHIVE_PASSWORD)
         return BatchItemOutcome(ok=False, manual_url=page_url)
 

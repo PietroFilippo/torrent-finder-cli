@@ -84,7 +84,7 @@ def save_response(resp, dest_dir: str, filename: str, cancel_event=None, progres
         # file is removed below instead of being published under its name.
         if cancel_event is not None and cancel_event.is_set():
             raise Cancelled()
-        return _promote(temporary, dest)
+        return _promote(temporary, dest, cancel_event)
     except BaseException:
         try:
             os.remove(temporary)
@@ -93,22 +93,28 @@ def save_response(resp, dest_dir: str, filename: str, cancel_event=None, progres
         raise
 
 
-def _promote(temporary: str, dest: str) -> str:
+def _promote(temporary: str, dest: str, cancel_event=None) -> str:
     """Give a finished transfer the first free name among *dest*, ``dest (1)``, …"""
     root, extension = os.path.splitext(dest)
     for number in range(1000):
         candidate = f"{root} ({number}){extension}" if number else dest
         try:
-            _rename_new(temporary, candidate)
+            _rename_new(temporary, candidate, cancel_event)
         except FileExistsError:
             continue
         return candidate
     raise FileExistsError(f"No free filename for {dest}")
 
 
-def _rename_new(source: str, target: str) -> None:
-    """Rename *source* to *target*, raising ``FileExistsError`` instead of replacing it."""
+def _rename_new(source: str, target: str, cancel_event=None) -> None:
+    """Rename *source* to *target*, raising ``FileExistsError`` instead of replacing it.
+
+    A cancel that arrives while a locked file is being retried stops the
+    rename; the caller then removes the temporary file.
+    """
     for delay in (*_RETRY_DELAYS, None):
+        if cancel_event is not None and cancel_event.is_set():
+            raise Cancelled()
         try:
             if os.name == "nt":
                 os.rename(source, target)  # never replaces on Windows
