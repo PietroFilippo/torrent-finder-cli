@@ -67,12 +67,13 @@ def env_theme(environ=None) -> tuple[str | None, str]:
     return key, ""
 
 
-def resolve(cli_theme: str | None = None, environ=None) -> tuple[dict, str, str]:
+def resolve(cli_theme: str | None = None, environ=None, base: dict | None = None) -> tuple[dict, str, str]:
     """The appearance to start with, where its theme came from, and any notice.
 
-    The source is ``"cli"``, ``"env"`` or ``"saved"``.
+    The source is ``"cli"``, ``"env"`` or ``"saved"``. *base* replaces the
+    saved appearance (which is then not read).
     """
-    appearance = saved()
+    appearance = dict(base) if base is not None else saved()
     key, notice = env_theme(environ)
     source = "saved"
     if key:
@@ -86,9 +87,13 @@ def resolve(cli_theme: str | None = None, environ=None) -> tuple[dict, str, str]
 _session = {"source": "saved", "painting": DEFAULTS["painting"]}
 
 
-def apply_startup(cli_theme: str | None = None, environ=None) -> str:
-    """Apply the startup appearance; returns a notice for the first screen ("" when none)."""
-    appearance, source, notice = resolve(cli_theme, environ)
+def apply_startup(cli_theme: str | None = None, environ=None, saved_settings: bool = True) -> str:
+    """Apply the startup appearance; returns a notice for the first screen ("" when none).
+
+    Without *saved_settings* the saved appearance is not read (the update
+    preview must not load, and so migrate, the settings file).
+    """
+    appearance, source, notice = resolve(cli_theme, environ, None if saved_settings else DEFAULTS)
     _session["source"] = source
     _session["painting"] = appearance["painting"]
     theme.apply(appearance["theme"], focus=appearance["focus"], density=appearance["density"])
@@ -373,7 +378,9 @@ def appearance_menu() -> None:
 
     items = build()
     start = next(i for i, item in enumerate(items) if item.value == ("theme", chosen["theme"]))
-    result = arrow_select(items, title="Settings › Appearance", status=status, footer=footer,
-                          start_index=start, on_action=choose, key_actions={" ": preview})
-    if result is None and state["preview"] != chosen["theme"]:
-        theme.apply(chosen["theme"])  # Esc during a preview: back to the applied theme
+    try:
+        arrow_select(items, title="Settings › Appearance", status=status, footer=footer,
+                     start_index=start, on_action=choose, key_actions={" ": preview})
+    finally:
+        if state["preview"] != chosen["theme"]:
+            theme.apply(chosen["theme"])  # leaving during a preview (Esc or Back): the applied theme returns

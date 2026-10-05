@@ -350,22 +350,33 @@ def _render_query_frame(
     below = (_capture_lines(lambda target: render_recent(target, *recall), width, full_height)
              if render_recent is not None and recall is not None else [])
 
+    # Inside the Athanor frame each side takes a cell: rows fold to the room
+    # between them, and continuation rows start with the space a side
+    # replaces (the first row starts with the margin already).
+    fold_width = max(1, width - 2) if framed else width
+
+    def sided(folded: list[Text]) -> list[Text]:
+        return folded[:1] + [Text(" ") + row for row in folded[1:]] if framed else folded
+
     prompt = Text.from_markup(theme.MARGIN + prompt_str)
     queued: list[Text] = []
-    for title in committed:
+    for query in committed:
         line = prompt.copy()
-        line.append(title)
-        queued.extend(_fold(line, width)[0])
+        line.append(query)
+        queued.extend(sided(_fold(line, fold_width)[0]))
     field = prompt.copy()
     field.append("".join(buffer))
-    rows, starts = _fold(field, width)
+    rows, starts = _fold(field, fold_width)
     cursor_index = len(prompt.plain) + pos
     cursor_row = max(k for k, start in enumerate(starts) if start <= cursor_index)
     cursor_col = cell_len(field.plain[starts[cursor_row]:cursor_index])
-    if cursor_col >= width:  # the cursor sits just past a full row
+    if cursor_col >= fold_width:  # the cursor sits just past a full row
         cursor_row, cursor_col = cursor_row + 1, 0
         if cursor_row == len(rows):
             rows.append(Text(""))
+    rows = sided(rows)
+    if framed and cursor_row:
+        cursor_col += 1  # a continuation row starts one cell further in
 
     def total() -> int:
         return len(top) + len(queued) + len(rows) + len(below) + len(footer)
@@ -526,7 +537,11 @@ def get_query_with_shortcut(
 
     if screen_renderer is not None:
         display.enter_screen(cursor=True)
-        draw()
+        try:
+            draw()
+        except BaseException:  # Ctrl+C or a failure in the first frame: leave the screen it opened
+            display.leave_screen()
+            raise
         watcher_thread = threading.Thread(target=watcher, daemon=True)
         watcher_thread.start()
     else:
@@ -1487,15 +1502,23 @@ def confirm_prompt(message: str, title: str = "Confirm") -> bool:
     from torrent_finder.ui.selector import _render
     width, height = console.size.width, console.size.height
     rows = theme.view_height(height, width)
-    lines = list(theme.frame_header(title, "", width, height))
-    if theme.roomy(rows, 12):
-        lines += theme.frame_rule(width, height)
-    lines += theme.wrap_block(Text.from_markup(message), width, console)
-    lines.append(Text(""))
-    lines += theme.wrap_block(Text("Any other key cancels too.", style=theme.MUTED), width, console)
-    if theme.roomy(rows, 12):
-        lines.append(theme.rule(width))
-    lines += theme.wrap_keys(theme.parse_footer("Y confirm  •  Esc cancel").keys, width)
+    roomy = theme.roomy(rows, 12)
+    head = list(theme.frame_header(title, "", width, height)) + (theme.frame_rule(width, height) if roomy else [])
+    keys = theme.wrap_keys(theme.parse_footer("Y confirm  •  Esc cancel").keys, width)
+    body = theme.wrap_block(Text.from_markup(message), width, console)
+    rule = [theme.rule(width)] if roomy else []
+    extra = [Text("")] + theme.wrap_block(Text("Any other key cancels too.", style=theme.MUTED), width, console)
+    room = rows - len(head) - len(keys)
+    # A small window keeps the keys: the cancel note and the rule go first, then the message's end.
+    if len(body) + len(extra) + len(rule) > room:
+        extra = []
+    if len(body) + len(rule) > room:
+        rule = []
+    if len(body) > room:
+        body = body[:max(1, room)]
+        body[-1].truncate(max(1, width - 1))
+        body[-1].append("…")
+    lines = head + body + extra + rule + keys
     display.enter_screen()
     try:
         _render(None, Group(*frames.compose(lines, title, "", width, height)), width=width)

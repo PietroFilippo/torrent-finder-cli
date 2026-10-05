@@ -1063,9 +1063,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _apply_appearance(args) -> str:
-    """Apply the theme before the first frame; returns a notice for the main menu."""
+    """Apply the theme before the first frame; returns a notice for the main menu.
+
+    The update preview changes no settings, so it does not read them either.
+    """
     from torrent_finder.ui.appearance import apply_startup
-    return apply_startup(getattr(args, "theme", None))
+    return apply_startup(getattr(args, "theme", None), saved_settings=not getattr(args, "preview_update", None))
 
 
 def _main_loop(args=None) -> None:

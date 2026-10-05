@@ -202,7 +202,7 @@ def _scenarios():
     scenarios = [
         ("provider-menu", lambda: prompts.provider_select_prompt(update_available=True)),
         ("provider-menu-exit-armed", lambda: prompts.provider_select_prompt(
-            alert="[not dim bold yellow]Press Esc or Ctrl+C again to quit[/not dim bold yellow]")),
+            quit_guard=prompts.QuitGuard(armed=True))),
         ("group-games", lambda: prompts._provider_group_menu(GAMES_GROUP)),
         ("group-software", lambda: prompts._provider_group_menu(SOFTWARE_GROUP)),
         ("group-manga", lambda: prompts._provider_group_menu(MANGA_GROUP)),
@@ -406,8 +406,14 @@ def _size(name: str) -> tuple[int, int]:
 
 
 def check(label: str) -> int:
-    """Report every frame in one capture that overflows its terminal."""
+    """Report every frame in one capture that overflows its terminal, and every scenario that failed."""
     problems = 0
+    report = OUT / label / "_report.log"
+    failed = [line for line in report.read_text(encoding="utf-8").splitlines() if " error: " in line] \
+        if report.exists() else []
+    for line in failed:
+        problems += 1
+        print(f"--- scenario failed: {line}")
     for path in sorted((OUT / label).glob("*.txt")):
         found = _overflow(path.read_text(encoding="utf-8"), *_size(path.name))
         if found:
@@ -415,7 +421,7 @@ def check(label: str) -> int:
             print(f"--- {path.name}")
             for line in found:
                 print("    " + line)
-    print(f"\n{problems} capture(s) overflow")
+    print(f"\n{problems} capture(s) overflow or failed")
     return problems
 
 

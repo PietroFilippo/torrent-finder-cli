@@ -269,9 +269,6 @@ def write(palette, painting: str, environ=None, *, add_font: bool = False) -> Pa
     image = None
     if palette.design == "athanor" and painting in paintings.catalog():
         image = paintings.export(painting, palette, target)
-    for old in target.glob(f"{APP}-*.png"):
-        if old != image:
-            old.unlink()  # Windows Terminal caches pictures by path, so each look gets its own file
     launch = command()
     starting = str(Path(__file__).resolve().parent.parent) if launch[1:2] == ["-m"] else "%USERPROFILE%"
     data = fragment(palette, image, font_installed(), launch, starting)
@@ -280,6 +277,11 @@ def write(palette, painting: str, environ=None, *, add_font: bool = False) -> Pa
     temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     temporary.replace(path)
     _check_real(path, environ)
+    # Only now that the fragment names the new picture do the old ones go (Windows Terminal
+    # caches pictures by path, so each look has its own file).
+    for old in target.glob(f"{APP}-*.png"):
+        if old != image:
+            old.unlink()
     return path
 
 

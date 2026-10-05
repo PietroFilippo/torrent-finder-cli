@@ -431,6 +431,9 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     # announcements take the Athanor message line when the window shows one.
     bar_message = message if theme.bars(screen_width, full_height) else ""
     alert_lines = theme.wrap_block(Text.from_markup(alert), width, console) if alert else []
+    if message and not bar_message and theme.FRAMED:
+        # No message line in this window (compact, or short): the announcement goes under the keys.
+        alert_lines += theme.wrap_block(theme._as_text(message), width, console)
     intro_lines = []
     for block in (intro if isinstance(intro, list) else [intro]):
         text = (block.copy() if isinstance(block, Text) else Text.from_markup(block)) if block else Text()
@@ -592,6 +595,7 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
                                       for i in range(rows)] + tip_lines
     elif tip_lines and height - len(lines) - len(tip_lines) >= 1:
         lines += [Text("")] * (height - len(lines) - len(tip_lines)) + tip_lines
+    lines = lines[:height]  # a window too small for every control keeps its top rather than scrolling
     return Group(*frames.compose(lines, title, header_status(position), screen_width, full_height, bar_message))
 
 
@@ -752,6 +756,15 @@ def arrow_select(
         "paused": False,  # another screen (the key list) owns the terminal
     }
     help_enabled = help and "?" not in (hotkeys or {}) and "?" not in (key_actions or {})
+
+    def aside(callback, *args):
+        """Run a callback that may open another view, with this screen's redraws paused."""
+        with render_lock:  # a frame being drawn finishes first
+            state["paused"] = True
+        try:
+            return callback(*args)
+        finally:
+            state["paused"] = False
     announcement = frames.take_message()  # the message line's text while this screen is open
     stop_event = threading.Event()
     render_lock = threading.Lock()
@@ -760,6 +773,8 @@ def arrow_select(
     def draw(tick: int) -> bool:
         """Write a complete frame only when it matches the current viewport."""
         with render_lock:
+            if state["paused"]:
+                return False  # another view owns the screen
             for _ in range(3):
                 frame_size = console.size
                 panel = _build_panel(
@@ -856,7 +871,7 @@ def arrow_select(
                 if multi:
                     if items[cursor].is_action:
                         # Check if callback wants us to stay
-                        if on_action and on_action(cursor, items):
+                        if on_action and aside(on_action, cursor, items):
                             pass  # Stay in the menu
                         else:
                             return cursor
@@ -868,7 +883,7 @@ def arrow_select(
                     if items[cursor].enabled:
                         if items[cursor].passive:
                             pass  # Passive row: Enter is a no-op (scroll-view read-only)
-                        elif items[cursor].is_action and on_action and on_action(cursor, items):
+                        elif items[cursor].is_action and on_action and aside(on_action, cursor, items):
                             pass  # Stay in the menu
                         else:
                             return cursor
@@ -887,7 +902,7 @@ def arrow_select(
             elif hotkeys and key in hotkeys:
                 return ("hotkey", hotkeys[key], cursor)
             elif key_actions and key in key_actions:
-                outcome = key_actions[key](cursor, items)
+                outcome = aside(key_actions[key], cursor, items)
                 # bool True = stay; int = return that index; "jump:N" = move cursor
                 if isinstance(outcome, bool):
                     pass  # stay and redraw
