@@ -1529,6 +1529,56 @@ def torrent_info_screen(result: dict) -> None:
     )
 
 
+_INSTALL_HINTS = {"aria2c": "install: aria2.github.io", "webtorrent": "install: npm i -g webtorrent-cli",
+                  "peerflix": "install: npm i -g peerflix"}
+
+
+def _install_hint(tool: str, available: bool) -> str:
+    return "" if available else _INSTALL_HINTS[tool]
+
+
+def _tool_label(label: str, available: bool) -> "str | Text":
+    """A tool's row label; steel when the tool is not installed (the row stays readable, Enter does nothing)."""
+    return label if available else Text(label, style=theme.MUTED)
+
+
+def torrent_summary(torrent: "dict | None", *, file_count: "int | None" = None, subtitles: str = "",
+                    selected: "list[int] | None" = None) -> Text:
+    """``Nyaa · 1.4 GB · 812 seeds · 140 leeches · 2026-09-14 · 12 files · subs auto``; seeds in their health colour."""
+    from datetime import datetime, timezone
+
+    from torrent_finder.result_view import timestamp
+    from torrent_finder.utils import format_size
+    parts: list[Text] = []
+    if torrent:
+        source = str(torrent.get("source") or "")
+        if source:
+            parts.append(Text(source + ("*" if torrent.get("apibay_cached_at") else "")))
+        size = int(torrent.get("size", 0) or 0)
+        if size:
+            parts.append(Text(format_size(size)))
+        seeds = int(torrent.get("seeders", 0) or 0)
+        parts.append(Text.assemble((str(seeds), theme.seed_style(seeds)), " seeds"))
+        leeches = int(torrent.get("leechers", 0) or 0)
+        parts.append(Text(f"{leeches} leeches"))
+        uploaded = timestamp(torrent.get("uploaded_at"))
+        if uploaded:
+            parts.append(Text(datetime.fromtimestamp(uploaded, timezone.utc).strftime("%Y-%m-%d")))
+    if file_count:
+        parts.append(Text(f"{file_count} file{'s' if file_count != 1 else ''}"))
+    if selected:
+        from torrent_finder.torrent_meta import compact_ranges
+        parts.append(Text.assemble((f"{len(selected)} picked", theme.ACCENT), f" ({compact_ranges(selected)})"))
+    if subtitles:
+        parts.append(Text("subs " + subtitles.replace("auto-detect from torrent", "auto").replace("disabled", "off")))
+    summary = Text()
+    for index, part in enumerate(parts):
+        if index:
+            summary.append(" · ", style=theme.MUTED)
+        summary.append_text(part)
+    return summary
+
+
 def download_method_prompt(
     magnet: str = "",
     show_subtitles: bool = True,
@@ -1540,9 +1590,14 @@ def download_method_prompt(
     info_source: str | None = None,
     focus: str | None = None,
     torrent: dict | None = None,
+    file_count: int | None = None,
 ) -> str | None:
     """
     Prompt the user to choose a download method.
+
+    *torrent* (the picked result) fills the summary line under the header:
+    source, size, seeds, leeches, upload date, *file_count* once the file
+    list is known, the subtitle choice and the picked files.
     Returns 't', 'd', 'p', 'aria', 'stream_w', 'stream_p', 's', 'pick_episodes',
     'torrent_info', 'set_subs', 'back', 'cancel', or None (Esc). 'back' and Esc
     step back to the results table; 'cancel' (✕ Cancel) means "done with this
@@ -1581,14 +1636,12 @@ def download_method_prompt(
                 label=ep_label,
                 value="pick_episodes",
                 is_action=True,
-                hint=(
-                    f"requires aria2c — {_ARIA2_INSTALL_URL}"
-                    if not aria_available else ""
-                ),
+                hint=_install_hint("aria2c", aria_available),
                 passive=not aria_available,
                 description=(
                     "Browse every file in the torrent and pick any subset. "
                     "Downloads grab exactly what you pick; streams auto-skip non-video files."
+                    + ("" if aria_available else f"\nNeeds aria2c to read the file list: {_ARIA2_INSTALL_URL}")
                 ),
             ))
         if _info_available:
@@ -1642,26 +1695,28 @@ def download_method_prompt(
     if show_streaming:
         items.append(_section("Stream to VLC"))
         items.append(SelectItem(
-            label="Stream with webtorrent",
+            label=_tool_label("Stream with webtorrent", wt_available),
             value="stream_w",
             passive=not wt_available,
             hint=(
-                f"(not installed — {_WEBTORRENT_INSTALL_URL})" if not wt_available
-                else f"plays {n_sel} episode(s) sequentially" if has_selection
-                else "requires VLC installed"
+                _install_hint("webtorrent", False) if not wt_available
+                else f"plays {n_sel} episode{'s' if n_sel != 1 else ''} in order" if has_selection
+                else "needs VLC"
             ),
-            description="Stream via webtorrent — good streaming default",
+            description="Stream via webtorrent — good streaming default"
+                        + ("" if wt_available else f"\nInstall: {_WEBTORRENT_INSTALL_URL}"),
         ))
         items.append(SelectItem(
-            label="Stream with peerflix",
+            label=_tool_label("Stream with peerflix", pf_available),
             value="stream_p",
             passive=not pf_available,
             hint=(
-                f"(not installed — {_PEERFLIX_INSTALL_URL})" if not pf_available
-                else f"plays {n_sel} episode(s) sequentially" if has_selection
-                else "requires VLC installed"
+                _install_hint("peerflix", False) if not pf_available
+                else f"plays {n_sel} episode{'s' if n_sel != 1 else ''} in order" if has_selection
+                else "needs VLC"
             ),
-            description="Watch while downloading via VLC (peerflix) — try if webtorrent stalls or finds no peers",
+            description="Watch while downloading via VLC (peerflix) — try if webtorrent stalls or finds no peers"
+                        + ("" if pf_available else f"\nInstall: {_PEERFLIX_INSTALL_URL}"),
         ))
 
     # --- Download ---
@@ -1674,51 +1729,56 @@ def download_method_prompt(
     items.append(SelectItem(
         label=f"Open in {client_name}",
         value="t",
-        hint=("uncheck unwanted files in the client's dialog" if has_selection else ""),
-        description="Hand magnet to your desktop client — use to seed or manage in a GUI",
+        hint=("untick unwanted files in its dialog" if has_selection
+              else Text.assemble(("recommended", theme.ACCENT), " · seeds · GUI")),
+        description="Hand the magnet to your desktop client — use to seed or manage in a GUI",
     ))
     from torrent_finder.qbittorrent import configured
     if configured():
         items.append(SelectItem("Send to qBittorrent WebUI", "qbittorrent",
                                 description="Choose client folder/category and view real progress. Adds the full torrent; manage file selection in qBittorrent."))
     items.append(SelectItem(
-        label="Download with aria2c",
+        label=_tool_label("Download with aria2c", aria_available),
         value="aria",
         passive=not aria_available,
         hint=(
-            f"(not installed — {_ARIA2_INSTALL_URL})" if not aria_available
-            else "fastest, multi-file in one process, won't seed - downloads only selected files"
+            _install_hint("aria2c", False) if not aria_available
+            else "fastest · picked files only" if has_selection
+            else "fastest · resumes · no seeding"
         ),
-        description="Best downloader — native multi-file, resumes, fastest for batches",
+        description="Best downloader — native multi-file, resumes, fastest for batches"
+                    + ("" if aria_available else f"\nInstall: {_ARIA2_INSTALL_URL}"),
     ))
     items.append(SelectItem(
-        label="Download with webtorrent",
+        label=_tool_label("Download with webtorrent", wt_available),
         value="d",
         passive=not wt_available,
         hint=(
-            f"(not installed — {_WEBTORRENT_INSTALL_URL})" if not wt_available
-            else f"may ignore selection ({n_sel} picked) — can pull full torrent" if has_selection
-            else "slower, won't seed"
+            _install_hint("webtorrent", False) if not wt_available
+            else "may download the full torrent" if has_selection
+            else "slower · no seeding"
         ),
         description=(
             "Plain download via webtorrent — one file per run, no seeding. "
             "--select is not strict; webtorrent-cli often downloads the whole torrent anyway. "
             "Use aria2c if you need strict file picking."
+            + ("" if wt_available else f"\nInstall: {_WEBTORRENT_INSTALL_URL}")
         ),
     ))
     items.append(SelectItem(
-        label="Download with peerflix",
+        label=_tool_label("Download with peerflix", pf_available),
         value="p",
         passive=not pf_available,
         hint=(
-            f"(not installed — {_PEERFLIX_INSTALL_URL})" if not pf_available
-            else f"ignores file selection ({n_sel} picked) — downloads full torrent" if has_selection
-            else "slower, won't seed"
+            _install_hint("peerflix", False) if not pf_available
+            else "ignores the file selection" if has_selection
+            else "slower · no seeding"
         ),
         description=(
             "Plain download via peerflix — slower than aria2, no seeding. "
             "Does NOT honor file selection: peerflix always downloads the whole torrent. "
             "Use aria2c if you need strict file picking."
+            + ("" if pf_available else f"\nInstall: {_PEERFLIX_INSTALL_URL}")
         ),
     ))
 
@@ -1828,23 +1888,18 @@ def download_method_prompt(
             return True  # Stay in menu — arrow_select redraws in place, no flicker
         return False
 
-    # The header names the picked torrent; its size and seeds sit on the right.
+    # The header names the picked torrent; the summary under it says what it is.
     title = "Download"
-    status = ""
     if torrent:
-        from torrent_finder.utils import format_size
         title += f" › {escape(str(torrent.get('name') or 'Unknown'))}"
-        size = int(torrent.get("size", 0) or 0)
-        seeds = int(torrent.get("seeders", 0) or 0)
-        status = " · ".join(part for part in (format_size(size) if size else "", f"{seeds} seeds") if part)
-    if has_selection:
-        from torrent_finder.torrent_meta import compact_ranges
-        title += f" › {n_sel} episode(s) selected [{compact_ranges(selected_indexes)}]"
+    summary = torrent_summary(torrent, file_count=file_count,
+                              subtitles=sub_label if show_subtitles else "",
+                              selected=selected_indexes if has_selection else None)
 
     idx = arrow_select(
         items,
         title=title,
-        status=status,
+        intro=summary,
         banner=_make_banner_panel(),
         on_action=handle_download_action,
         # Return to the option chosen last time, else "Open in client" (the primary action).

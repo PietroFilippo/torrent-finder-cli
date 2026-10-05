@@ -215,7 +215,8 @@ def _scenarios():
         ("download-method", lambda: prompts.download_method_prompt(
             magnet="magnet:?xt=urn:btih:" + "ab" * 20, show_subtitles=True, show_episode_picker=True,
             selected_indexes=None, show_streaming=True, page_url="https://nyaa.si/view/1", info_source="Nyaa",
-            torrent={"name": "[SubsPlease] Frieren - 01 (1080p)", "size": 1_450_000_000, "seeders": 812})),
+            torrent={"name": "[SubsPlease] Frieren - 01 (1080p)", "size": 1_450_000_000, "seeders": 812,
+                     "leechers": 140, "source": "Nyaa", "uploaded_at": 1_789_000_000})),
         ("download-method-selection", lambda: prompts.download_method_prompt(
             magnet="magnet:?xt=urn:btih:" + "ab" * 20, show_subtitles=True, show_episode_picker=True,
             selected_indexes=[1, 2, 3, 7], show_streaming=True, page_url="https://nyaa.si/view/1",

@@ -45,11 +45,37 @@ class DownloadMethodMenuTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertTrue(by_value[value].enabled)
                 self.assertTrue(by_value[value].passive)
-                self.assertIn(link, by_value[value].hint)
+                self.assertTrue(by_value[value].hint.startswith("install: "))  # short enough to sit inline
+                self.assertIn(link, by_value[value].description)  # the full link when focused
 
         open_index = next(index for index, item in enumerate(items) if item.value == "t")
         aria_index = next(index for index, item in enumerate(items) if item.value == "aria")
         self.assertEqual(_next_enabled(items, open_index, 1), aria_index)
+        self.assertEqual(by_value["aria"].label.style, prompts.theme.MUTED)  # an unavailable tool reads quieter
+
+
+class DownloadSummaryTests(unittest.TestCase):
+    def test_the_summary_says_what_the_torrent_is(self):
+        torrent = {"name": "Frieren - 01", "source": "Nyaa", "size": 1_450_000_000, "seeders": 812,
+                   "leechers": 140, "uploaded_at": 1_789_000_000}
+        summary = prompts.torrent_summary(torrent, file_count=12, subtitles="auto-detect from torrent",
+                                          selected=[1, 2, 3, 7])
+        self.assertEqual(summary.plain, "Nyaa · 1.4 GB · 812 seeds · 140 leeches · 2026-09-10 · 12 files"
+                                        " · 4 picked (1-3,7) · subs auto")
+        seeds = next(span for span in summary.spans if summary.plain[span.start:span.end] == "812")
+        self.assertEqual(str(seeds.style), prompts.theme.seed_style(812))
+        self.assertEqual(prompts.torrent_summary({"seeders": 0}, subtitles="disabled").plain,
+                         "0 seeds · 0 leeches · subs off")
+
+    def test_the_client_row_is_marked_recommended(self):
+        captured = {}
+        with patch.object(prompts, "detect_torrent_client", return_value="qBittorrent"), \
+             patch.object(prompts, "arrow_select", side_effect=lambda items, **kw: captured.update(kw, items=items)), \
+             patch("torrent_finder.state.load_setting", return_value=False):
+            prompts.download_method_prompt(show_subtitles=False, show_streaming=False)
+        client = next(item for item in captured["items"] if item.value == "t")
+        self.assertTrue(client.hint.plain.startswith("recommended"))
+        self.assertEqual(captured["start_index"], captured["items"].index(client))
 
 
 if __name__ == "__main__":

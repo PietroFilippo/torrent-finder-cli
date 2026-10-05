@@ -569,6 +569,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                 info_source=session.result.get("source") or None,
                 focus=last_method,
                 torrent=session.result,
+                file_count=len(meta.files) if (meta := getattr(session, "files_meta", None)) else None,
             )
             last_method = method
 
