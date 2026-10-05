@@ -404,7 +404,9 @@ def build_table(
     table = Table(
         box=None,
         show_edge=False,
-        pad_edge=False,
+        # The layout counts a cell of padding on both sides of every column, the outer ones too.
+        # Rich before 15 padded the edges whatever pad_edge said; 15 honours it, so ask for it.
+        pad_edge=True,
         padding=(0, 1),
         header_style=theme.SECTION,
         show_lines=False,

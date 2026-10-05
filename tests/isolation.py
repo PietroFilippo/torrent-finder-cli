@@ -46,6 +46,13 @@ MangaProvider.looks_up_aliases = False
 AnimeProvider.looks_up_aliases = False
 MadokamiProvider.looks_up_aliases = False
 
+# Rich takes a console that writes to a file on Windows for the legacy console
+# and draws it one column narrower; terminals (Windows Terminal, and CI's
+# Linux) use the full width, so tests do too, on every platform.
+import rich.console  # noqa: E402
+
+rich.console.detect_legacy_windows = lambda: False
+
 # Athanor is the app's default design, but most layout tests describe the
 # Simple design's frames, and tests that start the app apply its startup
 # appearance: every test starts and ends on this baseline. Tests of Athanor
