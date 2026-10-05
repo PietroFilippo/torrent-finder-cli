@@ -35,6 +35,7 @@ class ProfileCase(unittest.TestCase):
         self.install_font = self.patch(terminal_profile, "install_font")
         self.patch(terminal_profile, "supported", return_value=True)
         self.patch(terminal_profile, "font_installed", return_value=False)
+        self.patch(terminal_profile.shutil, "which", return_value=None)  # as from a source checkout
         environ = patch.dict(terminal_profile.os.environ, self.environ)
         environ.start()
         self.addCleanup(environ.stop)
