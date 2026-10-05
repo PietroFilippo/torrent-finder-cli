@@ -4,6 +4,8 @@
     python scripts/ui_snapshots.py capture after
     python scripts/ui_snapshots.py compare before after
     python scripts/ui_snapshots.py check after        # overflow only, every size
+    python scripts/ui_snapshots.py capture iris iris:fill   # in a theme, focus style or density
+    python scripts/ui_snapshots.py themes              # every theme shows exactly the same words
 
 Each scenario opens a real screen with every key press answered by Ctrl+C, so
 a screen draws its first frame and then backs out. Frames are recorded at a
@@ -312,7 +314,34 @@ def _frames(raw: str) -> list[str]:
     return frames
 
 
-def capture(label: str) -> None:
+def _apply(spec: str) -> None:
+    """``iris``, ``paper:fill``, ``quiet:compact``: a theme, then optional focus and density."""
+    from torrent_finder.ui import theme
+    parts = spec.split(":") if spec else [theme.DEFAULT_THEME]
+    theme.apply(parts[0] or theme.DEFAULT_THEME, focus="fill" if "fill" in parts else "bar",
+                density="compact" if "compact" in parts else "comfortable")
+
+
+def _fresh_state() -> None:
+    """Start a capture from empty saved settings and no network check, like a first run.
+
+    Captures taken one after another in one process would otherwise see each
+    other's searches, stats and network verdict.
+    """
+    import atexit
+    import shutil
+    from torrent_finder import security, store
+    directory = tempfile.mkdtemp(prefix="tf-ui-snapshots-state-")
+    atexit.register(shutil.rmtree, directory, ignore_errors=True)
+    store.STATE_PATH = str(Path(directory) / "filter_state.json")
+    store._cache, store._signature, store._problem = None, None, None
+    store._pending.clear()
+    security._exposure["state"] = None
+
+
+def capture(label: str, appearance: str = "") -> None:
+    _fresh_state()
+    _apply(appearance)
     out_dir = OUT / label
     out_dir.mkdir(parents=True, exist_ok=True)
     for old in out_dir.glob("*.txt"):
@@ -414,9 +443,29 @@ def compare(before: str, after: str) -> int:
     return problems
 
 
+def themes() -> int:
+    """Capture every theme (and the filled focus) and report any word one shows and another does not.
+
+    Themes change colours only, so every capture must hold the same words as
+    Quiet Blue's, in both directions, and none may overflow its terminal.
+    """
+    from torrent_finder.ui.theme import THEMES
+    specs = list(THEMES) + ["quiet:fill"]
+    for spec in specs:
+        capture("theme-" + spec.replace(":", "-"), spec)
+    problems = 0
+    for spec in specs[1:]:
+        label = "theme-" + spec.replace(":", "-")
+        problems += compare("theme-quiet", label) + compare(label, "theme-quiet")
+    print(f"\n{problems} difference(s) across {len(specs)} appearances")
+    return problems
+
+
 def main() -> None:
     if len(sys.argv) >= 3 and sys.argv[1] == "capture":
-        capture(sys.argv[2])
+        capture(sys.argv[2], sys.argv[3] if len(sys.argv) >= 4 else "")
+    elif len(sys.argv) >= 2 and sys.argv[1] == "themes":
+        sys.exit(1 if themes() else 0)
     elif len(sys.argv) >= 4 and sys.argv[1] == "compare":
         compare(sys.argv[2], sys.argv[3])
     elif len(sys.argv) >= 3 and sys.argv[1] == "check":

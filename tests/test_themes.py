@@ -80,6 +80,15 @@ class ApplyTests(ThemeCase):
         theme.apply("quiet")
         self.assertEqual(constants.console.get_style("accent").color, Color.parse("bright_blue"))
 
+    def test_no_color_drops_colour_but_keeps_bold_focus(self):
+        import os
+        buffer = io.StringIO()
+        with unittest.mock.patch.dict(os.environ, {"NO_COLOR": "1"}), \
+             unittest.mock.patch.object(constants.console, "_color_system", ColorSystem.TRUECOLOR):
+            constants.buffer_console(buffer, 40).print("[accent]x[/accent] [key]Enter[/key]")
+        self.assertNotIn("38;", buffer.getvalue())
+        self.assertIn("\x1b[1mEnter", buffer.getvalue())
+
     def test_state_and_seed_colours_follow_the_palette(self):
         theme.apply("ember")
         self.assertEqual(theme.state_style("auto"), "#FF8A3D")
