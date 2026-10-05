@@ -739,7 +739,8 @@ def quick_actions_menu(update_available: bool = False, provider=None) -> "str | 
     jump = " / ".join((["U"] if update_available else []) + [key for _, _, key in base])
     idx = arrow_select(
         items,
-        title="Quick actions" + (f" · {provider.name}" if provider else " · choose a provider for search actions"),
+        title="Quick actions" + (f" › {provider.name}" if provider else ""),
+        intro=lambda: "" if provider or console.size.height < 20 else "Search actions ask for a provider first.",
         banner=_make_banner_panel(),
         footer=f"↑/↓ select  •  {jump} jump  •  Esc back",
         key_actions=key_actions,
@@ -756,7 +757,8 @@ def action_provider_prompt(action):
     items = [SelectItem(provider_label(p), value=p,
                         description=getattr(p, "search_note", "")) for p in PROVIDERS]
     items.append(SelectItem("Back", value=None, is_action=True))
-    index = arrow_select(items, title=f"{action} · choose provider", banner=_make_banner_panel(),
+    index = arrow_select(items, title=action, intro=lambda: "Choose a provider." if console.size.height >= 20 else "",
+                         banner=_make_banner_panel(),
                          footer="All / selected providers uses its current profile.\n"
                                 "↑/↓ navigate  •  Enter select  •  Esc back")
     return None if index is None else items[index].value
@@ -944,10 +946,30 @@ def filter_menu(provider, on_save=None) -> None:
     # Start cursor on first enabled item (skip header)
     start = 1 if has_engines else 0
 
+    def filter_status() -> str:
+        """``3 on · 1 auto · 1 required · 2 preferred`` for the draft as it stands."""
+        states = [items[i].toggle_state for i in engine_indices + preset_indices]
+        parts = []
+        if engine_indices:
+            parts.append(f"{states.count('On')} on" + (f" · {states.count('Auto')} auto" if "Auto" in states else ""))
+        for state, word in (("Require", "required"), ("Prefer", "preferred")):
+            if state in states:
+                parts.append(f"{states.count(state)} {word}")
+        return " · ".join(parts)
+
+    legend_text = Text.assemble(("On", theme.GOOD), " searches every time · ", ("Auto", theme.WARN),
+                                " only when On finds nothing · ", ("Off", theme.MUTED), " is skipped")
+
+    def legend():
+        # Tall windows only: each engine row's own description explains its mode too.
+        return legend_text if has_engines and console.size.height >= 28 else ""
+
     while True:
         result_idx = arrow_select(
             items,
-            title=f"Filters — {provider.label}",
+            title=f"Filters › {provider.label}",
+            status=filter_status,
+            intro=legend,
             multi=True,
             banner=_make_banner_panel(),
             on_action=handle_filter_action,
@@ -1041,7 +1063,9 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
 
     items: list[SelectItem] = []
     file_item_indexes: list[int] = []
-    for f in files:
+    sizes = [format_size(f.size_bytes) if f.size_bytes else "" for f in files]  # unknown, not "0 B"
+    size_width = max((len(size) for size in sizes), default=0)
+    for f, size in zip(files, sizes):
         ep = extract_episode_number(f.name)
         ep_label = f"Ep {ep.rjust(3, '0') if ep.isdigit() else ep}" if ep else "      "
         label = f"{ep_label}  {os.path.basename(f.name)}"
@@ -1049,7 +1073,7 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
             label=label,
             value=("file", f),
             toggled=(f.index in pre_set),
-            hint=format_size(f.size_bytes) if f.size_bytes else "",  # unknown, not "0 B"
+            hint=size.rjust(size_width) if size else "",  # sizes right-aligned, like the results table
         ))
         file_item_indexes.append(len(items) - 1)
 
@@ -1147,7 +1171,8 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
 
     result = arrow_select(
         items,
-        title=f"Select Episodes — {len(files)} files",
+        title="Select Episodes",
+        status=f"{len(files)} file{'s' if len(files) != 1 else ''}",
         multi=True,
         banner=_make_banner_panel(),
         on_action=on_action,
@@ -1523,7 +1548,7 @@ def torrent_info_screen(result: dict) -> None:
     items = rows + [SelectItem(label="Back", value="back", is_action=True)]
     arrow_select(
         items,
-        title=f"Torrent info — {info.source}",
+        title=f"Torrent info › {info.source}",
         banner=_make_banner_panel(),
         footer="↑/↓ scroll  •  Esc back",
     )
@@ -1987,7 +2012,8 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
                                    description="Magnets and Online-Fix torrent files. Direct downloads are skipped."))
     idx = arrow_select(
         items,
-        title=f"Batch download — {count} torrents",
+        title="Batch download",
+        status=f"{count} torrents",
         banner=_make_banner_panel(),
         start_index=0,
         footer="↑/↓ navigate  •  Enter select  •  Esc back to results",
@@ -2030,11 +2056,8 @@ def _provider_group_menu(group) -> object | None:
         _filter_request["target"] = None
         result = arrow_select(
             items,
-            title=f"{group.name} — choose a source",
-            footer=(
-                "↑/↓ navigate  •  Enter select  •  "
-                "[warning]F[/warning] filters  •  Esc back"
-            ),
+            title=group.name,
+            footer="↑/↓ navigate  •  Enter select  •  F filters  •  Esc back",
             banner=_make_banner_panel(),
             start_index=start,
             key_actions={"F": _handle_f, "f": _handle_f},
@@ -2094,7 +2117,7 @@ def _provider_source_menu(provider, facets=None) -> "str | object | None":
 
     idx = arrow_select(
         items,
-        title=f"{provider.name} — choose how to search",
+        title=f"Search options › {provider.name}",
         banner=_make_banner_panel(),
         footer="↑/↓ navigate  •  Enter select  •  Esc back",
         start_index=1,  # land on the keyword-search row, skipping the header

@@ -174,7 +174,7 @@ def combined_filter_menu(provider):
         ]
         save_index = next(i for i, item in enumerate(items) if item.value == "save")
         chosen = arrow_select(
-            items, title="Search across providers — filters", banner=_make_banner_panel(),
+            items, title="Filters › Search across providers", banner=_make_banner_panel(),
             footer=(escape(error) + "\n" if error else "") + "Enter choose • w save all profiles • Esc discard changes",
             key_actions={"w": lambda *_: save_index if draft.selected_slugs else True,
                          "W": lambda *_: save_index if draft.selected_slugs else True},

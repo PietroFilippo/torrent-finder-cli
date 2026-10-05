@@ -261,7 +261,8 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
     page_label = f"page {page_no}" + (f"/{total_pages}" if total_pages else "")
     result = arrow_select(
         items,
-        title=f"{facet.label}: {escape(entity.name)} — {page_label}",
+        title=f"{facet.label} › {escape(entity.name)}",
+        status=page_label,
         multi=True,
         banner=_make_banner_panel(),
         on_action=on_action,

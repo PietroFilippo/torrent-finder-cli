@@ -2,6 +2,8 @@
 
 from datetime import datetime, timedelta, timezone
 
+from rich.markup import escape
+
 from torrent_finder.providers import PROVIDERS, display_name_for
 from torrent_finder.state import clear_history, load_history
 from torrent_finder.ui.selector import SelectItem, arrow_select
@@ -173,20 +175,15 @@ def history_select_prompt() -> dict | None:
             tags.append(date_filter)
         if sort_order != "Newest first":
             tags.append(sort_order)
-        t = "Search History"
-        if tags:
-            t += " — " + "  •  ".join(tags)
-        return t
+        return " › ".join(["Search History", " · ".join(tags)] if tags else ["Search History"])
 
     def _footer():
         prov_filter, date_filter, sort_order, type_filter = _current_filters()
         return (
             (notice + "\n" if notice else "")
             + "↑/↓ navigate  •  Enter re-run  •  Esc back\n"
-            f"[bold]Filters:[/bold]  [warning]P[/warning] provider: [muted]{_option_label(prov_filter)}[/muted]  •  "
-            f"[warning]T[/warning] type: [muted]{type_filter}[/muted]  •  "
-            f"[warning]D[/warning] date: [muted]{date_filter}[/muted]  •  "
-            f"[warning]S[/warning] sort: [muted]{sort_order}[/muted]"
+            f"P provider: {escape(_option_label(prov_filter))}  •  T type: {type_filter}  •  "
+            f"D date: {date_filter}  •  S sort: {sort_order}"
         )
 
     # --- key_action callbacks (cycle filter + rebuild in-place) ---

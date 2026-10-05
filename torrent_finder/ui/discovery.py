@@ -33,7 +33,7 @@ def _choose_topics(catalog, selected, initial=""):
                   SelectItem("Browse matching titles", "browse", enabled=bool(selected),
                              description="Match ALL chosen catalog terms. AniList tags require at least 60% relevance. Release availability is checked after selecting titles."),
                   SelectItem("Back", None)]
-        index = arrow_select(items, title=f"{catalog.label} · topics ({len(selected)}/{limit})",
+        index = arrow_select(items, title=f"Topics › {catalog.label}", status=f"{len(selected)} of {limit} chosen",
                              banner=_make_banner_panel(), footer="Enter add/remove • Esc back • Catalog vocabulary varies")
         if index is None or items[index].value is None:
             return None
@@ -87,7 +87,7 @@ def _browse_works(provider, catalog, criteria, cli_filters, browse_fn):
             if cursor < len(matches):
                 rows[cursor].cycle_toggle()
             return True
-        index = arrow_select(items, title=f"Matching titles · page {page}/{topics.MAX_PAGES} max",
+        index = arrow_select(items, title="Matching titles", status=f"page {page} of up to {topics.MAX_PAGES}",
                              multi=True, banner=_make_banner_panel(),
                              footer=f"Space select (up to {topics.MAX_WORKS}) • W review • Esc back",
                              key_actions={" ": toggle, "w": lambda *_: search_index, "W": lambda *_: search_index})

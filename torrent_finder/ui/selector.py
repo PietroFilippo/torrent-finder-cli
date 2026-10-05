@@ -325,6 +325,10 @@ def _build_panel(
     alert_lines = theme.wrap_block(Text.from_markup(alert), width, console) if alert else []
     intro_text = (intro.copy() if isinstance(intro, Text) else Text.from_markup(intro)) if intro else Text()
     intro_lines = theme.wrap_block(intro_text, width, console) if intro_text.plain.strip() else []
+    if compact and len(intro_lines) > 1:  # a short window keeps one line of summary, ending in "…"
+        intro_lines = intro_lines[:1]
+        intro_lines[0].truncate(max(1, min(cell_len(intro_lines[0].plain), width - len(theme.MARGIN)) - 1))
+        intro_lines[0].append("…")
 
     # Partition into leading actions, a windowed main list, and trailing actions.
     n = len(items)

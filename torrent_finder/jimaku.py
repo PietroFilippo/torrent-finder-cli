@@ -129,7 +129,7 @@ def search_and_download(torrent_name: str) -> Optional[str]:
     else:
         items = [SelectItem(label=_entry_label(e), value=e, is_action=True) for e in entries[:25]]
         items.append(SelectItem(label="Cancel", value=None, is_action=True))
-        idx = arrow_select(items, title="Jimaku — pick a series")
+        idx = arrow_select(items, title="Jimaku series")
         if idx is None or items[idx].value is None:
             return None
         entry = items[idx].value
@@ -148,7 +148,7 @@ def search_and_download(torrent_name: str) -> Optional[str]:
         hint = f"{int(size)/1024:.0f} KiB" if isinstance(size, (int, float)) and size else ""
         file_items.append(SelectItem(label=f["name"], value=f, is_action=True, hint=hint))
     file_items.append(SelectItem(label="Cancel", value=None, is_action=True))
-    idx = arrow_select(file_items, title=f"Jimaku — {escape(_entry_label(entry))}")
+    idx = arrow_select(file_items, title=f"Jimaku › {escape(_entry_label(entry))}")
     if idx is None or file_items[idx].value is None:
         return None
     chosen = file_items[idx].value

@@ -49,7 +49,7 @@ def show_progress(client, hashes=()):
             items.append(SelectItem("No torrents reported by the client", passive=True))
         items += [SelectItem("Refresh progress", value="refresh", hint="R"), SelectItem("Back", value=None)]
         while True:
-            index = arrow_select(items, title=f"qBittorrent · read at {stamp}",
+            index = arrow_select(items, title="qBittorrent progress", status=f"read at {stamp}",
                                  footer="Enter details • R refresh • Esc back",
                                  hotkeys={"r": "refresh", "R": "refresh"})
             if index is None:

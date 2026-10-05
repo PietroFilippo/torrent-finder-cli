@@ -96,7 +96,8 @@ def title_search_flow(provider, cli_filters, browse_fn, initial=""):
                 choices.append(SelectItem("Next catalog page", value="next", is_action=True))
             choices.append(SelectItem("Back", value=None, is_action=True))
             index = (0 if catalog == "manual" else arrow_select(
-                choices, title=f"Choose work · page {page}/{MAX_CATALOG_PAGES} max", banner=_make_banner_panel(),
+                choices, title="Choose work", status=f"page {page} of up to {MAX_CATALOG_PAGES}",
+                banner=_make_banner_panel(),
                 footer="Check year/type to distinguish sequels and adaptations."))
             if index is None or choices[index].value is None:
                 break

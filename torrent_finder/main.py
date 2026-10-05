@@ -976,7 +976,7 @@ def _handle_whats_next(current_provider, cli_filters=None, on_update=None):
     while True:
         choice = search_again_prompt()
         if choice in (None, "exit"):
-            if confirm_prompt("Exit Torrent Finder?", title="Exit"):
+            if confirm_prompt("Quit torrent-finder?", title="Quit"):
                 return "EXIT"
             clear_screen()
             continue

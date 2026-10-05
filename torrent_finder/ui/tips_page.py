@@ -118,14 +118,16 @@ def tips_page() -> None:
     }
 
     def _title() -> str:
-        parts = ["Tips"]
+        parts = []
         category = _CATEGORY_OPTIONS[state["category_idx"]]
         if category != "All":
-            parts.append(f"category: {escape(category)}")
+            parts.append(escape(category))
         if state["query"]:
-            parts.append(f'search: "{escape(state["query"])}"')
-        parts.append(f"{_match_count(state['query'], state['category_idx'])} shown")
-        return " · ".join(parts)
+            parts.append(f'"{escape(state["query"])}"')
+        return " › ".join(["Tips & shortcuts", " · ".join(parts)] if parts else ["Tips & shortcuts"])
+
+    def _status() -> str:
+        return f"{_match_count(state['query'], state['category_idx'])} shown"
 
     def _footer() -> str:
         category = _CATEGORY_OPTIONS[state["category_idx"]]
@@ -162,6 +164,7 @@ def tips_page() -> None:
         result = arrow_select(
             items,
             title=_title,
+            status=_status,
             banner=_make_banner_panel(),
             start_index=start,
             footer=_footer,

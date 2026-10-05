@@ -202,11 +202,13 @@ def _selected_metadata(
     if _tiny():
         lines = [theme.labelled(ellipsize_cells(" · ".join(origin + parts), room), theme.MARGIN)]
     else:
-        tags = _tags_line(str(item.get("name", "")), preferred, room)
-        lines = ([theme.labelled(line, theme.MARGIN) for line in (_pack(origin, room) if origin else [])]
-                 + ([tags] if tags is not None else [])
-                 + [theme.labelled(line, theme.MARGIN) for line in _pack(parts, room)])
         cap = _metadata_cap()
+        origin_lines = [theme.labelled(line, theme.MARGIN) for line in (_pack(origin, room) if origin else [])]
+        part_lines = [theme.labelled(line, theme.MARGIN) for line in _pack(parts, room)]
+        tags = _tags_line(str(item.get("name", "")), preferred, room)
+        # Tags give way first: hidden columns (size, seeds, leeches) matter more.
+        room_for_tags = tags is not None and len(origin_lines) + len(part_lines) < cap
+        lines = origin_lines + ([tags] if room_for_tags else []) + part_lines
         if len(lines) > cap:  # very long values (a long "From" title) stop at the cap
             lines = lines[:cap]
             last = lines[-1]

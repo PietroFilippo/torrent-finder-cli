@@ -74,7 +74,7 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
         width, height = console.size.width, console.size.height
         compact = not theme.roomy(height, 20)
         parsed = theme.parse_footer(footer)
-        title = f"Credentials › {meta.name} — sign in"
+        title = f"Credentials › {meta.name} › sign in"
         top = theme.header_lines(title, "", width)
         guide: list[Text] = []
         if meta.howto:
@@ -279,7 +279,7 @@ def _view_credentials(meta: CredentialSpec) -> None:
 
     arrow_select(
         items,
-        title=f"Credentials › {meta.name} — stored credentials",
+        title=f"Credentials › {meta.name} › stored values",
         banner=_make_banner_panel(),
         footer="Secrets are masked — pick Show password / API key to reveal.",
         on_action=on_action,

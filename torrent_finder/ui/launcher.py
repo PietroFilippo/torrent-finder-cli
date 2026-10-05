@@ -31,15 +31,18 @@ def _command_items(selected: str, available: bool) -> list[SelectItem]:
     items = []
     for name in COMMAND_CHOICES:
         is_current = name == selected
-        hint = "current"
-        if is_current and not available:
-            hint = "selected; launcher is not currently reachable from PATH"
+        description = _DESCRIPTIONS[name]
+        hint = ""
+        if is_current:
+            hint = "current" if available else "not on PATH yet"
+            if not available:  # what the command is first, then what to do about its status
+                description += "\nSelected, but the launcher is not on PATH yet: open a new terminal, or add its folder to PATH."
         items.append(SelectItem(
             label=f"{'✓' if is_current else ' '}  {name}",
             value=name,
-            hint=hint if is_current else "",
+            hint=hint,
             is_action=True,
-            description=_DESCRIPTIONS[name],
+            description=description,
         ))
     items.append(SelectItem(label="Back", value="back", is_action=True))
     return items
