@@ -183,7 +183,10 @@ class SecondReviewTests(unittest.TestCase):
         from torrent_finder import security
         security._exposure["state"] = "vpn"
         self.addCleanup(security._exposure.update, state=None)
-        with patch.object(security, "_fetch_network_info", return_value=None),              patch.object(security.readchar, "readkey", return_value=""),              patch.object(security.sys, "stdout", io.StringIO()),              patch.object(security, "console", Console(file=io.StringIO(), width=80, height=24)):
+        with patch.object(security, "_fetch_network_info", return_value=None), \
+             patch.object(security.readchar, "readkey", return_value="\x1b"), \
+             patch.object(security.sys, "stdout", io.StringIO()), \
+             patch.object(security, "console", Console(file=io.StringIO(), width=80, height=24)):
             security.show_security_warning(force=True)
         self.assertIsNone(security.exposure())
         self.assertEqual(security.exposure_label(), "")
@@ -204,6 +207,78 @@ class SecondReviewTests(unittest.TestCase):
     def test_the_baseline_also_applies_under_unittest(self):
         self.assertTrue(getattr(unittest.TestCase.run, "from_baseline", False))
         self.assertEqual(theme.PALETTE.key, "quiet")
+
+
+class RoundTwoTests(unittest.TestCase):
+    """Found in the second review round (GPT-6-Astra)."""
+
+    def setUp(self):
+        isolate_store(self)
+
+    def test_a_slow_drive_does_not_hold_up_the_menu(self):
+        from torrent_finder.ui import inspector
+        started = time.monotonic()
+        with patch.object(inspector.shutil, "disk_usage", side_effect=lambda path: time.sleep(2)):
+            lines = [line.plain for line in inspector.download_folder(".")]
+        self.assertLess(time.monotonic() - started, 1.5)
+        self.assertFalse(any("Free" in line for line in lines))
+        self.assertTrue(any("Unpack" in line for line in lines))
+
+    def test_recent_searches_do_not_expand_the_whole_history(self):
+        from torrent_finder import state
+        from torrent_finder.ui import inspector
+        for query in ("one", "two", "three", "four"):
+            state.add_history_entry(query, "movies")
+        with patch.object(state, "load_history", side_effect=AssertionError("expanded every entry")):
+            self.assertEqual([entry["query"] for entry in inspector._recent("movies")], ["four", "three", "two"])
+            self.assertEqual([entry["query"] for entry in inspector._recent(skip=1, limit=2)], ["three", "two"])
+
+    def test_a_saved_query_with_line_breaks_stays_one_row(self):
+        NEWLINE = chr(10)
+        BROKEN = "Part one" + NEWLINE + "Part two"
+        items = [SelectItem("Row", "row", description="Help.",
+                            inspect=lambda: [Text(f"line {i}") for i in range(30)] + [Text(BROKEN)]),
+                 SelectItem(BROKEN, "q", description="Help.")]
+        for design in ("quiet", "citrinitas"):
+            theme.apply(design)
+            for cursor in (0, 1):
+                with self.subTest(design=design, cursor=cursor):
+                    screen = Console(file=io.StringIO(), width=150, height=24, color_system=None)
+                    with patch.object(selector, "console", screen):
+                        screen.print(selector._build_panel(items, cursor, "Menu", False))
+                    self.assertLessEqual(len(screen.file.getvalue().rstrip(NEWLINE).split(NEWLINE)), 24)
+
+    def test_the_key_list_is_not_drawn_over(self):
+        size = [ConsoleDimensions(80, 24)]
+        drawn = []
+
+        def keys_list(title, footer):
+            before = len(drawn)
+            size[0] = ConsoleDimensions(100, 30)
+            time.sleep(0.4)
+            drawn.append(("during", len(drawn) - before))
+
+        keys = iter(["?", K.ESC])
+        with patch.object(type(selector.console), "size", property(lambda _self: size[0])), \
+             patch.object(selector, "_render", side_effect=lambda *a, **k: drawn.append("frame") or True), \
+             patch.object(selector, "show_keys", side_effect=keys_list), \
+             patch.object(selector.sys, "stdout", io.StringIO()), \
+             patch.object(selector.readchar, "readkey", side_effect=lambda: next(keys)):
+            selector.arrow_select([SelectItem("Row")], title="Menu")
+        self.assertIn(("during", 0), drawn)
+
+    def test_a_text_field_without_a_message_line_leaves_the_message_waiting(self):
+        from torrent_finder.ui import chrome
+        theme.apply("citrinitas", focus="bar", density="comfortable")
+        chrome.clear_messages()
+        self.addCleanup(chrome.clear_messages)
+        chrome.announce("A raven arrives.")
+        screen = Console(file=io.StringIO(), width=80, height=12, color_system=None)
+        with patch.object(prompts, "console", screen), \
+             patch.object(prompts.sys, "stdout", io.StringIO()), \
+             patch.object(prompts.readchar, "readkey", side_effect=[K.ESC]):
+            prompts.get_query_with_shortcut(prompts.PROMPT, screen_renderer=prompts.input_screen("Name"))
+        self.assertEqual(chrome.take_message(), "A raven arrives.")
 
 
 if __name__ == "__main__":

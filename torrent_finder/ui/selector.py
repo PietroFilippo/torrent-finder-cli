@@ -287,11 +287,15 @@ def _row(item: "SelectItem", index: int, is_cursor: bool, multi: bool, geometry:
     else:
         style = ""
     available = _label_avail_width(item, multi, geometry)
-    plain_label = _plain(item.label)
+    item_label = item.label
+    if "\n" in _plain(item_label):  # a saved query with line breaks still takes one row
+        item_label = (Text(" ").join(item_label.split("\n")) if isinstance(item_label, Text)
+                      else " ".join(item_label.splitlines()))
+    plain_label = _plain(item_label)
     if is_cursor and cell_len(plain_label) > available:
         label = Text(marquee_cells(plain_label, available, tick), style=style)
-    elif isinstance(item.label, Text):
-        label = item.label.copy()
+    elif isinstance(item_label, Text):
+        label = item_label.copy()
         label.stylize_before(style)  # the label's own colours win over the row's
         if cell_len(label.plain) > available:
             label.truncate(available, overflow="ellipsis")
@@ -374,6 +378,8 @@ def _pane(item: "SelectItem | None", width: int) -> list[Text]:
 
     def fit(line: "str | Text") -> Text:
         text = line.copy() if isinstance(line, Text) else Text.from_markup(line)
+        if "\n" in text.plain:  # one entry, one row: line breaks in saved text become spaces
+            text = Text(" ").join(text.split("\n"))
         text.no_wrap, text.overflow, text.justify = True, "ellipsis", "left"
         if cell_len(text.plain) > width:
             text.truncate(width, overflow="ellipsis")
@@ -904,13 +910,10 @@ def arrow_select(
             elif key in (readchar.key.CTRL_C, "\x03"):
                 return None
             elif key == "?" and help_enabled:
-                state["paused"] = True
                 try:
-                    show_keys(_resolve(title), _resolve(footer) or _default_footer(multi))
+                    aside(show_keys, _resolve(title), _resolve(footer) or _default_footer(multi))
                 except KeyboardInterrupt:
                     pass
-                finally:
-                    state["paused"] = False  # the key list shared the alternate screen
             elif hotkeys and key in hotkeys:
                 return ("hotkey", hotkeys[key], cursor)
             elif key_actions and key in key_actions:

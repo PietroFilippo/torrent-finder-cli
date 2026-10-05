@@ -307,6 +307,27 @@ def history_queries(provider_slug: str) -> list[str]:
     ]
 
 
+def recent_history(provider_slug: str | None = None, skip: int = 0, limit: int = 3) -> list[dict]:
+    """The newest searches, one per query (of one provider when *provider_slug* is given).
+
+    Entries come as saved, their combined-search profiles not expanded, so a
+    long history stays quick to look at; *skip* passes over the newest ones.
+    """
+    seen: set[str] = set()
+    found: list[dict] = []
+    for entry in _saved_history()[skip:]:
+        if not isinstance(entry, dict):
+            continue
+        query = " ".join(str(entry.get("query", "")).split())
+        if not query or (provider_slug and entry.get("provider") != provider_slug) or query.casefold() in seen:
+            continue
+        seen.add(query.casefold())
+        found.append(dict(entry))
+        if len(found) == limit:
+            break
+    return found
+
+
 def history_notes(provider_slug: str) -> dict[str, str]:
     """A short note per past search of one provider, for the search screen's RECENT list.
 

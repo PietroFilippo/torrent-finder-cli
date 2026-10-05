@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import threading
 
 from rich.cells import cell_len
 from rich.text import Text
@@ -54,19 +55,29 @@ def _state(word: str) -> Text:
 
 def _recent(slug: str | None = None, skip: int = 0, limit: int = 3) -> list[dict]:
     """The newest history entries (of one provider when *slug* is given), one per query."""
-    from torrent_finder.state import load_history
-    seen, entries = set(), []
-    for entry in load_history()[skip:]:
-        if not isinstance(entry, dict):
-            continue
-        query = str(entry.get("query", "")).strip()
-        if not query or (slug and entry.get("provider") != slug) or query.casefold() in seen:
-            continue
-        seen.add(query.casefold())
-        entries.append(entry)
-        if len(entries) == limit:
-            break
-    return entries
+    from torrent_finder.state import recent_history
+    return recent_history(slug, skip, limit)
+
+
+def _one_line(value: object) -> str:
+    """User text on one line: a query saved with line breaks keeps its words."""
+    return " ".join(str(value).split())
+
+
+def _within(seconds: float, probe):
+    """*probe*'s result, or None when it fails or takes longer than *seconds* (a slow or unplugged drive)."""
+    box = {}
+
+    def run():
+        try:
+            box["value"] = probe()
+        except Exception:
+            pass
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(seconds)
+    return box.get("value")
 
 
 def _when(entry: dict) -> str:
@@ -95,7 +106,7 @@ def _recent_here(slug: str) -> list[Text]:
         return []
     lines = [Text(""), heading("Recent here")]
     for entry in entries:
-        line = Text("  " + _column(str(entry["query"]).strip(), 30))
+        line = Text("  " + _column(_one_line(entry["query"]), 30))
         line.append(_when(entry), style=theme.MUTED)
         lines.append(line)
     return lines
@@ -148,19 +159,19 @@ def continue_search(entry: dict) -> list[Text]:
     from torrent_finder.providers import display_name_for
     lines = []
     if entry.get("kind") == "creator" and entry.get("name"):
-        lines.append(pair(str(entry.get("facet") or "Creator").capitalize(), str(entry["name"])))
-    queries = [str(query) for query in entry.get("queries") or [] if str(query).strip()]
+        lines.append(pair(_one_line(entry.get("facet") or "Creator").capitalize(), _one_line(entry["name"])))
+    queries = [_one_line(query) for query in entry.get("queries") or [] if str(query).strip()]
     if queries:
         lines.append(pair("Names", ", ".join(queries)))
-    presets = [str(preset) for preset in entry.get("presets") or []]
+    presets = [_one_line(preset) for preset in entry.get("presets") or []]
     if presets:
         lines.append(pair("Presets", ", ".join(presets)))
     before = _recent(skip=1, limit=_RECENT)
     if before:
         lines += ([Text("")] if lines else []) + [heading("Recent searches")]
         for item in before:
-            line = Text("  " + _column(str(item["query"]).strip(), 24))
-            line.append(_column(display_name_for(str(item.get("provider", ""))), 26), style=theme.MUTED)
+            line = Text("  " + _column(_one_line(item["query"]), 24))
+            line.append(_column(_one_line(display_name_for(str(item.get("provider", "")))), 26), style=theme.MUTED)
             line.append(_when(item), style=theme.MUTED)
             lines.append(line)
         hint = Text("  ")
@@ -185,17 +196,18 @@ def download_folder(path: str) -> list[Text]:
     """The folder's free space and the unpack setting."""
     from torrent_finder import unpack
     from torrent_finder.utils import format_size
+    def usage():
+        existing = path
+        while existing and not os.path.isdir(existing):
+            parent = os.path.dirname(existing)
+            existing = "" if parent == existing else parent
+        return shutil.disk_usage(existing) if existing else None
+
     lines = []
-    existing = path
-    while existing and not os.path.isdir(existing):
-        parent = os.path.dirname(existing)
-        existing = "" if parent == existing else parent
-    if existing:
-        try:
-            usage = shutil.disk_usage(existing)
-            lines.append(pair("Free", f"{format_size(usage.free)} of {format_size(usage.total)}"))
-        except OSError:
-            pass
+    # A network or unplugged drive can take seconds to answer: the menu does not wait for it.
+    space = _within(0.25, usage)
+    if space:
+        lines.append(pair("Free", f"{format_size(space.free)} of {format_size(space.total)}"))
     lines.append(pair("Unpack", _state("On" if unpack.enabled() else "Off")))
     return lines
 

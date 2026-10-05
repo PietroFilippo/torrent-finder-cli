@@ -463,7 +463,9 @@ def get_query_with_shortcut(
     committed: list[str] = []
 
     hist = history or []
-    announcement = frames.take_message() if screen_renderer is not None else ""
+    # Taken only when this screen has a message line to show it on; otherwise it waits for one.
+    announcement = (frames.take_message()
+                    if screen_renderer is not None and theme.bars(console.size.width, console.size.height) else "")
     hpos = -1          # the chosen past search in `matches`, -1 while typing
     stash = ""         # what was typed before ↑ started walking past searches
     matches: list[str] = []

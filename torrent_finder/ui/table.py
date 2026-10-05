@@ -611,7 +611,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     scroll_offset = 0
     expanded, detail_offset, saved_scroll = False, 0, 0
     feedback, feedback_style = "", theme.WARN  # a one-line outcome; green when it worked
-    announcement = frames.take_message()  # the Athanor message line while the table is open
+    # The Athanor message line while the table is open; without one, the message waits for a screen that has it.
+    announcement = frames.take_message() if theme.bars(console.size.width, console.size.height) else ""
 
     # Marquee state shared with the ticker thread
     marquee_state = {
