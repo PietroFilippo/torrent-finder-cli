@@ -371,24 +371,26 @@ def _has_details(item: "SelectItem") -> bool:
     return not _is_section_header(item) and bool(item.description or item.inspect)
 
 
+def _fit(line: "str | Text", width: int) -> Text:
+    """One detail entry on one row of *width* cells: line breaks become spaces, the end an ellipsis."""
+    text = line.copy() if isinstance(line, Text) else Text.from_markup(line)
+    if "\n" in text.plain:  # one entry, one row: line breaks in saved text become spaces
+        text = Text(" ").join(text.split("\n"))
+    text.no_wrap, text.overflow, text.justify = True, "ellipsis", "left"
+    if cell_len(text.plain) > width:
+        text.truncate(width, overflow="ellipsis")
+    return text
+
+
 def _pane(item: "SelectItem | None", width: int) -> list[Text]:
     """The inspector: the focused row's name, hint and help, then its detail lines, fitted to *width*."""
     if item is None or _is_section_header(item):
         return []
 
-    def fit(line: "str | Text") -> Text:
-        text = line.copy() if isinstance(line, Text) else Text.from_markup(line)
-        if "\n" in text.plain:  # one entry, one row: line breaks in saved text become spaces
-            text = Text(" ").join(text.split("\n"))
-        text.no_wrap, text.overflow, text.justify = True, "ellipsis", "left"
-        if cell_len(text.plain) > width:
-            text.truncate(width, overflow="ellipsis")
-        return text
-
     def prose(text: Text) -> list[Text]:
         return list(text.wrap(console, max(1, width), overflow="fold"))
 
-    lines = [fit(Text(_plain(item.label), style=theme.FOCUS))]
+    lines = [_fit(Text(_plain(item.label), style=theme.FOCUS), width)]
     if _plain(item.hint):
         lines += prose(_hint_text(item))
     if item.description:
@@ -396,7 +398,7 @@ def _pane(item: "SelectItem | None", width: int) -> list[Text]:
     details = item.details()
     if details:
         lines.append(Text(""))
-        lines += [fit(line) for line in details]
+        lines += [_fit(line, width) for line in details]
     return lines
 
 
@@ -554,6 +556,21 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
             last.append("…")
     max_visible = max(1, height - chrome)
 
+    # A tall window with no room beside the list shows the inspector's detail
+    # lines under the focused row's help instead, in rows the list leaves empty.
+    detail_lines: list[Text] = []
+    spare = max_visible - main_len - 1  # one row stays between the list and the footer
+    if not pane_width and not compact and current_item is not None and spare > 2:
+        details = [] if _is_section_header(current_item) else current_item.details()
+        if details:
+            room = spare - 1  # the blank row above them
+            detail_lines = [Text(theme.MARGIN) + _fit(line, inner_width) for line in details[:room]]
+            if len(details) > room:
+                detail_lines[-1] = Text(theme.MARGIN + "…", style=theme.MUTED)
+            detail_lines.insert(0, Text(""))
+            chrome += len(detail_lines)
+            max_visible = max(1, height - chrome)
+
     win_start_rel, win_end_rel = _compute_window(
         main_len, cursor - main_start, max_visible
     )
@@ -587,8 +604,12 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
 
     # The line above the key bar is a rule in roomy windows; spacing stays the same.
     has_context = bool(item_lines or notice_lines)
+    footer_start = len(lines)  # the help, notices and keys: in roomy windows they sit at the bottom
     lines.append(theme.rule(width) if not compact and not has_context else Text(""))
-    for block in item_blocks + context:
+    for block in item_blocks:
+        lines.extend(theme.wrap_block(block, width, console))
+    lines.extend(detail_lines)
+    for block in context:
         lines.extend(theme.wrap_block(block, width, console))
     if has_context and not compact:
         lines.append(theme.rule(width))
@@ -597,6 +618,14 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     # The tip takes the bottom rows, below a gap, only when the screen left them empty.
     _layout.width = None  # the tip spans the window
     tip_lines = theme.wrap_block(Text.from_markup(tip), screen_width, console) if tip else []
+
+    def settle(body: list[Text], rows: int, footer: int) -> list[Text]:
+        """*body* in *rows* rows: a roomy window puts the footer on the last ones, the list stays on top."""
+        gap = rows - len(body)
+        if compact or gap <= 0:
+            return body
+        return body[:footer] + [Text("")] * gap + body[footer:]
+
     if pane_width:
         body = lines[body_start:]
         rows = height - body_start
@@ -607,12 +636,18 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
             tip_lines = []
         if len(pane) > rows:
             pane = pane[:max(0, rows - 1)] + [Text("…", style=theme.MUTED)]
+        body = settle(body, rows - (1 if tip_lines else 0), footer_start - body_start)
         rows = max(rows, len(body))
         lines = lines[:body_start] + [_beside(body[i] if i < len(body) else None,
                                               pane[i] if i < len(pane) else None, width)
                                       for i in range(rows)] + tip_lines
-    elif tip_lines and height - len(lines) - len(tip_lines) >= 1:
-        lines += [Text("")] * (height - len(lines) - len(tip_lines)) + tip_lines
+    else:
+        if tip_lines and height - len(lines) - len(tip_lines) < 1:
+            tip_lines = []
+        below = [Text("")] + tip_lines if tip_lines else []
+        lines = settle(lines, height - len(below), footer_start)
+        if tip_lines:
+            lines += [Text("")] * (height - len(lines) - len(tip_lines)) + tip_lines
     lines = lines[:height]  # a window too small for every control keeps its top rather than scrolling
     return Group(*frames.compose(lines, title, header_status(position), screen_width, full_height, bar_message))
 

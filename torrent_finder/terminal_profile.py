@@ -32,16 +32,87 @@ import shutil
 import subprocess
 import sys
 import uuid
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
 from torrent_finder import paintings
 
 APP = NAME = "torrent-finder"
-FONT_FACE = "PxPlus IBM VGA 8x16"
-FONT_FILE = "PxPlus_IBM_VGA_8x16.ttf"
-FONTS = Path(__file__).resolve().parent / "assets" / "fonts"
+FONT_DIR = Path(__file__).resolve().parent / "assets" / "fonts"
 _FONTS_KEY = r"Software\Microsoft\Windows NT\CurrentVersion\Fonts"
+
+PIXEL_SCALES = (1, 1.5, 2, 3)        # a pixel font's sizes: screen pixels per font pixel at 100% scaling
+POINT_SIZES = (10, 12, 14, 16, 20)   # an outline font's sizes, in points
+
+
+@dataclass(frozen=True)
+class Font:
+    """A font the profile can draw the app in.
+
+    Athanor's are pixel fonts bundled with the app (*file*), installed for
+    the user; their sizes are multiples of the *cell*, so every font pixel
+    stays square. Simple's come with Windows or Windows Terminal.
+    """
+
+    key: str
+    face: str      # the family name Windows Terminal asks DirectWrite for
+    design: str
+    note: str
+    file: str = ""
+    cell: tuple[int, int] = (0, 0)   # a pixel font's character cell, in pixels
+
+    @property
+    def pixel(self) -> bool:
+        return bool(self.cell[1])
+
+    @property
+    def sizes(self) -> tuple:
+        return PIXEL_SCALES if self.pixel else POINT_SIZES
+
+    @property
+    def default_size(self) -> float:
+        return 1 if self.pixel else 12
+
+    def points(self, size: "float | None" = None) -> float:
+        """The size in points: 12 pt is 16 pixels at 100% scaling, one font pixel per screen pixel."""
+        size = size if size in self.sizes else self.default_size
+        return self.cell[1] * 0.75 * size if self.pixel else float(size)
+
+    def size_label(self, size: float) -> str:
+        shown = f"{round(self.points(size), 1):g} pt"
+        return f"×{size:g} · {shown}" if self.pixel else shown
+
+
+FONTS: dict[str, Font] = {font.key: font for font in (
+    Font("ibm-vga-8x16", "PxPlus IBM VGA 8x16", "athanor", "The IBM PC's VGA text mode: the classic letters.",
+         "PxPlus_IBM_VGA_8x16.ttf", (8, 16)),
+    Font("ibm-vga-9x16", "PxPlus IBM VGA 9x16", "athanor",
+         "VGA with its ninth column: wider letters with more space between them.",
+         "PxPlus_IBM_VGA_9x16.ttf", (9, 16)),
+    Font("toshiba-txl1", "PxPlus ToshibaTxL1 8x16", "athanor", "A Toshiba laptop's: thin strokes, a lighter page.",
+         "PxPlus_ToshibaTxL1_8x16.ttf", (8, 16)),
+    Font("ast-premium-exec", "PxPlus AST PremiumExec", "athanor", "A tall cell: more air between the lines.",
+         "PxPlus_AST_PremiumExec.ttf", (8, 19)),
+    Font("ibm-xga-12x20", "PxPlus IBM XGA-AI 12x20", "athanor",
+         "XGA's high-resolution letters: larger and finer, for big screens.",
+         "PxPlus_IBM_XGA-AI_12x20.ttf", (12, 20)),
+    Font("cascadia-mono", "Cascadia Mono", "simple", "Windows Terminal's own font."),
+    Font("cascadia-code", "Cascadia Code", "simple",
+         "Cascadia with programming ligatures: pairs such as -> and != drawn as one sign."),
+    Font("consolas", "Consolas", "simple", "Windows' long-standing programming font."),
+    Font("lucida-console", "Lucida Console", "simple", "The classic console font: wide and plain."),
+)}
+DEFAULT_FONTS = {"athanor": "ibm-vga-8x16", "simple": "cascadia-mono"}
+
+
+def fonts(design: str) -> list[Font]:
+    """The fonts that suit *design*, the default first."""
+    return [font for font in FONTS.values() if font.design == design]
+
+
+def default_font(design: str) -> Font:
+    return FONTS[DEFAULT_FONTS.get(design, "cascadia-mono")]
 
 # Windows Terminal names fragment profiles by two UUIDv5 steps from its own
 # namespace: the app's folder name, then the profile name, both as UTF-16LE.
@@ -198,8 +269,13 @@ def scheme(palette) -> dict:
     }
 
 
-def fragment(palette, image: "Path | None", font: bool, launch: list[str], starting: str) -> dict:
-    """The fragment: one profile and its colour scheme."""
+def _number(value: float) -> "int | float":
+    return int(value) if float(value).is_integer() else round(value, 2)
+
+
+def fragment(palette, image: "Path | None", font: "Font | None", launch: list[str], starting: str,
+             size: "float | None" = None) -> dict:
+    """The fragment: one profile and its colour scheme; *font* at *size* when Windows has it."""
     colours = scheme(palette)
     profile = {
         "guid": PROFILE_GUID,
@@ -214,43 +290,51 @@ def fragment(palette, image: "Path | None", font: bool, launch: list[str], start
         profile.update(backgroundImage=image.name, backgroundImageStretchMode="uniform",
                        backgroundImageAlignment="right", backgroundImageOpacity=1.0)
     if font:
-        # 12 pt is the font's own size at 100% scaling: one font pixel per screen pixel. It has no
-        # bold, and Windows Terminal's made-up bold smears it, so bold text keeps its weight.
-        profile.update(font={"face": FONT_FACE, "size": 12}, antialiasingMode="aliased",
-                       intenseTextStyle="bright")
+        profile["font"] = {"face": font.face, "size": _number(font.points(size))}
+        if font.pixel:
+            # Pixel letters stay square only unsmoothed. They have no bold, and Windows
+            # Terminal's made-up bold smears them, so bold text keeps its weight.
+            profile.update(antialiasingMode="aliased", intenseTextStyle="bright")
     return {"profiles": [profile], "schemes": [colours]}
 
 
-def font_installed() -> bool:
-    """Whether Windows lists the VGA font, for this user or for everyone."""
+def _registered_fonts() -> set[str]:
+    """The font names Windows lists, for this user and for everyone (" (TrueType)" removed)."""
     try:
         import winreg
     except ImportError:
-        return False
+        return set()
+    names = set()
     for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
         try:
             with winreg.OpenKey(root, _FONTS_KEY) as key:
                 index = 0
                 while True:
-                    if winreg.EnumValue(key, index)[0].startswith(FONT_FACE):
-                        return True
+                    names.add(winreg.EnumValue(key, index)[0].rsplit(" (", 1)[0])
                     index += 1
         except OSError:
             continue
-    return False
+    return names
 
 
-def install_font(environ=None) -> Path:
-    """Install the bundled font for the current user, as Windows' own Install does."""
+def font_installed(font: "Font | None" = None) -> bool:
+    """Whether Windows has *font* (the default pixel font when None); fonts the app does not bundle always count."""
+    font = font or default_font("athanor")
+    return not font.file or font.face in _registered_fonts()
+
+
+def install_font(font: "Font | None" = None, environ=None) -> Path:
+    """Install a bundled font for the current user, as Windows' own Install does."""
     import ctypes
     import winreg
+    font = font or default_font("athanor")
     environ = os.environ if environ is None else environ
-    target = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "Windows" / "Fonts" / FONT_FILE
+    target = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "Windows" / "Fonts" / font.file
     _make_folder(target.parent)
-    shutil.copyfile(FONTS / FONT_FILE, target)
+    shutil.copyfile(FONT_DIR / font.file, target)
     _check_real(target, environ)
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _FONTS_KEY) as key:
-        winreg.SetValueEx(key, f"{FONT_FACE} (TrueType)", 0, winreg.REG_SZ, str(target))
+        winreg.SetValueEx(key, f"{font.face} (TrueType)", 0, winreg.REG_SZ, str(target))
     try:
         ctypes.windll.gdi32.AddFontResourceW(str(target))  # usable now, without signing out
     except (AttributeError, OSError):
@@ -258,23 +342,46 @@ def install_font(environ=None) -> Path:
     return target
 
 
-def write(palette, painting: str, environ=None, *, add_font: bool = False) -> Path:
-    """Write (or rewrite) the profile for *palette* and *painting*; returns the fragment's path.
+def missing_fonts() -> list[Font]:
+    """The bundled fonts Windows does not have yet."""
+    return [font for font in FONTS.values() if font.file and not font_installed(font)]
 
-    The painting shows only with an Athanor colourway. With *add_font* the
-    font is installed first when Windows does not have it.
+
+def install_fonts(environ=None) -> list[Font]:
+    """Install every bundled font Windows lacks; returns the ones installed now.
+
+    All at once, because an open Windows Terminal tab only finds fonts that
+    were installed before it first drew: afterwards switching between them
+    takes effect at once.
+    """
+    installed = []
+    for font in missing_fonts():
+        install_font(font, environ)
+        installed.append(font)
+    return installed
+
+
+def write(palette, painting: str, environ=None, *, font: "Font | None" = None, size: "float | None" = None,
+          add_font: bool = False) -> Path:
+    """Write (or rewrite) the profile for *palette*, *painting* and *font* at *size*; returns the fragment's path.
+
+    The painting shows only with an Athanor colourway; *font* defaults to the
+    design's own. With *add_font* the bundled fonts Windows lacks are
+    installed first. A font Windows does not have is left out, so the
+    profile keeps Windows Terminal's.
     """
     target = folder(environ)
     _drop_private_copy(target, environ)
     _make_folder(target)
-    if add_font and not font_installed():
-        install_font(environ)
+    if add_font:
+        install_fonts(environ)
+    font = font or default_font(palette.design)
     image = None
     if palette.design == "athanor" and painting in paintings.catalog():
         image = paintings.export(painting, palette, target)
     launch = command()
     starting = str(Path(__file__).resolve().parent.parent) if launch[1:2] == ["-m"] else "%USERPROFILE%"
-    data = fragment(palette, image, font_installed(), launch, starting)
+    data = fragment(palette, image, font if font_installed(font) else None, launch, starting, size)
     path = fragment_path(environ)
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")

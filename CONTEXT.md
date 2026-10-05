@@ -406,13 +406,23 @@ the saved `settings.appearance`, then Citrinitas; Settings › Appearance
 previews and saves. See [ADR-0021](docs/adr/0021-themes.md). Athanor's
 **painting** is a separate saved choice, recoloured by the colourway; the
 terminal shows it, through the Windows Terminal profile or an exported image.
+Each design also keeps the profile's **font** and **text size** (bundled pixel
+fonts for Athanor, Windows' own for Simple; `terminal_profile.FONTS`). The
+profile is a fragment Windows Terminal re-reads whenever its settings.json
+changes; `terminal_profile.refresh()` updates that file's modification time
+after each write so open tabs follow at once. See
+[ADR-0026](docs/adr/0026-profile-fonts.md).
 
 Rows may carry styled labels and hints; an `intro` summary sits under a
 header; `?` lists a screen's keys. From 150 columns a selector whose rows have
 help shows an **inspector pane** for the focused row (its help, then
 `SelectItem.inspect` lines; the main menu's come from `ui/inspector.py`), beside
 a list column laid out at that narrower width. See
-[ADR-0023](docs/adr/0023-inspector-pane.md). The main menu groups CONTINUE (the newest
+[ADR-0023](docs/adr/0023-inspector-pane.md). In roomy windows a selector's
+footer (row help, notices, rule, key bar) sits on the bottom rows above the
+tip while the list stays on top, and when the pane does not fit beside the
+list the focused row's `inspect` lines fill rows the list leaves empty, above
+the keys, never costing list rows. See [ADR-0025](docs/adr/0025-tall-windows.md). The main menu groups CONTINUE (the newest
 search; a plain keyword search reopens the field with its query), SEARCH and
 TOOLS, with hints saying what each row will search, and a header status for
 the version, a pending update and this session's network verdict. Search

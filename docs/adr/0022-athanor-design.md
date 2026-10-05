@@ -87,6 +87,8 @@ Painting for the Athanor design.
   at once; with no settings.json to touch, the screen says the change waits
   for a restart. (Checked on Windows Terminal 1.24: a fragment written while
   it ran was loaded without a restart.)
+- The profile's font and text size are chosen per design
+  ([ADR-0026](0026-profile-fonts.md)); the VGA font at 12 pt is Athanor's default.
 - Elsewhere, "Save the painting as an image" writes the PNG in the colours on
   screen to `~/Pictures/torrent-finder`, for the terminal's own background
   setting.

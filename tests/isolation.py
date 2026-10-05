@@ -68,6 +68,7 @@ def restore_baseline() -> None:
     if (palette.key, focus, density) != BASELINE:
         theme.apply(BASELINE[0], focus=BASELINE[1], density=BASELINE[2])
     appearance._session["painting"] = paintings.DEFAULT
+    appearance._session["fonts"] = appearance.DEFAULT_FONTS
 
 
 def _screens_closed() -> None:

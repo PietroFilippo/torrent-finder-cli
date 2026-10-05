@@ -2286,14 +2286,17 @@ def settings_menu() -> None:
         items = [
             SelectItem("Appearance", "appearance",
                        hint=f"{palette.name} · {theme.FOCUS_STYLES[focus].lower()} · {density}",
-                       description="Theme colours, how the focused row is marked, and spacing."),
+                       description="Theme colours, how the focused row is marked, and spacing.",
+                       inspect=inspector.appearance_details),
             SelectItem(f"Terminal command: {command.name}", "__terminal_command__",
                        hint="ready" if command.available else "setup needed",
                        description=("Choose a preferred quick-launch command for new terminal sessions. "
-                                    "The canonical torrent-finder command always remains available.")),
+                                    "The canonical torrent-finder command always remains available."),
+                       inspect=inspector.command_details),
             SelectItem("Network exposure info", "__network_info__",
                        hint=Text.from_markup(exposure_label()) if exposure_label() else "",
-                       description="Check which IP address peers see before downloading."),
+                       description="Check which IP address peers see before downloading.",
+                       inspect=inspector.network_details),
             SelectItem("Back", None, is_action=True),
         ]
         index = arrow_select(items, title="Settings", banner=_make_banner_panel(), start_index=start,

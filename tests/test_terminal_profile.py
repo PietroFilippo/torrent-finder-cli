@@ -99,16 +99,23 @@ class FragmentTests(ProfileCase):
         terminal_profile.remove()
         self.assertFalse(terminal_profile.folder().exists())
 
-    def test_the_font_is_installed_only_when_asked_and_missing(self):
+    def test_fonts_are_installed_only_when_asked_and_missing(self):
         terminal_profile.write(theme.THEMES["citrinitas"], "none")
         self.install_font.assert_not_called()
         terminal_profile.write(theme.THEMES["citrinitas"], "none", add_font=True)
-        self.install_font.assert_called_once()
+        bundled = [font for font in terminal_profile.FONTS.values() if font.file]
+        self.assertEqual([call.args[0] for call in self.install_font.call_args_list], bundled)
 
-    def test_the_bundled_font_and_its_licence_ship(self):
-        self.assertTrue((terminal_profile.FONTS / terminal_profile.FONT_FILE).is_file())
-        licence = (terminal_profile.FONTS / "LICENSE.TXT").read_text(encoding="utf-8", errors="replace")
+    def test_the_bundled_fonts_and_their_licence_ship(self):
+        for font in terminal_profile.FONTS.values():
+            if font.file:
+                self.assertTrue((terminal_profile.FONT_DIR / font.file).is_file(), font.file)
+        licence = (terminal_profile.FONT_DIR / "LICENSE.TXT").read_text(encoding="utf-8", errors="replace")
         self.assertIn("Attribution-ShareAlike 4.0", licence)
+        credits = (terminal_profile.FONT_DIR / "README.md").read_text(encoding="utf-8")
+        for font in terminal_profile.FONTS.values():
+            if font.file:
+                self.assertIn(font.file, credits)
 
     def test_in_profile_reads_windows_terminals_profile_id(self):
         self.assertTrue(terminal_profile.in_profile({"WT_PROFILE_ID": terminal_profile.PROFILE_GUID.upper()}))
@@ -191,6 +198,72 @@ class StorePythonTests(ProfileCase):
             terminal_profile._check_real(path)
 
 
+class FontTests(ProfileCase):
+    def have(self, *faces):
+        """Windows lists these bundled faces; fonts the app does not bundle always count."""
+        listed = set(faces)
+        terminal_profile.font_installed.side_effect = lambda font=None: not font.file or font.face in listed
+        self.install_font.side_effect = lambda font, environ=None: listed.add(font.face)
+
+    def test_each_design_offers_its_own_fonts_its_default_first(self):
+        for design in theme.DESIGNS:
+            fonts = terminal_profile.fonts(design)
+            self.assertGreaterEqual(len(fonts), 4)
+            self.assertEqual(fonts[0], terminal_profile.default_font(design))
+            self.assertTrue(all(font.pixel == (design == "athanor") for font in fonts))
+
+    def test_pixel_sizes_are_whole_and_half_multiples_of_the_cell(self):
+        vga, xga = terminal_profile.FONTS["ibm-vga-8x16"], terminal_profile.FONTS["ibm-xga-12x20"]
+        self.assertEqual([vga.points(size) for size in vga.sizes], [12, 18, 24, 36])
+        self.assertEqual(xga.points(1), 15)
+        self.assertEqual(vga.points(7), 12)  # an unknown size is the default
+        self.assertEqual(vga.size_label(2), "×2 · 24 pt")
+        self.assertEqual(terminal_profile.FONTS["ast-premium-exec"].size_label(1.5), "×1.5 · 21.4 pt")
+        self.assertEqual(terminal_profile.FONTS["consolas"].size_label(14), "14 pt")
+
+    def test_pixel_fonts_draw_unsmoothed_and_simple_gets_its_own_font(self):
+        self.have(*(font.face for font in terminal_profile.FONTS.values()))
+        terminal_profile.write(theme.THEMES["citrinitas"], "none", font=terminal_profile.FONTS["ibm-xga-12x20"], size=2)
+        profile = self.fragment()["profiles"][0]
+        self.assertEqual(profile["font"], {"face": "PxPlus IBM XGA-AI 12x20", "size": 30})
+        self.assertEqual((profile["antialiasingMode"], profile["intenseTextStyle"]), ("aliased", "bright"))
+        terminal_profile.write(theme.THEMES["citrinitas"], "none", font=terminal_profile.FONTS["ast-premium-exec"],
+                               size=1.5)
+        self.assertEqual(self.fragment()["profiles"][0]["font"]["size"], 21.38)
+        terminal_profile.write(theme.THEMES["quiet"], "none")
+        profile = self.fragment()["profiles"][0]
+        self.assertEqual(profile["font"], {"face": "Cascadia Mono", "size": 12})  # not the VGA font any more
+        self.assertNotIn("antialiasingMode", profile)
+
+    def test_a_pixel_font_windows_lacks_is_left_out(self):
+        self.have()
+        terminal_profile.write(theme.THEMES["citrinitas"], "none", font=terminal_profile.FONTS["ibm-vga-9x16"])
+        self.assertNotIn("font", self.fragment()["profiles"][0])
+
+    def test_installing_adds_the_missing_fonts_once(self):
+        self.have("PxPlus IBM VGA 8x16")
+        installed = terminal_profile.install_fonts()
+        self.assertEqual([font.key for font in installed],
+                         [font.key for font in terminal_profile.fonts("athanor")][1:])
+        self.assertEqual(terminal_profile.install_fonts(), [])
+
+    def test_saved_fonts_are_kept_per_design_and_checked(self):
+        fonts = appearance.normalize({"fonts": {"athanor": {"font": "consolas", "size": 2},
+                                                "simple": {"font": "cascadia-code", "size": 16}}})["fonts"]
+        self.assertEqual(fonts, {"athanor": {"font": "ibm-vga-8x16", "size": 2},  # Consolas is not Athanor's
+                                 "simple": {"font": "cascadia-code", "size": 16}})
+        fonts = appearance.normalize({"fonts": {"athanor": {"font": "ibm-vga-9x16", "size": 13}}})["fonts"]
+        self.assertEqual(fonts["athanor"], {"font": "ibm-vga-9x16", "size": 1})
+        self.assertEqual(fonts["simple"], appearance.DEFAULT_FONTS["simple"])
+
+    def test_the_settings_details_name_the_font(self):
+        from torrent_finder.ui import inspector
+        theme.apply("citrinitas")
+        self.addCleanup(theme.apply, "quiet")
+        text = " ".join(line.plain for line in inspector.appearance_details())
+        self.assertIn("PxPlus IBM VGA 8x16 · ×1 · 12 pt", text)
+
+
 class AppearanceRowTests(ProfileCase):
     def setUp(self):
         super().setUp()
@@ -234,9 +307,10 @@ class AppearanceRowTests(ProfileCase):
     def test_windows_offers_the_profile_and_it_follows_later_choices(self):
         self.assertIn(("profile", "add"), [item.value for item in self.capture()])
         asked = self.run_menu(("profile", "add"))
-        self.assertIn("PxPlus IBM VGA 8x16", asked.call_args.args[0])  # says it installs the font
+        self.assertIn("PxPlus IBM VGA 8x16", asked.call_args.args[0])  # names the font
+        self.assertIn("installed for your account", asked.call_args.args[0])
         self.assertEqual(self.fragment()["schemes"][0]["name"], "torrent-finder Citrinitas")
-        self.install_font.assert_called_once()
+        self.assertEqual(self.install_font.call_count, len(terminal_profile.missing_fonts()))
         self.assertIn(("profile", "remove"), [item.value for item in self.capture()])
 
         self.run_menu(("theme", "viriditas"))
@@ -262,10 +336,40 @@ class AppearanceRowTests(ProfileCase):
         self.assertFalse(terminal_profile.folder().exists())
         self.install_font.assert_not_called()
 
+    def test_font_and_size_rows_follow_the_design_on_screen(self):
+        values = [item.value for item in self.capture()]
+        self.assertIn(("font", "ibm-xga-12x20"), values)
+        self.assertNotIn(("font", "consolas"), values)
+        self.assertEqual([value for value in values if isinstance(value, tuple) and value[0] == "size"],
+                         [("size", size) for size in terminal_profile.PIXEL_SCALES])
+
+    def test_choosing_a_font_installs_them_and_restyles_the_profile(self):
+        self.run_menu(("profile", "add"))
+        terminal_profile.font_installed.return_value = True
+        nine = terminal_profile.FONTS["ibm-vga-9x16"]
+        with patch.object(terminal_profile, "install_fonts", return_value=[nine]) as fonts, \
+             patch.object(terminal_profile, "refresh", return_value=True) as refresh:
+            self.run_menu(("font", "ibm-vga-9x16"))
+            fonts.assert_called_once()
+            refresh.assert_called_once()
+            self.assertIn(appearance.NEW_FONTS, self.footers[-1])
+            self.assertEqual(self.fragment()["profiles"][0]["font"], {"face": "PxPlus IBM VGA 9x16", "size": 12})
+            self.run_menu(("size", 2))
+        self.assertEqual(self.fragment()["profiles"][0]["font"]["size"], 24)
+        self.assertEqual(appearance.saved()["fonts"]["athanor"], {"font": "ibm-vga-9x16", "size": 2})
+
+    def test_a_font_chosen_without_the_profile_is_saved_for_it(self):
+        self.run_menu(("font", "toshiba-txl1"))
+        self.assertIn(appearance.FONT_SAVED, self.footers[-1])
+        self.assertEqual(appearance.saved()["fonts"]["athanor"]["font"], "toshiba-txl1")
+        self.assertFalse(terminal_profile.folder().exists())
+        self.install_font.assert_not_called()
+
     def test_other_systems_get_no_profile_rows(self):
         terminal_profile.supported.return_value = False
         values = [item.value for item in self.capture()]
         self.assertNotIn(("profile", "add"), values)
+        self.assertFalse([value for value in values if isinstance(value, tuple) and value[0] in ("font", "size")])
         self.assertIn(appearance.PAINTING_HELP, next(item for item in self.capture()
                                                      if item.value == ("painting", "dore-satan")).description)
 

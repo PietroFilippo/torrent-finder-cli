@@ -238,11 +238,9 @@ def download_folder(path: str) -> list[Text]:
     return lines
 
 
-def settings() -> list[Text]:
-    """The appearance in use, the terminal command and the network check."""
+def appearance_details() -> list[Text]:
+    """The appearance in use: design and colours, painting, focus, density, the terminal profile."""
     from torrent_finder import paintings, terminal_profile
-    from torrent_finder.launcher_alias import current_status
-    from torrent_finder.security import exposure_label
     from torrent_finder.ui import appearance
     palette, focus, density = theme.current()
     lines = [heading("Appearance"),
@@ -253,10 +251,25 @@ def settings() -> list[Text]:
     lines += [pair("Focus", theme.FOCUS_STYLES[focus]), pair("Density", theme.DENSITIES[density])]
     if terminal_profile.supported():
         lines.append(pair("Terminal", "torrent-finder profile" if terminal_profile.installed() else "no profile"))
-    command = current_status()
-    lines += [Text(""), heading("Command and network"),
-              pair("Command", command.name if command.available else f"{command.name} (setup needed)")]
-    network = exposure_label()
-    if network:
-        lines.append(pair("Network", Text.from_markup(network)))
+        font, size = appearance.font(palette.design)
+        lines.append(pair("Font", f"{font.face} · {font.size_label(size)}"))
     return lines
+
+
+def command_details() -> list[Text]:
+    from torrent_finder.launcher_alias import current_status
+    command = current_status()
+    return [pair("Command", command.name if command.available else f"{command.name} (setup needed)")]
+
+
+def network_details() -> list[Text]:
+    from torrent_finder.security import exposure_label
+    network = exposure_label()
+    return [pair("Network", Text.from_markup(network))] if network else [pair("Network", "not checked yet")]
+
+
+def settings() -> list[Text]:
+    """The appearance in use, the terminal command and the network check."""
+    from torrent_finder.security import exposure_label
+    lines = appearance_details() + [Text(""), heading("Command and network")] + command_details()
+    return lines + (network_details() if exposure_label() else [])

@@ -5,6 +5,8 @@ At startup the theme comes from ``--theme`` (this run only), then the
 Citrinitas (the Athanor design). A theme's design (Athanor or Simple) comes
 with it. Focus style, density and the Athanor painting come from the saved
 setting; the painting is chosen apart from the colours, which recolour it.
+Each design also keeps the font and text size of the Windows Terminal
+profile, so switching designs switches fonts that suit them.
 The Settings › Appearance screen previews a theme in place and saves the
 choice. See docs/adr/0021-themes.md and docs/adr/0022-athanor-design.md.
 """
@@ -21,7 +23,11 @@ from torrent_finder.ui import theme
 
 SETTING = "appearance"
 ENV = "TORRENT_FINDER_THEME"
-DEFAULTS = {"theme": theme.DEFAULT_THEME, "focus": "fill", "density": "comfortable", "painting": paintings.DEFAULT}
+DEFAULT_FONTS = {design: {"font": terminal_profile.default_font(design).key,
+                           "size": terminal_profile.default_font(design).default_size}
+                 for design in theme.DESIGNS}
+DEFAULTS = {"theme": theme.DEFAULT_THEME, "focus": "fill", "density": "comfortable", "painting": paintings.DEFAULT,
+            "fonts": DEFAULT_FONTS}
 
 
 def theme_key(name: object) -> str | None:
@@ -35,14 +41,26 @@ def theme_key(name: object) -> str | None:
     return None
 
 
+def _font_choice(design: str, value: object) -> dict:
+    """A valid {"font", "size"} for *design*: a font that suits it, at one of that font's sizes."""
+    value = value if isinstance(value, dict) else {}
+    font = terminal_profile.FONTS.get(value.get("font"))
+    if font is None or font.design != design:
+        font = terminal_profile.default_font(design)
+    size = value.get("size")
+    return {"font": font.key, "size": size if size in font.sizes else font.default_size}
+
+
 def normalize(value: object) -> dict:
     """A complete, valid appearance dict; anything unknown falls back to its default."""
     value = value if isinstance(value, dict) else {}
+    fonts = value.get("fonts") if isinstance(value.get("fonts"), dict) else {}
     return {
         "theme": theme_key(value.get("theme")) or DEFAULTS["theme"],
         "focus": value.get("focus") if value.get("focus") in theme.FOCUS_STYLES else DEFAULTS["focus"],
         "density": value.get("density") if value.get("density") in theme.DENSITIES else DEFAULTS["density"],
         "painting": paintings.painting_key(value.get("painting")) or DEFAULTS["painting"],
+        "fonts": {design: _font_choice(design, fonts.get(design)) for design in theme.DESIGNS},
     }
 
 
@@ -84,7 +102,7 @@ def resolve(cli_theme: str | None = None, environ=None, base: dict | None = None
     return appearance, source, notice
 
 
-_session = {"source": "saved", "painting": DEFAULTS["painting"]}
+_session = {"source": "saved", "painting": DEFAULTS["painting"], "fonts": DEFAULT_FONTS}
 
 
 def apply_startup(cli_theme: str | None = None, environ=None, saved_settings: bool = True) -> str:
@@ -96,6 +114,7 @@ def apply_startup(cli_theme: str | None = None, environ=None, saved_settings: bo
     appearance, source, notice = resolve(cli_theme, environ, None if saved_settings else DEFAULTS)
     _session["source"] = source
     _session["painting"] = appearance["painting"]
+    _session["fonts"] = appearance["fonts"]
     theme.apply(appearance["theme"], focus=appearance["focus"], density=appearance["density"])
     return notice
 
@@ -110,15 +129,24 @@ def painting() -> str:
     return _session["painting"]
 
 
-def save(theme_name: str, focus: str, density: str, painting_name: str | None = None) -> None:
+def font(design: str | None = None) -> tuple["terminal_profile.Font", float]:
+    """The Windows Terminal profile's font for *design* (the current one by default) and its size."""
+    design = design or theme.PALETTE.design
+    choice = _font_choice(design, _session["fonts"].get(design))
+    return terminal_profile.FONTS[choice["font"]], choice["size"]
+
+
+def save(theme_name: str, focus: str, density: str, painting_name: str | None = None,
+         fonts: dict | None = None) -> None:
     """Save an explicit appearance choice now; raises ``ValueError``/``OSError`` when that fails.
 
-    Without *painting_name* the current painting is kept.
+    Without *painting_name* the current painting is kept, without *fonts* the current fonts.
     """
     from torrent_finder.state import commit_setting
     value = normalize({"theme": theme_name, "focus": focus, "density": density,
-                       "painting": painting_name or _session["painting"]})
+                       "painting": painting_name or _session["painting"], "fonts": fonts or _session["fonts"]})
     _session["painting"] = value["painting"]  # in use this session even if saving fails
+    _session["fonts"] = value["fonts"]
     commit_setting(SETTING, value)
     _session["source"] = "saved"
 
@@ -180,12 +208,35 @@ _DESIGN_HINTS = {"athanor": "frame · message and status lines · painting", "si
 PAINTING_HELP = "Set the saved image as your terminal's background picture to see it behind the app."
 PROFILE_PAINTING_HELP = "The Windows Terminal profile (at the end of this list) shows it behind the app."
 PROFILE_HELP = ("A torrent-finder profile in Windows Terminal opens the app on the theme's own page: its colours, "
-                "the painting behind the text (Windows Terminal 1.24 or later) and the PxPlus IBM VGA font, "
-                "installed for your account. It follows what you choose here.")
+                "the painting behind the text (Windows Terminal 1.24 or later), and the font and text size chosen "
+                "above, with the pixel fonts installed for your account. It follows what you choose here.")
 PROFILE_NOTE = "This tab is the torrent-finder profile: its page, painting and font follow what you choose here."
 # What a change does to Windows Terminal: at once when a running one could be told, else at its next start.
 FOLLOWS_NOW = "The Windows Terminal profile follows."
 FOLLOWS_LATER = "The Windows Terminal profile follows; it changes when Windows Terminal restarts."
+# An open tab only finds fonts installed before it first drew.
+NEW_FONTS = "Installed the pixel fonts for your account: a tab opened before now shows them once you open a new one."
+FONT_SAVED = "Saved. The torrent-finder profile uses it: add it at the end of this list."
+FONT_HELP = "The torrent-finder profile in Windows Terminal draws the app in it; other terminals keep their own font."
+SIZE_HELP = ("How large the profile draws text. Larger text fills a big window with fewer, bigger rows; "
+             "whole multiples keep pixel letters sharp at 100% display scaling.")
+
+
+def _font_hint(option) -> str:
+    if option.pixel:
+        return f"{option.cell[0]}×{option.cell[1]} pixels"
+    return "Windows Terminal's" if option.face.startswith("Cascadia") else "Windows'"
+
+
+def _font_help(option) -> str:
+    install = " Installed for your account when chosen." if not terminal_profile.font_installed(option) else ""
+    return f"{option.note} {FONT_HELP}{install}"
+
+
+def _size_hint(option, size) -> str:
+    if option.pixel:  # half sizes draw font pixels one and two screen pixels wide by turns
+        return "sharp" if float(size).is_integer() else "uneven pixels"
+    return "Windows Terminal's default" if size == 12 else ""
 
 
 def _painting_help() -> str:
@@ -228,11 +279,16 @@ def appearance_menu() -> None:
     from torrent_finder.ui.selector import SelectItem, arrow_select
 
     palette, focus, density = theme.current()
-    chosen = {"theme": palette.key, "focus": focus, "density": density, "painting": painting()}
+    chosen = {"theme": palette.key, "focus": focus, "density": density, "painting": painting(),
+              "fonts": {design: dict(choice) for design, choice in _session["fonts"].items()}}
     state = {"preview": palette.key, "notice": ""}
 
     def design_of(key: str) -> str:
         return theme.THEMES[key].design
+
+    def chosen_font(design: str):
+        choice = _font_choice(design, chosen["fonts"].get(design))
+        return terminal_profile.FONTS[choice["font"]], choice["size"]
 
     def build() -> list:
         design = design_of(state["preview"])
@@ -251,6 +307,16 @@ def appearance_menu() -> None:
                 items.append(SelectItem("Save the painting as an image", ("export", None), is_action=True,
                                         hint=f"a PNG in the {theme.THEMES[state['preview']].name} colours",
                                         description=f"Into {paintings.export_folder()}. {PAINTING_HELP}"))
+        if terminal_profile.supported():  # the app sets a font only through the Windows Terminal profile
+            current, size = chosen_font(design)
+            items.append(_section("Font"))
+            for option in terminal_profile.fonts(design):
+                items.append(_choice(option.face, ("font", option.key), option.key == current.key,
+                                     _font_hint(option), _font_help(option)))
+            items.append(_section("Text size"))
+            for value in current.sizes:
+                items.append(_choice(current.size_label(value), ("size", value), value == size,
+                                     _size_hint(current, value), SIZE_HELP))
         items.append(_section("Focus"))
         for key, label in theme.FOCUS_STYLES.items():
             items.append(_choice(label, ("focus", key), key == chosen["focus"], _focus_hint(key), _FOCUS_HELP[key]))
@@ -264,7 +330,7 @@ def appearance_menu() -> None:
                 items.append(SelectItem("Remove the torrent-finder profile", ("profile", "remove"), is_action=True,
                                         hint="it follows the choices above",
                                         description=f"{PROFILE_HELP} Removing it deletes "
-                                                    f"{terminal_profile.folder()}; the font stays installed."))
+                                                    f"{terminal_profile.folder()}; the fonts stay installed."))
             else:
                 items.append(SelectItem("Add a torrent-finder profile", ("profile", "add"), is_action=True,
                                         hint="the painting behind the app", description=PROFILE_HELP))
@@ -273,32 +339,42 @@ def appearance_menu() -> None:
 
     def persist(kind: str) -> None:
         try:
-            save(chosen["theme"], chosen["focus"], chosen["density"], chosen["painting"])
+            save(chosen["theme"], chosen["focus"], chosen["density"], chosen["painting"], chosen["fonts"])
             state["notice"] = ""
         except (OSError, ValueError) as error:
             state["notice"] = f"[error]Applied for this session, but not saved:[/error] {escape(str(error))}"
             return
-        if kind in ("design", "theme", "painting") and terminal_profile.installed():
-            try:
-                terminal_profile.write(theme.THEMES[chosen["theme"]], chosen["painting"])
-                state["notice"] = FOLLOWS_NOW if terminal_profile.refresh() else FOLLOWS_LATER
-            except OSError as error:
-                state["notice"] = f"[error]The Windows Terminal profile was not updated:[/error] {escape(str(error))}"
+        if kind not in ("design", "theme", "painting", "font", "size"):
+            return
+        if not terminal_profile.installed():
+            state["notice"] = FONT_SAVED if kind in ("font", "size") else ""
+            return
+        try:
+            installed = terminal_profile.install_fonts() if kind == "font" else []
+            current, size = chosen_font(design_of(chosen["theme"]))
+            terminal_profile.write(theme.THEMES[chosen["theme"]], chosen["painting"], font=current, size=size)
+            state["notice"] = FOLLOWS_NOW if terminal_profile.refresh() else FOLLOWS_LATER
+            if installed:
+                state["notice"] += " " + NEW_FONTS
+        except OSError as error:
+            state["notice"] = f"[error]The Windows Terminal profile was not updated:[/error] {escape(str(error))}"
 
     def add_profile() -> None:
         from torrent_finder.ui.prompts import confirm_prompt
         palette = theme.THEMES[chosen["theme"]]
         shown = paintings.catalog().get(chosen["painting"]) if palette.design == "athanor" else None
         parts = [f"the {palette.name} colours"] + ([f"{escape(shown.title)} behind the text"] if shown else [])
-        if not terminal_profile.font_installed():
-            parts.append("the PxPlus IBM VGA 8x16 font, installed for your account")
+        current, size = chosen_font(palette.design)
+        parts.append(f"{current.face} at {current.size_label(size)}")
+        if terminal_profile.missing_fonts():
+            parts.append("the PxPlus pixel fonts installed for your account")
         listed = parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
         message = ("Add a [bold]torrent-finder[/bold] profile to Windows Terminal?\n\n"
                    f"It opens the app with {listed}, from the ▾ menu next to the tabs.")
         if not confirm_prompt(message, title="Windows Terminal profile"):
             return
         try:
-            terminal_profile.write(palette, chosen["painting"], add_font=True)
+            terminal_profile.write(palette, chosen["painting"], font=current, size=size, add_font=True)
             if terminal_profile.refresh():
                 state["notice"] = "[good]Added[/good] the torrent-finder profile: open it from the ▾ menu next to the tabs."
             else:
@@ -340,6 +416,13 @@ def appearance_menu() -> None:
             return True
         if kind in ("design", "theme"):
             chosen["theme"] = state["preview"] = target(value)
+        elif kind in ("font", "size"):
+            design = design_of(state["preview"])  # the sections show the design on screen
+            current, size = chosen_font(design)
+            if kind == "font":
+                chosen["fonts"][design] = _font_choice(design, {"font": key, "size": size})
+            else:
+                chosen["fonts"][design] = {"font": current.key, "size": key}
         else:
             chosen[kind] = key
         theme.apply(chosen["theme"], focus=chosen["focus"], density=chosen["density"])
