@@ -64,8 +64,9 @@ drew their own panels and did not follow the menus' conventions.
   which keeps the colour depth of the real console so the fixed shades
   survive.
 - **No emoji in menus.** Provider, engine and credential icons remain data.
-- Random tips appear only in windows at least 30 rows tall, so they never cost
-  list rows. Search progress is a frame on the alternate screen, redrawn in
+- Random tips sit on the bottom rows (`arrow_select(tip=…)`), below a gap,
+  only when the screen leaves those rows empty, so they never cost list
+  rows. Search progress is a frame on the alternate screen, redrawn in
   place line by line. Text fields share `prompts.input_screen`.
 
 ## Consequences

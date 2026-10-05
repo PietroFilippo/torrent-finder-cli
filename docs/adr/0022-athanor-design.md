@@ -35,7 +35,7 @@ pass it to `chrome.compose()` (or wrap a Rich renderable in `chrome.Framed`),
 which returns exactly the window's height:
 
 - a **message line**: the newest `chrome.announce()` message, `--More--` when
-  others wait, or the screen's own message (the quit guard);
+  others wait (the quit guard stays under the key bar, as in Simple);
 - the **frame's top edge** carrying the header, `torrent-finder » Screen ›
   subject`, and the screen's status;
 - the content between `║` sides that take the two margin cells, so content

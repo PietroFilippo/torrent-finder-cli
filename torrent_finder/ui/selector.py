@@ -289,14 +289,18 @@ def _build_panel(
     intro: "str | Text | list[Text]" = "",
     help_key: bool = False,
     message: "str | Text" = "",
+    tip: str = "",
 ) -> Group:
-    """Render one complete selector frame: header, intro, windowed list, context, keys, alert.
+    """Render one complete selector frame: header, intro, windowed list, context, keys, alert, tip.
 
     *intro* is a short summary under the header (what the screen is about),
     one Text or several; *help_key* adds "? keys" to the key bar when it fits
-    on the lines the keys already take. In the Athanor design the frame comes
-    from ``chrome.compose`` (imported as ``frames``): the screen name moves into its top edge and the
-    alert (or *message*, an announcement) onto the message line above it.
+    on the lines the keys already take. *alert* (the quit guard) is the line
+    under the keys. *tip* sits on the bottom rows, in space the screen leaves
+    empty, and steps aside when there is none. In the Athanor design the
+    frame comes from ``chrome.compose`` (imported as ``frames``): the screen
+    name moves into its top edge and *message*, an announcement, onto the
+    message line above it.
 
     Every selectable row stays one physical line so the window is stable;
     descriptions, notices and the key bar wrap and are measured, and the list
@@ -326,10 +330,10 @@ def _build_panel(
         item_blocks.append(description)
     item_lines = sum(_wrapped_line_count(block, inner_width) for block in item_blocks)
     notice_lines = sum(_wrapped_line_count(block, inner_width) for block in parsed.context)
-    # A transient message (the quit guard) is the last line, under the key bar,
-    # or the Athanor message line when the window shows one.
-    bar_message = (alert or message) if theme.bars(width, full_height) else ""
-    alert_lines = theme.wrap_block(Text.from_markup(alert), width, console) if alert and not bar_message else []
+    # A transient message (the quit guard) is the line under the key bar;
+    # announcements take the Athanor message line when the window shows one.
+    bar_message = message if theme.bars(width, full_height) else ""
+    alert_lines = theme.wrap_block(Text.from_markup(alert), width, console) if alert else []
     intro_lines = []
     for block in (intro if isinstance(intro, list) else [intro]):
         text = (block.copy() if isinstance(block, Text) else Text.from_markup(block)) if block else Text()
@@ -470,6 +474,12 @@ def _build_panel(
         lines.append(theme.rule(width))
     lines.extend(theme.wrap_keys(shown_keys, width))
     lines.extend(alert_lines)
+    if tip:
+        # The tip takes the bottom rows, below a gap, only when the screen left them empty.
+        tip_lines = theme.wrap_block(Text.from_markup(tip), width, console)
+        spare = height - len(lines) - len(tip_lines)
+        if spare >= 1:
+            lines += [Text("")] * spare + tip_lines
     return Group(*frames.compose(lines, title, header_status(position), width, full_height, bar_message))
 
 
@@ -575,6 +585,7 @@ def arrow_select(
     alert: str | Callable[[], str] = "",
     intro: "str | Text | Callable[[], str | Text]" = "",
     help: bool = True,
+    tip: str = "",
 ) -> int | list[int] | tuple | None:
     """Interactive arrow-key selector.
 
@@ -602,6 +613,8 @@ def arrow_select(
         intro: Optional summary under the header (str, Text or callable).
         help: ``?`` opens the list of this screen's keys unless the caller
               binds ``?`` itself.
+        tip: Optional Rich-markup tip for the bottom rows, shown when the
+             screen leaves them empty.
         on_action: Optional callback for action items. Called with
                    (index, items). Return True to stay in the menu,
                    False to exit and return the index.
@@ -649,6 +662,7 @@ def arrow_select(
                     intro=_resolve(intro),
                     help_key=help_enabled,
                     message=announcement,
+                    tip=tip,
                 )
                 if _render(
                     banner,

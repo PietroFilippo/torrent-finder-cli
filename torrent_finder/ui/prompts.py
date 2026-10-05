@@ -4,6 +4,7 @@ import io
 import sys
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import readchar
 from rich.cells import cell_len
@@ -24,8 +25,15 @@ from torrent_finder.providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
 from torrent_finder.ui import chrome as frames, display, theme
 from torrent_finder.ui.selector import SelectItem, arrow_select
 
-# Random tips share the footer only in tall windows, so they never cost list rows.
-_TIP_MIN_HEIGHT = 30
+
+@dataclass
+class QuitGuard:
+    """The main menu's double-press quit: Esc arms it, a second Esc quits, any other choice disarms it."""
+
+    armed: bool = False
+
+    def hint(self) -> str:
+        return "[alert]Press Esc or Ctrl+C again to quit[/alert]" if self.armed else ""
 
 _ARIA2_INSTALL_URL = "https://aria2.github.io/"
 _WEBTORRENT_INSTALL_URL = "https://www.npmjs.com/package/webtorrent-cli"
@@ -2279,8 +2287,8 @@ def settings_menu() -> None:
 
 
 def provider_select_prompt(
-    notice: str = "", open_group=None, update_available: bool = False, alert: str = "",
-    update_status: str = "",
+    notice: str = "", open_group=None, update_available: bool = False,
+    quit_guard: "QuitGuard | None" = None, update_status: str = "",
 ) -> object | None:
     """The main menu: continue the last search, pick a provider, or open a tool.
 
@@ -2294,8 +2302,9 @@ def provider_select_prompt(
     Press H to browse search history, S for stats, T for all tips and shortcuts.
 
     ``notice`` is an optional Rich-markup line (e.g. an "update available"
-    banner) prepended to the footer; pass "" to show nothing. ``alert`` is a
-    transient line drawn under the key bar (the "press again to quit" guard).
+    banner) prepended to the footer; pass "" to show nothing. ``quit_guard``
+    draws "press again to quit" under the key bar while it is armed; any
+    choice made here, a submenu included, disarms it.
     ``update_status`` is a few words for the header ("update 0.8.2 ready").
 
     ``update_available`` adds an "Install update" action row (and the U hotkey)
@@ -2390,19 +2399,18 @@ def provider_select_prompt(
             start = 1  # the continue row when there is one, else the first provider
 
         # Fresh tip each time we enter the selector — but NOT on every render
-        # (that would re-roll on every keypress and make the footer jitter).
+        # (that would re-roll on every keypress and make the screen jitter).
         tip_line = random_tip()
 
-        def footer(notice=notice, tip_line=tip_line):
+        def footer(notice=notice):
             # Re-evaluated on every render: resizing the open menu switches
-            # between the full footer (with the tip) and a compact one.
+            # between the full key bar and a compact one.
             if console.size.height < 24 or console.size.width < 60:
                 return ((notice + "\n" if notice else "")
                         + "↑/↓ move • Enter select • Tab actions • Esc quit\nF filters • H history • S stats")
             return ((notice + "\n" if notice else "")
                     + "↑/↓ navigate  •  Enter select  •  F filters  •  H history  •  "
-                    "S stats  •  T tips  •  Tab actions  •  Esc quit"
-                    + (f"\n\n{tip_line}" if tip_line and console.size.height >= _TIP_MIN_HEIGHT else ""))
+                    "S stats  •  T tips  •  Tab actions  •  Esc quit")
 
         result = arrow_select(
             items,
@@ -2412,7 +2420,8 @@ def provider_select_prompt(
             footer=footer,
             banner=_make_banner_panel(),
             start_index=start,
-            alert=alert,
+            alert=quit_guard.hint if quit_guard else "",
+            tip=tip_line,
             hotkeys={
                 "H": "history",
                 "h": "history",
@@ -2428,6 +2437,8 @@ def provider_select_prompt(
 
         if result is None:
             return None
+        if quit_guard:
+            quit_guard.armed = False  # any other choice disarms it, a submenu included
 
         # F key pressed on a provider — open its filter menu
         if _filter_request["target"] is not None:
@@ -2533,15 +2544,14 @@ def search_again_prompt() -> str | tuple | None:
 
     start = 0
     while True:
-        # Fresh tip per menu entry, fixed across the render loop; shown only
-        # while the window is large (the footer is re-evaluated on resize).
+        # Fresh tip per menu entry, fixed across the render loop; it takes the
+        # bottom rows when the screen leaves them empty.
         tip_line = random_tip()
 
         def footer():
             if console.size.height < 24 or console.size.width < 60:
                 return "↑/↓ move • Enter select • Esc exit\nR/P/M/Tab/H/S/T/C/Q jump"
-            return ("↑/↓ navigate • Enter select • R/P/M/Tab/H/S/T/C/Q jump • Esc request exit"
-                    + (f"\n\n{tip_line}" if tip_line and console.size.height >= _TIP_MIN_HEIGHT else ""))
+            return "↑/↓ navigate • Enter select • R/P/M/Tab/H/S/T/C/Q jump • Esc request exit"
 
         idx = arrow_select(
             items,
@@ -2550,6 +2560,7 @@ def search_again_prompt() -> str | tuple | None:
             start_index=start,
             hotkeys=hotkeys,
             footer=footer,
+            tip=tip_line,
         )
 
         if idx is None:

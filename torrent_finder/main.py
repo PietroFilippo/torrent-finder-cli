@@ -55,6 +55,7 @@ from torrent_finder.ui.prompts import (
     make_search_screen_renderer,
     print_banner,
     provider_select_prompt,
+    QuitGuard,
     search_again_prompt,
 )
 from torrent_finder.terminal_check import advise_limited_terminal
@@ -1205,9 +1206,10 @@ def _main_loop(args=None) -> None:
 
     # Double-press quit guard: the first Esc/Ctrl+C on the provider menu or
     # search prompt re-opens the menu with a "press again to quit" hint; the
-    # next Esc/Ctrl+C there quits, any other selection disarms. Deeper flows
-    # keep instant Ctrl+C (it means "abort this operation", not idle exit).
-    exit_armed = False
+    # next Esc/Ctrl+C there quits, any other selection (a submenu of the menu
+    # included) disarms. Deeper flows keep instant Ctrl+C (it means "abort
+    # this operation", not idle exit).
+    quit_guard = QuitGuard()
 
     while True:
         # One-shot CLI creator search (--by/--name): jump into the by-creator
@@ -1237,14 +1239,10 @@ def _main_loop(args=None) -> None:
             continue
 
         if not current_provider:
-            exit_hint = (
-                "[alert]Press Esc or Ctrl+C again to quit[/alert]"
-                if exit_armed else ""
-            )
             try:
                 result = provider_select_prompt(
                     notice="" if theme.FRAMED else update_msg or "",  # Athanor: the message line says it
-                    alert=exit_hint,  # the last line of the frame, under the keys
+                    quit_guard=quit_guard,  # its hint is the line under the keys
                     open_group=pending_open_group,
                     update_available=bool(update_info),
                     update_status=status_label(update_info),
@@ -1253,12 +1251,12 @@ def _main_loop(args=None) -> None:
                 result = None  # Ctrl+C/Ctrl+D arm the same quit guard as Esc
             pending_open_group = None
             if result is None:
-                if exit_armed:
+                if quit_guard.armed:
                     _goodbye()
                     break
-                exit_armed = True
+                quit_guard.armed = True
                 continue
-            exit_armed = False
+            quit_guard.armed = False
             if result == "__update__":
                 _run_update_flow(update_info)
                 update_info = None   # consumed → drop the notice + menu row
@@ -1355,7 +1353,7 @@ def _main_loop(args=None) -> None:
                 # Ctrl+C at the search prompt: route to the provider menu with
                 # the quit guard armed instead of exiting outright — the next
                 # Esc/Ctrl+C there quits.
-                exit_armed = True
+                quit_guard.armed = True
                 current_provider = None
                 query = None
                 show_source = False

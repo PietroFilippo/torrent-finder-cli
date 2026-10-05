@@ -69,7 +69,7 @@ class GlobalActionsTests(unittest.TestCase):
         def resize_and_render(items, **kwargs):
             terminal.width, terminal.height = 40, 16
             terminal.print(selector._build_panel(items, 0, kwargs["title"], False,
-                                                 footer=kwargs["footer"]()))
+                                                 footer=kwargs["footer"](), tip=kwargs["tip"]))
             return None
 
         with patch.object(prompts, "console", terminal), patch.object(selector, "console", terminal), \

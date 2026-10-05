@@ -662,6 +662,24 @@ class ContrastTests(unittest.TestCase):
                 self.assertIn("Esc cancel", lines[-2])
                 self.assertNotIn("again to quit", "\n".join(lines[:-1]))
 
+    def test_the_tip_takes_the_bottom_rows_only_when_they_are_free(self):
+        tip = "[accent]Tip[/accent]  Press T for every tip."
+        for rows, height, shown in ((4, 24, True), (4, 9, True), (30, 24, False), (4, 8, False)):
+            with self.subTest(rows=rows, height=height):
+                items = [SelectItem(f"Row {i}") for i in range(rows)]
+                screen = Console(file=io.StringIO(), width=80, height=height, color_system=None)
+                with patch.object(selector, "console", screen):
+                    lines = plain_lines(selector._build_panel(items, 0, "Menu", False, "Enter select • Esc back",
+                                                              tip=tip), 80, height)
+                self.assertLessEqual(len(lines), height)
+                self.assertIn("Esc back", "\n".join(lines))
+                if shown:
+                    self.assertEqual(len(lines), height)
+                    self.assertEqual(lines[-1].strip(), "Tip  Press T for every tip.")
+                    self.assertEqual(lines[-2].strip(), "")
+                else:
+                    self.assertNotIn("Press T", "\n".join(lines))
+
     def test_compact_frames_keep_their_height(self):
         items = [SelectItem(f"Row {i}") for i in range(30)]
         for height in (12, 16, 19, 20, 24):

@@ -98,7 +98,7 @@ class MessageTests(AthanorCase):
 class FramedScreenTests(AthanorCase):
     SIZES = ((40, 12), (50, 16), (80, 24), (120, 40))
 
-    def test_menus_fit_with_the_alert_on_the_message_line(self):
+    def test_menus_fit_with_the_alert_under_the_keys(self):
         items = [SelectItem(f"Row {i}") for i in range(30)]
         for width, height in self.SIZES:
             with self.subTest(width=width, height=height):
@@ -112,10 +112,20 @@ class FramedScreenTests(AthanorCase):
                 self.assertTrue(all(cell_len(line) <= width for line in out))
                 text = "\n".join(out)
                 self.assertIn("@ Row 0", text)
-                self.assertIn("Esc quit", text)
-                if theme.bars(width, height):
-                    self.assertIn("again to quit", out[0])  # the message line, above the frame
-                self.assertIn("again to quit", text)
+                keys = max(i for i, line in enumerate(out) if "Esc quit" in line or "PgUp/PgDn" in line)
+                self.assertIn("again to quit", out[keys + 1])  # under the keys, as in the Simple design
+                self.assertNotIn("again to quit", out[0])
+
+    def test_the_tip_sits_on_the_bottom_rows_of_the_frame(self):
+        items = [SelectItem(f"Row {i}") for i in range(4)]
+        screen = Console(file=io.StringIO(), width=80, height=24, color_system=None)
+        with patch.object(selector, "console", screen):
+            screen.print(selector._build_panel(items, 0, "Menu", False, "Enter select • Esc back",
+                                               tip="[accent]Tip[/accent]  Press T for every tip."))
+        out = screen.file.getvalue().rstrip("\n").split("\n")
+        self.assertEqual(len(out), 24)
+        self.assertIn("Tip  Press T for every tip.", out[-3])  # above the bottom edge and the status line
+        self.assertTrue(out[-4].strip("║ ") == "")             # with room above it
 
     def test_the_text_field_cursor_lands_on_the_field(self):
         render = prompts.input_screen("Profile name", "Use a unique name.")

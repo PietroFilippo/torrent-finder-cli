@@ -4,8 +4,8 @@ Screens build their content as usual (without a header line when framed, see
 ``theme.frame_header``) for ``theme.view_height`` rows, then pass it here:
 ``compose`` puts the screen name and status in the frame's top edge, draws
 the sides in the two-cell margins (so content keeps its columns), and adds
-the message line (the newest announcement, or a screen's own message such as
-the quit guard) and the NetHack-style status line. In the Simple design, or
+the message line (the newest announcement) and the NetHack-style status
+line. In the Simple design, or
 in windows too small for a frame, content passes through unchanged.
 See docs/adr/0022-athanor-design.md.
 """

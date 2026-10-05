@@ -123,6 +123,26 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(seen[0][0], "dune part two")
         goodbye.assert_called_once()
 
+    def test_a_submenu_disarms_the_quit_guard(self):
+        guard = prompts.QuitGuard(armed=True)
+        hints = []
+
+        def menu(items, **kw):
+            hints.append(kw["alert"]())
+            if len(hints) == 1:
+                return next(i for i, item in enumerate(items) if item.value == "__settings__")
+            return None
+
+        with patch.object(prompts, "arrow_select", side_effect=menu), patch.object(prompts, "settings_menu"):
+            self.assertIsNone(prompts.provider_select_prompt(quit_guard=guard))
+        self.assertEqual(hints, ["[alert]Press Esc or Ctrl+C again to quit[/alert]", ""])
+        self.assertFalse(guard.armed)  # the next Esc only arms it again
+
+    def test_the_tip_is_passed_for_the_bottom_rows(self):
+        items, kwargs = capture_home()
+        self.assertTrue(kwargs["tip"].startswith("[accent]Tip[/accent]"))
+        self.assertNotIn("Tip", kwargs["footer"]())  # no longer above the keys
+
     def test_settings_gathers_appearance_command_and_network(self):
         captured = []
         with patch.object(prompts, "arrow_select", side_effect=lambda items, **kw: captured.append(items)):
