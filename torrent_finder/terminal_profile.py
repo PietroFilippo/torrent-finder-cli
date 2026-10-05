@@ -2,8 +2,11 @@
 
 Terminals draw background pictures; an app cannot. On Windows the app can add
 a "torrent-finder" profile to Windows Terminal with a JSON fragment: a folder
-Windows Terminal reads when it starts, %LOCALAPPDATA%\\Microsoft\\Windows
-Terminal\\Fragments\\torrent-finder. The profile starts the app with the
+Windows Terminal reads whenever it loads its settings, %LOCALAPPDATA%\\Microsoft\\
+Windows Terminal\\Fragments\\torrent-finder. It loads them when it starts and
+when its settings.json changes, so after rewriting the fragment the app updates
+that file's modification time (``refresh``) and open tabs take the new look at
+once; the settings themselves are never edited. The profile starts the app with the
 theme's page and text as its colour scheme, the Athanor painting (recoloured
 in the colourway's ink) as its background picture, and the PxPlus IBM VGA
 8x16 font, installed for the current user. Nothing is written until the user
@@ -13,8 +16,8 @@ pictures from its own folder; earlier versions show the colours and font
 without the picture.
 
 Python from the Microsoft Store runs in an app container that keeps the
-folders it creates under AppData in a private copy (%LOCALAPPDATA%\Packages\
-<its package>\LocalCache\Local\…), which Windows Terminal never reads. Files
+folders it creates under AppData in a private copy (%LOCALAPPDATA%\\Packages\\
+<its package>\\LocalCache\\Local\\…), which Windows Terminal never reads. Files
 written into a folder that exists outside the container do land there, and
 child processes are not redirected, so the folders are made with ``cmd``
 and a private copy left by an earlier version is removed. See
@@ -285,8 +288,40 @@ def write(palette, painting: str, environ=None, *, add_font: bool = False) -> Pa
     return path
 
 
+# Windows Terminal's settings: the Store's stable, Preview and Canary builds keep
+# them in their package, unpackaged builds (winget, zip) in the shared folder.
+_TERMINAL_PACKAGES = ("Microsoft.WindowsTerminal_8wekyb3d8bbwe", "Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe",
+                      "Microsoft.WindowsTerminalCanary_8wekyb3d8bbwe")
+
+
+def settings_files(environ=None) -> list[Path]:
+    """The settings.json of every Windows Terminal build on this account."""
+    environ = os.environ if environ is None else environ
+    local = Path(environ["LOCALAPPDATA"])
+    paths = [local / "Packages" / package / "LocalState" / "settings.json" for package in _TERMINAL_PACKAGES]
+    paths.append(local / "Microsoft" / "Windows Terminal" / "settings.json")
+    return [path for path in paths if path.is_file()]
+
+
+def refresh(environ=None) -> bool:
+    """Make running Windows Terminals load the profile again now; False when none was found.
+
+    Windows Terminal reloads its settings, fragments included, when settings.json's
+    modification time changes, and open tabs of the profile take the new colours,
+    painting and font. Only that time changes; the file is not written.
+    """
+    told = False
+    for path in settings_files(environ):
+        try:
+            os.utime(path)
+            told = True
+        except OSError:
+            continue
+    return told
+
+
 def remove(environ=None) -> None:
-    """Delete the profile's folder; Windows Terminal drops the profile when it next starts."""
+    """Delete the profile's folder; Windows Terminal drops the profile when it next loads its settings."""
     target = folder(environ)
     _drop_private_copy(target, environ)
     if target.exists() and _package_family():

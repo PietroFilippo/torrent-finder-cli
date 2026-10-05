@@ -115,6 +115,32 @@ class FragmentTests(ProfileCase):
         self.assertFalse(terminal_profile.in_profile({"WT_PROFILE_ID": "{0000}"}))
 
 
+class RefreshTests(ProfileCase):
+    """Windows Terminal reloads its settings, fragments included, when settings.json's time changes."""
+
+    def settings(self, *parts) -> Path:
+        path = Path(self.environ["LOCALAPPDATA"], *parts, "settings.json")
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b'{"profiles": {}}\r\n')
+        terminal_profile.os.utime(path, (1_000_000_000, 1_000_000_000))
+        return path
+
+    def test_every_terminal_build_is_found(self):
+        stable = self.settings("Packages", "Microsoft.WindowsTerminal_8wekyb3d8bbwe", "LocalState")
+        preview = self.settings("Packages", "Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe", "LocalState")
+        unpackaged = self.settings("Microsoft", "Windows Terminal")
+        self.assertEqual(terminal_profile.settings_files(), [stable, preview, unpackaged])
+
+    def test_refreshing_changes_only_the_modification_time(self):
+        path = self.settings("Packages", "Microsoft.WindowsTerminal_8wekyb3d8bbwe", "LocalState")
+        self.assertTrue(terminal_profile.refresh())
+        self.assertGreater(path.stat().st_mtime, 1_000_000_000)
+        self.assertEqual(path.read_bytes(), b'{"profiles": {}}\r\n')
+
+    def test_without_windows_terminal_nothing_is_told(self):
+        self.assertFalse(terminal_profile.refresh())
+
+
 class StorePythonTests(ProfileCase):
     """Python from the Microsoft Store keeps the folders it makes under AppData in a private copy."""
 
@@ -189,7 +215,15 @@ class AppearanceRowTests(ProfileCase):
             keys += [step] * sum(item.enabled for item in span) + [K.ENTER]
             position = value
         screen = Console(file=io.StringIO(), width=100, height=40, color_system=None)
+        build = selector._build_panel
+        self.footers = []
+
+        def record(*args, **kwargs):
+            self.footers.append(args[4])  # the footer, resolved for this frame
+            return build(*args, **kwargs)
+
         with patch.object(selector, "console", screen), \
+             patch.object(selector, "_build_panel", side_effect=record), \
              patch.object(selector, "_render", return_value=True), \
              patch.object(selector.sys, "stdout", io.StringIO()), \
              patch("torrent_finder.ui.prompts.confirm_prompt", return_value=confirm) as asked, \
@@ -212,6 +246,16 @@ class AppearanceRowTests(ProfileCase):
 
         self.run_menu(("profile", "remove"))
         self.assertFalse(terminal_profile.installed())
+
+    def test_a_running_terminal_follows_at_once_else_after_a_restart(self):
+        self.run_menu(("profile", "add"))
+        for told, theme_key, expected in ((True, "rubedo", appearance.FOLLOWS_NOW),
+                                          (False, "albedo", appearance.FOLLOWS_LATER)):
+            with self.subTest(told=told), patch.object(terminal_profile, "refresh", return_value=told) as refresh:
+                self.run_menu(("theme", theme_key))
+            refresh.assert_called_once()
+            self.assertIn(expected, self.footers[-1])
+            self.assertEqual(self.fragment()["schemes"][0]["name"], f"torrent-finder {theme.THEMES[theme_key].name}")
 
     def test_declining_the_confirmation_writes_nothing(self):
         self.run_menu(("profile", "add"), confirm=False)

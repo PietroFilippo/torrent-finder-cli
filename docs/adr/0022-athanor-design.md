@@ -80,8 +80,13 @@ Painting for the Athanor design.
 - Nothing is written until the user asks. Afterwards, colour and painting
   choices rewrite the profile, each look under its own picture name because
   Windows Terminal caches pictures by path. Remove deletes the folder (the
-  font stays). Windows Terminal reads fragments when it starts, and the
-  screen says so.
+  font stays). Windows Terminal reads fragments whenever it loads its
+  settings: at start and whenever its settings.json changes. After each
+  write the app updates that file's modification time (never its content),
+  so running Terminals reload and open tabs of the profile take the new look
+  at once; with no settings.json to touch, the screen says the change waits
+  for a restart. (Checked on Windows Terminal 1.24: a fragment written while
+  it ran was loaded without a restart.)
 - Elsewhere, "Save the painting as an image" writes the PNG in the colours on
   screen to `~/Pictures/torrent-finder`, for the terminal's own background
   setting.

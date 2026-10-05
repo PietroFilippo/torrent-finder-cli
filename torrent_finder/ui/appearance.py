@@ -182,7 +182,10 @@ PROFILE_PAINTING_HELP = "The Windows Terminal profile (at the end of this list) 
 PROFILE_HELP = ("A torrent-finder profile in Windows Terminal opens the app on the theme's own page: its colours, "
                 "the painting behind the text (Windows Terminal 1.24 or later) and the PxPlus IBM VGA font, "
                 "installed for your account. It follows what you choose here.")
-PROFILE_NOTE = "This tab is the torrent-finder profile: its background follows the theme after a restart."
+PROFILE_NOTE = "This tab is the torrent-finder profile: its page, painting and font follow what you choose here."
+# What a change does to Windows Terminal: at once when a running one could be told, else at its next start.
+FOLLOWS_NOW = "The Windows Terminal profile follows."
+FOLLOWS_LATER = "The Windows Terminal profile follows; it changes when Windows Terminal restarts."
 
 
 def _painting_help() -> str:
@@ -278,7 +281,7 @@ def appearance_menu() -> None:
         if kind in ("design", "theme", "painting") and terminal_profile.installed():
             try:
                 terminal_profile.write(theme.THEMES[chosen["theme"]], chosen["painting"])
-                state["notice"] = "The Windows Terminal profile follows; it changes when Windows Terminal restarts."
+                state["notice"] = FOLLOWS_NOW if terminal_profile.refresh() else FOLLOWS_LATER
             except OSError as error:
                 state["notice"] = f"[error]The Windows Terminal profile was not updated:[/error] {escape(str(error))}"
 
@@ -291,20 +294,24 @@ def appearance_menu() -> None:
             parts.append("the PxPlus IBM VGA 8x16 font, installed for your account")
         listed = parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
         message = ("Add a [bold]torrent-finder[/bold] profile to Windows Terminal?\n\n"
-                   f"It opens the app with {listed}. It appears when Windows Terminal restarts.")
+                   f"It opens the app with {listed}, from the ▾ menu next to the tabs.")
         if not confirm_prompt(message, title="Windows Terminal profile"):
             return
         try:
             terminal_profile.write(palette, chosen["painting"], add_font=True)
-            state["notice"] = ("[good]Added[/good] the torrent-finder profile: restart Windows Terminal, "
-                               "then open it from the ▾ menu next to the tabs.")
+            if terminal_profile.refresh():
+                state["notice"] = "[good]Added[/good] the torrent-finder profile: open it from the ▾ menu next to the tabs."
+            else:
+                state["notice"] = ("[good]Added[/good] the torrent-finder profile: restart Windows Terminal, "
+                                   "then open it from the ▾ menu next to the tabs.")
         except OSError as error:
             state["notice"] = f"[error]The profile was not added:[/error] {escape(str(error))}"
 
     def remove_profile() -> None:
         try:
             terminal_profile.remove()
-            state["notice"] = "Removed the torrent-finder profile; Windows Terminal drops it when it restarts."
+            state["notice"] = ("Removed the torrent-finder profile." if terminal_profile.refresh() else
+                               "Removed the torrent-finder profile; Windows Terminal drops it when it restarts.")
         except OSError as error:
             state["notice"] = f"[error]The profile was not removed:[/error] {escape(str(error))}"
 
