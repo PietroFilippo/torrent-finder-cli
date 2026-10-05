@@ -11,7 +11,7 @@ from rich.console import Group
 from rich.text import Text
 
 from torrent_finder.constants import buffer_console, console
-from torrent_finder.ui import chrome as frames, theme
+from torrent_finder.ui import chrome as frames, display, theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 
 
@@ -532,12 +532,12 @@ def _render(
     width: int | None = None,
     expected_size: object | None = None,
 ) -> bool:
-    """Redraw inside the alternate screen buffer.
+    """Redraw inside the alternate screen buffer, over the previous frame.
 
-    Clears the viewport first (cheap inside an alt-screen) so a previous
-    render that overflowed and scrolled can't leave ghost rows behind. The
-    frame carries its own header line, so *banner* is accepted for older
-    callers and ignored.
+    ``display.paint`` rewrites every row in place and erases the rest, so a
+    render that overflowed and scrolled leaves no ghost rows, and the screen
+    is never blank between frames. The frame carries its own header line, so
+    *banner* is accepted for older callers and ignored.
     """
     from io import StringIO
 
@@ -548,11 +548,10 @@ def _render(
     # its heading in short terminals. The next redraw already homes the cursor.
     content = buf.getvalue().rstrip("\n")
 
-    # Home + clear entire screen + write content. The 2J clear avoids
-    # ghost rows when a prior render overflowed and scrolled the viewport.
     if expected_size is not None and console.size != expected_size:
         return False
-    sys.stdout.write("\033[H\033[2J" + content)
+    size = console.size
+    sys.stdout.write(display.paint(content, width if width is not None else size.width, size.height))
     sys.stdout.flush()
     return True
 
@@ -693,9 +692,7 @@ def arrow_select(
                 last_rendered_tick = new_tick
                 draw(new_tick)
 
-    # Enter alternate screen buffer + hide cursor + clear it
-    sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
-    sys.stdout.flush()
+    display.enter_screen()
 
     watcher_thread = threading.Thread(target=watcher, daemon=True)
     watcher_thread.start()
@@ -760,10 +757,7 @@ def arrow_select(
                 except KeyboardInterrupt:
                     pass
                 finally:
-                    # The key list left the alternate screen; take it back.
-                    sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
-                    sys.stdout.flush()
-                    state["paused"] = False
+                    state["paused"] = False  # the key list shared the alternate screen
             elif hotkeys and key in hotkeys:
                 return ("hotkey", hotkeys[key], cursor)
             elif key_actions and key in key_actions:
@@ -795,9 +789,6 @@ def arrow_select(
     finally:
         stop_event.set()
         watcher_thread.join(timeout=1)
-        # Show cursor + exit alt screen + clear main screen — all in one write
-        # to prevent any flash of stale content
-        sys.stdout.write("\033[?25h\033[?1049l\033[2J\033[H")
-        sys.stdout.flush()
+        display.leave_screen(clear=True)  # a view underneath keeps the alternate screen
 
     return None

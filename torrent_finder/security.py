@@ -12,7 +12,7 @@ from rich.text import Text
 
 from torrent_finder.constants import console
 from torrent_finder.state import load_setting, save_setting
-from torrent_finder.ui import theme
+from torrent_finder.ui import display, theme
 from torrent_finder.ui.selector import _render
 
 DISMISSED_KEY = "security_warning_dismissed"
@@ -225,8 +225,7 @@ def show_security_warning(force: bool = False) -> bool:
                                      width, full_height))
 
     dismissed = False
-    sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
-    sys.stdout.flush()
+    display.enter_screen()
     try:
         while True:
             _render(None, frame())
@@ -248,7 +247,6 @@ def show_security_warning(force: bool = False) -> bool:
             if key in (readchar.key.CTRL_C, "\x03"):
                 return False
     finally:
-        sys.stdout.write("\033[?25h\033[?1049l")
-        sys.stdout.flush()
+        display.leave_screen()
         if dismissed:
             console.print("[muted]Warning dismissed. Re-open via the provider menu.[/muted]")

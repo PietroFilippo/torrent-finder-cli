@@ -21,7 +21,7 @@ from torrent_finder.downloader import (
     open_magnet,
 )
 from torrent_finder.providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
-from torrent_finder.ui import chrome as frames, theme
+from torrent_finder.ui import chrome as frames, display, theme
 from torrent_finder.ui.selector import SelectItem, arrow_select
 
 # Random tips share the footer only in tall windows, so they never cost list rows.
@@ -405,11 +405,8 @@ def _write_query_frame(
     """Atomically replace the search screen if its render size is still current."""
     if console.size != expected_size:
         return False
-    sys.stdout.write(
-        "\033[H\033[2J"
-        + content
-        + f"\033[{cursor_row};{cursor_col}H"
-    )
+    sys.stdout.write(display.paint(content, expected_size.width, expected_size.height,
+                                   after=f"\033[{cursor_row};{cursor_col}H"))
     sys.stdout.flush()
     return True
 
@@ -520,8 +517,7 @@ def get_query_with_shortcut(
         repaint(prev_col, prev_len)
 
     if screen_renderer is not None:
-        sys.stdout.write("\033[?1049h\033[?25h\033[2J\033[H")
-        sys.stdout.flush()
+        display.enter_screen(cursor=True)
         draw()
         watcher_thread = threading.Thread(target=watcher, daemon=True)
         watcher_thread.start()
@@ -717,8 +713,7 @@ def get_query_with_shortcut(
             stop_event.set()
             if watcher_thread is not None:
                 watcher_thread.join(timeout=0.25)
-            sys.stdout.write("\033[?25h\033[?1049l")
-            sys.stdout.flush()
+            display.leave_screen()
 
 
 def quick_actions_menu(update_available: bool = False, provider=None) -> "str | None":
@@ -1493,8 +1488,7 @@ def confirm_prompt(message: str, title: str = "Confirm") -> bool:
     if theme.roomy(rows, 12):
         lines.append(theme.rule(width))
     lines += theme.wrap_keys(theme.parse_footer("Y confirm  •  Esc cancel").keys, width)
-    sys.stdout.write("\033[?1049h\033[?25l\033[H\033[2J")
-    sys.stdout.flush()
+    display.enter_screen()
     try:
         _render(None, Group(*frames.compose(lines, title, "", width, height)), width=width)
         try:
@@ -1503,8 +1497,7 @@ def confirm_prompt(message: str, title: str = "Confirm") -> bool:
             return False
         return key.lower() == "y"
     finally:
-        sys.stdout.write("\033[?25h\033[?1049l\033[2J\033[H")
-        sys.stdout.flush()
+        display.leave_screen(clear=True)
 
 
 def print_banner() -> None:

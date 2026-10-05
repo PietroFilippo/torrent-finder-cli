@@ -14,7 +14,7 @@ from rich.cells import cell_len
 from rich.console import Console
 from rich.text import Text
 
-from torrent_finder.ui import prompts, search_progress, selector, theme
+from torrent_finder.ui import display, prompts, search_progress, selector, theme
 from torrent_finder.ui.selector import SelectItem
 
 
@@ -232,7 +232,7 @@ class ConfirmPromptTests(unittest.TestCase):
              patch.object(prompts.sys, "stdout", terminal):
             answer = prompts.confirm_prompt("[error]Clear all search history?[/error]\n\nThis cannot be undone.",
                                             title="Clear history")
-        frame = terminal.getvalue().split("\033[H\033[2J")[-1].split("\033[?25h")[0]
+        frame = terminal.getvalue().split(display.BEGIN_UPDATE)[-1].split(display.END_UPDATE)[0]
         return answer, Text.from_ansi(frame).plain
 
     def test_y_confirms_and_other_keys_cancel(self):

@@ -120,7 +120,8 @@ class KeyListTests(unittest.TestCase):
             result = selector.arrow_select([SelectItem("Row")], title="Menu", footer="Enter open • Esc back")
         self.assertIsNone(result)
         self.assertEqual(shown, [("Menu", "Enter open • Esc back")])
-        self.assertGreaterEqual(out.getvalue().count("\033[?1049h"), 2)  # the screen is taken back
+        # The key list shares the alternate screen: the menu enters it once and leaves it once.
+        self.assertEqual((out.getvalue().count("\033[?1049h"), out.getvalue().count("\033[?1049l")), (1, 1))
 
     def test_a_screen_that_binds_question_mark_keeps_it(self):
         keys = iter(["?"])

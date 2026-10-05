@@ -10,7 +10,7 @@ from rich.text import Text
 
 from torrent_finder.constants import console
 from torrent_finder.credential_registry import CREDENTIAL_REGISTRY, CredentialField, CredentialSpec
-from torrent_finder.ui import theme
+from torrent_finder.ui import display, theme
 from torrent_finder.ui.layout import ellipsize_cells
 from torrent_finder.ui.prompts import _make_banner_panel, confirm_prompt
 from torrent_finder.ui.selector import SelectItem, _render, arrow_select
@@ -127,8 +127,7 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
         lines += ([blank] if gaps[3] and prose else []) + prose + ([rule] if gaps[4] else []) + keys_lines
         return Group(*frames.compose(lines, title, "", width, full_height))
 
-    sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
-    sys.stdout.flush()
+    display.enter_screen()
     try:
         _render(_make_banner_panel(), _panel())
         while True:
@@ -159,8 +158,7 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
                     buffers[env_key] = buffers.get(env_key, "") + key
             _render(_make_banner_panel(), _panel())
     finally:
-        sys.stdout.write("\033[?25h\033[?1049l\033[2J\033[H")
-        sys.stdout.flush()
+        display.leave_screen(clear=True)
 
 
 def _inline_confirm(message: str, default: bool = False) -> bool:

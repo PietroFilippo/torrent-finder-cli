@@ -18,7 +18,7 @@ from rich.spinner import SPINNERS
 from rich.text import Text
 
 from torrent_finder.constants import buffer_console, console
-from torrent_finder.ui import chrome as frames, theme
+from torrent_finder.ui import chrome as frames, display, theme
 from torrent_finder.ui.layout import ellipsize_cells
 
 KEYS = "Enter view results so far  •  Esc cancel"
@@ -214,9 +214,7 @@ class ProgressScreen:
     """Owns the alternate screen while a search runs; restores the terminal on exit."""
 
     def __enter__(self) -> "ProgressScreen":
-        sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
-        sys.stdout.flush()
-        self._last_size = None
+        display.enter_screen()
         return self
 
     def draw(self, frame) -> None:
@@ -224,12 +222,8 @@ class ProgressScreen:
         buffer = io.StringIO()
         buffer_console(buffer, size.width, size.height).print(frame)
         lines = buffer.getvalue().rstrip("\n").split("\n")[: size.height]
-        # A resize needs a clean slate; otherwise overwrite in place.
-        prefix = "\033[2J\033[H" if size != self._last_size else "\033[H"
-        self._last_size = size
-        sys.stdout.write(prefix + "\033[K\n".join(lines) + "\033[K\033[J")
+        sys.stdout.write(display.paint("\n".join(lines), size.width, size.height))
         sys.stdout.flush()
 
     def __exit__(self, *_exc) -> None:
-        sys.stdout.write("\033[?25h\033[?1049l")
-        sys.stdout.flush()
+        display.leave_screen()
