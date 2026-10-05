@@ -19,13 +19,41 @@ from rich.text import Text
 
 APP_NAME = "torrent-finder"
 MARGIN = "  "
-CURSOR = "▍"
-CHECK = "✓"
-UNCHECKED = "•"
-MARKER = "◆"
-CRUMB = " › "
 KEY_GAP = "   "
-BAR = "▇"  # one cell of a bar in a chart row
+
+
+@dataclass(frozen=True)
+class Glyphs:
+    """The symbols a design draws with; screens read them from this module at render time."""
+
+    cursor: str      # marks the focused row
+    check: str       # a ticked checkbox
+    unchecked: str   # an unticked checkbox
+    marker: str      # a range-select anchor
+    crumb: str       # between the parts of a screen name
+    bar: str         # one cell of a bar in a chart row
+    spinner: str     # a Rich spinner name
+    rule: str = "─"
+
+
+@dataclass(frozen=True)
+class Design:
+    """A whole look: its glyphs and whether frames get the Athanor chrome (frame, message and status lines)."""
+
+    key: str
+    name: str
+    glyphs: Glyphs
+    framed: bool
+    note: str
+
+
+DESIGNS: dict[str, Design] = {design.key: design for design in (
+    Design("athanor", "Athanor", Glyphs("@", "√", "∙", "♦", " » ", "▓", "line"), True,
+           "A roguelike scriptorium: a double-line frame, a message line, a status line, "
+           "glyphs from the IBM PC character set, and a painting behind the terminal."),
+    Design("simple", "Simple", Glyphs("▍", "✓", "•", "◆", " › ", "▇", "dots"), False,
+           "The quiet look: a header line, thin rules and a key bar; no frame."),
+)}
 
 
 @dataclass(frozen=True)
@@ -37,6 +65,11 @@ class Palette:
     *steel* labels, hints, separators, Off and disabled rows; *deep* rules and
     bars; *fill* the focused row's background when focus is "fill". *good*,
     *warn* and *bad* are the state colours (On / Auto / failures, seed health).
+
+    Every palette belongs to a *design*. The terminal colours describe the page
+    it is made for: *page* (background), *text* (foreground) and *ink* (the
+    painting's lines); Athanor colourways draw their text in *text* and their
+    frame and bars in *frame* and *bar_bg*.
     """
 
     key: str
@@ -51,13 +84,45 @@ class Palette:
     bad: str = "red"
     note: str = ""
     light: bool = False
+    design: str = "simple"
+    page: str = "#0C0C0C"
+    text: str = ""
+    ink: str = ""
+    frame: str = ""
+    bar_bg: str = ""
 
 
-# Dark palettes leave the state colours to the terminal's own green, yellow and
-# red. Hex shades degrade to the nearest named colour without true colour.
+def _colourway(key, name, accent, sky, steel, deep, fill, good, warn, bad, *, page, text, ink, frame, bar_bg, note):
+    return Palette(key, name, accent, sky, steel, deep, fill, good, warn, bad, note=note, design="athanor",
+                   page=page, text=text, ink=ink, frame=frame, bar_bg=bar_bg)
+
+
+# Dark Simple palettes leave the state colours to the terminal's own green,
+# yellow and red. Hex shades degrade to the nearest named colour without true
+# colour. Athanor colourways are named for the stages of the alchemical work.
 THEMES: dict[str, Palette] = {palette.key: palette for palette in (
+    _colourway("citrinitas", "Citrinitas", "#D49A3A", "#E3C27A", "#83745E", "#5C4C39", "#2B2117",
+               "#8F9A5A", "#C8742E", "#C2452D", page="#16120E", text="#CFC1A3", ink="#3A3026",
+               frame="#AC7D31", bar_bg="#0D0B08",
+               note="Lamplight amber on parchment: the scriptorium as first seen."),
+    _colourway("rubedo", "Rubedo", "#D86A45", "#EBA987", "#8D6F65", "#5A3A33", "#2C1714",
+               "#8F9A5A", "#D9A441", "#C23A3A", page="#150E0D", text="#D9C6B8", ink="#3A2420",
+               frame="#A8472F", bar_bg="#0C0807",
+               note="Vermilion and rust: the reddening, the work's last stage."),
+    _colourway("albedo", "Albedo", "#E6E1D6", "#B9C6D2", "#7C8088", "#43474E", "#24272C",
+               "#8FA68A", "#D3A955", "#C9675A", page="#121315", text="#D2CEC6", ink="#2E3237",
+               frame="#9AA0A8", bar_bg="#0B0C0E",
+               note="Bone and silver: the whitening, cool and quiet."),
+    _colourway("viriditas", "Viriditas", "#5FB3A1", "#A7D8C8", "#6E8577", "#3A4D42", "#16241F",
+               "#A3C25E", "#D9A441", "#CF5D4B", page="#0F1412", text="#C6D1C3", ink="#26342D",
+               frame="#4E8F7F", bar_bg="#090C0B",
+               note="Verdigris on copper: the greening of old metal."),
+    _colourway("nigredo", "Nigredo", "#C8643C", "#D8CFC3", "#6E6A64", "#3A3835", "#1E1C1B",
+               "#8F9A5A", "#D9A441", "#B83A3A", page="#0E0E0E", text="#BDB6AD", ink="#2B2928",
+               frame="#6E6A64", bar_bg="#080808",
+               note="Ash and a single ember: the blackening."),
     Palette("quiet", "Quiet Blue", "bright_blue", "#7DAEFF", "#6A86B3", "#3A5A8C", "#16233D",
-            note="The default: your terminal's bright blue with three fixed shades of blue."),
+            note="Your terminal's bright blue with three fixed shades of blue."),
     Palette("iris", "Iris", "#A78BFA", "#C9B8FF", "#8F86B5", "#4B3F86", "#231B3F",
             note="Violet; green, yellow and red stay free for states."),
     Palette("lagoon", "Lagoon", "#2DD4BF", "#9FF2E4", "#6E9CA3", "#1E5C66", "#0E2A2E",
@@ -67,20 +132,30 @@ THEMES: dict[str, Palette] = {palette.key: palette for palette in (
     Palette("mono", "Mono", "#F2F2F2", "#D9D9D9", "#8C8C8C", "#474747", "#262626",
             note="No hue: weight carries the structure, states keep their colours."),
     Palette("paper", "Paper", "#1F5FD6", "#2B4C8C", "#6B7A99", "#B9C6DC", "#DCE6F7",
-            good="#1A7F37", warn="#9A6700", bad="#CF222E", light=True,
+            good="#1A7F37", warn="#9A6700", bad="#CF222E", light=True, page="#FAFAFA",
             note="For light terminals: switch your terminal to a light colour scheme first."),
 )}
-DEFAULT_THEME = "quiet"
+DEFAULT_THEME = "citrinitas"
+DEFAULT_THEMES = {"athanor": "citrinitas", "simple": "quiet"}  # what choosing a design starts on
 FOCUS_STYLES = {"bar": "Cursor bar", "fill": "Filled row"}
 DENSITIES = {"comfortable": "Comfortable", "compact": "Compact"}
 
-# The active palette's roles, rebound by apply(). Screens read these at render
-# time (``theme.ACCENT``), so a theme change reaches the next frame.
+
+def palettes(design: str) -> list[Palette]:
+    """The palettes of one design, in their registry order."""
+    return [palette for palette in THEMES.values() if palette.design == design]
+
+
+# The active palette's roles and the active design's glyphs, rebound by
+# apply(). Screens read these at render time (``theme.ACCENT``,
+# ``theme.CURSOR``), so a theme change reaches the next frame.
 PALETTE: Palette = THEMES[DEFAULT_THEME]
-ACCENT = SKY = STEEL = DEEP = FILL = GOOD = WARN = BAD = ""
+DESIGN: Design = DESIGNS[PALETTE.design]
+ACCENT = SKY = STEEL = DEEP = FILL = GOOD = WARN = BAD = TEXT = FRAME = BAR_BG = ""
 KEY = MUTED = SECTION = FOCUS = BRAND = SUBJECT = RULE_STYLE = ""
+CURSOR = CHECK = UNCHECKED = MARKER = CRUMB = BAR = SPINNER = RULE = ""
+FRAMED = False            # the Athanor chrome: a frame, a message line and a status line
 SCREEN = "bold"           # the screen name after the app name
-RULE = "─"
 FILL_FOCUS = False        # focus style "fill": the focused row on a tinted background
 COMPACT = False           # density "compact": the short-window layout at every size
 
@@ -92,11 +167,20 @@ _STATE_STYLES: dict[str, str] = {}
 
 
 def _bind(palette: Palette) -> None:
-    global PALETTE, ACCENT, SKY, STEEL, DEEP, FILL, GOOD, WARN, BAD
-    global KEY, MUTED, SECTION, FOCUS, BRAND, SUBJECT, RULE_STYLE
+    global PALETTE, DESIGN, ACCENT, SKY, STEEL, DEEP, FILL, GOOD, WARN, BAD, TEXT, FRAME, BAR_BG
+    global KEY, MUTED, SECTION, FOCUS, BRAND, SUBJECT, RULE_STYLE, FRAMED
+    global CURSOR, CHECK, UNCHECKED, MARKER, CRUMB, BAR, SPINNER, RULE
     PALETTE = palette
+    DESIGN = DESIGNS[palette.design]
+    glyphs = DESIGN.glyphs
+    CURSOR, CHECK, UNCHECKED, MARKER = glyphs.cursor, glyphs.check, glyphs.unchecked, glyphs.marker
+    CRUMB, BAR, SPINNER, RULE = glyphs.crumb, glyphs.bar, glyphs.spinner, glyphs.rule
+    FRAMED = DESIGN.framed
     ACCENT, SKY, STEEL, DEEP, FILL = palette.accent, palette.sky, palette.steel, palette.deep, palette.fill
     GOOD, WARN, BAD = palette.good, palette.warn, palette.bad
+    TEXT = palette.text                      # "" leaves body text to the terminal's foreground
+    FRAME = palette.frame or palette.deep
+    BAR_BG = palette.bar_bg
     KEY = f"bold {ACCENT}"
     MUTED = STEEL
     SECTION = f"bold {SKY}"     # uppercase section headers and table column headers

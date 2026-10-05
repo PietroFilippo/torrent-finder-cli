@@ -27,7 +27,7 @@ class ThemeCase(unittest.TestCase):
     """Restores the default appearance after each test, whatever it applied."""
 
     def setUp(self):
-        self.addCleanup(theme.apply, theme.DEFAULT_THEME, focus="bar", density="comfortable")
+        self.addCleanup(theme.apply, "quiet", focus="bar", density="comfortable")  # the suite's baseline
 
 
 class PaletteTests(ThemeCase):
@@ -51,6 +51,36 @@ class PaletteTests(ThemeCase):
                         self.assertGreater(_luminance(palette.deep), _luminance(palette.steel))
                     else:
                         self.assertLess(_luminance(palette.deep), _luminance(palette.steel))
+
+    def test_every_palette_belongs_to_a_design_with_a_default(self):
+        self.assertEqual(theme.THEMES[theme.DEFAULT_THEME].design, "athanor")
+        for key, design in theme.DESIGNS.items():
+            with self.subTest(design=key):
+                self.assertEqual(theme.THEMES[theme.DEFAULT_THEMES[key]].design, key)
+                self.assertTrue(theme.palettes(key))
+        self.assertEqual({p.design for p in theme.THEMES.values()}, set(theme.DESIGNS))
+        self.assertEqual([p.key for p in theme.palettes("simple")],
+                         ["quiet", "iris", "lagoon", "ember", "mono", "paper"])
+
+    def test_colourways_describe_the_page_they_are_made_for(self):
+        # Ink (the painting's lines) sits between the page and the text, so text stays readable over it.
+        for palette in theme.palettes("athanor"):
+            with self.subTest(theme=palette.key):
+                for color in (palette.page, palette.text, palette.ink, palette.frame, palette.bar_bg):
+                    Color.parse(color)
+                self.assertLess(_luminance(palette.page), _luminance(palette.ink))
+                self.assertLess(_luminance(palette.ink), _luminance(palette.steel))
+                self.assertLess(_luminance(palette.bar_bg), _luminance(palette.page))
+
+    def test_designs_bring_their_glyphs_and_frame(self):
+        theme.apply("citrinitas")
+        self.assertEqual((theme.CURSOR, theme.CRUMB, theme.CHECK, theme.SPINNER), ("@", " » ", "√", "line"))
+        self.assertTrue(theme.FRAMED)
+        self.assertEqual(theme.TEXT, theme.THEMES["citrinitas"].text)  # body text drawn in parchment
+        theme.apply("quiet")
+        self.assertEqual((theme.CURSOR, theme.CRUMB, theme.CHECK, theme.SPINNER), ("▍", " › ", "✓", "dots"))
+        self.assertFalse(theme.FRAMED)
+        self.assertEqual(theme.TEXT, "")  # the terminal's own foreground
 
     def test_quiet_blue_keeps_the_terminal_accent_and_state_colours(self):
         quiet = theme.THEMES["quiet"]
@@ -136,7 +166,7 @@ class ResolutionTests(ThemeCase):
         self.assertIsNone(appearance.theme_key(None))
 
     def test_cli_beats_environment_beats_saved_beats_default(self):
-        self.assertEqual(appearance.resolve(None, {})[0]["theme"], "quiet")
+        self.assertEqual(appearance.resolve(None, {})[0]["theme"], theme.DEFAULT_THEME)
         appearance.save("iris", "fill", "compact")
         resolved, source, notice = appearance.resolve(None, {})
         self.assertEqual((resolved, source, notice),
@@ -148,7 +178,7 @@ class ResolutionTests(ThemeCase):
 
     def test_an_unknown_environment_theme_is_named_and_ignored(self):
         resolved, source, notice = appearance.resolve(None, {appearance.ENV: "neon"})
-        self.assertEqual((resolved["theme"], source), ("quiet", "saved"))
+        self.assertEqual((resolved["theme"], source), (theme.DEFAULT_THEME, "saved"))
         self.assertIn("neon", notice)
         self.assertIn("lagoon", notice)
 

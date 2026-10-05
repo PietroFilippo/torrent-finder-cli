@@ -2,7 +2,8 @@
 
 At startup the theme comes from ``--theme`` (this run only), then the
 ``TORRENT_FINDER_THEME`` environment variable, then the saved setting, then
-Quiet Blue. Focus style and density come from the saved setting. The
+Citrinitas (the Athanor design). A theme's design (Athanor or Simple) comes
+with it. Focus style and density come from the saved setting. The
 Settings › Appearance screen previews a theme in place and saves the choice.
 See docs/adr/0021-themes.md.
 """
@@ -18,7 +19,7 @@ from torrent_finder.ui import theme
 
 SETTING = "appearance"
 ENV = "TORRENT_FINDER_THEME"
-DEFAULTS = {"theme": theme.DEFAULT_THEME, "focus": "bar", "density": "comfortable"}
+DEFAULTS = {"theme": theme.DEFAULT_THEME, "focus": "fill", "density": "comfortable"}
 
 
 def theme_key(name: object) -> str | None:
@@ -140,52 +141,70 @@ def _theme_help(palette) -> str:
     return f"{palette.note} {light_scheme_help()}" if palette.light else palette.note
 
 
-_FOCUS_HINTS = {"bar": f"{theme.CURSOR} beside the focused row", "fill": "the focused row on a tint"}
+def _focus_hint(key: str) -> str:
+    return f"{theme.CURSOR} beside the focused row" if key == "bar" else "the focused row on a tint"
+
+
 _FOCUS_HELP = {
-    "bar": "A bar in the gutter and bold text mark the focused row.",
+    "bar": "A mark in the gutter and bold text show the focused row.",
     "fill": "The focused row also gets a tinted background across the screen; easier to follow in long lists.",
 }
 _DENSITY_HINTS = {"comfortable": "rules and spacing when there is room", "compact": "more rows in every window"}
 _DENSITY_HELP = {
-    "comfortable": "Rules under the header and above the keys, and spacer lines, whenever the window has room.",
-    "compact": "The short-window layout at every size: no rules or spacer lines, so lists show more rows.",
+    "comfortable": "Rules, spacer lines and (in Athanor) the message and status lines whenever the window has room.",
+    "compact": "The short-window layout at every size: no rules, spacer, message or status lines, so lists show more rows.",
 }
+_DESIGN_HINTS = {"athanor": "frame · message and status lines · painting", "simple": "header line · rules · no frame"}
+
+
+def _choice(label, value, chosen: bool, hint="", description=""):
+    from torrent_finder.ui.selector import SelectItem
+    return SelectItem(label, value, hint=hint, is_action=True, description=description,
+                      marker="●" if chosen else "○", marker_style="" if chosen else theme.MUTED)
+
+
+def _section(label: str):
+    from torrent_finder.ui.selector import SelectItem
+    return SelectItem(f"─── {label} ───", "section_header", enabled=False, is_action=True)
 
 
 def appearance_menu() -> None:
-    """Settings › Appearance: pick a theme (Space previews it), a focus style and a density.
+    """Settings › Appearance: the design, its colours, the focus style and the density.
 
-    Enter applies a choice and saves it for later runs; Esc leaves, putting
-    back the theme that was applied when the screen opened if a preview was
-    showing.
+    Athanor and Simple are designs; each has its own colours. Space previews a
+    design or a colourway in place; Enter applies a choice and saves it for
+    later runs; Esc leaves, putting back what was applied when the screen
+    opened if a preview was showing.
     """
     from rich.markup import escape
 
-    from torrent_finder.ui.selector import SelectItem, arrow_select
+    from torrent_finder.ui.selector import arrow_select
 
     palette, focus, density = theme.current()
     chosen = {"theme": palette.key, "focus": focus, "density": density}
     state = {"preview": palette.key, "notice": ""}
 
+    def design_of(key: str) -> str:
+        return theme.THEMES[key].design
+
     def build() -> list:
-        items = [SelectItem("─── Theme ───", "section_header", enabled=False, is_action=True)]
-        for key, option in theme.THEMES.items():
-            items.append(SelectItem(option.name, ("theme", key), hint=_swatches(option), is_action=True,
-                                    marker="●" if key == chosen["theme"] else "○",
-                                    marker_style="" if key == chosen["theme"] else theme.MUTED,
-                                    description=_theme_help(option)))
-        items.append(SelectItem("─── Focus ───", "section_header", enabled=False, is_action=True))
+        design = design_of(state["preview"])
+        items = [_section("Design")]
+        for key, option in theme.DESIGNS.items():
+            items.append(_choice(option.name, ("design", key), key == design_of(chosen["theme"]),
+                                 _DESIGN_HINTS[key], option.note))
+        items.append(_section(f"{theme.DESIGNS[design].name} colours"))
+        for option in theme.palettes(design):
+            items.append(_choice(option.name, ("theme", option.key), option.key == chosen["theme"],
+                                 _swatches(option), _theme_help(option)))
+        items.append(_section("Focus"))
         for key, label in theme.FOCUS_STYLES.items():
-            items.append(SelectItem(label, ("focus", key), hint=_FOCUS_HINTS[key], is_action=True,
-                                    marker="●" if key == chosen["focus"] else "○",
-                                    marker_style="" if key == chosen["focus"] else theme.MUTED,
-                                    description=_FOCUS_HELP[key]))
-        items.append(SelectItem("─── Density ───", "section_header", enabled=False, is_action=True))
+            items.append(_choice(label, ("focus", key), key == chosen["focus"], _focus_hint(key), _FOCUS_HELP[key]))
+        items.append(_section("Density"))
         for key, label in theme.DENSITIES.items():
-            items.append(SelectItem(label, ("density", key), hint=_DENSITY_HINTS[key], is_action=True,
-                                    marker="●" if key == chosen["density"] else "○",
-                                    marker_style="" if key == chosen["density"] else theme.MUTED,
-                                    description=_DENSITY_HELP[key]))
+            items.append(_choice(label, ("density", key), key == chosen["density"], _DENSITY_HINTS[key],
+                                 _DENSITY_HELP[key]))
+        from torrent_finder.ui.selector import SelectItem
         items.append(SelectItem("Back", None, is_action=True))
         return items
 
@@ -196,33 +215,43 @@ def appearance_menu() -> None:
         except (OSError, ValueError) as error:
             state["notice"] = f"[error]Applied for this session, but not saved:[/error] {escape(str(error))}"
 
+    def target(value) -> str:
+        """The palette a design or colourway row stands for."""
+        kind, key = value
+        if kind == "design":
+            # Choosing the design you are in keeps its colourway; another design starts on its default.
+            return chosen["theme"] if design_of(chosen["theme"]) == key else theme.DEFAULT_THEMES[key]
+        return key
+
     def choose(index: int, items: list) -> bool:
         value = items[index].value
         if value is None:
             return False  # Back
         kind, key = value
-        chosen[kind] = key
-        if kind == "theme":
-            state["preview"] = key
+        if kind in ("design", "theme"):
+            chosen["theme"] = state["preview"] = target(value)
+        else:
+            chosen[kind] = key
         theme.apply(chosen["theme"], focus=chosen["focus"], density=chosen["density"])
         persist()
-        items[:] = build()  # the same rows with the markers moved
+        items[:] = build()  # markers move; a new design brings its own colours
         return True  # stay: the screen redraws in the new appearance
 
     def preview(index: int, items: list) -> bool:
         value = items[index].value
         if not value:
             return True
-        if value[0] != "theme":
+        if value[0] not in ("design", "theme"):
             return choose(index, items)
-        state["preview"] = value[1]
-        theme.apply(value[1])
+        state["preview"] = target(value)
+        theme.apply(state["preview"])
+        items[:] = build()
         return True
 
     def status() -> str:
-        if state["preview"] != chosen["theme"]:
-            return f"previewing {theme.THEMES[state['preview']].name}"
-        return f"using {theme.THEMES[chosen['theme']].name}"
+        shown = theme.THEMES[state["preview"]]
+        label = f"{theme.DESIGNS[shown.design].name} · {shown.name}"
+        return f"previewing {label}" if state["preview"] != chosen["theme"] else f"using {label}"
 
     def footer() -> str:
         lines = []

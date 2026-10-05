@@ -75,7 +75,7 @@ def run_action(session, action):
     stop = start_esc_listener(cancel, finish_event=finish)
     try:
         label = "Retrying failed sources" if action == "retry" else "Loading more results"
-        with console.status(label + " · Enter: results so far · Esc: stop", spinner="dots"):
+        with console.status(label + " · Enter: results so far · Esc: stop", spinner=theme.SPINNER):
             while not done.wait(0.05):
                 pass
     except KeyboardInterrupt:

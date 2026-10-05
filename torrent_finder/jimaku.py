@@ -15,6 +15,7 @@ import requests
 from rich.markup import escape
 
 from torrent_finder.constants import console, get_download_dir
+from torrent_finder.ui import theme
 from torrent_finder.credentials import jimaku_api_key
 
 _BASE = "https://jimaku.cc/api"
@@ -117,7 +118,7 @@ def search_and_download(torrent_name: str) -> Optional[str]:
     query = _clean_title(torrent_name)
     console.print(f"[info]Searching Jimaku for:[/info] [highlight]{escape(query)}[/highlight]")
 
-    with console.status("[accent]Querying Jimaku...[/accent]", spinner="dots"):
+    with console.status("[accent]Querying Jimaku...[/accent]", spinner=theme.SPINNER):
         entries = _search_entries(query, key)
     if not entries:
         console.print("[warning]No Jimaku series matched — trying subliminal instead.[/warning]")
@@ -134,7 +135,7 @@ def search_and_download(torrent_name: str) -> Optional[str]:
             return None
         entry = items[idx].value
 
-    with console.status("[accent]Loading subtitle files...[/accent]", spinner="dots"):
+    with console.status("[accent]Loading subtitle files...[/accent]", spinner=theme.SPINNER):
         files = _list_files(entry.get("id"), key)
     files = [f for f in files if isinstance(f.get("name"), str) and f.get("url")]
     if not files:
@@ -153,7 +154,7 @@ def search_and_download(torrent_name: str) -> Optional[str]:
         return None
     chosen = file_items[idx].value
 
-    with console.status(f"[accent]Downloading {escape(chosen['name'])}...[/accent]", spinner="dots"):
+    with console.status(f"[accent]Downloading {escape(chosen['name'])}...[/accent]", spinner=theme.SPINNER):
         saved = _download(chosen["url"], chosen["name"], key)
     if saved:
         console.print(f"\n[success]Saved Jimaku subtitle to {escape(get_download_dir())}![/success]")

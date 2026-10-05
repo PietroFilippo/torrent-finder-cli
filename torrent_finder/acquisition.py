@@ -39,7 +39,7 @@ def _unpack_saved(paths) -> list[str]:
     on; summary lines for the result panel ([] when nothing to say)."""
     if not paths or not unpack.enabled():
         return []
-    with console.status("[accent]Unpacking…[/accent]", spinner="dots") as status:
+    with console.status("[accent]Unpacking…[/accent]", spinner=theme.SPINNER) as status:
         report = unpack.unpack_all(paths, expect_pages=True,
                                    status=lambda text: status.update(f"[accent]{escape(text)}[/accent]"))
     return unpack.summary_lines(report)
@@ -142,7 +142,7 @@ def _wait_with_esc(message: str, work, *args):
     worker = threading.Thread(target=run, daemon=True)
     stop_listener = start_esc_listener(cancel)
     try:
-        with console.status(f"[accent]{message}[/accent] [dim]Esc to cancel[/dim]", spinner="dots"):
+        with console.status(f"[accent]{message}[/accent] [dim]Esc to cancel[/dim]", spinner=theme.SPINNER):
             worker.start()
             while worker.is_alive() and not cancel.is_set():
                 worker.join(0.1)

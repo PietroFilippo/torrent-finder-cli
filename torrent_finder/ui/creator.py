@@ -51,7 +51,7 @@ def _run_cancellable(fn, message: str, cancel: "threading.Event | None" = None):
     threading.Thread(target=work, daemon=True).start()
     stop = start_esc_listener(cancel)
     try:
-        with console.status(f"[accent]{escape(message)}[/accent]", spinner="dots"):
+        with console.status(f"[accent]{escape(message)}[/accent]", spinner=theme.SPINNER):
             while not out.get("done") and not cancel.is_set():
                 time.sleep(0.05)
     except KeyboardInterrupt:
@@ -334,7 +334,7 @@ def _apply_prefetch(cache):
     if holder is None:
         return
     if not holder["done"]:
-        with console.status("[accent]Fetching more titles…[/accent]", spinner="dots"):
+        with console.status("[accent]Fetching more titles…[/accent]", spinner=theme.SPINNER):
             holder["thread"].join()
     have = {w.title for w in cache["all"]}
     cache["all"].extend(w for w in holder["works"] if w.title not in have)

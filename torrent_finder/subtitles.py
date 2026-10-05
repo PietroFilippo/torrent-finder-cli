@@ -14,6 +14,7 @@ from subliminal.cache import region as _subliminal_region
 
 from rich.markup import escape
 from torrent_finder.constants import console, get_download_dir
+from torrent_finder.ui import theme
 
 # subliminal caches provider auth tokens (e.g. the OpenSubtitles.com session) in
 # a dogpile cache region that must be configured before use. As a library (not
@@ -168,7 +169,7 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
             # subliminal treat the string as a standard video filename.
             video = Video.fromname(f"{torrent_name}.mkv")
 
-        with console.status(f"[accent]Downloading subtitles for '[highlight]{escape(torrent_name)}[/highlight]'...[/accent]", spinner="dots"):
+        with console.status(f"[accent]Downloading subtitles for '[highlight]{escape(torrent_name)}[/highlight]'...[/accent]", spinner=theme.SPINNER):
             # subliminal downloads the best subtitle per requested language.
             best_subtitles = download_best_subtitles(
                 [video], set(languages),

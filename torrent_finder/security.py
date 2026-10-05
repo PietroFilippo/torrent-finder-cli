@@ -104,7 +104,7 @@ def show_security_warning(force: bool = False) -> bool:
         if load_setting(DISMISSED_KEY, False):
             return True
 
-    with console.status("[accent]Fetching network info…[/accent]", spinner="dots", spinner_style=theme.ACCENT):
+    with console.status("[accent]Fetching network info…[/accent]", spinner=theme.SPINNER, spinner_style=theme.ACCENT):
         info = _fetch_network_info()
 
     # (label, value) rows; rows marked optional give way first in a short window.

@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from rich.markup import escape
 
 from torrent_finder.constants import console, get_download_dir, prepare_download_dir
+from torrent_finder.ui import theme
 from torrent_finder.state import load_setting
 from torrent_finder.torrent_meta import compact_ranges
 from torrent_finder.ui.streaming import (
@@ -570,7 +571,7 @@ def _run_download(cmd: list[str], quiet: bool, status_msg: str) -> int | None:
     proc = _spawn_detached(cmd, quiet)
     try:
         if quiet:
-            with console.status(status_msg, spinner="dots"):
+            with console.status(status_msg, spinner=theme.SPINNER):
                 return _wait_interruptibly(proc)
         return _wait_interruptibly(proc)
     except KeyboardInterrupt:
@@ -945,7 +946,7 @@ def _run_stream(
                 if allow_navigate:
                     hints.append("n/b next/prev")
                 msg = "[accent]Streaming…[/accent]  " + "  •  ".join(hints)
-                with console.status(msg, spinner="dots"):
+                with console.status(msg, spinner=theme.SPINNER):
                     nav_action = _poll_loop()
             else:
                 nav_action = _poll_loop()
@@ -1092,7 +1093,7 @@ def _resolve_subs_for_session(
         console.print(
             f"[info]Found {len(missing)} subtitle file(s) inside torrent — fetching via aria2c…[/info]"
         )
-        with console.status("[accent]Downloading subtitles…[/accent]", spinner="dots"):
+        with console.status("[accent]Downloading subtitles…[/accent]", spinner=theme.SPINNER):
             local.update(_fetch_torrent_subs(magnet_link, files_meta, missing))
 
     result: dict[int, list[str]] = {}

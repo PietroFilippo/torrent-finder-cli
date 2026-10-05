@@ -135,7 +135,7 @@ class HomeTests(unittest.TestCase):
 class AppearanceMenuTests(unittest.TestCase):
     def setUp(self):
         isolate_store(self)
-        self.addCleanup(theme.apply, theme.DEFAULT_THEME, focus="bar", density="comfortable")
+        self.addCleanup(theme.apply, "quiet", focus="bar", density="comfortable")  # the suite's baseline
 
     def run_menu(self, keys):
         screen = Console(file=io.StringIO(), width=100, height=40, color_system=None)
@@ -151,7 +151,7 @@ class AppearanceMenuTests(unittest.TestCase):
     def test_space_previews_and_esc_puts_the_saved_theme_back(self):
         self.run_menu([K.DOWN, " ", K.ESC])
         self.assertEqual(theme.PALETTE.key, "quiet")
-        self.assertEqual(appearance.saved()["theme"], "quiet")
+        self.assertIsNone(state.load_setting(appearance.SETTING))  # a preview saves nothing
 
     def test_enter_applies_and_saves_the_theme(self):
         self.run_menu([K.DOWN, K.ENTER, K.ESC])  # Quiet Blue → Iris
@@ -165,17 +165,32 @@ class AppearanceMenuTests(unittest.TestCase):
         self.assertEqual(appearance.saved(), {"theme": "quiet", "focus": "fill", "density": "compact"})
 
     def test_every_theme_row_shows_its_own_colours(self):
-        captured = []
-        with patch("torrent_finder.ui.selector.arrow_select", side_effect=lambda items, **kw: captured.append(items)):
-            appearance.appearance_menu()
-        rows = {item.label: item for item in captured[0] if isinstance(item.value, tuple) and item.value[0] == "theme"}
-        self.assertEqual(list(rows), [palette.name for palette in theme.THEMES.values()])
-        for palette in theme.THEMES.values():
-            styles = {str(span.style) for span in rows[palette.name].hint.spans}
-            self.assertIn(palette.accent, styles)
-            self.assertIn(f"bold {palette.sky}", styles)
-        self.assertEqual(rows["Quiet Blue"].marker, "●")
-        self.assertEqual(rows["Iris"].marker, "○")
+        for design, current in (("simple", "quiet"), ("athanor", "citrinitas")):
+            theme.apply(current)
+            captured = []
+            with patch("torrent_finder.ui.selector.arrow_select",
+                       side_effect=lambda items, **kw: captured.append(items)):
+                appearance.appearance_menu()
+            items = captured[0]
+            designs = [item.label for item in items if isinstance(item.value, tuple) and item.value[0] == "design"]
+            self.assertEqual(designs, ["Athanor", "Simple"])
+            rows = {item.label: item for item in items if isinstance(item.value, tuple) and item.value[0] == "theme"}
+            self.assertEqual(list(rows), [palette.name for palette in theme.palettes(design)])  # only its own design
+            for palette in theme.palettes(design):
+                styles = {str(span.style) for span in rows[palette.name].hint.spans}
+                self.assertIn(palette.accent, styles)
+                self.assertIn(f"bold {palette.sky}", styles)
+            self.assertEqual(rows[theme.THEMES[current].name].marker, "●")
+
+    def test_choosing_a_design_starts_on_its_default_colours(self):
+        # From Quiet Blue (Simple): up past the colours heading to Simple, then up to Athanor.
+        self.run_menu([K.UP, K.UP, K.ENTER, K.ESC])
+        self.assertEqual(theme.PALETTE.key, "citrinitas")
+        self.assertTrue(theme.FRAMED)
+        self.assertEqual(appearance.saved()["theme"], "citrinitas")
+        self.run_menu([K.DOWN, K.ENTER, K.ESC])  # Citrinitas → Rubedo keeps the Athanor design
+        self.assertEqual(theme.PALETTE.design, "athanor")
+        self.assertEqual(theme.PALETTE.key, "rubedo")
 
     def test_the_screen_says_themes_leave_the_background_to_the_terminal(self):
         captured = {}

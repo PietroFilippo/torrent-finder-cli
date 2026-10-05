@@ -189,7 +189,7 @@ def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) ->
         return False
 
     try:
-        with console.status("[accent]Verifying credentials…[/accent]", spinner="dots"):
+        with console.status("[accent]Verifying credentials…[/accent]", spinner=theme.SPINNER):
             ok, message = meta.verify(effective)
     except KeyboardInterrupt:
         console.print("[warning]Verification cancelled — nothing saved.[/warning]")

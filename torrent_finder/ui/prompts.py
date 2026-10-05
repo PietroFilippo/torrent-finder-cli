@@ -1499,7 +1499,7 @@ def torrent_info_screen(result: dict) -> None:
     from torrent_finder.torrent_info import fetch_torrent_info
 
     try:
-        with console.status("[accent]Fetching torrent info…[/accent]", spinner="dots"):
+        with console.status("[accent]Fetching torrent info…[/accent]", spinner=theme.SPINNER):
             info, err = fetch_torrent_info(result)
     except KeyboardInterrupt:
         console.print("[warning]Torrent info fetch cancelled.[/warning]")

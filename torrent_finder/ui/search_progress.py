@@ -23,7 +23,6 @@ from torrent_finder.ui.layout import ellipsize_cells
 
 KEYS = "Enter view results so far  •  Esc cancel"
 REDRAW_S = 0.1
-_DOTS = SPINNERS["dots"]
 _LABEL_MAX = 20
 
 # What an engine's status reads as, here and on the diagnostics screen.
@@ -50,9 +49,10 @@ def status_style(status: str) -> str:
 
 
 def spinner_frame(elapsed: float) -> str:
-    """The "dots" spinner frame for *elapsed* seconds, so every redraw advances it."""
-    frames = _DOTS["frames"]
-    return frames[int(elapsed * 1000 / _DOTS["interval"]) % len(frames)]
+    """The design's spinner frame for *elapsed* seconds, so every redraw advances it."""
+    spinner = SPINNERS[theme.SPINNER]
+    frames = spinner["frames"]
+    return frames[int(elapsed * 1000 / spinner["interval"]) % len(frames)]
 
 
 def _engine_part(engine) -> Text:

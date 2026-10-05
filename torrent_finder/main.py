@@ -18,6 +18,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 from rich.markup import escape as markup_escape  # _main_loop imports `escape` locally further down
 
 from torrent_finder import __version__, acquisition, store
+from torrent_finder.ui import theme
 from torrent_finder.constants import console
 import readchar
 from torrent_finder.downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, stream_with_peerflix, stream_with_webtorrent
@@ -191,7 +192,7 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
     # The status line names the item being handled ("(3/8) Title…") — and for a
     # Madokami file, a live MB counter — so a multi-minute batch isn't a blind
     # spinner. Titles are markup-escaped (manga names carry brackets).
-    status = console.status("[accent]Opening torrents…  (Esc to stop)[/accent]", spinner="dots")
+    status = console.status("[accent]Opening torrents…  (Esc to stop)[/accent]", spinner=theme.SPINNER)
     selection = [results[gi] for gi in idxs if 0 <= gi < len(results)]
     notes: list[str] = []
     try:
@@ -266,7 +267,7 @@ def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
     """
     magnets: list[str] = []
     skipped = 0
-    with console.status("[accent]Collecting magnet links…[/accent]", spinner="dots"):
+    with console.status("[accent]Collecting magnet links…[/accent]", spinner=theme.SPINNER):
         for gi in idxs:
             if not (0 <= gi < len(results)):
                 continue
@@ -313,7 +314,7 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
     magnets: list[str] = []
     picked: list[dict] = []
     skipped = 0
-    with console.status("[accent]Collecting magnet links…[/accent]", spinner="dots"):
+    with console.status("[accent]Collecting magnet links…[/accent]", spinner=theme.SPINNER):
         for gi in idxs:
             if not (0 <= gi < len(results)):
                 continue
@@ -414,7 +415,7 @@ def _unpack_downloaded(paths) -> str:
 
     if not any(unpack.is_archive(path) for path in paths):
         return ""
-    with console.status("[accent]Unpacking…[/accent]", spinner="dots") as status:
+    with console.status("[accent]Unpacking…[/accent]", spinner=theme.SPINNER) as status:
         report = unpack.unpack_all(paths, status=lambda text: status.update(f"[accent]{escape(text)}[/accent]"))
     return "\n".join(unpack.summary_lines(report))
 
@@ -443,7 +444,7 @@ def _fetch_session_files(session) -> tuple[bool, object]:
     stop_listener = start_esc_listener(cancel_event)
     try:
         try:
-            with console.status("[accent]Fetching file list...[/accent]", spinner="dots"):
+            with console.status("[accent]Fetching file list...[/accent]", spinner=theme.SPINNER):
                 metadata = session.fetch_files_meta(cancel_event=cancel_event)
         except KeyboardInterrupt:
             # Deeper flows cancel locally. Only the idle provider /
