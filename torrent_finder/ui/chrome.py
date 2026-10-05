@@ -141,7 +141,7 @@ def _figures() -> list[tuple[str, str]]:
         pass
     try:
         from torrent_finder import bookmarks
-        figures.append(("Bookmarks", str(len(bookmarks.entries()))))
+        figures.append(("Bookmarks", str(bookmarks.count())))
     except Exception:
         pass
     figures.append(("T", str(_session.turns)))

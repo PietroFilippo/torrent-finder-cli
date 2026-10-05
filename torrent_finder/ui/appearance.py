@@ -118,8 +118,9 @@ def save(theme_name: str, focus: str, density: str, painting_name: str | None = 
     from torrent_finder.state import commit_setting
     value = normalize({"theme": theme_name, "focus": focus, "density": density,
                        "painting": painting_name or _session["painting"]})
+    _session["painting"] = value["painting"]  # in use this session even if saving fails
     commit_setting(SETTING, value)
-    _session["source"], _session["painting"] = "saved", value["painting"]
+    _session["source"] = "saved"
 
 
 def _swatches(palette) -> Text:

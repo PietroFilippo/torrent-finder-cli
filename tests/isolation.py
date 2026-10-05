@@ -5,6 +5,10 @@ and the default download folder to a temporary directory for the whole run.
 Test discovery imports every test module before any test runs, so one import
 protects the full suite; each module that reaches persistence imports it too,
 so running it alone is safe.
+
+It also starts every test, under unittest or pytest alike, from one
+appearance: the Simple design with the default painting, the Windows
+Terminal profile out of reach, and no full-screen view left open after it.
 """
 
 import atexit
@@ -12,6 +16,7 @@ import json
 import os
 import shutil
 import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
@@ -40,6 +45,50 @@ BookProvider.looks_up_authors = False
 MangaProvider.looks_up_aliases = False
 AnimeProvider.looks_up_aliases = False
 MadokamiProvider.looks_up_aliases = False
+
+# Athanor is the app's default design, but most layout tests describe the
+# Simple design's frames, and tests that start the app apply its startup
+# appearance: every test starts and ends on this baseline. Tests of Athanor
+# or of the Windows Terminal profile opt in themselves.
+from torrent_finder import paintings, terminal_profile  # noqa: E402
+from torrent_finder.ui import appearance, display, theme  # noqa: E402
+
+BASELINE = ("quiet", "bar", "comfortable")
+
+
+def restore_baseline() -> None:
+    palette, focus, density = theme.current()
+    if (palette.key, focus, density) != BASELINE:
+        theme.apply(BASELINE[0], focus=BASELINE[1], density=BASELINE[2])
+    appearance._session["painting"] = paintings.DEFAULT
+
+
+def _screens_closed() -> None:
+    left_open = display.depth()
+    display._views.clear()
+    if left_open:
+        raise AssertionError(f"{left_open} full-screen view(s) left open")
+
+
+_run = unittest.TestCase.run
+
+
+def _run_from_baseline(self, result=None):
+    restore_baseline()
+    self.addCleanup(_screens_closed)  # runs after the test's own cleanups, reported like them
+    # The real Windows Terminal folder and the Store Python's cmd calls stay out of reach.
+    with patch.object(terminal_profile, "supported", lambda environ=None: False), \
+         patch.object(terminal_profile, "_package_family", lambda: ""):
+        try:
+            return _run(self, result)
+        finally:
+            restore_baseline()
+
+
+if not getattr(unittest.TestCase.run, "from_baseline", False):  # once, even if imported twice
+    _run_from_baseline.from_baseline = True
+    unittest.TestCase.run = _run_from_baseline
+restore_baseline()
 
 
 def isolate_store(case, data=None, path=None) -> Path:

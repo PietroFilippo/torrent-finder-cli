@@ -498,20 +498,27 @@ def matches_name(name: str, query: str, mode: str = "contains") -> bool:
 
 
 def timestamp(value) -> int:
-    """UTC upload time, or 0 when absent/invalid; never guess from last-seen."""
+    """UTC upload time, or 0 when absent/invalid; never guess from last-seen.
+
+    A time this platform cannot turn back into a date (Windows stops at the
+    year 3000) is invalid too, so every screen can show what this accepts.
+    """
     try:
         number = max(0, int(value or 0))
-        return number if number <= 253402300799 else 0  # datetime's year 9999
     except (TypeError, ValueError, OverflowError):
-        pass
-    try:
         try:
-            date = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        except ValueError:
-            date = parsedate_to_datetime(str(value))
-        return max(0, int(date.replace(tzinfo=date.tzinfo or timezone.utc).timestamp()))
-    except (ValueError, TypeError, OverflowError, OSError):
+            try:
+                date = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            except ValueError:
+                date = parsedate_to_datetime(str(value))
+            number = max(0, int(date.replace(tzinfo=date.tzinfo or timezone.utc).timestamp()))
+        except (ValueError, TypeError, OverflowError, OSError):
+            return 0
+    try:
+        datetime.fromtimestamp(number, timezone.utc)
+    except (ValueError, OverflowError, OSError):
         return 0
+    return number
 
 
 # What a title score means, for the "Ranked:" note under a focused result.

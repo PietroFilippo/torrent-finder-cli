@@ -34,6 +34,12 @@ def entries():
     return deepcopy(_validated(store.read()))
 
 
+def count() -> int:
+    """How many bookmarks are saved, without copying them (the status line asks on every frame)."""
+    rows = store.read().get("bookmarks", [])
+    return len(rows) if isinstance(rows, list) else 0
+
+
 def _change(edit):
     """Commit *edit(rows)* against the saved collection; raises when saving fails."""
     def apply(data):

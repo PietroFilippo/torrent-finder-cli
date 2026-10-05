@@ -110,6 +110,7 @@ def show_security_warning(force: bool = False) -> bool:
     # (label, value) rows; rows marked optional give way first in a short window.
     rows: list[tuple[str, str, bool]] = []
     verdict: Text | None = None
+    _exposure["state"] = None  # a lookup that fails leaves no earlier verdict standing
     if info:
         ip = info.get("query", "unknown")
         isp = info.get("isp", "") or info.get("org", "") or "unknown"

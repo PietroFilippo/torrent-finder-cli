@@ -1,6 +1,7 @@
 """Reusable arrow-key interactive selector using readchar + Rich."""
 
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Callable
@@ -134,12 +135,19 @@ _GUTTER = 2  # cursor bar + space
 
 
 # The width rows are laid out in: the window's, or the list column's when the
-# inspector pane takes the right of a wide window (set while a frame is built).
-_layout = {"width": None}
+# inspector pane takes the right of a wide window. Set while a frame is built
+# or measured, per thread: the marquee watcher measures while frames draw.
+_layout = threading.local()
 
 
 def _screen_width() -> int:
-    return _layout["width"] or console.size.width
+    return getattr(_layout, "width", None) or console.size.width
+
+
+def _list_width(items: list["SelectItem"]) -> "int | None":
+    """The list column's width when the window shows the inspector beside *items*, else None."""
+    pane = theme.inspector_width(console.size.width) if any(_has_details(item) for item in items) else 0
+    return console.size.width - pane - _PANE_GAP if pane else None
 
 
 def _inner_width() -> int:
@@ -228,7 +236,11 @@ def _cursor_overflows(items: list["SelectItem"], cursor: int, multi: bool) -> bo
     item = items[cursor]
     if _is_section_header(item):
         return False
-    return cell_len(_plain(item.label)) > _label_avail_width(item, multi, _geometry(items, multi))
+    _layout.width = _list_width(items)  # measured in the column the row is drawn in
+    try:
+        return cell_len(_plain(item.label)) > _label_avail_width(item, multi, _geometry(items, multi))
+    finally:
+        _layout.width = None
 
 
 def _wrapped_line_count(text: Text, width: int) -> int:
@@ -339,12 +351,12 @@ def _build_panel(
     full_height = console.size.height
     pane_width = theme.inspector_width(screen_width) if any(_has_details(item) for item in items) else 0
     width = screen_width - pane_width - _PANE_GAP if pane_width else screen_width  # the list column
-    _layout["width"] = width if pane_width else None
+    _layout.width = width if pane_width else None
     try:
         return _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help_key, message, tip,
                       screen_width, full_height, width, pane_width)
     finally:
-        _layout["width"] = None
+        _layout.width = None
 
 
 # The pane's divider, the space after it and the right margin.
@@ -577,7 +589,7 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     lines.extend(theme.wrap_keys(shown_keys, width))
     lines.extend(alert_lines)
     # The tip takes the bottom rows, below a gap, only when the screen left them empty.
-    _layout["width"] = None  # the tip spans the window
+    _layout.width = None  # the tip spans the window
     tip_lines = theme.wrap_block(Text.from_markup(tip), screen_width, console) if tip else []
     if pane_width:
         body = lines[body_start:]

@@ -166,5 +166,45 @@ class AppearanceBackTests(unittest.TestCase):
         self.assertEqual(theme.PALETTE.key, "citrinitas")
 
 
+class SecondReviewTests(unittest.TestCase):
+    """Found by the second outside review (GPT-6.1-Sol)."""
+
+    def setUp(self):
+        isolate_store(self)
+
+    def test_the_status_line_counts_bookmarks_without_copying_them(self):
+        from torrent_finder import bookmarks
+        from torrent_finder.ui import chrome
+        with patch.object(bookmarks, "entries", side_effect=AssertionError("copied every bookmark")):
+            figures = dict(chrome._figures())
+        self.assertEqual(figures["Bookmarks"], "0")
+
+    def test_a_failed_network_check_leaves_no_old_verdict(self):
+        from torrent_finder import security
+        security._exposure["state"] = "vpn"
+        self.addCleanup(security._exposure.update, state=None)
+        with patch.object(security, "_fetch_network_info", return_value=None),              patch.object(security.readchar, "readkey", return_value=""),              patch.object(security.sys, "stdout", io.StringIO()),              patch.object(security, "console", Console(file=io.StringIO(), width=80, height=24)):
+            security.show_security_warning(force=True)
+        self.assertIsNone(security.exposure())
+        self.assertEqual(security.exposure_label(), "")
+
+    def test_a_painting_that_cannot_be_saved_is_still_used_this_session(self):
+        with patch("torrent_finder.state.commit_setting", side_effect=OSError("disk full")),              self.assertRaises(OSError):
+            appearance.save("citrinitas", "bar", "comfortable", "dore-raven")
+        self.assertEqual(appearance.painting(), "dore-raven")
+
+    def test_every_accepted_upload_time_can_be_shown(self):
+        from datetime import datetime, timezone
+        from torrent_finder.result_view import timestamp
+        for value in (253402300799, "9999-12-31T23:59:59+00:00", 32536850399, 1700000000, "2024-01-02T03:04:05Z"):
+            with self.subTest(value=value):
+                datetime.fromtimestamp(timestamp(value), timezone.utc)  # never raises
+        self.assertEqual(timestamp(1700000000), 1700000000)
+
+    def test_the_baseline_also_applies_under_unittest(self):
+        self.assertTrue(getattr(unittest.TestCase.run, "from_baseline", False))
+        self.assertEqual(theme.PALETTE.key, "quiet")
+
+
 if __name__ == "__main__":
     unittest.main()
