@@ -177,6 +177,19 @@ class AppearanceMenuTests(unittest.TestCase):
         self.assertEqual(rows["Quiet Blue"].marker, "●")
         self.assertEqual(rows["Iris"].marker, "○")
 
+    def test_the_screen_says_themes_leave_the_background_to_the_terminal(self):
+        captured = {}
+        with patch("torrent_finder.ui.selector.arrow_select", side_effect=lambda items, **kw: captured.update(kw, items=items)):
+            appearance.appearance_menu()
+        self.assertIn(appearance.BACKGROUND_NOTE, captured["footer"]())
+        rows = {item.label: item for item in captured["items"]}
+        self.assertIn("light colour scheme", rows["Paper"].description)  # only the light theme says how
+        self.assertIn(appearance.light_scheme_help(), rows["Paper"].description)
+        self.assertNotIn("colour scheme", rows["Iris"].description)
+        self.assertIn("Windows Terminal: Ctrl+,", appearance.light_scheme_help("win32"))
+        self.assertIn("iTerm2", appearance.light_scheme_help("darwin"))
+        self.assertIn("preferences", appearance.light_scheme_help("linux"))
+
 
 if __name__ == "__main__":
     unittest.main()

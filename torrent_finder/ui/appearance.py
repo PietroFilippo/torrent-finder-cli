@@ -10,6 +10,7 @@ See docs/adr/0021-themes.md.
 from __future__ import annotations
 
 import os
+import sys
 
 from rich.text import Text
 
@@ -117,6 +118,28 @@ def _swatches(palette) -> Text:
     return hint
 
 
+# Themes colour text, rules and the focused row; the page itself is the
+# terminal's, and an app cannot change it, so a light theme needs a light
+# terminal colour scheme.
+BACKGROUND_NOTE = "Themes colour the text; the background is your terminal's own."
+
+
+def light_scheme_help(platform: str | None = None) -> str:
+    """Where to switch the terminal to a light colour scheme, for the light theme."""
+    platform = platform or sys.platform
+    if platform == "win32":
+        return ("Windows Terminal: Ctrl+, › profile › Appearance › Color scheme. "
+                "Classic window: title bar › Properties › Colors.")
+    if platform == "darwin":
+        return "Terminal: Settings › Profiles. iTerm2: Settings › Profiles › Colors."
+    return "Your terminal's preferences hold its colour schemes."
+
+
+def _theme_help(palette) -> str:
+    """A theme row's description: its note, and for a light theme where to make the terminal light."""
+    return f"{palette.note} {light_scheme_help()}" if palette.light else palette.note
+
+
 _FOCUS_HINTS = {"bar": f"{theme.CURSOR} beside the focused row", "fill": "the focused row on a tint"}
 _FOCUS_HELP = {
     "bar": "A bar in the gutter and bold text mark the focused row.",
@@ -150,7 +173,7 @@ def appearance_menu() -> None:
             items.append(SelectItem(option.name, ("theme", key), hint=_swatches(option), is_action=True,
                                     marker="●" if key == chosen["theme"] else "○",
                                     marker_style="" if key == chosen["theme"] else theme.MUTED,
-                                    description=option.note))
+                                    description=_theme_help(option)))
         items.append(SelectItem("─── Focus ───", "section_header", enabled=False, is_action=True))
         for key, label in theme.FOCUS_STYLES.items():
             items.append(SelectItem(label, ("focus", key), hint=_FOCUS_HINTS[key], is_action=True,
@@ -210,6 +233,7 @@ def appearance_menu() -> None:
             lines.append(f"{ENV} chooses the theme at startup; the saved theme applies when it is unset.")
         elif source == "cli":
             lines.append("This run uses --theme; the saved theme applies to later runs.")
+        lines.append(BACKGROUND_NOTE)
         lines.append("↑/↓ navigate  •  Enter apply  •  Space preview  •  Esc back")
         return "\n".join(lines)
 

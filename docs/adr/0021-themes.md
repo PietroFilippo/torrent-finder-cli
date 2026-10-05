@@ -33,6 +33,12 @@ terminal's own `bright_blue` with the ADR-0020 shades), **Iris** (violet),
 like the accent), **Mono** (no hue; weight carries structure) and **Paper**
 (every shade darker than a light page, with darker state colours). Dark
 palettes leave good/warn/bad to the terminal's named green, yellow and red.
+No palette paints the page: the background is the terminal's own, so Paper
+needs a light terminal colour scheme, and the Appearance screen says so (a
+footer line for every theme, and where to switch schemes in Paper's
+description). Painting a page was rejected: the terminal's padding stays
+dark, download and stream output keeps the terminal's colours, and a resize
+can flash the real background.
 
 `theme.apply()` rebinds every role name in the module (`ACCENT`, `KEY`,
 `MUTED`, `SECTION`, `SUBJECT`, `RULE_STYLE`, …), refills `STYLES` in place,

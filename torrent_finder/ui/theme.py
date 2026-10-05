@@ -68,7 +68,7 @@ THEMES: dict[str, Palette] = {palette.key: palette for palette in (
             note="No hue: weight carries the structure, states keep their colours."),
     Palette("paper", "Paper", "#1F5FD6", "#2B4C8C", "#6B7A99", "#B9C6DC", "#DCE6F7",
             good="#1A7F37", warn="#9A6700", bad="#CF222E", light=True,
-            note="For light terminal backgrounds; every shade is darker than the page."),
+            note="For light terminals: switch your terminal to a light colour scheme first."),
 )}
 DEFAULT_THEME = "quiet"
 FOCUS_STYLES = {"bar": "Cursor bar", "fill": "Filled row"}
