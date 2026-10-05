@@ -71,11 +71,14 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
         the notes and the header's second line go; as a last resort the fields
         scroll around the focused one. The focused field and the keys stay.
         """
-        width, height = console.size.width, console.size.height
+        from torrent_finder.ui import chrome as frames
+        width, full_height = console.size.width, console.size.height
+        height = theme.view_height(full_height, width)  # rows inside the Athanor chrome
+        framed = theme.framed(width, full_height)
         compact = not theme.roomy(height, 20)
         parsed = theme.parse_footer(footer)
         title = f"Credentials › {meta.name} › sign in"
-        top = theme.header_lines(title, "", width)
+        top = theme.frame_header(title, "", width, full_height)
         guide: list[Text] = []
         if meta.howto:
             guide.append(Text(theme.MARGIN + "HOW TO GET THIS", style=theme.SECTION))
@@ -92,7 +95,7 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
             prose += theme.wrap_block(line, width, console)
         keys_lines = theme.wrap_keys(parsed.keys, width)
         # Blank lines: after the header, after the guide, before Save, before the notes, before the keys.
-        gaps = [not compact, True, True, True, not compact]
+        gaps = [not compact and not framed, True, True, True, not compact]
 
         def size(with_guide: bool = True) -> int:
             return (len(top) + (len(guide) if with_guide else 0) + len(selectable) + len(prose)
@@ -122,7 +125,7 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
         lines = list(top) + ([rule] if gaps[0] else []) + guide + ([blank] if gaps[1] and guide else [])
         lines += fields_part + ([blank] if gaps[2] and fields_part and actions_part else []) + actions_part
         lines += ([blank] if gaps[3] and prose else []) + prose + ([rule] if gaps[4] else []) + keys_lines
-        return Group(*lines)
+        return Group(*frames.compose(lines, title, "", width, full_height))
 
     sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
     sys.stdout.flush()

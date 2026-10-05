@@ -225,14 +225,15 @@ class SecurityWarningTests(unittest.TestCase):
 
 class ConfirmPromptTests(unittest.TestCase):
     def ask(self, key, width=50, height=16):
-        out = io.StringIO()
-        screen = Console(file=out, width=width, height=height, color_system=None)
+        terminal = io.StringIO()  # the dialog writes its frame to the terminal, like every selector frame
+        screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
         with patch.object(prompts, "console", screen), \
              patch.object(prompts.readchar, "readkey", return_value=key), \
-             patch.object(prompts.sys, "stdout", io.StringIO()):
+             patch.object(prompts.sys, "stdout", terminal):
             answer = prompts.confirm_prompt("[error]Clear all search history?[/error]\n\nThis cannot be undone.",
                                             title="Clear history")
-        return answer, out.getvalue()
+        frame = terminal.getvalue().split("\033[H\033[2J")[-1].split("\033[?25h")[0]
+        return answer, Text.from_ansi(frame).plain
 
     def test_y_confirms_and_other_keys_cancel(self):
         self.assertTrue(self.ask("y")[0])

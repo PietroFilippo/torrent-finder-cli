@@ -11,7 +11,7 @@ from rich.console import Group
 from rich.text import Text
 
 from torrent_finder.constants import buffer_console, console
-from torrent_finder.ui import theme
+from torrent_finder.ui import chrome as frames, theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 
 
@@ -286,21 +286,26 @@ def _build_panel(
     tick: int = 0,
     status: str = "",
     alert: str = "",
-    intro: "str | Text" = "",
+    intro: "str | Text | list[Text]" = "",
     help_key: bool = False,
+    message: "str | Text" = "",
 ) -> Group:
     """Render one complete selector frame: header, intro, windowed list, context, keys, alert.
 
-    *intro* is a short summary under the header (what the screen is about);
-    *help_key* adds "? keys" to the key bar when it fits on the lines the
-    keys already take.
+    *intro* is a short summary under the header (what the screen is about),
+    one Text or several; *help_key* adds "? keys" to the key bar when it fits
+    on the lines the keys already take. In the Athanor design the frame comes
+    from ``chrome.compose`` (imported as ``frames``): the screen name moves into its top edge and the
+    alert (or *message*, an announcement) onto the message line above it.
 
     Every selectable row stays one physical line so the window is stable;
     descriptions, notices and the key bar wrap and are measured, and the list
     gets whatever height is left.
     """
     width = console.size.width
-    height = console.size.height
+    full_height = console.size.height
+    height = theme.view_height(full_height, width)  # the chrome's rows come off first
+    framed = theme.framed(width, full_height)
     inner_width = _inner_width()
     compact = not theme.roomy(height, _COMPACT_HEIGHT)
     has_actions = any(item.is_action for item in items)
@@ -321,10 +326,15 @@ def _build_panel(
         item_blocks.append(description)
     item_lines = sum(_wrapped_line_count(block, inner_width) for block in item_blocks)
     notice_lines = sum(_wrapped_line_count(block, inner_width) for block in parsed.context)
-    # A transient message (the quit guard) is the last line, under the key bar.
-    alert_lines = theme.wrap_block(Text.from_markup(alert), width, console) if alert else []
-    intro_text = (intro.copy() if isinstance(intro, Text) else Text.from_markup(intro)) if intro else Text()
-    intro_lines = theme.wrap_block(intro_text, width, console) if intro_text.plain.strip() else []
+    # A transient message (the quit guard) is the last line, under the key bar,
+    # or the Athanor message line when the window shows one.
+    bar_message = (alert or message) if theme.bars(width, full_height) else ""
+    alert_lines = theme.wrap_block(Text.from_markup(alert), width, console) if alert and not bar_message else []
+    intro_lines = []
+    for block in (intro if isinstance(intro, list) else [intro]):
+        text = (block.copy() if isinstance(block, Text) else Text.from_markup(block)) if block else Text()
+        if text.plain.strip():
+            intro_lines += theme.wrap_block(text, width, console)
     if compact and len(intro_lines) > 1:  # a short window keeps one line of summary, ending in "…"
         intro_lines = intro_lines[:1]
         intro_lines[0].truncate(max(1, min(cell_len(intro_lines[0].plain), width - len(theme.MARGIN)) - 1))
@@ -357,7 +367,7 @@ def _build_panel(
     header_count = 1
 
     def chrome_for(key_segments: list[Text], context_lines: int) -> int:
-        spacing = 1 + (0 if compact else 1)  # below the list; below the header
+        spacing = 1 + (0 if compact or framed else 1)  # below the list; below the header
         if context_lines and not compact:
             spacing += 1  # between the context and the keys
         return (header_count + spacing + len(intro_lines) + always_visible_rows + separators
@@ -374,14 +384,14 @@ def _build_panel(
     def plan() -> tuple[list[Text], int]:
         """Keys and chrome height for the current pinning, paging included."""
         nonlocal header_count
-        header_count = len(theme.header_lines(title, header_status(""), width))
+        header_count = len(theme.frame_header(title, header_status(""), width, full_height))
         segments = with_help(keys)
         total = chrome_for(segments, item_lines + notice_lines)
         if main_len > height - total:
             segments = with_help(windowed_keys())
             # Measure the header with a position as wide as the real one will be.
             widest_position = f"{main_len}–{main_len} of {main_len}"
-            header_count = len(theme.header_lines(title, header_status(widest_position), width))
+            header_count = len(theme.frame_header(title, header_status(widest_position), width, full_height))
             total = chrome_for(segments, item_lines + notice_lines)
         return segments, total
 
@@ -432,9 +442,9 @@ def _build_panel(
     position = (
         f"{win_start_rel + 1}–{win_end_rel} of {main_len}" if main_len > max_visible else ""
     )
-    lines: list[Text] = theme.header_lines(title, header_status(position), width)
+    lines: list[Text] = theme.frame_header(title, header_status(position), width, full_height)
     if not compact:
-        lines.append(theme.rule(width))
+        lines += theme.frame_rule(width, full_height)
     lines.extend(intro_lines)
 
     for i, item in enumerate(items):
@@ -460,7 +470,7 @@ def _build_panel(
         lines.append(theme.rule(width))
     lines.extend(theme.wrap_keys(shown_keys, width))
     lines.extend(alert_lines)
-    return Group(*lines)
+    return Group(*frames.compose(lines, title, header_status(position), width, full_height, bar_message))
 
 
 # Keys every selector understands, listed by show_keys after the screen's own.
@@ -618,6 +628,7 @@ def arrow_select(
         "paused": False,  # another screen (the key list) owns the terminal
     }
     help_enabled = help and "?" not in (hotkeys or {}) and "?" not in (key_actions or {})
+    announcement = frames.take_message()  # the message line's text while this screen is open
     stop_event = threading.Event()
     render_lock = threading.Lock()
     resize = _ResizeRedraw(console.size)
@@ -638,6 +649,7 @@ def arrow_select(
                     alert=_resolve(alert),
                     intro=_resolve(intro),
                     help_key=help_enabled,
+                    message=announcement,
                 )
                 if _render(
                     banner,
@@ -695,6 +707,7 @@ def arrow_select(
         while True:
             try:
                 key = readchar.readkey()
+                frames.turn()
             except KeyboardInterrupt:
                 # Some terminals raise for Ctrl+C instead of returning \x03.
                 # Treat both forms exactly like Esc at the active selector.

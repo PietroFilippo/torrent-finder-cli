@@ -273,6 +273,38 @@ def current() -> tuple[Palette, str, str]:
     return PALETTE, "fill" if FILL_FOCUS else "bar", "compact" if COMPACT else "comfortable"
 
 
+def framed(width: int, height: int) -> bool:
+    """True when frames of this size get the Athanor frame (never in tiny windows)."""
+    return FRAMED and width >= 40 and height >= 12
+
+
+def bars(width: int, height: int) -> bool:
+    """True when a framed screen also gets its message and status lines (comfortable density, 24+ rows)."""
+    return framed(width, height) and not COMPACT and height >= 24
+
+
+def view_height(height: int, width: int) -> int:
+    """Rows a frame's content may use: the Athanor frame and its two lines take theirs first.
+
+    In framed windows the screen name sits in the frame's top edge, so screens
+    leave their header out (see ``frame_header``).
+    """
+    if not framed(width, height):
+        return height
+    return height - 2 - (2 if bars(width, height) else 0)
+
+
+def frame_header(title: "str | Text" = "", status: "str | Text" = "", width: int = 80,
+                 height: int = 24) -> list[Text]:
+    """A screen's header lines, or none when the Athanor frame carries the screen name."""
+    return [] if framed(width, height) else header_lines(title, status, width)
+
+
+def frame_rule(width: int, height: int) -> list[Text]:
+    """The rule under a header, or none under the Athanor frame's top edge."""
+    return [] if framed(width, height) else [rule(width)]
+
+
 def roomy(height: int, threshold: int) -> bool:
     """True when a window *height* rows tall has room for spacing and rules.
 
@@ -321,11 +353,13 @@ def _title_text(title: str | Text) -> Text:
     name.
     """
     crumb = _as_text(title)
-    styled = Text(crumb.plain, style=SCREEN)
-    first = crumb.plain.find(CRUMB)
+    # Titles are written with " › "; each design draws its own crumb (same width, so spans still fit).
+    plain = crumb.plain.replace(" › ", CRUMB)
+    styled = Text(plain, style=SCREEN)
+    first = plain.find(CRUMB)
     if first >= 0:
         styled.stylize(SUBJECT, first + len(CRUMB))
-        for match in re.finditer(re.escape(CRUMB), crumb.plain):
+        for match in re.finditer(re.escape(CRUMB), plain):
             styled.stylize(f"not bold {MUTED}", match.start(), match.end())
     styled.spans.extend(crumb.spans)  # last wins: the title's own markup beats these defaults
     return styled

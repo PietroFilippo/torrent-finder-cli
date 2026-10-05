@@ -446,17 +446,21 @@ def compare(before: str, after: str) -> int:
 def themes() -> int:
     """Capture every theme (and the filled focus) and report any word one shows and another does not.
 
-    Themes change colours only, so every capture must hold the same words as
-    Quiet Blue's, in both directions, and none may overflow its terminal.
+    Within a design, themes change colours only, so every capture must hold
+    the same words as its design's default theme, in both directions, and
+    none may overflow its terminal. (Athanor adds its own lines, so the two
+    designs are compared separately.)
     """
-    from torrent_finder.ui.theme import THEMES
-    specs = list(THEMES) + ["quiet:fill"]
+    from torrent_finder.ui.theme import DEFAULT_THEMES, THEMES
+    specs = list(THEMES) + [f"{key}:fill" for key in DEFAULT_THEMES.values()]
     for spec in specs:
         capture("theme-" + spec.replace(":", "-"), spec)
     problems = 0
-    for spec in specs[1:]:
+    for spec in specs:
+        base = "theme-" + DEFAULT_THEMES[THEMES[spec.split(":")[0]].design]
         label = "theme-" + spec.replace(":", "-")
-        problems += compare("theme-quiet", label) + compare(label, "theme-quiet")
+        if label != base:
+            problems += compare(base, label) + compare(label, base)
     print(f"\n{problems} difference(s) across {len(specs)} appearances")
     return problems
 

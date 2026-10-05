@@ -21,7 +21,7 @@ from torrent_finder.downloader import (
     open_magnet,
 )
 from torrent_finder.providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
-from torrent_finder.ui import theme
+from torrent_finder.ui import chrome as frames, theme
 from torrent_finder.ui.selector import SelectItem, arrow_select
 
 # Random tips share the footer only in tall windows, so they never cost list rows.
@@ -79,22 +79,26 @@ def input_screen(
     """
 
     def render(target: Console) -> None:
-        for line in theme.header_lines(title, status, target.size.width):
+        width, height = target.size.width, target.size.height
+        rows = theme.view_height(height, width)
+        for line in theme.frame_header(title, status, width, height):
             target.print(line)
-        if theme.roomy(target.size.height, 12):
-            target.print(theme.rule(target.size.width))
+        if theme.roomy(rows, 12):
+            for line in theme.frame_rule(width, height):
+                target.print(line)
         for line in lines:
             if line:
                 _print_lines(target, Text.from_markup(line))
-        if lines and any(lines) and theme.roomy(target.size.height, 12):
+        if lines and any(lines) and theme.roomy(rows, 12):
             target.print()
 
     def footer(target: Console) -> None:
-        if theme.roomy(target.size.height, 12):
+        if theme.roomy(theme.view_height(target.size.height, target.size.width), 12):
             target.print(theme.rule(target.size.width))
         _print_keys(target, keys)
 
     render.footer = footer
+    render.title, render.status = title, status  # for the Athanor frame's top edge
     return render
 
 
@@ -216,11 +220,13 @@ def make_search_screen_renderer(
     full_shortcuts = search_shortcuts_line(has_history)
 
     def render(target: Console) -> None:
-        width, height = target.size.width, target.size.height
-        for line in theme.header_lines(title, "", width):
+        width, full_height = target.size.width, target.size.height
+        height = theme.view_height(full_height, width)
+        for line in theme.frame_header(title, "", width, full_height):
             target.print(line)
         if theme.roomy(height, 14):
-            target.print(theme.rule(width))
+            for line in theme.frame_rule(width, full_height):
+                target.print(line)
         if height >= 12:
             for block in info:
                 for line in theme.wrap_block(block, width, target):
@@ -237,7 +243,7 @@ def make_search_screen_renderer(
         needle = typed.strip().casefold()
         first = max(0, selected - _RECENT_ROWS + 1)
         shown = candidates[first:first + _RECENT_ROWS]
-        if theme.roomy(target.size.height, 12):
+        if theme.roomy(theme.view_height(target.size.height, target.size.width), 12):
             target.print()
         heading = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
         heading.append("RECENT", style=theme.SECTION)
@@ -252,12 +258,14 @@ def make_search_screen_renderer(
             target.print(_recent_row(text, needle, index == selected, label_width, hints.get(text, "")))
 
     def footer(target: Console) -> None:
-        if theme.roomy(target.size.height, 12):
+        rows = theme.view_height(target.size.height, target.size.width)
+        if theme.roomy(rows, 12):
             target.print(theme.rule(target.size.width))
-        _print_keys(target, full_shortcuts if target.size.height >= 18 else compact_shortcuts)
+        _print_keys(target, full_shortcuts if rows >= 18 else compact_shortcuts)
 
     render.footer = footer
     render.recent = recent
+    render.title, render.status = title, ""  # for the Athanor frame's top edge
     return render
 
 
@@ -308,6 +316,7 @@ def _render_query_frame(
     width: int,
     height: int,
     recall: "tuple[str, list[str], int] | None" = None,
+    message: str = "",
 ) -> tuple[str, int, int]:
     """Pre-render one complete text-field frame and its absolute cursor position.
 
@@ -319,11 +328,18 @@ def _render_query_frame(
     same character-folded rows that are drawn.
     """
     width, height = max(1, width), max(1, height)
-    top = _capture_lines(screen_renderer, width, height)
+    # A renderer that names its screen gets the Athanor frame: it lays out for
+    # the rows inside it, and the frame and its lines are added at the end.
+    title = getattr(screen_renderer, "title", None)
+    framed = title is not None and theme.framed(width, height)
+    full_height = height
+    if framed:
+        height = theme.view_height(full_height, width)
+    top = _capture_lines(screen_renderer, width, full_height)
     render_footer = getattr(screen_renderer, "footer", None)
-    footer = _capture_lines(render_footer, width, height) if render_footer is not None else []
+    footer = _capture_lines(render_footer, width, full_height) if render_footer is not None else []
     render_recent = getattr(screen_renderer, "recent", None)
-    below = (_capture_lines(lambda target: render_recent(target, *recall), width, height)
+    below = (_capture_lines(lambda target: render_recent(target, *recall), width, full_height)
              if render_recent is not None and recall is not None else [])
 
     prompt = Text.from_markup(theme.MARGIN + prompt_str)
@@ -367,6 +383,12 @@ def _render_query_frame(
 
     lines = top + [_ansi(row, width) for row in queued + rows] + below + footer
     row_number = len(top) + len(queued) + (cursor_row - first_row) + 1
+    if framed:
+        texts = [Text.from_ansi(line) for line in lines]
+        composed = frames.compose(texts, title, getattr(screen_renderer, "status", ""), width, full_height, message)
+        lines = [_ansi(text, width) for text in composed]
+        row_number += 1 + (1 if theme.bars(width, full_height) else 0)  # the top edge and the message line
+        height = full_height
     return (
         "\n".join(lines),
         max(1, min(height, row_number)),
@@ -425,6 +447,7 @@ def get_query_with_shortcut(
     committed: list[str] = []
 
     hist = history or []
+    announcement = frames.take_message() if screen_renderer is not None else ""
     hpos = -1          # the chosen past search in `matches`, -1 while typing
     stash = ""         # what was typed before ↑ started walking past searches
     matches: list[str] = []
@@ -447,6 +470,7 @@ def get_query_with_shortcut(
                     frame_size.width,
                     frame_size.height,
                     recall=recall_state(),
+                    message=announcement,
                 )
                 if _write_query_frame(
                     content,
@@ -510,6 +534,7 @@ def get_query_with_shortcut(
     try:
         while True:
             key = readchar.readkey()
+            frames.turn()
 
             if multi and key in _ADD_LINE_KEYS:
                 text = "".join(buffer).strip()
@@ -1455,20 +1480,23 @@ def download_dir_prompt() -> None:
 def confirm_prompt(message: str, title: str = "Confirm") -> bool:
     """Show a Y/N confirmation on the alt-screen in the Quiet layout. Returns True on Y."""
     from rich.console import Group
-    width = console.size.width
-    lines = list(theme.header_lines(title, "", width))
-    if theme.roomy(console.size.height, 12):
-        lines.append(theme.rule(width))
+
+    from torrent_finder.ui.selector import _render
+    width, height = console.size.width, console.size.height
+    rows = theme.view_height(height, width)
+    lines = list(theme.frame_header(title, "", width, height))
+    if theme.roomy(rows, 12):
+        lines += theme.frame_rule(width, height)
     lines += theme.wrap_block(Text.from_markup(message), width, console)
     lines.append(Text(""))
     lines += theme.wrap_block(Text("Any other key cancels too.", style=theme.MUTED), width, console)
-    if theme.roomy(console.size.height, 12):
+    if theme.roomy(rows, 12):
         lines.append(theme.rule(width))
     lines += theme.wrap_keys(theme.parse_footer("Y confirm  •  Esc cancel").keys, width)
     sys.stdout.write("\033[?1049h\033[?25l\033[H\033[2J")
     sys.stdout.flush()
     try:
-        console.print(Group(*lines))
+        _render(None, Group(*frames.compose(lines, title, "", width, height)), width=width)
         try:
             key = readchar.readkey()
         except (EOFError, KeyboardInterrupt):
@@ -2329,6 +2357,15 @@ def provider_select_prompt(
         except (OSError, ValueError):
             history = []
         continue_item = _continue_item(history[0]) if history else None
+        room_exits = ([("continue", continue_item.label)] if continue_item else []) + [
+            ("search", f"{len(PROVIDER_MENU)} shelves"), ("tools", "credentials, settings")]
+
+        def room(exits=room_exits):
+            """The Athanor main menu's room description, in windows tall enough to keep every row."""
+            if not theme.FRAMED or theme.view_height(console.size.height, console.size.width) < 30:
+                return ""
+            return frames.room("The Index", "Lamplight pools over shelves of catalogued torrents. "
+                                            "A terminal hums here.", exits)
         items: list[SelectItem] = []
         if continue_item is not None:
             items += [_section_row("Continue"), continue_item]
@@ -2378,6 +2415,7 @@ def provider_select_prompt(
             items,
             title="Select Provider",
             status=lambda: home_status(update_status),
+            intro=room,
             footer=footer,
             banner=_make_banner_panel(),
             start_index=start,

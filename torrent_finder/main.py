@@ -1097,6 +1097,12 @@ def _main_loop(args=None) -> None:
         if not show_security_warning():
             console.print("[info]Aborted.[/info]")
             return
+    from torrent_finder.security import exposure
+    from torrent_finder.ui import chrome as frames
+    if exposure() == "exposed":
+        frames.announce("You feel watched: every peer can see your real IP.")
+    elif exposure() == "vpn":
+        frames.announce("A cloak of VPN hides your address from the swarm.")
 
     query = args.query
     initial_provider = None
@@ -1161,6 +1167,13 @@ def _main_loop(args=None) -> None:
     update_report = consume_update_report()
     if update_report:
         update_msg = "\n".join(filter(None, (update_msg, escape(update_report))))
+    # In the Athanor design these are messages on the message line instead of a banner.
+    if update_info:
+        frames.announce(f"A raven arrives: {escape(status_label(update_info))}. U installs it.")
+    if update_report:
+        frames.announce(escape(update_report.splitlines()[0]))
+    if theme_notice:
+        frames.announce(f"[warn]{markup_escape(theme_notice)}[/warn]")
     if current_provider and update_msg:
         # highlight=False: the auto-highlighter would restyle the version
         # digits (bold → bright black) on the yellow banner.
@@ -1230,7 +1243,7 @@ def _main_loop(args=None) -> None:
             )
             try:
                 result = provider_select_prompt(
-                    notice=update_msg or "",
+                    notice="" if theme.FRAMED else update_msg or "",  # Athanor: the message line says it
                     alert=exit_hint,  # the last line of the frame, under the keys
                     open_group=pending_open_group,
                     update_available=bool(update_info),
@@ -1514,6 +1527,9 @@ def _main_loop(args=None) -> None:
         # Results + download (shared with the by-creator flow). Esc on the
         # results table steps back to the keyword prompt; a completed download
         # proceeds to "what's next?".
+        frames.clear_messages()
+        frames.announce(f"You find {len(results)} result{'s' if len(results) != 1 else ''} "
+                        f"for {escape(', '.join(queries))}.")
         if browse_results(provider, results, note=note) == "back":
             query = None
             clear_screen()

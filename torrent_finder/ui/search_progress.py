@@ -18,7 +18,7 @@ from rich.spinner import SPINNERS
 from rich.text import Text
 
 from torrent_finder.constants import buffer_console, console
-from torrent_finder.ui import theme
+from torrent_finder.ui import chrome as frames, theme
 from torrent_finder.ui.layout import ellipsize_cells
 
 KEYS = "Enter view results so far  •  Esc cancel"
@@ -132,6 +132,20 @@ def _cut(rows: list[Text], room: int, progress) -> list[Text]:
     return rows[:keep] + [Text(theme.MARGIN + summary, style=theme.MUTED, no_wrap=True, overflow="ellipsis")]
 
 
+def progress_message(progress, waiting_label: str) -> str:
+    """The Athanor message line while a search runs: what the last provider to finish did."""
+    lines = tuple(getattr(progress, "providers", ()) or ()) if progress is not None else ()
+    finished = [line for line in lines if line.state != "running"]
+    if not finished:
+        return "You search the stacks…" if lines else waiting_label
+    last = finished[-1]
+    if last.state == "failed":
+        return f"{last.label} falls silent."
+    if last.results:
+        return f"{last.label} answers: {last.results} result{'s' if last.results != 1 else ''}."
+    return f"{last.label} finds nothing."
+
+
 def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: float,
                    waiting_label: str, now: float | None = None):
     """One frame: header, what is searched, a line per provider, live counts, keys.
@@ -141,9 +155,10 @@ def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: 
     line), the pending names and the header's second line; the description
     of what is searched shortens last (ending in "…").
     """
-    width, height = console.size.width, console.size.height
+    width, full_height = console.size.width, console.size.height
+    height = theme.view_height(full_height, width)  # rows inside the Athanor chrome
     seconds = int(elapsed)
-    top: list[Text] = list(theme.header_lines(title, f"{seconds}s", width))
+    top: list[Text] = theme.frame_header(title, f"{seconds}s", width, full_height)
     intro_lines = theme.wrap_block(Text.from_markup(intro), width, console)
     note_lines = [line for note in notes
                   for line in theme.wrap_block(Text.from_markup(note, style=theme.MUTED), width, console)]
@@ -168,9 +183,10 @@ def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: 
 
     def assemble() -> list[Text]:
         blank = [Text("")] if spaced else []
+        head_rule = theme.frame_rule(width, full_height) if spaced else []
         rule = [theme.rule(width)] if spaced else []
         middle = rows + blank if rows else []
-        return [*top, *rule, *intro_lines, *note_lines, *blank, *middle, status, *waiting, *rule, *keys]
+        return [*top, *head_rule, *intro_lines, *note_lines, *blank, *middle, status, *waiting, *rule, *keys]
 
     if len(assemble()) > height:
         spaced = False
@@ -181,7 +197,7 @@ def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: 
     if len(assemble()) > height:
         waiting = []
     if len(assemble()) > height and len(top) > 1:
-        top = [theme.header(title, f"{seconds}s", width)]
+        top = [theme.header(title, f"{seconds}s", width)]  # (never framed: the frame's edge holds one line)
     if len(assemble()) > height:
         room = max(0, height - (len(assemble()) - len(intro_lines)))
         cut = len(intro_lines) > room
@@ -190,7 +206,8 @@ def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: 
             last = intro_lines[-1]
             last.truncate(max(1, min(cell_len(last.plain), width - 1) - 1))
             last.append("…")
-    return Group(*assemble())
+    return Group(*frames.compose(assemble(), title, f"{seconds}s", width, full_height,
+                                 progress_message(progress, waiting_label)))
 
 
 class ProgressScreen:

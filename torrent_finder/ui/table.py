@@ -14,7 +14,7 @@ from rich.table import Table
 from rich.text import Text
 
 from torrent_finder.constants import RESULTS_PER_PAGE, console
-from torrent_finder.ui import theme
+from torrent_finder.ui import chrome as frames, theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 from torrent_finder.utils import format_size, leech_style, seed_style
 from torrent_finder.result_view import SORT_ORDERS, result_indices, timestamp
@@ -121,9 +121,14 @@ def _pack(parts: list[str], width: int) -> list[str]:
     return lines
 
 
+def _rows() -> int:
+    """Rows the results screen may use: the window less the Athanor chrome."""
+    return theme.view_height(console.size.height, console.size.width)
+
+
 def _tiny() -> bool:
     """Windows under 16 rows keep one header line and one line of details."""
-    return console.size.height < 16
+    return _rows() < 16
 
 
 def _age(uploaded: int, now: float | None = None) -> str:
@@ -225,7 +230,7 @@ def _selected_metadata(
 
 def _metadata_cap() -> int:
     """Most metadata lines under the focused row, so results keep their rows."""
-    return max(2, min(6, console.size.height // 6))
+    return max(2, min(6, _rows() // 6))
 
 
 def _wrapped_details(item, layout):
@@ -235,7 +240,7 @@ def _wrapped_details(item, layout):
 
 def _detail_count():
     # Leave a line for the compact search-notice banner, including bookmarks.
-    return max(2, min(8, console.size.height // 4) - 1)
+    return max(2, min(8, _rows() // 4) - 1)
 
 
 def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = False) -> str:
@@ -287,7 +292,7 @@ def _table_caption(
         if cell_len(legend) > room:  # one line, always: the row budget counts one
             legend = ellipsize_cells("Apibay* = cached results", room)
         caption.append(theme.MARGIN + legend + "\n", style=theme.WARN)
-    if theme.roomy(console.size.height, 20):  # short windows keep the row for results
+    if theme.roomy(_rows(), 20):  # short windows keep the row for results
         caption.append_text(theme.rule(width))
         caption.append("\n")
     segments = theme.parse_footer(Text(_result_keys(total_pages, picked, expanded))).keys
@@ -298,7 +303,7 @@ def _table_caption(
 def _note_preview(note: str) -> Text:
     """Keep partial-search notices from crowding results out of short windows."""
     count = len(note.splitlines())
-    if console.size.height < 28 or count > 2:
+    if _rows() < 28 or count > 2:
         return Text(f"{theme.MARGIN}{count} search notice{'s' if count != 1 else ''} — n to read",
                     style=theme.WARN, no_wrap=True, overflow="ellipsis")
     preview = Text(style=theme.WARN, overflow="fold")
@@ -347,6 +352,8 @@ def _visible_count(
     is measured for the tallest row, so a long wrapped "From" or provider line
     never pushes the key bar off screen; without them it is estimated.
     """
+    framed = theme.framed(width, height)  # the Athanor frame carries the header
+    height = theme.view_height(height, width)
     tiny = height < 16
     if rows is not None:
         layout = _page_layout(rows, width, show_from, indexes)
@@ -354,9 +361,9 @@ def _visible_count(
     else:
         layout = _table_layout(width, show_from, show_provider)
         details = 1 if tiny else 1 + _METADATA_LINES[layout.mode] + (2 if show_provider else 0)
-    header = 1 if tiny else len(theme.header_lines(
+    header = 0 if framed else 1 if tiny else len(theme.header_lines(
         heading or "Results", "888–888 of 888 · page 88/88 · 888 picked", width))
-    compact = not theme.roomy(height, 20)
+    compact = not theme.roomy(height, 20) or framed
     keys = len(theme.wrap_keys(theme.parse_footer(
         Text(_result_keys(2, frozenset(range(100))))).keys, width))
     chrome = (
@@ -604,6 +611,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     scroll_offset = 0
     expanded, detail_offset, saved_scroll = False, 0, 0
     feedback, feedback_style = "", theme.WARN  # a one-line outcome; green when it worked
+    announcement = frames.take_message()  # the Athanor message line while the table is open
 
     # Marquee state shared with the ticker thread
     marquee_state = {
@@ -616,12 +624,16 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         """The whole results screen: header, view line, notices, table, details, keys."""
         status = results_status(current if expanded else scroll_offset, 1 if expanded else visible_count,
                                 total, current_page, total_pages, frozenset(picked))
-        if _tiny():
-            parts: list[object] = [theme.header(heading or "Results", status, console.size.width)]
+        width, full_height = console.size.width, console.size.height
+        title = heading or "Results"
+        if theme.framed(width, full_height):
+            parts: list[object] = []  # the frame's top edge names the screen
+        elif _tiny():
+            parts = [theme.header(title, status, width)]
         else:
-            parts = list(theme.header_lines(heading or "Results", status, console.size.width))
-        if theme.roomy(console.size.height, 20):
-            parts.append(theme.rule(console.size.width))
+            parts = list(theme.header_lines(title, status, width))
+        if theme.roomy(_rows(), 20):
+            parts += theme.frame_rule(width, full_height)
         order_label = SORT_ORDERS.get(view_order, view_order)
         if view_order != "relevance":
             order_label += " (overrides preferences)"
@@ -646,10 +658,10 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
             if not results and not feedback:
                 view_status = Text(theme.MARGIN + "No results • n explains the search", style=theme.WARN,
                                    no_wrap=True, overflow="ellipsis")
-            return Group(*parts, view_status, controls, tbl)
+            return frames.Framed(Group(*parts, view_status, controls, tbl), title, status, announcement)
         if note:
-            return Group(*parts, view_status, _note_preview(note), tbl)
-        return Group(*parts, view_status, tbl)
+            return frames.Framed(Group(*parts, view_status, _note_preview(note), tbl), title, status, announcement)
+        return frames.Framed(Group(*parts, view_status, tbl), title, status, announcement)
 
     # screen=True renders into the terminal's alternate-screen buffer — a fixed
     # viewport that never scrolls. Without it, Live updates (e.g. the marquee on
@@ -729,6 +741,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
             while True:
                 try:
                     key = readchar.readkey()
+                    frames.turn()
                 except KeyboardInterrupt:
                     # Some terminals raise for Ctrl+C instead of returning
                     # the CTRL_C key code handled below.

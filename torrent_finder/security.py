@@ -169,8 +169,10 @@ def show_security_warning(force: bool = False) -> bool:
         return "  •  ".join(parts)
 
     def frame():
-        width, height = console.size.width, console.size.height
-        top = theme.header_lines("Network exposure warning", "", width)
+        from torrent_finder.ui import chrome as frames
+        width, full_height = console.size.width, console.size.height
+        height = theme.view_height(full_height, width)  # rows inside the Athanor chrome
+        top = theme.frame_header("Network exposure warning", "", width, full_height)
         keys_lines = theme.wrap_keys(theme.parse_footer(key_line()).keys, width)
         middle_parts = [
             theme.wrap_block(verdict, width, console),
@@ -190,12 +192,13 @@ def show_security_warning(force: bool = False) -> bool:
             line.truncate(room + len(theme.MARGIN), overflow="ellipsis")
             detail.append((line, 2 if optional else min(index, 1)))
         spaced = theme.roomy(height, 20)
-        one_line_header = [theme.header("Network exposure warning", "", width)]
+        one_line_header = [] if theme.framed(width, full_height) else [
+            theme.header("Network exposure warning", "", width)]
 
         def assemble(max_rank: int, spacing: bool, header: list[Text], parts: list[list[Text]]) -> list[Text]:
             blank = [Text("")] if spacing else []
             rule = [theme.rule(width)] if spacing else []
-            lines = list(header) + rule
+            lines = list(header) + (theme.frame_rule(width, full_height) if spacing else [])
             lines += [line for line, rank in detail if rank <= max_rank]
             for part in parts:
                 lines += blank + part
@@ -218,7 +221,8 @@ def show_security_warning(force: bool = False) -> bool:
                 last.truncate(max(1, cell_len(last.plain) - 1))
                 last.append("…")
             lines = assemble(0, False, one_line_header, [verdict_lines, warning_lines])
-        return Group(*[line.copy() for line in lines])
+        return Group(*frames.compose([line.copy() for line in lines], "Network exposure warning", "",
+                                     width, full_height))
 
     dismissed = False
     sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
