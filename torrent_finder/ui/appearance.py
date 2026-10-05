@@ -199,7 +199,7 @@ def appearance_menu() -> None:
     def status() -> str:
         if state["preview"] != chosen["theme"]:
             return f"previewing {theme.THEMES[state['preview']].name}"
-        return f"saved: {theme.THEMES[chosen['theme']].name}"
+        return f"using {theme.THEMES[chosen['theme']].name}"
 
     def footer() -> str:
         lines = []
