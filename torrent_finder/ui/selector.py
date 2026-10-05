@@ -55,10 +55,25 @@ class SelectItem:
     toggle_states: tuple[str, ...] = ()
     toggle_state: str = ""
     marker_style: str = ""  # the marker's colour; the accent when empty
+    # Lines for the inspector pane of wide windows, below the row's name, hint
+    # and description; called the first time the row is focused, then kept.
+    inspect: "Callable[[], list[str | Text]] | None" = None
+    _details: "list | None" = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.toggle_states and self.toggle_state not in self.toggle_states:
             self.toggle_state = self.toggle_states[0]
+
+    def details(self) -> list:
+        """The inspector lines, computed once; a failing source shows none rather than stopping the menu."""
+        if self.inspect is None:
+            return []
+        if self._details is None:
+            try:
+                self._details = list(self.inspect())
+            except Exception:
+                self._details = []
+        return self._details
 
     def cycle_toggle(self) -> None:
         """Cycle a named state, or flip the legacy boolean checkbox."""
@@ -118,9 +133,18 @@ _COMPACT_HEIGHT = 20
 _GUTTER = 2  # cursor bar + space
 
 
+# The width rows are laid out in: the window's, or the list column's when the
+# inspector pane takes the right of a wide window (set while a frame is built).
+_layout = {"width": None}
+
+
+def _screen_width() -> int:
+    return _layout["width"] or console.size.width
+
+
 def _inner_width() -> int:
     """Usable content width inside the left and right margins."""
-    return theme.inner_width(console.size.width)
+    return theme.inner_width(_screen_width())
 
 
 def _inline_hint(item: "SelectItem") -> bool:
@@ -129,7 +153,7 @@ def _inline_hint(item: "SelectItem") -> bool:
     hint = _plain(item.hint)
     return (
         bool(hint)
-        and console.size.width >= 72
+        and _screen_width() >= 72
         and cell_len(hint) + 2 <= inner // 2
     )
 
@@ -271,7 +295,7 @@ def _row(item: "SelectItem", index: int, is_cursor: bool, multi: bool, geometry:
         row.append_text(_hint_text(item))  # its own colours, keys as keys, else steel
     if is_cursor and theme.FILL_FOCUS and item.enabled:
         # Filled-row focus: tint from the cursor bar to the right margin.
-        end = max(cell_len(row.plain), console.size.width - len(theme.MARGIN))
+        end = max(cell_len(row.plain), _screen_width() - len(theme.MARGIN))
         row.append(" " * (end - cell_len(row.plain)))
         row.stylize(f"on {theme.FILL}", len(theme.MARGIN), len(row.plain))
     return row
@@ -305,11 +329,82 @@ def _build_panel(
     Every selectable row stays one physical line so the window is stable;
     descriptions, notices and the key bar wrap and are measured, and the list
     gets whatever height is left.
+
+    In a wide window, when the rows carry help or details, an inspector pane
+    takes the right of the frame: the focused row's name, hint, description
+    and ``SelectItem.inspect`` lines, beside a list column laid out as if the
+    window were that narrow.
     """
-    width = console.size.width
+    screen_width = console.size.width
     full_height = console.size.height
-    height = theme.view_height(full_height, width)  # the chrome's rows come off first
-    framed = theme.framed(width, full_height)
+    pane_width = theme.inspector_width(screen_width) if any(_has_details(item) for item in items) else 0
+    width = screen_width - pane_width - _PANE_GAP if pane_width else screen_width  # the list column
+    _layout["width"] = width if pane_width else None
+    try:
+        return _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help_key, message, tip,
+                      screen_width, full_height, width, pane_width)
+    finally:
+        _layout["width"] = None
+
+
+# The pane's divider, the space after it and the right margin.
+_PANE_GAP = 5
+
+
+def _has_details(item: "SelectItem") -> bool:
+    return not _is_section_header(item) and bool(item.description or item.inspect)
+
+
+def _pane(item: "SelectItem | None", width: int) -> list[Text]:
+    """The inspector: the focused row's name, hint and help, then its detail lines, fitted to *width*."""
+    if item is None or _is_section_header(item):
+        return []
+
+    def fit(line: "str | Text") -> Text:
+        text = line.copy() if isinstance(line, Text) else Text.from_markup(line)
+        text.no_wrap, text.overflow, text.justify = True, "ellipsis", "left"
+        if cell_len(text.plain) > width:
+            text.truncate(width, overflow="ellipsis")
+        return text
+
+    def prose(text: Text) -> list[Text]:
+        return list(text.wrap(console, max(1, width), overflow="fold"))
+
+    lines = [fit(Text(_plain(item.label), style=theme.FOCUS))]
+    if _plain(item.hint):
+        lines += prose(_hint_text(item))
+    if item.description:
+        lines += [Text("")] + prose(Text.from_markup(item.description))
+    details = item.details()
+    if details:
+        lines.append(Text(""))
+        lines += [fit(line) for line in details]
+    return lines
+
+
+def _beside(left: "Text | None", right: "Text | None", width: int) -> Text:
+    """A list-column line padded to *width*, the pane's divider, then the pane's line.
+
+    The left part is appended, not copied: a section heading's whole-line
+    style must not spill onto the pane's text.
+    """
+    line = Text(no_wrap=True, overflow="crop")
+    if left is not None:
+        line.append_text(left)
+    if cell_len(line.plain) > width:
+        line.truncate(width)
+    line.append(" " * (width - cell_len(line.plain)))
+    line.append("│", style=theme.RULE_STYLE)
+    line.append("  ")
+    if right is not None:
+        line.append_text(right)
+    return line
+
+
+def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help_key, message, tip,
+           screen_width: int, full_height: int, width: int, pane_width: int) -> Group:
+    height = theme.view_height(full_height, screen_width)  # the chrome's rows come off first
+    framed = theme.framed(screen_width, full_height)
     inner_width = _inner_width()
     compact = not theme.roomy(height, _COMPACT_HEIGHT)
     has_actions = any(item.is_action for item in items)
@@ -320,11 +415,13 @@ def _build_panel(
 
     current_item = items[cursor] if 0 <= cursor < len(items) else None
     item_blocks: list[Text] = []
-    if current_item and _plain(current_item.hint) and not _inline_hint(current_item):
+    if pane_width:
+        pass  # the inspector pane shows the focused row's hint and description
+    elif current_item and _plain(current_item.hint) and not _inline_hint(current_item):
         hint = _hint_text(current_item)
         hint.overflow = "fold"
         item_blocks.append(hint)
-    if current_item and current_item.description:
+    if current_item and current_item.description and not pane_width:
         description = Text.from_markup(current_item.description)
         description.overflow = "fold"
         item_blocks.append(description)
@@ -332,7 +429,7 @@ def _build_panel(
     notice_lines = sum(_wrapped_line_count(block, inner_width) for block in parsed.context)
     # A transient message (the quit guard) is the line under the key bar;
     # announcements take the Athanor message line when the window shows one.
-    bar_message = message if theme.bars(width, full_height) else ""
+    bar_message = message if theme.bars(screen_width, full_height) else ""
     alert_lines = theme.wrap_block(Text.from_markup(alert), width, console) if alert else []
     intro_lines = []
     for block in (intro if isinstance(intro, list) else [intro]):
@@ -388,14 +485,15 @@ def _build_panel(
     def plan() -> tuple[list[Text], int]:
         """Keys and chrome height for the current pinning, paging included."""
         nonlocal header_count
-        header_count = len(theme.frame_header(title, header_status(""), width, full_height))
+        header_count = len(theme.frame_header(title, header_status(""), screen_width, full_height))
         segments = with_help(keys)
         total = chrome_for(segments, item_lines + notice_lines)
         if main_len > height - total:
             segments = with_help(windowed_keys())
             # Measure the header with a position as wide as the real one will be.
             widest_position = f"{main_len}–{main_len} of {main_len}"
-            header_count = len(theme.frame_header(title, header_status(widest_position), width, full_height))
+            header_count = len(theme.frame_header(title, header_status(widest_position), screen_width,
+                                                  full_height))
             total = chrome_for(segments, item_lines + notice_lines)
         return segments, total
 
@@ -446,9 +544,10 @@ def _build_panel(
     position = (
         f"{win_start_rel + 1}–{win_end_rel} of {main_len}" if main_len > max_visible else ""
     )
-    lines: list[Text] = theme.frame_header(title, header_status(position), width, full_height)
+    lines: list[Text] = theme.frame_header(title, header_status(position), screen_width, full_height)
     if not compact:
-        lines += theme.frame_rule(width, full_height)
+        lines += theme.frame_rule(screen_width, full_height)
+    body_start = len(lines)  # the list column starts here; the header spans the window
     lines.extend(intro_lines)
 
     for i, item in enumerate(items):
@@ -474,13 +573,26 @@ def _build_panel(
         lines.append(theme.rule(width))
     lines.extend(theme.wrap_keys(shown_keys, width))
     lines.extend(alert_lines)
-    if tip:
-        # The tip takes the bottom rows, below a gap, only when the screen left them empty.
-        tip_lines = theme.wrap_block(Text.from_markup(tip), width, console)
-        spare = height - len(lines) - len(tip_lines)
-        if spare >= 1:
-            lines += [Text("")] * spare + tip_lines
-    return Group(*frames.compose(lines, title, header_status(position), width, full_height, bar_message))
+    # The tip takes the bottom rows, below a gap, only when the screen left them empty.
+    _layout["width"] = None  # the tip spans the window
+    tip_lines = theme.wrap_block(Text.from_markup(tip), screen_width, console) if tip else []
+    if pane_width:
+        body = lines[body_start:]
+        rows = height - body_start
+        pane = _pane(current_item, pane_width)
+        if tip_lines and rows - max(len(body), len(pane)) - len(tip_lines) >= 1:
+            rows -= len(tip_lines)
+        else:
+            tip_lines = []
+        if len(pane) > rows:
+            pane = pane[:max(0, rows - 1)] + [Text("…", style=theme.MUTED)]
+        rows = max(rows, len(body))
+        lines = lines[:body_start] + [_beside(body[i] if i < len(body) else None,
+                                              pane[i] if i < len(pane) else None, width)
+                                      for i in range(rows)] + tip_lines
+    elif tip_lines and height - len(lines) - len(tip_lines) >= 1:
+        lines += [Text("")] * (height - len(lines) - len(tip_lines)) + tip_lines
+    return Group(*frames.compose(lines, title, header_status(position), screen_width, full_height, bar_message))
 
 
 # Keys every selector understands, listed by show_keys after the screen's own.

@@ -341,6 +341,16 @@ def inner_width(width: int) -> int:
     return max(8, width - 2 * len(MARGIN))
 
 
+INSPECTOR_MIN_WIDTH = 150  # narrower windows keep one column
+
+
+def inspector_width(width: int) -> int:
+    """Cells for the inspector pane beside a list in a window this wide; 0 when it stays one column."""
+    if width < INSPECTOR_MIN_WIDTH:
+        return 0
+    return max(56, min(90, round(width * 0.4)))
+
+
 def _as_text(value: str | Text) -> Text:
     return value.copy() if isinstance(value, Text) else Text.from_markup(value)
 

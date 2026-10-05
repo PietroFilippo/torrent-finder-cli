@@ -22,7 +22,7 @@ from torrent_finder.downloader import (
     open_magnet,
 )
 from torrent_finder.providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
-from torrent_finder.ui import chrome as frames, display, theme
+from torrent_finder.ui import chrome as frames, display, inspector, theme
 from torrent_finder.ui.selector import SelectItem, arrow_select
 
 
@@ -2229,7 +2229,7 @@ def _continue_item(entry: dict) -> "SelectItem | None":
     description = ("Runs this search again with its saved names and settings." if replays
                    else "Opens the search field with this search; Enter runs it, or edit it first.")
     return SelectItem(label=query, value=("history" if replays else "continue", entry), hint=hint,
-                      description=description)
+                      description=description, inspect=lambda: inspector.continue_search(entry))
 
 
 def _section_row(label: str) -> SelectItem:
@@ -2373,7 +2373,8 @@ def provider_select_prompt(
             items += [_section_row("Continue"), continue_item]
         items.append(_section_row("Search"))
         items += [
-            SelectItem(label=p.label, value=p, hint=provider_hint(p), description=getattr(p, "search_note", ""))
+            SelectItem(label=p.label, value=p, hint=provider_hint(p), description=getattr(p, "search_note", ""),
+                       inspect=lambda p=p: inspector.provider(p))
             for p in PROVIDER_MENU
         ]
         items.append(_section_row("Tools"))
@@ -2386,14 +2387,17 @@ def provider_select_prompt(
             SelectItem("Credentials", value="__credentials__", hint=_credentials_hint(),
                        description="Manage subtitle logins (OpenSubtitles / Addic7ed / Jimaku), search-provider "
                                    "logins (RuTracker / Online-Fix / Madokami), and the optional TMDB / IGDB "
-                                   "creator-search upgrades."),
+                                   "creator-search upgrades.",
+                       inspect=inspector.credentials),
             SelectItem("Download folder", value="__download_dir__", hint=_folder_hint(get_download_dir()),
                        description=(
                            f"Current: {escape(get_download_dir())}\nThe default folder for aria2c / webtorrent / "
                            "peerflix downloads, subtitle saves, and Online-Fix / Madokami / Libgen / F-Droid files.\n"
-                           "Also here: unpack downloaded manga archives into folders of pages.")),
+                           "Also here: unpack downloaded manga archives into folders of pages."),
+                       inspect=lambda: inspector.download_folder(get_download_dir())),
             SelectItem("Settings", value="__settings__", hint="theme · command · network",
-                       description="Theme and spacing, the quick-launch terminal command, and the network check."),
+                       description="Theme and spacing, the quick-launch terminal command, and the network check.",
+                       inspect=inspector.settings),
         ]
         if start is None:
             start = 1  # the continue row when there is one, else the first provider
