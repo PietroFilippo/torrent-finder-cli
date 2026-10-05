@@ -47,11 +47,29 @@ from torrent_finder.search_session import SearchResults as CombinedResults
 
 
 @dataclass(frozen=True)
+class EngineProgress:
+    """One engine of a provider during a search: its overall status and rows kept so far."""
+    name: str
+    status: str  # searching, results, empty, filtered, auto, skipped, off, or a failure status
+    kept: int = 0
+
+
+@dataclass(frozen=True)
+class ProviderProgress:
+    """One provider's line on the search progress screen."""
+    label: str
+    state: str  # running, done, failed
+    results: int  # distinct rows credited to this provider so far
+    engines: tuple[EngineProgress, ...] = ()
+
+
+@dataclass(frozen=True)
 class SearchProgress:
     completed: int
     total: int
     results: int
     waiting: tuple[str, ...]
+    providers: tuple[ProviderProgress, ...] = ()
 
 
 class CombinedProvider(BaseProvider):

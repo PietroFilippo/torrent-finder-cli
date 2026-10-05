@@ -165,6 +165,26 @@ def _scenarios():
                                        width=min(72, console.size.width)))
         return run
 
+    def search_progress():
+        from torrent_finder.constants import buffer_console
+        from torrent_finder.providers.combined_provider import EngineProgress, ProviderProgress, SearchProgress
+        from torrent_finder.ui.search_progress import progress_frame
+        providers = (
+            ProviderProgress("Movies & Series", "done", 28, (EngineProgress("Apibay", "results", 20),
+                                                              EngineProgress("Nyaa", "results", 8),
+                                                              EngineProgress("YTS", "off"))),
+            ProviderProgress("Anime", "running", 0, (EngineProgress("Nyaa", "searching"),
+                                                     EngineProgress("Knaben", "auto"))),
+            ProviderProgress("Manga · General", "failed", 0, (EngineProgress("Knaben", "timeout"),
+                                                              EngineProgress("Nyaa", "blocked"))),
+        )
+        progress = SearchProgress(2, 3, 28, ("Anime",), providers)
+        frame = progress_frame("Search across providers › dune part two",
+                               "Searching 3 providers for: [highlight]dune part two[/highlight]",
+                               ["Results appear when the search finishes or after 30 seconds."],
+                               progress, 4.2, "Contacting selected providers…")
+        buffer_console(sys.stdout, console.size.width, console.size.height).print(frame)
+
     files = [TorrentFile(i, f"Show/Show - {i:02d} (1080p).mkv", 1_400_000_000) for i in range(1, 13)]
     files.append(TorrentFile(13, "Show/readme.txt", 1_000))
 
@@ -206,6 +226,7 @@ def _scenarios():
         ("results-combined", table(_combined_results(), note="Madokami: not logged in")),
         ("results-empty", table([])),
         ("security-warning", security),
+        ("search-progress", search_progress),
         ("stream-header", stream_header),
         ("update-installing", update_view("installing")),
         ("update-failed", update_view("failed")),

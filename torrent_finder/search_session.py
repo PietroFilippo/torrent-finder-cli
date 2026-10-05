@@ -28,6 +28,19 @@ _MAX_OTHER_SPELLINGS = 4
 MAX_PAGE_TASKS = 24
 
 
+# A failed attempt, as opposed to one that searched and found nothing.
+_FAILED_STATUSES = {"error", "timeout", "interrupted", "missing_login", "rejected_login", "login_error", "blocked"}
+# When an engine's attempts (queries, spellings, pages) disagree, the first status here names it.
+_STATUS_ORDER = ("searching", "results", "blocked", "missing_login", "rejected_login", "login_error",
+                 "timeout", "interrupted", "error", "filtered", "empty", "auto", "skipped", "off")
+
+
+def _engine_status(diagnostics) -> str:
+    """One status for an engine from all its attempts: still searching wins, then rows, then failures."""
+    statuses = {"searching" if d.status == "pending" else d.status for d in diagnostics}
+    return next((status for status in _STATUS_ORDER if status in statuses), next(iter(statuses), "off"))
+
+
 class PageRows(list):
     def __init__(self, rows=(), *, has_more=True):
         super().__init__(rows)
@@ -331,6 +344,31 @@ class SearchSession:
             notices += list(dict.fromkeys(d.hint for d in self.diagnostics if d.hint))
         return SearchResults(ordered, notices, session=self)
 
+    def provider_progress(self, results):
+        """Each provider's state, distinct results and engine statuses, for the progress screen."""
+        from torrent_finder.providers.combined_provider import EngineProgress, ProviderProgress, provider_label
+        lines = []
+        for provider in self.providers:
+            by_engine: dict = {}
+            for task in self.tasks:
+                if self.groups[task.group][0] is provider:
+                    by_engine.setdefault(task.engine.name, []).append(task.diagnostic)
+            engines = tuple(EngineProgress(name, _engine_status(diagnostics), sum(d.kept for d in diagnostics))
+                            for name, diagnostics in by_engine.items())
+            count = (sum((row.get("provider_slug") or provider.slug) == provider.slug for row in results)
+                     if self.combined else len(results))
+            statuses = {engine.status for engine in engines}
+            if statuses & {"searching", "auto"}:  # the same rule as the finished count
+                state = "running"
+            elif count or "results" in statuses:
+                state = "done"
+            elif statuses & _FAILED_STATUSES:
+                state = "failed"
+            else:
+                state = "done"
+            lines.append(ProviderProgress(provider_label(provider), state, count, engines))
+        return tuple(lines)
+
     def run(self, action="initial", *, cancel_event=None, finish_event=None,
             on_progress=None, on_results=None, timeout=30):
         if not self._busy.acquire(blocking=False):
@@ -377,7 +415,8 @@ class SearchSession:
             if on_progress is not None:
                 waiting = {self.groups[t.group][0].slug for t in self.tasks if t.diagnostic.status in {"pending", "auto"}}
                 on_progress(SearchProgress(len(self.providers) - len(waiting), len(self.providers), len(results),
-                                           tuple(provider_label(p) for p in self.providers if p.slug in waiting)))
+                                           tuple(provider_label(p) for p in self.providers if p.slug in waiting),
+                                           self.provider_progress(results)))
 
         publish()
         executor = ThreadPoolExecutor(max_workers=self.workers)
