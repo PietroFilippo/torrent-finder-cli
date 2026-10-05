@@ -1,18 +1,28 @@
 import io
-import json
-import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 from rich.console import Console
+from rich.padding import Padding
+from rich.progress_bar import ProgressBar
 
 import isolation  # noqa: F401  # redirected settings and the shared test baseline
-from torrent_finder import main as app, updates, update_worker
+from torrent_finder import main as app, updates
 from torrent_finder.ui import update_progress as ui
 
 
-class UpdateProgressTests(unittest.TestCase):
+def _render(view, elapsed=3.0, width=72, notice=""):
+    output = io.StringIO()
+    Console(file=output, width=width).print(ui.update_panel(view, elapsed, min(72, width), notice))
+    return output.getvalue()
+
+
+def _bar(view, elapsed=3.0) -> ProgressBar:
+    return next(part.renderable for part in ui.update_panel(view, elapsed).renderables
+                if isinstance(part, Padding))
+
+
+class UpdateScreenTests(unittest.TestCase):
     def test_preview_cli_skips_normal_startup_and_persistence(self):
         for arguments, outcome in [(["--preview-update"], "success"), (["--preview-update", "failure"], "failure")]:
             with self.subTest(outcome=outcome), \
@@ -27,18 +37,18 @@ class UpdateProgressTests(unittest.TestCase):
             stats.assert_not_called()
             runtime.assert_not_called()
 
-    def test_preview_runs_real_display_without_an_installer_or_job(self):
+    def test_preview_runs_real_display_without_an_installer(self):
         for outcome in ("success", "failure"):
             output = io.StringIO()
             with patch.object(ui.time, "sleep"), \
                  patch.object(updates, "run_update") as update, \
-                 patch.object(updates, "_update_files") as files, \
+                 patch.object(updates, "_stream") as stream, \
                  patch.object(updates.subprocess, "Popen") as popen:
                 ui.preview_update(outcome, console=Console(file=output, width=48), pause=False)
             self.assertIn("PREVIEW", output.getvalue())
             self.assertIn("Update complete" if outcome == "success" else "Update did not complete", output.getvalue())
             update.assert_not_called()
-            files.assert_not_called()
+            stream.assert_not_called()
             popen.assert_not_called()
 
     def test_ctrl_c_in_preview_exits_without_a_traceback(self):
@@ -48,182 +58,152 @@ class UpdateProgressTests(unittest.TestCase):
             app.main()
         stats.assert_not_called()
 
-    def test_panels_fit_small_terminals_and_animation_moves_without_percentages(self):
-        for width in (32, 48, 80):
-            output = io.StringIO()
-            console = Console(file=output, width=width)
-            for time in (0, 1, 2, 7):
-                console.print(ui.update_panel(ui.preview_view(time), time, width=min(72, width)))
-            self.assertTrue(all(len(line) <= width for line in output.getvalue().splitlines()))
-            self.assertNotIn("%", output.getvalue())
-            self.assertIn("Elapsed 00:07", output.getvalue())
+    def test_preview_walks_through_the_real_stages(self):
+        def stages(outcome):
+            seen = []
+            for tick in range(int(ui.PREVIEW_SECONDS[outcome] * 10) + 1):
+                stage = ui.preview_view(tick / 10, outcome).stage
+                if not seen or seen[-1] != stage:
+                    seen.append(stage)
+            return seen
+        self.assertEqual(stages("success"), ["preparing", "downloading", "installing", "finishing", "succeeded"])
+        self.assertEqual(stages("failure"), ["preparing", "downloading", "installing", "failed"])
+        self.assertTrue(any(ui.preview_view(tick / 10).total for tick in range(70)))
+
+    def test_download_shows_its_percentage_bytes_and_a_filling_bar(self):
+        view = ui.UpdateView("downloading", "torrent_finder_cli-0.9.1-py3-none-any.whl", done=324_000, total=719_511)
+        text = _render(view)
+        self.assertIn("Downloading update", text)
+        self.assertIn("45%", text)
+        self.assertIn("324.0 kB of 719.5 kB", text)
+        self.assertIn("torrent_finder_cli-0.9.1-py3-none-any.whl", text)
+        bar = _bar(view)
+        self.assertEqual((bar.total, bar.completed), (719_511, 324_000))
+        self.assertFalse(bar.pulse)
+
+    def test_percentage_reaches_100_only_with_the_last_byte(self):
+        self.assertIn("99%", _render(ui.UpdateView("downloading", "", done=719_510, total=719_511)))
+        self.assertIn("100%", _render(ui.UpdateView("downloading", "", done=719_511, total=719_511)))
+
+    def test_steps_without_a_measurable_length_pulse_without_percentages(self):
+        view = ui.UpdateView("installing", "Installing torrent-finder-cli.")
+        self.assertNotIn("%", _render(view))
+        self.assertTrue(_bar(view).pulse)
         frames = []
         for elapsed in (2, 2.5):
             console = Console(file=io.StringIO(), width=72, record=True, color_system="truecolor")
-            console.print(ui.update_panel(ui.preview_view(elapsed), elapsed))
+            console.print(ui.update_panel(view, elapsed))
             frames.append(console.export_html(inline_styles=True))
         self.assertNotEqual(*frames)
+        self.assertIn("Elapsed 00:02", _render(view, elapsed=2.5))
 
-    def test_worker_publishes_installing_phase_then_real_outcome_for_same_job(self):
-        for code in (0, 1):
-            with self.subTest(code=code), tempfile.TemporaryDirectory() as directory:
-                status, log = Path(directory)/"status.json", Path(directory)/"update.log"
-                update_worker.write_status(status, state="pending", phase="waiting", job_id="job", current="1", latest="2", started_at=123)
-                phases = []
-                def run(*args, **kwargs):
-                    phases.append(json.loads(status.read_text())["phase"])
-                    return Mock(returncode=code)
-                with patch.object(update_worker, "_wait_for_parent", return_value=True), \
-                     patch.object(update_worker.time, "sleep"), \
-                     patch.object(update_worker.subprocess, "run", side_effect=run):
-                    update_worker.run_job(123, ["fixture"], status, log)
-                data = ui.read_job(status, "job")
-                self.assertEqual(phases, ["installing"])
-                self.assertEqual(data["state"], "failed" if code else "succeeded")
-                self.assertEqual(data["latest"], "2")
-                self.assertEqual(data["started_at"], 123)
+    def test_bar_is_full_only_when_the_update_succeeded(self):
+        succeeded, failed = _bar(ui.UpdateView("succeeded", "")), _bar(ui.UpdateView("failed", ""))
+        self.assertEqual((succeeded.completed, succeeded.total), (100, 100))
+        self.assertEqual(failed.completed, 0)
+        self.assertFalse(failed.pulse)
+        # A finished download is not a finished update.
+        self.assertNotIn("Update complete", _render(ui.UpdateView("downloading", "", done=5, total=5)))
 
-    def test_viewer_reads_archived_job_and_does_not_modify_it(self):
-        with tempfile.TemporaryDirectory() as directory:
-            status = Path(directory)/"status.json"
-            archive = status.with_name("last-update-status.json")
-            status.write_text('{"job_id":"newer", "state":"pending"}')
-            archive.write_text('{"job_id":"wanted", "state":"failed", "log":"fixture.log"}')
-            before = archive.read_bytes(), status.read_bytes()
-            output = io.StringIO()
-            ui.watch_update(status, "wanted", console=Console(file=output, width=72), pause=False)
-            self.assertIn("Update did not complete", output.getvalue())
-            self.assertIn("fixture.log", output.getvalue())
-            self.assertEqual(before, (archive.read_bytes(), status.read_bytes()))
-            self.assertIsNone(ui.read_job(status, "unrelated"))
+    def test_panels_fit_small_terminals(self):
+        for width in (24, 32, 48, 80):
+            for tick in range(0, 75, 5):
+                with self.subTest(width=width, elapsed=tick / 10):
+                    text = _render(ui.preview_view(tick / 10), tick / 10, width)
+                    self.assertTrue(all(len(line) <= width for line in text.splitlines()))
 
-    def test_viewer_launch_failure_keeps_single_hidden_update_queued(self):
-        with tempfile.TemporaryDirectory() as directory:
-            status, log = Path(directory)/"status.json", Path(directory)/"update.log"
-            with patch.object(updates, "_update_files", return_value=(status, log)), \
-                 patch.object(updates.subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True), \
-                 patch.object(updates.subprocess, "DETACHED_PROCESS", 8, create=True), \
-                 patch.object(updates.subprocess, "CREATE_NEW_CONSOLE", 16, create=True), \
-                 patch.object(updates.subprocess, "Popen", side_effect=[Mock(), OSError("no console")]) as popen:
-                ok, message = updates._schedule_update(["fixture"], show_progress=True)
-                self.assertTrue(ok)
-                self.assertIn("queued", message)
-                self.assertEqual(popen.call_count, 2)
-                worker, viewer = popen.call_args_list
-                self.assertIn("torrent_finder.update_worker", worker.args[0])
-                self.assertIn("--reopen", worker.args[0])
-                self.assertIn("torrent_finder.ui.update_progress", viewer.args[0])
-                self.assertNotEqual(worker.kwargs["creationflags"], viewer.kwargs["creationflags"])
-                self.assertEqual(json.loads(status.read_text())["state"], "pending")
-                updates._schedule_update(["fixture"], show_progress=True)
-                self.assertEqual(popen.call_count, 2)  # no duplicate installer
+    def test_interrupt_note_shows_while_updating_but_not_after(self):
+        display = ui.UpdateDisplay(Console(file=io.StringIO(), width=72))
+        display.update("installing", "Installing torrent-finder-cli.")
+        display.interrupted()
+        output = io.StringIO()
+        Console(file=output, width=72).print(display.render())
+        self.assertIn("Ctrl+C cannot stop an update halfway", output.getvalue())
+        display.update("succeeded", "Torrent Finder 0.9.1 is installed.")
+        output = io.StringIO()
+        Console(file=output, width=72).print(display.render())
+        self.assertNotIn("Ctrl+C", output.getvalue())
 
-    def test_inline_update_logs_output_and_reports_installing_phase(self):
-        with tempfile.TemporaryDirectory() as directory:
-            status, log = Path(directory)/"status.json", Path(directory)/"update.log"
-            def run(*args, **kwargs):
-                kwargs["stdout"].write("installer details")
-                return Mock(returncode=0)
-            progress = Mock()
-            with patch.object(updates, "_update_files", return_value=(status, log)), \
-                 patch.object(updates.subprocess, "run", side_effect=run):
-                ok, message = updates.run_update({"kind": "git"}, on_progress=progress)
-            self.assertTrue(ok, message)
-            self.assertEqual(progress.call_args.args[0], "installing")
-            self.assertEqual(log.read_text(), "installer details")
+    def test_installed_version_replaces_the_announced_one_in_the_header(self):
+        display = ui.UpdateDisplay(Console(file=io.StringIO(), width=72), current="0.9.0", latest="0.9.1")
+        display.update("installing", "Installed torrent-finder-cli 0.9.2.", latest="0.9.2")
+        display.update("finishing", "Updating pipx's copy of the torrent-finder command.")
+        self.assertEqual(display.view.latest, "0.9.2")
 
-    def test_queue_is_never_displayed_as_already_installed(self):
-        with patch.object(app, "run_update", return_value=(True, "queued")), \
-             patch.object(app, "needs_exit_before_update", return_value=True), \
-             patch.object(app, "clear_screen"), patch.object(app, "console"), \
-             patch.object(app, "UpdateDisplay") as display, \
-             patch.object(app.readchar, "readkey", return_value=" "):
-            with self.assertRaises(SystemExit):
-                app._run_update_flow({"kind": "pip"})
-        display.return_value.__enter__.return_value.update.assert_called_once_with("waiting", "queued")
 
-    def test_failed_browser_launch_does_not_claim_it_opened(self):
-        with patch("webbrowser.open", return_value=False):
-            self.assertFalse(updates.run_update({"kind": "binary"})[0])
-
-    def test_worker_reopens_only_successful_updates_after_three_seconds(self):
-        for code in (0, 1):
-            with self.subTest(code=code), tempfile.TemporaryDirectory() as directory:
-                status, log = Path(directory)/"status.json", Path(directory)/"update.log"
-                events = []
-                def sleep(seconds):
-                    events.append(("wait", seconds))
-                    if seconds == 3:
-                        data = json.loads(status.read_text())
-                        self.assertEqual(data["state"], "succeeded")
-                        self.assertEqual(data["reopen"], "waiting")
-                with patch.object(update_worker, "_wait_for_parent", return_value=True), \
-                     patch.object(update_worker.time, "sleep", side_effect=sleep), \
-                     patch.object(update_worker.subprocess, "run", side_effect=lambda *a, **k: events.append("install") or Mock(returncode=code)), \
-                     patch.object(update_worker.subprocess, "CREATE_NEW_CONSOLE", 16, create=True), \
-                     patch.object(update_worker.subprocess, "Popen", side_effect=lambda *a, **k: events.append("open")) as popen:
-                    update_worker.run_job(123, ["fixture"], status, log, reopen=True)
-                data = json.loads(status.read_text())
-                if code == 0:
-                    self.assertEqual(events, [("wait", 1), "install", ("wait", 3), "open"])
-                    popen.assert_called_once_with([update_worker.sys.executable, "-m", "torrent_finder"],
-                                                 creationflags=16, close_fds=True)
-                    self.assertEqual(data["reopen"], "started")
-                else:
-                    popen.assert_not_called()
-                    self.assertEqual(events, [("wait", 1), "install"])
-                    self.assertEqual(data["state"], "failed")
-
-    def test_reopening_failure_does_not_turn_a_completed_install_into_failure(self):
-        with tempfile.TemporaryDirectory() as directory:
-            status, log = Path(directory)/"status.json", Path(directory)/"update.log"
-            with patch.object(update_worker, "_wait_for_parent", return_value=True), \
-                 patch.object(update_worker.time, "sleep"), \
-                 patch.object(update_worker.subprocess, "run", return_value=Mock(returncode=0)), \
-                 patch.object(update_worker.subprocess, "CREATE_NEW_CONSOLE", 16, create=True), \
-                 patch.object(update_worker.subprocess, "Popen", side_effect=OSError("fixture failure")):
-                update_worker.run_job(123, ["fixture"], status, log, reopen=True)
-            data = json.loads(status.read_text())
-            self.assertEqual(data["state"], "succeeded")
-            self.assertEqual(data["reopen"], "failed")
-            self.assertIn("manually", ui.completion_detail(data["reopen"]))
-
-    def test_viewer_counts_down_then_closes_without_waiting_for_a_key(self):
+class UpdateFlowTests(unittest.TestCase):
+    def _flow(self, result, kind="pip", key=" "):
         display = Mock()
-        display.started = 0
-        display.view = ui.UpdateView()
-        with patch.object(ui, "UpdateDisplay") as factory, \
-             patch.object(ui, "read_job", side_effect=[
-                 {"state": "succeeded", "reopen": "waiting", "reopen_at": 103},
-                 {"state": "succeeded", "reopen": "started"},
-             ]), \
-             patch.object(ui.time, "time", return_value=100), \
-             patch.object(ui.time, "monotonic", return_value=1), \
-             patch.object(ui.time, "sleep"), patch.object(ui.readchar, "readkey") as key:
+        console = Mock()
+        with patch.object(app, "run_update", return_value=result) as run, \
+             patch.object(app, "clear_screen"), patch.object(app, "console", console), \
+             patch.object(app, "UpdateDisplay") as factory, \
+             patch.object(app.readchar, "readkey", side_effect=[key]):
             factory.return_value.__enter__.return_value = display
-            ui.watch_update(Path("unused.json"), "job")
-        self.assertIn("3 seconds", display.update.call_args_list[0].args[1])
-        self.assertIn("Starting Torrent Finder", display.update.call_args.args[1])
-        key.assert_not_called()
+            try:
+                app._run_update_flow({"kind": kind, "current": "0.9.0", "latest": "0.9.1"})
+                raised = None
+            except BaseException as error:  # noqa: BLE001  # the flow's way out is under test
+                raised = error
+        prompt = " ".join(str(call.args[0]) for call in console.print.call_args_list)
+        return display, run, prompt, raised
 
-    def test_startup_leaves_countdown_report_for_worker_but_consumes_expired_one(self):
-        with tempfile.TemporaryDirectory() as directory:
-            status, log = Path(directory)/"status.json", Path(directory)/"update.log"
-            status.write_text('{"state":"succeeded", "reopen":"waiting", "reopen_at":103}')
-            with patch.object(updates, "_update_files", return_value=(status, log)), \
-                 patch.object(updates.time, "time", return_value=100):
-                self.assertEqual(updates.consume_update_report(), "")
-                self.assertTrue(status.exists())
-            with patch.object(updates, "_update_files", return_value=(status, log)), \
-                 patch.object(updates.time, "time", return_value=114):
-                self.assertIn("successfully", updates.consume_update_report())
+    def test_successful_update_asks_for_a_key_then_restarts(self):
+        display, run, prompt, raised = self._flow(updates.UpdateResult(True, "Torrent Finder 0.9.1 is installed.", restart=True))
+        self.assertIsInstance(raised, updates.RestartRequested)
+        display.update.assert_called_with("succeeded", "Torrent Finder 0.9.1 is installed.")
+        self.assertIn("restart Torrent Finder", prompt)
+        self.assertIs(run.call_args.kwargs["on_progress"], display.update)
+        self.assertIs(run.call_args.kwargs["on_interrupt"], display.interrupted)
 
-    def test_preview_countdown_matches_worker_delay_and_never_reopens(self):
-        self.assertEqual(update_worker.REOPEN_DELAY, 3)
-        for elapsed, remaining in ((7, 3), (8, 2), (9, 1)):
-            self.assertIn(f"in {remaining} second", ui.preview_view(elapsed).detail)
-        self.assertIn("Starting Torrent Finder", ui.preview_view(10).detail)
-        self.assertNotIn("Reopening", ui.preview_view(7, "failure").detail)
+    def test_failed_update_returns_to_the_app(self):
+        display, _run, prompt, raised = self._flow(updates.UpdateResult(False, "The installer stopped."))
+        self.assertIsNone(raised)
+        display.update.assert_called_with("failed", "The installer stopped.")
+        self.assertIn("continue", prompt)
+
+    def test_nothing_new_and_release_pages_do_not_restart(self):
+        for kind, result, stage in [("pip", updates.UpdateResult(True, "Torrent Finder is already up to date."), "succeeded"),
+                                    ("binary", updates.UpdateResult(True, "Opened the Releases page."), "opened")]:
+            with self.subTest(kind=kind):
+                display, _run, prompt, raised = self._flow(result, kind)
+                self.assertIsNone(raised)
+                self.assertEqual(display.update.call_args.args[0], stage)
+                self.assertNotIn("restart", prompt)
+
+    def test_ctrl_c_at_the_restart_prompt_quits_instead(self):
+        _display, _run, _prompt, raised = self._flow(updates.UpdateResult(True, "Installed.", restart=True), key=KeyboardInterrupt())
+        self.assertIsInstance(raised, KeyboardInterrupt)
+
+    def test_main_saves_the_session_then_restarts_in_this_terminal(self):
+        events = []
+        with patch("sys.argv", ["torrent-finder", "-y", "--theme", "quiet", "-t", "movies", "-q", "dune"]), \
+             patch.object(app, "_main_loop", side_effect=updates.RestartRequested), \
+             patch.object(app, "record_session_start"), \
+             patch.object(app, "add_runtime_seconds", side_effect=lambda seconds: events.append("runtime")), \
+             patch.object(app.store, "flush", side_effect=lambda: events.append("flush")), \
+             patch.object(app, "console"), \
+             patch.object(app, "relaunch", side_effect=lambda args: events.append(("relaunch", args)) or 3):
+            with self.assertRaises(SystemExit) as exit_:
+                app.main()
+        self.assertEqual(exit_.exception.code, 3)
+        # The first search is not repeated; the session's options are kept.
+        self.assertEqual(events, ["runtime", "flush", ("relaunch", ["--skip-warning", "--theme", "quiet"])])
+
+    def test_restart_that_cannot_start_asks_the_user_to_reopen(self):
+        console = Mock()
+        with patch("sys.argv", ["torrent-finder"]), \
+             patch.object(app, "_main_loop", side_effect=updates.RestartRequested), \
+             patch.object(app, "record_session_start"), patch.object(app, "add_runtime_seconds"), \
+             patch.object(app.store, "flush"), patch.object(app, "console", console), \
+             patch.object(app, "relaunch", side_effect=OSError("missing")):
+            with self.assertRaises(SystemExit) as exit_:
+                app.main()
+        self.assertEqual(exit_.exception.code, 0)
+        self.assertIn("Open Torrent Finder again", console.print.call_args.args[0])
+
+    def test_an_unhandled_restart_request_still_exits_cleanly(self):
+        self.assertEqual(updates.RestartRequested().code, 0)
 
 
 if __name__ == "__main__":

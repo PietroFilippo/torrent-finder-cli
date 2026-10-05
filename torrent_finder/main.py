@@ -63,8 +63,8 @@ from torrent_finder.ui.search_progress import REDRAW_S as SEARCH_REDRAW_S, Progr
 from torrent_finder.ui.table import interactive_select
 from torrent_finder.ui.update_progress import UpdateDisplay, preview_update
 from torrent_finder.updates import (
-    check_for_update, consume_update_report, needs_exit_before_update,
-    notice_line, run_update, status_label,
+    RestartRequested, check_for_update, consume_update_report, notice_line,
+    relaunch, remove_moved_launchers, run_update, status_label,
 )
 from torrent_finder.utils import start_esc_listener
 
@@ -1002,37 +1002,38 @@ def _handle_whats_next(current_provider, cli_filters=None, on_update=None):
 
 
 def _run_update_flow(info: dict) -> None:
-    """Run the install-appropriate update (git pull / pipx / open Releases)."""
+    """Run the install-appropriate update (git pull / pip and pipx / open Releases) in this terminal.
+
+    A successful package or checkout update raises ``RestartRequested`` after a
+    key press, and ``main()`` starts the new version in the same window.
+    """
     clear_screen()
     try:
         with UpdateDisplay(console, current=info.get("current", ""), latest=info.get("latest", "")) as display:
-            ok, msg = run_update(info, on_progress=display.update)
+            result = run_update(info, on_progress=display.update, on_interrupt=display.interrupted)
             stage = "failed"
-            if ok:
-                if needs_exit_before_update(info):
-                    stage = "waiting"
-                elif info.get("kind") == "binary":
-                    stage = "opened"
-                else:
-                    stage = "succeeded"
-            display.update(stage, msg)
+            if result.ok:
+                stage = "opened" if info.get("kind") == "binary" else "succeeded"
+            display.update(stage, result.message)
     except KeyboardInterrupt:
         console.print("\n[warning]Update cancelled.[/warning]")
         clear_screen()
         return
-    if ok and needs_exit_before_update(info):
-        console.print("[muted]Press [key]any key[/key] to close and let the update finish.[/muted]")
-        try:
-            readchar.readkey()
-        except KeyboardInterrupt:
-            pass
-        raise SystemExit(0)
-    console.print("\n[muted]Press [key]any key[/key] to continue…[/muted]")
+    console.print("\n" + theme.any_key("restart Torrent Finder" if result.restart else "continue"))
     try:
         readchar.readkey()
     except KeyboardInterrupt:
-        pass
+        if result.restart:
+            raise  # quit instead; the next launch runs the new version
+    if result.restart:
+        raise RestartRequested
     clear_screen()
+
+
+def _restart_args(args) -> list[str]:
+    """The options the restarted app keeps: this session's, not its first search."""
+    kept = ["--skip-warning"] if args.skip_warning else []
+    return kept + (["--theme", args.theme] if args.theme else [])
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -1168,6 +1169,7 @@ def _main_loop(args=None) -> None:
     if theme_notice:
         update_msg = "\n".join(filter(None, (update_msg, f"[warning]{markup_escape(theme_notice)}[/warning]")))
     from rich.markup import escape
+    remove_moved_launchers()
     update_report = consume_update_report()
     if update_report:
         update_msg = "\n".join(filter(None, (update_msg, escape(update_report))))
@@ -1557,8 +1559,11 @@ def main() -> None:
         return
     record_session_start()
     t0 = time.monotonic()
+    restart = False
     try:
         _main_loop(args)
+    except RestartRequested:
+        restart = True
     except ProfileError as error:
         from rich.markup import escape
         console.print(f"[warning]{escape(str(error))}[/warning]")
@@ -1569,6 +1574,17 @@ def main() -> None:
         _goodbye()
     finally:
         add_runtime_seconds(time.monotonic() - t0)
+    if restart:
+        # This process still runs the old code: save its last changes now, so
+        # nothing it holds is written over the new version's after it starts.
+        store.flush()
+        console.print("[muted]Restarting Torrent Finder…[/muted]")
+        try:
+            code = relaunch(_restart_args(args))
+        except OSError:
+            console.print("[warning]Open Torrent Finder again to use the new version.[/warning]")
+            code = 0
+        raise SystemExit(code)
 
 
 if __name__ == "__main__":

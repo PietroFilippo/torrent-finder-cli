@@ -1,8 +1,6 @@
-import json
 import unittest
 import warnings
-from io import StringIO
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
@@ -10,7 +8,6 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 from rich.text import Text
 
 import isolation  # noqa: F401  # redirected settings and the shared test baseline
-from torrent_finder import updates
 from torrent_finder.updates import _is_newer, notice_line
 
 
@@ -75,64 +72,6 @@ class BannerContrastTests(unittest.TestCase):
         self.assertIn("[banner]", line)
         self.assertIn("black on", theme.STYLES["banner"])
         self.assertNotIn("bold", theme.STYLES["banner"])
-
-
-class PipxUpgradeExitCodeTests(unittest.TestCase):
-    def setUp(self):
-        # These tests simulate installers; never overwrite a real update log.
-        log = Mock()
-        log.open.return_value.__enter__ = Mock(return_value=StringIO())
-        log.open.return_value.__exit__ = Mock(return_value=False)
-        patcher = patch.object(updates, "_update_files", return_value=(Mock(), log))
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def test_partial_package_upgrade_is_not_reported_as_success(self):
-        # On Windows, pipx exits nonzero when it can't replace the running
-        # .local/bin launcher even though the venv upgraded fine. The flow
-        # must not hide an incomplete update just because metadata changed.
-        def fake_run(cmd, **kwargs):
-            result = Mock()
-            if cmd[:2] == ["pipx", "upgrade"]:
-                result.returncode = 1  # WinError 32 replacing the launcher
-            else:  # pipx list --json
-                result.returncode = 0
-                result.stdout = json.dumps({
-                    "venvs": {
-                        "torrent-finder-cli": {
-                            "metadata": {
-                                "main_package": {"package_version": "9.9.9"}
-                            }
-                        }
-                    }
-                })
-            return result
-
-        # Pin the running version: a source checkout that was never built
-        # reports "0+unknown" (e.g. on CI), which _is_newer refuses to compare.
-        with patch.object(updates, "__version__", "0.1.0"), patch.object(
-            updates, "_pipx_install", return_value=True
-        ), patch.object(updates.subprocess, "run", side_effect=fake_run), \
-             patch.object(updates, "needs_exit_before_update", return_value=False):
-            ok, msg = updates.run_update({"kind": "pip"})
-
-        self.assertFalse(ok)
-        self.assertNotIn("harmless", msg)
-
-    def test_real_failure_still_reports_failure(self):
-        def fake_run(cmd, **kwargs):
-            result = Mock()
-            result.returncode = 1
-            result.stdout = ""
-            return result
-
-        with patch.object(updates, "_pipx_install", return_value=True), patch.object(
-            updates.subprocess, "run", side_effect=fake_run
-        ), patch.object(updates, "needs_exit_before_update", return_value=False):
-            ok, msg = updates.run_update({"kind": "pip"})
-
-        self.assertFalse(ok)
-        self.assertIn("pipx upgrade torrent-finder-cli", msg)
 
 
 if __name__ == "__main__":

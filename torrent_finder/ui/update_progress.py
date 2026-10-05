@@ -1,15 +1,11 @@
-"""Update display and a read-only viewer for the detached Windows updater."""
+"""The update screen: one renderer for real updates, the terminal preview and visual QA."""
 
-import argparse
 from dataclasses import dataclass, replace
-import json
-import math
-from pathlib import Path
-import sys
 import time
 
 import readchar
 from rich.console import Console, Group
+from rich.filesize import decimal
 from rich.live import Live
 from rich.padding import Padding
 from rich.progress_bar import ProgressBar
@@ -21,49 +17,74 @@ from torrent_finder.ui import theme
 @dataclass(frozen=True)
 class UpdateView:
     stage: str = "preparing"
-    detail: str = "Preparing the updater."
+    detail: str = "Getting ready to update."
     current: str = ""
     latest: str = ""
+    done: "int | None" = None   # bytes downloaded, while pip reports them
+    total: "int | None" = None
 
 
 _HEADINGS = {
     "preparing": "Preparing update",
-    "waiting": "Waiting for Torrent Finder to close",
+    "downloading": "Downloading update",
     "installing": "Installing update",
+    "finishing": "Finishing update",
     "opening": "Opening release page",
     "opened": "Release page opened",
     "succeeded": "Update complete",
     "failed": "Update did not complete",
 }
 _FINISHED = {"succeeded", "failed", "opened"}
+INTERRUPT_NOTE = "Ctrl+C cannot stop an update halfway. It finishes in a moment."
 
 
-def update_panel(view: UpdateView, elapsed: float, width: int = 72):
-    """One shared renderer for real updates, terminal previews, and visual QA.
+def _spread(left: Text, right: Text, width: int) -> Text:
+    """*left* at the margin and *right* ending where the bar ends."""
+    line = Text(theme.MARGIN, overflow="fold")
+    line.append_text(left)
+    if right.plain:
+        line.append(" " * max(2, theme.inner_width(width) - left.cell_len - right.cell_len))
+        line.append_text(right)
+    return line
 
-    Quiet layout: the header line carries the version change, then the stage
-    in its colour, an activity bar, the elapsed time and the detail text.
+
+def update_panel(view: UpdateView, elapsed: float, width: int = 72, notice: str = ""):
+    """The header with the version change, the stage, a bar and the detail text.
+
+    The bar fills with the download percentage while pip reports bytes, pulses
+    while a step's length is unknown, and is full only when the update succeeded.
     """
     width = max(24, width)
-    done = view.stage in _FINISHED
+    finished = view.stage in _FINISHED
     color = theme.GOOD if view.stage == "succeeded" else theme.BAD if view.stage == "failed" else theme.ACCENT
+    measured = not finished and bool(view.total) and view.done is not None
     versions = ""
     if view.current or view.latest:
         versions = f"{view.current or 'Installed version'} → {view.latest or 'Latest version'}"
+    heading = Text(_HEADINGS.get(view.stage, "Updating"), style=f"bold {color}")
+    percent = Text(f"{min(100, view.done * 100 // view.total)}%", style=f"bold {color}") if measured else Text()
+    if measured:
+        bar = ProgressBar(total=view.total, completed=min(view.done, view.total), width=theme.inner_width(width),
+                          style=theme.MUTED, complete_style=theme.ACCENT, finished_style=theme.ACCENT)
+    else:
+        bar = ProgressBar(total=100 if finished else None, completed=100 if view.stage == "succeeded" else 0,
+                          width=theme.inner_width(width), pulse=not finished, animation_time=elapsed,
+                          style=theme.MUTED, pulse_style=theme.ACCENT, finished_style=theme.GOOD)
+    size = Text(f"{decimal(view.done)} of {decimal(view.total)}", style=theme.MUTED) if measured else Text()
+    clock = Text(f"Elapsed {int(elapsed) // 60:02d}:{int(elapsed) % 60:02d}", style=theme.MUTED)
     parts: list = list(theme.header_lines("Update", Text(versions), width))
     parts.extend([
         theme.rule(width),
-        Text(theme.MARGIN + _HEADINGS.get(view.stage, "Updating"), style=f"bold {color}"),
+        _spread(heading, percent, width),
         Text(""),
-        Padding(ProgressBar(total=100 if done else None, completed=100 if view.stage == "succeeded" else 0,
-                            width=theme.inner_width(width), pulse=not done, animation_time=elapsed,
-                            style=theme.MUTED, pulse_style=theme.ACCENT, finished_style=theme.GOOD),
-                (0, 0, 0, len(theme.MARGIN))),
-        Text(theme.MARGIN + f"Elapsed {int(elapsed) // 60:02d}:{int(elapsed) % 60:02d}", style=theme.MUTED),
+        Padding(bar, (0, 0, 0, len(theme.MARGIN))),
+        _spread(size, clock, width) if measured else _spread(clock, Text(), width),
         Text(""),
     ])
     for line in view.detail.splitlines() or [""]:
         parts.append(Text(theme.MARGIN + line, overflow="fold"))
+    if notice and not finished:
+        parts.extend([Text(""), Text(theme.MARGIN + notice, style=theme.WARN, overflow="fold")])
     return Group(*parts)
 
 
@@ -71,6 +92,7 @@ class UpdateDisplay:
     def __init__(self, console=None, *, current="", latest="", preview=False):
         self.console = console or Console()
         self.view = UpdateView(current=current, latest=latest)
+        self.notice = ""
         self.started = time.monotonic()
         self.finished_at = None
         self.preview = preview
@@ -79,17 +101,22 @@ class UpdateDisplay:
 
     def render(self):
         elapsed = (self.finished_at or time.monotonic()) - self.started
-        panel = update_panel(self.view, elapsed, min(72, self.console.size.width))
+        panel = update_panel(self.view, elapsed, min(72, self.console.size.width), self.notice)
         if self.preview:
             return Group(Text(theme.MARGIN + "PREVIEW · No update will be installed", style=f"bold {theme.WARN}"),
                          panel)
         return panel
 
-    def update(self, stage, detail=""):
-        self.view = replace(self.view, stage=stage, detail=detail)
+    def update(self, stage, detail="", *, done=None, total=None, latest=None):
+        self.view = replace(self.view, stage=stage, detail=detail, done=done, total=total,
+                            latest=latest or self.view.latest)
         if stage in _FINISHED and self.finished_at is None:
             self.finished_at = time.monotonic()
         self.live.refresh()
+
+    def interrupted(self):
+        """Ctrl+C while installing: say why it is ignored. Safe from a signal handler (no drawing)."""
+        self.notice = INTERRUPT_NOTE
 
     def __enter__(self):
         self.live.start(refresh=True)
@@ -99,119 +126,46 @@ class UpdateDisplay:
         self.live.stop()
 
 
-def completion_detail(reopen=None, seconds=0):
-    message = "The update was installed successfully.\n"
-    if reopen == "waiting":
-        if seconds > 0:
-            return message + f"Reopening Torrent Finder in {seconds} second{'s' if seconds != 1 else ''}..."
-        return message + "Reopening Torrent Finder..."
-    if reopen == "started":
-        return message + "Starting Torrent Finder..."
-    if reopen == "failed":
-        return message + "Could not reopen automatically. Open Torrent Finder manually."
-    return message + "You can reopen Torrent Finder now."
+_PREVIEW_BYTES = 719_511  # the size of a recent release's wheel
+PREVIEW_SECONDS = {"success": 7.0, "failure": 6.0}
 
 
 def preview_view(elapsed, outcome="success"):
+    """The real flow's stages on a fixed timeline; nothing is downloaded or installed."""
     if elapsed < 1:
-        return UpdateView("preparing", "Preparing the updater.")
-    if elapsed < 2:
-        return UpdateView("waiting", "Return to the main app and press any key to begin.")
-    if elapsed < 7:
-        return UpdateView("installing", "Downloading and installing the latest version.\nLeave Torrent Finder closed until this finishes.")
+        return UpdateView("preparing", "Getting ready to update.")
+    if elapsed < 1.5:
+        return UpdateView("downloading", "Looking for the latest version on PyPI.")
+    if elapsed < 4:
+        done = int(_PREVIEW_BYTES * min(1.0, (elapsed - 1.5) / 2.4))
+        return UpdateView("downloading", "Downloading the newest torrent-finder-cli package.",
+                          done=done, total=_PREVIEW_BYTES)
+    if elapsed < 6:
+        return UpdateView("installing", "Installing torrent-finder-cli.")
     if outcome == "failure":
-        return UpdateView("failed", "The update could not be completed.\nCheck update.log, then retry the update.")
-    return UpdateView("succeeded", completion_detail(
-        "waiting" if elapsed < 10 else "started", max(0, math.ceil(10 - elapsed))))
+        return UpdateView("failed", "The installer stopped with an error.\nDetails: update.log\n"
+                                    "Or close Torrent Finder and run: pipx upgrade torrent-finder-cli")
+    if elapsed < 7:
+        return UpdateView("finishing", "Updating pipx's copy of the torrent-finder command.")
+    return UpdateView("succeeded", "Torrent Finder is installed.")
 
 
 def preview_update(outcome="success", *, console=None, pause=True):
-    """Exercise the actual display without invoking installers or status files."""
+    """Exercise the actual display without invoking installers or writing files."""
+    end = PREVIEW_SECONDS[outcome]
     with UpdateDisplay(console, preview=True) as display:
-        stages = (0, 1, 2, 7, 8, 9, 10) if outcome == "success" else (0, 1, 2, 7)
-        for index, stage_time in enumerate(stages):
-            view = preview_view(stage_time, outcome)
-            display.update(view.stage, view.detail)
-            if index + 1 < len(stages):
-                time.sleep(stages[index + 1] - stage_time)
-        if pause:
-            display.console.print(Text(theme.MARGIN + "Press any key to close the preview.", style=theme.MUTED))
-            try:
-                readchar.readkey()
-            except (KeyboardInterrupt, EOFError):
-                pass
-
-
-def read_job(status: Path, job_id: str):
-    # Startup may already have archived a completed report for its own notice.
-    for path in (status, status.with_name("last-update-status.json")):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and data.get("job_id") == job_id:
-                return data
-        except (OSError, ValueError):
-            continue
-    return None
-
-
-def watch_update(status: Path, job_id: str, *, console=None, pause=True):
-    """Observe a job; closing this viewer cannot cancel the hidden installer."""
-    with UpdateDisplay(console) as display:
-        while True:
-            data = read_job(status, job_id)
-            if data:
-                if data.get("reopen") == "waiting" and time.time() > data.get("reopen_at", 0) + 10:
-                    data = {**data, "reopen": "failed"}
-                state = data.get("state")
-                stage = data.get("phase", "waiting") if state == "pending" else state
-                detail = {
-                    "waiting": "Return to the main app and press any key to begin.",
-                    "installing": "Downloading and installing the latest version.\nLeave Torrent Finder closed until this finishes.",
-                    "succeeded": completion_detail(data.get("reopen"), max(0, math.ceil(data.get("reopen_at", 0) - time.time()))),
-                    "failed": f"Check the update log, then retry.\n{data.get('log', status.with_name('update.log'))}",
-                }.get(stage, "Waiting for the updater to report its status.")
-                display.view = replace(display.view, current=str(data.get("current", "")), latest=str(data.get("latest", "")))
-                display.update(stage, detail)
-                if stage == "succeeded" and data.get("reopen") == "started":
-                    return  # The app owns a new console; close the updater window.
-                if stage in _FINISHED and data.get("reopen") != "waiting":
-                    break
-            if time.monotonic() - display.started > 1900:
-                display.update("failed", "The updater did not report completion. Check update.log before trying again.")
+        for tick in range(int(end * 10) + 1):
+            view = preview_view(tick / 10, outcome)
+            display.update(view.stage, view.detail, done=view.done, total=view.total)
+            if view.stage in _FINISHED:
                 break
-            time.sleep(0.15)
-        if pause:
-            display.console.print(Text(theme.MARGIN + "Press any key to close this window.", style=theme.MUTED))
-            try:
-                readchar.readkey()
-            except (KeyboardInterrupt, EOFError):
-                pass
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--watch", type=Path)
-    parser.add_argument("--job-id")
-    parser.add_argument("--preview", choices=("success", "failure"), default="success")
-    args = parser.parse_args()
-    from torrent_finder.ui.appearance import apply_startup
-    apply_startup()  # the viewer is its own process: draw it in the saved theme
-    if args.watch:
-        if not args.job_id:
-            parser.error("--watch requires --job-id")
-        if sys.platform == "win32":
-            # The viewer owns a new console, separate from the closing app.
-            sys.stdout = open("CONOUT$", "w", encoding="utf-8")
-            sys.stderr = sys.stdout
-            sys.stdin = open("CONIN$", "r", encoding="utf-8")
-        action = lambda: watch_update(args.watch, args.job_id)
-    else:
-        action = lambda: preview_update(args.preview)
-    try:
-        action()
-    except (KeyboardInterrupt, EOFError):
-        pass
-
-
-if __name__ == "__main__":
-    main()
+            time.sleep(0.1)
+    if pause:
+        if outcome == "success":
+            display.console.print(Text(theme.MARGIN + "A real update now restarts Torrent Finder in this window "
+                                       "after a key press.", style=theme.MUTED, overflow="fold"))
+        display.console.print(Text(theme.MARGIN + "Press any key to close the preview.", style=theme.MUTED))
+        try:
+            readchar.readkey()
+        except (KeyboardInterrupt, EOFError):
+            pass

@@ -168,11 +168,11 @@ def _scenarios():
                                        backend="webtorrent", filename="Frieren - 01 (1080p).mkv",
                                        filesize_bytes=1_500_000_000)
 
-    def update_view(stage):
+    def update_view(stage, detail="Installing torrent-finder-cli 0.8.2.", **download):
         def run():
             from torrent_finder.ui.update_progress import UpdateView, update_panel
-            console.print(update_panel(UpdateView(stage=stage, detail="Installing torrent-finder-cli 0.8.2.",
-                                                  current="0.8.1", latest="0.8.2"), 12.0,
+            console.print(update_panel(UpdateView(stage=stage, detail=detail, current="0.8.1", latest="0.8.2",
+                                                  **download), 12.0,
                                        width=min(72, console.size.width)))
         return run
 
@@ -240,6 +240,8 @@ def _scenarios():
         ("security-warning", security),
         ("search-progress", search_progress),
         ("stream-header", stream_header),
+        ("update-downloading", update_view("downloading", "torrent_finder_cli-0.8.2-py3-none-any.whl",
+                                           done=324_000, total=719_511)),
         ("update-installing", update_view("installing")),
         ("update-failed", update_view("failed")),
     ]

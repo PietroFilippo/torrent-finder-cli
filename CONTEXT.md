@@ -441,24 +441,35 @@ to the UI. See [ADR-0012](docs/adr/0012-stable-credentials-and-safe-updates.md).
 
 ## Updates
 
-Windows pip/pipx updates run through `update_worker.py` after the parent process
-exits, releasing the running launcher. A hidden helper writes output to a local
-log and records the real exit status; startup consumes the report. Nonzero exits
-are failures even when package version metadata changed. A separate read-only
-console viewer observes the job ID and waiting/installing/final states; closing
-it never cancels the hidden worker. After a successful interactive update, the
-worker waits three seconds and starts the updated package in a fresh Python
-process and Windows console. The viewer shows the countdown, then closes without
-a keypress. Reopening failure preserves the successful install result and asks
-the user to open the app manually. Failed installs never trigger reopening.
-Startup leaves an active countdown report for the worker to finish.
-The viewer can read an archived completion report if
-startup consumed it first. Failure to open the viewer leaves the queued job intact.
+Updates run in the app's own terminal (see
+[ADR-0024](docs/adr/0024-in-place-updates.md)). `updates.run_update` runs each
+installer command hidden (`CREATE_NO_WINDOW` on Windows, a new session
+elsewhere), writes its output to update.log and parses it into stages for the
+display; Ctrl+C during a command only shows a note. pip and pipx installs run
+this Python's `pip install --upgrade --progress-bar raw`, whose `Progress <done>
+of <total>` lines give the download percentage, then `pipx upgrade` to refresh
+pipx's records and command; pipx alone updates when its venv has no pip or it
+tracks a file, URL or git source. A nonzero exit from the command that installs
+is a failure; pipx failing only to refresh after pip leaves the update in place
+with a note.
 
-`ui/update_progress.py` renders an indeterminate activity bar, elapsed time, and
-the actual outcome. Git/non-Windows package updates use the same display inline
-and redirect installer output to the local log; binaries open Releases.
+On Windows the running launcher cannot be replaced but can be renamed. The
+update reads all metadata first, clears Python's metadata cache (which keeps the
+launcher zip open), renames in-use launchers to `<name>.exe.<8 hex>.old`, and
+refuses to start pip while any installed file is held open, because pip does
+not restore files it already moved when a later move fails. Launchers the
+installer did not replace are put back; moved ones still running go into the
+`moved_launchers` setting and are deleted at a later startup. A successful
+package or checkout update raises `RestartRequested` after a key press;
+`main()` records the session, flushes the store and starts the app again the
+way it was started (exec on POSIX; on Windows the old process waits for the new
+one). `consume_update_report` still reports results that versions before this
+recorded in update-status.json.
+
+`ui/update_progress.py` renders the stage, a bar (the download percentage and
+bytes while pip reports them, a pulse otherwise, full only on success), elapsed
+time and the detail text; binaries open Releases.
 `--preview-update [success|failure]` bypasses normal startup, settings loading,
 usage stats, and installers. `scripts/preview_update.py` exports a browser replay
 from the same renderer for visual QA. Neither preview changes update status or
-opens the application; both simulate the three-second success countdown.
+opens the application.

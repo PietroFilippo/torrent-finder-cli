@@ -1,6 +1,7 @@
 # Stable credentials and deferred Windows package updates
 
-Status: Accepted
+Status: Accepted; the Windows update half (hidden helper, progress window,
+reopening) superseded by [ADR-0024](0024-in-place-updates.md).
 
 ## Context
 

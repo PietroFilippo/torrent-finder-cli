@@ -11,7 +11,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.terminal_theme import MONOKAI
 
-from torrent_finder.ui.update_progress import preview_view, update_panel
+from torrent_finder.ui.update_progress import PREVIEW_SECONDS, preview_view, update_panel
 
 
 def export_preview(destination=Path("dist/update-preview/index.html")):
@@ -20,10 +20,11 @@ def export_preview(destination=Path("dist/update-preview/index.html")):
         for outcome in ("success", "failure"):
             key = f"{width}-{outcome}"
             frames[key] = []
-            for tick in range(81):
+            end = PREVIEW_SECONDS[outcome]
+            for tick in range(int(end * 8) + 9):  # one more second on the result
                 elapsed = tick / 8
                 console = Console(file=io.StringIO(), width=width, record=True, color_system="truecolor", legacy_windows=False)
-                console.print(update_panel(preview_view(elapsed, outcome), min(elapsed, 7), min(72, width)))
+                console.print(update_panel(preview_view(min(elapsed, end), outcome), min(elapsed, end), min(72, width)))
                 frames[key].append(console.export_html(inline_styles=True, code_format="{code}", theme=MONOKAI))
     html = '''<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -42,15 +43,16 @@ label{display:flex;align-items:center;gap:8px}.terminal{border:1px solid #33405a
 </style>
 <main><div class="eyebrow">TORRENT FINDER · VISUAL PREVIEW</div>
 <h1>See the update screen now.</h1>
-<p>This replay uses frames from the app’s actual terminal renderer. The moving bar shows activity;
-it becomes full only when the update succeeds. No percentage is estimated.</p>
+<p>This replay uses frames from the app’s actual terminal renderer. While pip downloads, the bar
+fills with the percentage pip reports; while a step has no measurable length it pulses. It is green
+and full only when the update succeeds.</p>
 <div class="controls"><button id="replay">Replay animation</button>
 <label>Outcome <select id="outcome"><option value="success">Success</option><option value="failure">Failure</option></select></label>
 <label>Terminal <select id="width"><option value="80">Normal · 80 columns</option><option value="48">Compact · 48 columns</option></select></label></div>
 <div class="terminal"><div class="titlebar"><span>Update progress</span><span class="badge">PREVIEW ONLY · NOTHING IS INSTALLED</span></div>
 <div class="screen"><pre id="frame" aria-label="Terminal update preview"></pre></div></div>
-<p class="note">After a successful Windows update, Torrent Finder reopens automatically after three seconds and the updater window closes.
-Closing the progress display early does not stop the update or automatic reopening. This preview never opens the app.</p>
+<p class="note">The update runs inside the app’s own window: no other window or tab opens. After a successful
+update, a key press restarts Torrent Finder in the same window. This preview never installs anything or opens the app.</p>
 <p class="note">Try it in your terminal: <code>python -m torrent_finder --preview-update</code><br>
 Preview a failure: <code>python -m torrent_finder --preview-update failure</code></p></main>
 <script>

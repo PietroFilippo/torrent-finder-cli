@@ -356,22 +356,24 @@ with **U** on the provider menu (an **Install update** row also appears
 there) or **Tab → Install update** at the search prompt — either does the
 right thing for your install type:
 
-- **pip / pipx** — runs `pipx upgrade torrent-finder-cli` (or `pip install -U`). On Windows the app queues a hidden helper, then closes after you press a key so pipx can replace the launcher. Close any other Torrent Finder windows too, and let the update finish before reopening. The next launch reports success or failure; `update.log` beside your settings contains the output. A partial upgrade is reported as a failure.
+- **pip / pipx** — runs `pip install -U torrent-finder-cli` for the app's own Python, then `pipx upgrade torrent-finder-cli` for a pipx install so pipx's records stay right (pipx does it all when it installed the app from a file, URL or git). A failed install is reported as a failure.
 - **standalone binary** — opens the Releases page so you can download the new file.
 - **source clone** — runs `git pull`.
 
-Package updates include an **update progress display**:
-an animated activity bar, elapsed time, and a clear success or failure result.
-The bar moves while the installer is working; pip/pipx does not provide a reliable
-overall percentage. Full installer output stays in `update.log`.
-On Windows a separate progress window stays open while the main app closes and
-the hidden helper installs the update. Closing the progress window does not stop
-the installer or automatic reopening. After a successful Windows package update,
-a three-second countdown runs, Torrent Finder opens automatically, and the
-progress window closes. Failed updates stay on the error screen; if reopening
-fails after installation, the display tells you to open the app manually.
-Other platforms and source clones show progress in the current
-terminal. Standalone binaries still open the download page.
+The update runs **in the same window**: no other window or tab opens. The
+update screen shows each step (preparing, downloading, installing, finishing),
+a bar that fills with the **download percentage** and size while pip downloads
+and moves while other steps run, the elapsed time, and a clear success or
+failure result. Full installer output goes to `update.log` beside your settings.
+After a successful update, press any key and Torrent Finder restarts in the
+same window with the new version. If the update fails, the app keeps running
+the version you had.
+
+On Windows a running program's file cannot be replaced, so the app first
+renames its own launcher (`torrent-finder.exe`) out of the way and deletes the
+old copy on a later start. If another Torrent Finder window is open, the update
+stops before changing anything and asks you to close it. Ctrl+C cannot stop an
+update halfway; the screen says so and the update finishes.
 
 Preview this display now, without installing anything or changing your settings:
 
@@ -382,14 +384,15 @@ python -m torrent_finder --preview-update failure
 torrent-finder --preview-update
 ```
 
-The success preview takes about ten seconds, including the reopening countdown;
-the failure preview takes about seven seconds. Both wait for a key afterward,
-and neither installs an update nor opens another app instance. For a browser replay
+The success preview takes about seven seconds and the failure preview about six.
+Both wait for a key afterward, and neither installs an update nor restarts the
+app. For a browser replay
 with success/failure and compact-terminal controls, run
 `python -m scripts.preview_update` from the source checkout and open
 `dist/update-preview/index.html`. Both previews use the real terminal renderer.
-The installed version controls the update UI: installing the release that adds
-this feature uses the old screen; subsequent in-app updates use the new one.
+The installed version runs the update: updating from v0.9.0 or earlier still
+closes the app and installs in the background once (on Windows with a separate
+progress window); updates after that run in the same window.
 
 Or close the app and update manually with `pipx upgrade torrent-finder-cli`.
 If an older version reports Windows `WinError 32` while replacing
@@ -705,9 +708,8 @@ provider-based — the module paths below are relative to `torrent_finder/`:
 - `state.py`: Public settings and history operations over `store.py`, including engine modes, active presets, download preferences, backward-compatible migration from boolean engine toggles, and the one-shot migration from legacy display-name keys (e.g. `"Movies & Series"`) to provider slugs.
 - `stats.py`: Usage counter recorders and read helpers over the `stats` subtree owned by `store.py`, keyed by provider slug.
 - `torrent_meta.py`: Fetches a torrent's file list from a magnet via `aria2c`. Helpers for episode-number extraction, video/subtitle classification, multi-episode detection (any torrent with ≥ 2 video files), sub-to-video matching (`match_subtitles_for`), and `--select-file` range formatting.
-- `update_worker.py`: Hidden Windows helper that waits for the app to exit, runs a queued pip/pipx update, and records its output and actual result.
-- `ui/update_progress.py`: Shared update renderer, safe terminal preview, and read-only Windows progress viewer.
-- `updates.py`: Install-aware update check (git clone / pip-pipx / binary). Rate-limited; compares against `origin` (git) or PyPI (`__version__`), and powers the in-app **Install update** action via `check_for_update()` / `run_update()`.
+- `ui/update_progress.py`: The update screen (stage, download percentage or activity bar, elapsed time, result) and its safe terminal preview.
+- `updates.py`: Install-aware update check (git clone / pip-pipx / binary). Rate-limited; compares against `origin` (git) or PyPI (`__version__`), and powers the in-app **Install update** action via `check_for_update()` / `run_update()`: hidden installer commands with their output parsed for progress, the Windows launcher moved aside, and the restart in the same terminal.
 - `constants.py`: Configuration constants, trackers, UI themes, the platform user-data resolver (`user_data_dir()` / `data_path()`), the machine-stable state resolver (`machine_state_dir()` / `machine_state_path()`), legacy-location discovery, and `get_download_dir()` (returns the user's chosen `download_dir` setting or falls back to `DOWNLOADS_DIR`).
 
 ## Security Notes
