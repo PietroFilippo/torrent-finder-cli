@@ -75,6 +75,7 @@ class FragmentTests(ProfileCase):
         self.assertEqual(profile["backgroundImage"], "torrent-finder-dore-raven-rubedo.png")  # beside the fragment
         self.assertEqual(self.pictures(), ["torrent-finder-dore-raven-rubedo.png"])
         self.assertEqual(profile["font"]["face"], "PxPlus IBM VGA 8x16")
+        self.assertEqual(profile["intenseTextStyle"], "bright")  # no smeared made-up bold
         self.assertIn("torrent_finder", profile["commandline"] + profile.get("startingDirectory", ""))
         self.assertTrue(terminal_profile.installed())
 

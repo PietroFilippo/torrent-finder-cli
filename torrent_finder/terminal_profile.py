@@ -211,7 +211,10 @@ def fragment(palette, image: "Path | None", font: bool, launch: list[str], start
         profile.update(backgroundImage=image.name, backgroundImageStretchMode="uniform",
                        backgroundImageAlignment="right", backgroundImageOpacity=1.0)
     if font:
-        profile.update(font={"face": FONT_FACE, "size": 12}, antialiasingMode="aliased")
+        # 12 pt is the font's own size at 100% scaling: one font pixel per screen pixel. It has no
+        # bold, and Windows Terminal's made-up bold smears it, so bold text keeps its weight.
+        profile.update(font={"face": FONT_FACE, "size": 12}, antialiasingMode="aliased",
+                       intenseTextStyle="bright")
     return {"profiles": [profile], "schemes": [colours]}
 
 
