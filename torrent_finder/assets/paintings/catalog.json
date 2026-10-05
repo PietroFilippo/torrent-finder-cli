@@ -1,0 +1,102 @@
+[
+  {
+    "key": "dore-satan",
+    "title": "Satan in profile",
+    "artist": "Gustave Doré",
+    "year": "1866",
+    "work": "Paradise Lost",
+    "source": "https://commons.wikimedia.org/wiki/File:GustaveDoreParadiseLostSatanProfile.jpg",
+    "licence": "Public domain",
+    "file": "dore-satan.png"
+  },
+  {
+    "key": "dore-despair",
+    "title": "Satan's despair",
+    "artist": "Gustave Doré",
+    "year": "1866",
+    "work": "Paradise Lost",
+    "source": "https://commons.wikimedia.org/wiki/File:Gustave_Dore_Satan%27s_Despair.jpg",
+    "licence": "Public domain",
+    "file": "dore-despair.png"
+  },
+  {
+    "key": "dore-quixote",
+    "title": "The windmills",
+    "artist": "Gustave Doré",
+    "year": "1863",
+    "work": "Don Quixote",
+    "source": "https://commons.wikimedia.org/wiki/File:Adventure_with_the_Windmills.jpg",
+    "licence": "Public domain",
+    "file": "dore-quixote.png"
+  },
+  {
+    "key": "dore-raven",
+    "title": "The Raven",
+    "artist": "Gustave Doré",
+    "year": "1884",
+    "work": "The Raven",
+    "source": "https://commons.wikimedia.org/wiki/File:Dore_raven_shadow2.jpg",
+    "licence": "Public domain",
+    "file": "dore-raven.png"
+  },
+  {
+    "key": "dore-charon",
+    "title": "Charon",
+    "artist": "Gustave Doré",
+    "year": "1861",
+    "work": "Inferno",
+    "source": "https://commons.wikimedia.org/wiki/File:Gustave_Dor%C3%A9_-_Dante_Alighieri_-_Inferno_-_Plate_9_(Canto_III_-_Charon).jpg",
+    "licence": "Public domain",
+    "file": "dore-charon.png"
+  },
+  {
+    "key": "dore-mariner",
+    "title": "The ice was all around",
+    "artist": "Gustave Doré",
+    "year": "1876",
+    "work": "The Rime of the Ancient Mariner",
+    "source": "https://commons.wikimedia.org/wiki/File:Dore_-_the_ice_was_all_around.jpg",
+    "licence": "Public domain",
+    "file": "dore-mariner.png"
+  },
+  {
+    "key": "durer-melencolia",
+    "title": "Melencolia I",
+    "artist": "Albrecht Dürer",
+    "year": "1514",
+    "work": "",
+    "source": "https://commons.wikimedia.org/wiki/File:Melencolia_I_MET_DP815743.jpg",
+    "licence": "Public domain",
+    "file": "durer-melencolia.png"
+  },
+  {
+    "key": "flammarion",
+    "title": "The Flammarion engraving",
+    "artist": "Unknown artist",
+    "year": "1888",
+    "work": "L'atmosphère",
+    "source": "https://commons.wikimedia.org/wiki/File:Flammarion.jpg",
+    "licence": "Public domain",
+    "file": "flammarion.png"
+  },
+  {
+    "key": "smith-hermit",
+    "title": "The Hermit",
+    "artist": "Pamela Colman Smith",
+    "year": "1909",
+    "work": "Rider–Waite tarot",
+    "source": "https://commons.wikimedia.org/wiki/File:RWS1909_-_09_Hermit.jpeg",
+    "licence": "Public domain",
+    "file": "smith-hermit.png"
+  },
+  {
+    "key": "maier-emblem",
+    "title": "Emblem XXI",
+    "artist": "Matthäus Merian, for Michael Maier",
+    "year": "1617",
+    "work": "Atalanta Fugiens",
+    "source": "https://commons.wikimedia.org/wiki/File:Michael_Maier_Atalanta_Fugiens_Emblem_21.jpeg",
+    "licence": "Public domain",
+    "file": "maier-emblem.png"
+  }
+]

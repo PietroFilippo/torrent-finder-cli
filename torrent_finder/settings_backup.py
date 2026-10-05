@@ -76,7 +76,7 @@ def validate_payload(data):
         if key == "hide_stream_output" and type(value) is not bool:
             raise ValueError("Invalid stream preference")
         if key == "appearance":
-            _object(value, {"theme", "focus", "density"})
+            _object(value, {"theme", "focus", "density", "painting"})
             if any(not isinstance(item, str) for item in value.values()):
                 raise ValueError("Invalid appearance settings")
         if key == "combined_search":

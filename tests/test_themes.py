@@ -170,7 +170,8 @@ class ResolutionTests(ThemeCase):
         appearance.save("iris", "fill", "compact")
         resolved, source, notice = appearance.resolve(None, {})
         self.assertEqual((resolved, source, notice),
-                         ({"theme": "iris", "focus": "fill", "density": "compact"}, "saved", ""))
+                         ({"theme": "iris", "focus": "fill", "density": "compact", "painting": "dore-satan"},
+                          "saved", ""))
         resolved, source, _ = appearance.resolve(None, {appearance.ENV: "ember"})
         self.assertEqual((resolved["theme"], resolved["focus"], source), ("ember", "fill", "env"))
         resolved, source, _ = appearance.resolve("mono", {appearance.ENV: "ember"})

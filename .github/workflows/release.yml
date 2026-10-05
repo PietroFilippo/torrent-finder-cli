@@ -64,7 +64,8 @@ jobs:
   binaries:
     # Tag pushes only — build a standalone executable per OS (no Python needed)
     # and attach it to the GitHub Release. The collect-all / copy-metadata flags
-    # are what make subliminal's entry-point subtitle providers work when frozen.
+    # are what make subliminal's entry-point subtitle providers work when frozen;
+    # collect-data torrent_finder brings the package's assets (the paintings).
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     permissions:
@@ -96,6 +97,7 @@ jobs:
           pyinstaller --onefile --name torrent-finder
           --collect-all subliminal --collect-all babelfish
           --collect-all guessit --collect-all dogpile.cache
+          --collect-data torrent_finder
           --copy-metadata torrent-finder-cli --copy-metadata readchar
           --copy-metadata rich --copy-metadata requests --copy-metadata subliminal
           torrent_finder/__main__.py

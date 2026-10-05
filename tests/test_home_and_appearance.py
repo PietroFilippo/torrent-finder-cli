@@ -156,13 +156,15 @@ class AppearanceMenuTests(unittest.TestCase):
     def test_enter_applies_and_saves_the_theme(self):
         self.run_menu([K.DOWN, K.ENTER, K.ESC])  # Quiet Blue → Iris
         self.assertEqual(theme.PALETTE.key, "iris")
-        self.assertEqual(appearance.saved(), {"theme": "iris", "focus": "bar", "density": "comfortable"})
+        self.assertEqual(appearance.saved(), {"theme": "iris", "focus": "bar", "density": "comfortable",
+                                              "painting": "dore-satan"})
 
     def test_focus_and_density_rows_apply_and_save(self):
         # From Quiet Blue: five themes down, past the Focus heading to Filled row, then Compact.
         self.run_menu([K.DOWN] * 7 + [K.ENTER] + [K.DOWN] * 2 + [K.ENTER, K.ESC])
         self.assertEqual(theme.current()[1:], ("fill", "compact"))
-        self.assertEqual(appearance.saved(), {"theme": "quiet", "focus": "fill", "density": "compact"})
+        self.assertEqual(appearance.saved(), {"theme": "quiet", "focus": "fill", "density": "compact",
+                                              "painting": "dore-satan"})
 
     def test_every_theme_row_shows_its_own_colours(self):
         for design, current in (("simple", "quiet"), ("athanor", "citrinitas")):

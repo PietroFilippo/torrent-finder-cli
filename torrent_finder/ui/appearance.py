@@ -1,11 +1,12 @@
-"""Appearance: the theme, focus style and density, saved per machine.
+"""Appearance: the theme, focus style, density and painting, saved per machine.
 
 At startup the theme comes from ``--theme`` (this run only), then the
 ``TORRENT_FINDER_THEME`` environment variable, then the saved setting, then
 Citrinitas (the Athanor design). A theme's design (Athanor or Simple) comes
-with it. Focus style and density come from the saved setting. The
-Settings › Appearance screen previews a theme in place and saves the choice.
-See docs/adr/0021-themes.md.
+with it. Focus style, density and the Athanor painting come from the saved
+setting; the painting is chosen apart from the colours, which recolour it.
+The Settings › Appearance screen previews a theme in place and saves the
+choice. See docs/adr/0021-themes.md and docs/adr/0022-athanor-design.md.
 """
 
 from __future__ import annotations
@@ -15,11 +16,12 @@ import sys
 
 from rich.text import Text
 
+from torrent_finder import paintings
 from torrent_finder.ui import theme
 
 SETTING = "appearance"
 ENV = "TORRENT_FINDER_THEME"
-DEFAULTS = {"theme": theme.DEFAULT_THEME, "focus": "fill", "density": "comfortable"}
+DEFAULTS = {"theme": theme.DEFAULT_THEME, "focus": "fill", "density": "comfortable", "painting": paintings.DEFAULT}
 
 
 def theme_key(name: object) -> str | None:
@@ -40,6 +42,7 @@ def normalize(value: object) -> dict:
         "theme": theme_key(value.get("theme")) or DEFAULTS["theme"],
         "focus": value.get("focus") if value.get("focus") in theme.FOCUS_STYLES else DEFAULTS["focus"],
         "density": value.get("density") if value.get("density") in theme.DENSITIES else DEFAULTS["density"],
+        "painting": paintings.painting_key(value.get("painting")) or DEFAULTS["painting"],
     }
 
 
@@ -80,13 +83,14 @@ def resolve(cli_theme: str | None = None, environ=None) -> tuple[dict, str, str]
     return appearance, source, notice
 
 
-_session = {"source": "saved"}
+_session = {"source": "saved", "painting": DEFAULTS["painting"]}
 
 
 def apply_startup(cli_theme: str | None = None, environ=None) -> str:
     """Apply the startup appearance; returns a notice for the first screen ("" when none)."""
     appearance, source, notice = resolve(cli_theme, environ)
     _session["source"] = source
+    _session["painting"] = appearance["painting"]
     theme.apply(appearance["theme"], focus=appearance["focus"], density=appearance["density"])
     return notice
 
@@ -96,11 +100,21 @@ def override_source() -> str:
     return _session["source"]
 
 
-def save(theme_name: str, focus: str, density: str) -> None:
-    """Save an explicit appearance choice now; raises ``ValueError``/``OSError`` when that fails."""
+def painting() -> str:
+    """The painting this run uses: a catalogue key or ``none``."""
+    return _session["painting"]
+
+
+def save(theme_name: str, focus: str, density: str, painting_name: str | None = None) -> None:
+    """Save an explicit appearance choice now; raises ``ValueError``/``OSError`` when that fails.
+
+    Without *painting_name* the current painting is kept.
+    """
     from torrent_finder.state import commit_setting
-    commit_setting(SETTING, normalize({"theme": theme_name, "focus": focus, "density": density}))
-    _session["source"] = "saved"
+    value = normalize({"theme": theme_name, "focus": focus, "density": density,
+                       "painting": painting_name or _session["painting"]})
+    commit_setting(SETTING, value)
+    _session["source"], _session["painting"] = "saved", value["painting"]
 
 
 def _swatches(palette) -> Text:
@@ -156,6 +170,20 @@ _DENSITY_HELP = {
 }
 _DESIGN_HINTS = {"athanor": "frame · message and status lines · painting", "simple": "header line · rules · no frame"}
 
+# Where a painting shows: terminals draw background images, apps cannot.
+PAINTING_HELP = "Set the saved image as your terminal's background picture to see it behind the app."
+
+
+def _painting_rows(chosen: str) -> list:
+    """The Painting section's rows: every engraving, then none."""
+    rows = []
+    for key, entry in paintings.catalog().items():
+        rows.append(_choice(entry.title, ("painting", key), key == chosen, f"{entry.artist}, {entry.year}",
+                            f"{entry.credit}; public domain. Recoloured in the colourway's ink. {PAINTING_HELP}"))
+    rows.append(_choice("None", ("painting", paintings.NONE), chosen == paintings.NONE, "a plain page",
+                        "No painting behind the app."))
+    return rows
+
 
 def _choice(label, value, chosen: bool, hint="", description=""):
     from torrent_finder.ui.selector import SelectItem
@@ -169,19 +197,20 @@ def _section(label: str):
 
 
 def appearance_menu() -> None:
-    """Settings › Appearance: the design, its colours, the focus style and the density.
+    """Settings › Appearance: the design, its colours, its painting, the focus style and the density.
 
-    Athanor and Simple are designs; each has its own colours. Space previews a
-    design or a colourway in place; Enter applies a choice and saves it for
-    later runs; Esc leaves, putting back what was applied when the screen
-    opened if a preview was showing.
+    Athanor and Simple are designs; each has its own colours, and Athanor a
+    painting chosen apart from them. Space previews a design or a colourway
+    in place; Enter applies a choice and saves it for later runs; Esc leaves,
+    putting back what was applied when the screen opened if a preview was
+    showing.
     """
     from rich.markup import escape
 
-    from torrent_finder.ui.selector import arrow_select
+    from torrent_finder.ui.selector import SelectItem, arrow_select
 
     palette, focus, density = theme.current()
-    chosen = {"theme": palette.key, "focus": focus, "density": density}
+    chosen = {"theme": palette.key, "focus": focus, "density": density, "painting": painting()}
     state = {"preview": palette.key, "notice": ""}
 
     def design_of(key: str) -> str:
@@ -197,6 +226,13 @@ def appearance_menu() -> None:
         for option in theme.palettes(design):
             items.append(_choice(option.name, ("theme", option.key), option.key == chosen["theme"],
                                  _swatches(option), _theme_help(option)))
+        if design == "athanor" and paintings.catalog():
+            items.append(_section("Painting"))
+            items += _painting_rows(chosen["painting"])
+            if chosen["painting"] != paintings.NONE:
+                items.append(SelectItem("Save the painting as an image", ("export", None), is_action=True,
+                                        hint=f"a PNG in the {theme.THEMES[state['preview']].name} colours",
+                                        description=f"Into {paintings.export_folder()}. {PAINTING_HELP}"))
         items.append(_section("Focus"))
         for key, label in theme.FOCUS_STYLES.items():
             items.append(_choice(label, ("focus", key), key == chosen["focus"], _focus_hint(key), _FOCUS_HELP[key]))
@@ -204,13 +240,12 @@ def appearance_menu() -> None:
         for key, label in theme.DENSITIES.items():
             items.append(_choice(label, ("density", key), key == chosen["density"], _DENSITY_HINTS[key],
                                  _DENSITY_HELP[key]))
-        from torrent_finder.ui.selector import SelectItem
         items.append(SelectItem("Back", None, is_action=True))
         return items
 
     def persist() -> None:
         try:
-            save(chosen["theme"], chosen["focus"], chosen["density"])
+            save(chosen["theme"], chosen["focus"], chosen["density"], chosen["painting"])
             state["notice"] = ""
         except (OSError, ValueError) as error:
             state["notice"] = f"[error]Applied for this session, but not saved:[/error] {escape(str(error))}"
@@ -228,6 +263,9 @@ def appearance_menu() -> None:
         if value is None:
             return False  # Back
         kind, key = value
+        if kind == "export":
+            export_painting()
+            return True
         if kind in ("design", "theme"):
             chosen["theme"] = state["preview"] = target(value)
         else:
@@ -236,6 +274,14 @@ def appearance_menu() -> None:
         persist()
         items[:] = build()  # markers move; a new design brings its own colours
         return True  # stay: the screen redraws in the new appearance
+
+    def export_painting() -> None:
+        """Save the chosen painting in the colours on screen."""
+        try:
+            path = paintings.export(chosen["painting"], theme.THEMES[state["preview"]], paintings.export_folder())
+            state["notice"] = f"[good]Saved[/good] {escape(str(path))}"
+        except (OSError, ValueError, KeyError) as error:
+            state["notice"] = f"[error]The painting was not saved:[/error] {escape(str(error))}"
 
     def preview(index: int, items: list) -> bool:
         value = items[index].value

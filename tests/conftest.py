@@ -8,7 +8,8 @@ test; tests of Athanor apply it themselves.
 
 import pytest
 
-from torrent_finder.ui import theme
+from torrent_finder import paintings
+from torrent_finder.ui import appearance, theme
 
 BASELINE = ("quiet", "bar", "comfortable")
 
@@ -17,6 +18,7 @@ def _restore() -> None:
     palette, focus, density = theme.current()
     if (palette.key, focus, density) != BASELINE:
         theme.apply(BASELINE[0], focus=BASELINE[1], density=BASELINE[2])
+    appearance._session["painting"] = paintings.DEFAULT
 
 
 _restore()
