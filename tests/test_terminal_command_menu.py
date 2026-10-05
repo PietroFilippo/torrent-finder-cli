@@ -49,7 +49,15 @@ class TerminalCommandMenuTests(unittest.TestCase):
 
         self.assertIsNone(result)
         values = [item.value for item in captured["items"]]
-        self.assertIn("__terminal_command__", values)
+        self.assertIn("__settings__", values)  # the command lives under Settings
+
+        with patch.object(prompts, "arrow_select", side_effect=capture), \
+             patch("torrent_finder.launcher_alias.current_status", return_value=LauncherStatus("tf", available=True)):
+            prompts.settings_menu()
+        rows = {item.value: item for item in captured["items"]}
+        self.assertIn("__terminal_command__", rows)
+        self.assertEqual(rows["__terminal_command__"].label, "Terminal command: tf")
+        self.assertEqual(rows["__terminal_command__"].hint, "ready")
 
 
 if __name__ == "__main__":

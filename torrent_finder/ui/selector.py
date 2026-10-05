@@ -158,7 +158,8 @@ def _geometry(items: list["SelectItem"], multi: bool) -> _Geometry:
     """Line hints up within each run of consecutive rows that show one inline.
 
     A lone hinted row keeps its hint beside the label instead of joining a
-    column set by unrelated rows further down the menu.
+    column set by unrelated rows further down the menu. Section headings
+    inside a run do not break it, so hinted sections share one column.
     """
     badge_width = _badge_width(items) if multi else 1
     columns: dict[int, int] = {}
@@ -176,7 +177,9 @@ def _geometry(items: list["SelectItem"], multi: bool) -> _Geometry:
         run.clear()
 
     for index, item in enumerate(items):
-        if _inline_hint(item) and not _is_section_header(item):
+        if _is_section_header(item):
+            continue
+        if _inline_hint(item):
             run.append(index)
         else:
             close_run()

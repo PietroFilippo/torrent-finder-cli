@@ -115,6 +115,7 @@ class KeyListTests(unittest.TestCase):
         out = io.StringIO()
         with patch.object(selector.readchar, "readkey", side_effect=lambda: next(keys)), \
              patch.object(selector, "show_keys", side_effect=lambda title, footer: shown.append((title, footer))), \
+             patch.object(selector, "_render", return_value=True), \
              patch.object(selector.sys, "stdout", out):
             result = selector.arrow_select([SelectItem("Row")], title="Menu", footer="Enter open • Esc back")
         self.assertIsNone(result)
@@ -124,6 +125,7 @@ class KeyListTests(unittest.TestCase):
     def test_a_screen_that_binds_question_mark_keeps_it(self):
         keys = iter(["?"])
         with patch.object(selector.readchar, "readkey", side_effect=lambda: next(keys)), \
+             patch.object(selector, "_render", return_value=True), \
              patch.object(selector, "show_keys") as show, patch.object(selector.sys, "stdout", io.StringIO()):
             result = selector.arrow_select([SelectItem("Row")], hotkeys={"?": "mine"})
         self.assertEqual(result, ("hotkey", "mine", 0))

@@ -62,7 +62,7 @@ from torrent_finder.ui.table import interactive_select
 from torrent_finder.ui.update_progress import UpdateDisplay, preview_update
 from torrent_finder.updates import (
     check_for_update, consume_update_report, needs_exit_before_update,
-    notice_line, run_update,
+    notice_line, run_update, status_label,
 )
 from torrent_finder.utils import start_esc_listener
 
@@ -1230,6 +1230,7 @@ def _main_loop(args=None) -> None:
                     alert=exit_hint,  # the last line of the frame, under the keys
                     open_group=pending_open_group,
                     update_available=bool(update_info),
+                    update_status=status_label(update_info),
                 )
             except (KeyboardInterrupt, EOFError):
                 result = None  # Ctrl+C/Ctrl+D arm the same quit guard as Esc
@@ -1253,6 +1254,17 @@ def _main_loop(args=None) -> None:
                     return
                 if outcome is not None:
                     query, current_provider, cli_facet, pending_creator_name = outcome
+                continue
+            # The CONTINUE row of a plain keyword search opens the search
+            # field with that query, ready to run or edit.
+            if isinstance(result, tuple) and result[0] == "continue":
+                continued = get_provider(result[1].get("provider", "") or "")
+                if continued is None:
+                    continue
+                current_provider = continued
+                pending_query = str(result[1].get("query", ""))
+                query = None
+                clear_screen()
                 continue
             # History selection returns ("history", entry) — keyword or creator.
             if isinstance(result, tuple) and result[0] == "history":

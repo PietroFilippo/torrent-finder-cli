@@ -1916,19 +1916,146 @@ def _provider_source_menu(provider, facets=None) -> "str | object | None":
     return None  # __back__
 
 
+def _presets_hint(provider) -> list[tuple[str, str]]:
+    """``Prefer 1080p`` / ``Require Dublado (PT-BR) +1`` parts: the word in the accent, names in text."""
+    parts: list[tuple[str, str]] = []
+    for word, presets in (("Require", provider.active_presets), ("Prefer", provider.preferred_presets)):
+        if presets:
+            more = f" +{len(presets) - 1}" if len(presets) > 1 else ""
+            parts += [(word, theme.ACCENT), (f" {presets[0].name}{more}", "")]
+    return parts
+
+
+def provider_hint(provider) -> Text:
+    """What a provider row will search: its On engines and its presets."""
+    from torrent_finder.providers.combined_provider import provider_label
+    if getattr(provider, "is_combined", False):
+        selected = [p for p in provider.children if p.slug in provider.selected_slugs]
+        names = ", ".join(provider_label(p).split(" · ")[0] for p in selected)
+        names = names if len(selected) <= 3 else f"{len(selected)} providers"
+        hint = Text(names or "no providers selected")
+        hint.append(f" · profile {provider.profile_name}")
+        return hint
+    if isinstance(provider, ProviderGroup):
+        return Text(", ".join(child.label for child in provider.children))
+    engines = [engine.name for engine in provider.effective_engines]
+    hint = Text(", ".join(engines) if engines else "no engines On")
+    presets = _presets_hint(provider)
+    if presets:
+        hint.append(" · ")
+        for value, style in presets:
+            hint.append(value, style=style or "default")
+    return hint
+
+
+def _folder_hint(path: str, room: int = 28) -> str:
+    """A download folder as ``~/Downloads``: the home folder shortened, long paths keep their end."""
+    import os
+    home = os.path.expanduser("~")
+    shown = "~" + path[len(home):] if path.casefold().startswith(home.casefold()) else path
+    shown = shown.replace("\\", "/")
+    return shown if cell_len(shown) <= room else "…" + shown[-(room - 1):]
+
+
+def _credentials_hint() -> str:
+    from torrent_finder.credential_registry import CREDENTIAL_REGISTRY
+    ready = sum(spec.status() != "not set" for spec in CREDENTIAL_REGISTRY)
+    return f"{ready} of {len(CREDENTIAL_REGISTRY)} set"
+
+
+def _continue_item(entry: dict) -> "SelectItem | None":
+    """The CONTINUE row for the newest history entry, or None when its provider is gone."""
+    from torrent_finder.providers import display_name_for, get_provider_by_slug
+    from torrent_finder.utils import relative_time
+    if not isinstance(entry, dict) or not get_provider_by_slug(str(entry.get("provider", ""))):
+        return None
+    query = str(entry.get("query", "")).strip()
+    if not query:
+        return None
+    when = relative_time(entry.get("timestamp"))
+    hint = display_name_for(entry["provider"]) + (f" · {when}" if when else "")
+    replays = entry.get("kind") == "creator" or entry.get("queries") or entry.get("search_profile")
+    if entry.get("queries"):
+        hint += f" · {len(entry['queries'])} names"
+    description = ("Runs this search again with its saved names and settings." if replays
+                   else "Opens the search field with this search; Enter runs it, or edit it first.")
+    return SelectItem(label=query, value=("history" if replays else "continue", entry), hint=hint,
+                      description=description)
+
+
+def _section_row(label: str) -> SelectItem:
+    return SelectItem(label=label, value="section_header", enabled=False)
+
+
+def home_status(update_status: str = "") -> str:
+    """The main menu's header status: version, a pending update, the network check's verdict."""
+    from torrent_finder import __version__
+    from torrent_finder.security import exposure_label
+    parts = [f"v{escape(str(__version__))}"]
+    if update_status:
+        parts.append(f"[warn]{escape(update_status)}[/warn]")
+    network = exposure_label()
+    if network:
+        parts.append(network)
+    return " · ".join(parts)
+
+
+def settings_menu() -> None:
+    """Appearance, the terminal command and the network check, behind one Settings row."""
+    from torrent_finder.launcher_alias import current_status
+    from torrent_finder.security import exposure_label, show_security_warning
+    from torrent_finder.ui.appearance import appearance_menu
+    start = 0
+    while True:
+        palette, focus, density = theme.current()
+        command = current_status()
+        items = [
+            SelectItem("Appearance", "appearance",
+                       hint=f"{palette.name} · {theme.FOCUS_STYLES[focus].lower()} · {density}",
+                       description="Theme colours, how the focused row is marked, and spacing."),
+            SelectItem(f"Terminal command: {command.name}", "__terminal_command__",
+                       hint="ready" if command.available else "setup needed",
+                       description=("Choose a preferred quick-launch command for new terminal sessions. "
+                                    "The canonical torrent-finder command always remains available.")),
+            SelectItem("Network exposure info", "__network_info__",
+                       hint=Text.from_markup(exposure_label()) if exposure_label() else "",
+                       description="Check which IP address peers see before downloading."),
+            SelectItem("Back", None, is_action=True),
+        ]
+        index = arrow_select(items, title="Settings", banner=_make_banner_panel(), start_index=start,
+                             footer="↑/↓ navigate  •  Enter select  •  Esc back")
+        if index is None or items[index].value is None:
+            return
+        start = index
+        action = items[index].value
+        if action == "appearance":
+            appearance_menu()
+        elif action == "__terminal_command__":
+            from torrent_finder.ui.launcher import terminal_command_prompt
+            terminal_command_prompt()
+        elif action == "__network_info__":
+            show_security_warning(force=True)
+
+
 def provider_select_prompt(
-    notice: str = "", open_group=None, update_available: bool = False, alert: str = ""
+    notice: str = "", open_group=None, update_available: bool = False, alert: str = "",
+    update_status: str = "",
 ) -> object | None:
-    """Prompt the user to select a torrent provider. Returns the provider object or None if cancelled.
+    """The main menu: continue the last search, pick a provider, or open a tool.
+
+    Rows come in three sections. CONTINUE holds the newest history entry;
+    SEARCH the providers and groups, each hinting what it will search; TOOLS
+    the update, quick actions, credentials, download folder and settings rows.
+    The header's status names the version, a pending update and the network
+    check's verdict.
 
     Press F on a highlighted provider to configure its filters without leaving the menu.
-    Press H to browse search history.
-    Press T to browse all tips and shortcuts.
-    A "Network exposure info" action re-opens the security warning on demand.
+    Press H to browse search history, S for stats, T for all tips and shortcuts.
 
     ``notice`` is an optional Rich-markup line (e.g. an "update available"
     banner) prepended to the footer; pass "" to show nothing. ``alert`` is a
     transient line drawn under the key bar (the "press again to quit" guard).
+    ``update_status`` is a few words for the header ("update 0.8.2 ready").
 
     ``update_available`` adds an "Install update" action row (and the U hotkey)
     so the update is reachable right here, not only via Tab → quick actions.
@@ -1941,7 +2068,10 @@ def provider_select_prompt(
         - A provider object for normal selection.
         - A ``("history", entry)`` tuple when the user picks a history entry
           (the raw entry dict; main routes keyword vs creator).
+        - A ``("continue", entry)`` tuple for the CONTINUE row of a plain
+          keyword search: main opens the search field with its query.
         - ``"__update__"`` when the user picks the update row / presses U.
+        - ``"__actions__"`` for Quick actions / Tab.
         - ``None`` if cancelled.
     """
     if open_group is not None:
@@ -1950,48 +2080,16 @@ def provider_select_prompt(
             return chosen
         # backed out of the submenu → fall through to the full provider list
 
-    provider_items = [
-        SelectItem(label=p.label, value=p, description=getattr(p, "search_note", ""))
-        for p in PROVIDER_MENU
-    ]
-    separator = SelectItem(
-        label="───────────────────",
-        value="section_header",
-        enabled=False,
-        is_action=True,
-    )
-    info_item = SelectItem(
-        label="Network exposure info",
-        value="__network_info__",
-        is_action=True,
-    )
-    tips_item = SelectItem(
-        label="Tips & shortcuts",
-        value="__tips__",
-        is_action=True,
-    )
-    creds_item = SelectItem(
-        label="Credentials — subtitles, provider logins, creator-search keys",
-        value="__credentials__",
-        is_action=True,
-        description="Manage subtitle logins (OpenSubtitles / Addic7ed / Jimaku), search-provider logins (RuTracker / Online-Fix / Madokami), and the optional TMDB / IGDB creator-search upgrades.",
-    )
-    update_item = SelectItem(
-        label="Install update",
-        value="__update__",
-        is_action=True,
-        hint="U",
-    )
-    start = 0
+    start = None
 
     # Closure flag: set by key_action when F is pressed on a provider
     _filter_request = {"target": None}
 
     def _handle_f(cursor, items_list):
         target = items_list[cursor].value
-        if isinstance(target, (str, ProviderGroup)):
-            # Non-provider row (separator, network info) or a group (no filters
-            # of its own — drill in with Enter instead) — silently ignore.
+        if not hasattr(target, "engines"):
+            # Not a provider (a group, the continue row, a tool): groups have no
+            # filters of their own — drill in with Enter instead. Ignore silently.
             return True  # stay in menu, no flicker
         _filter_request["target"] = target
         return cursor  # exit menu to open filter_menu outside
@@ -2001,40 +2099,45 @@ def provider_select_prompt(
     while True:
         _filter_request["target"] = None
 
-        # Rebuilt every pass (unlike the static rows above) so the description
-        # shows the folder picked in download_dir_prompt without leaving the
-        # screen.
+        # Rebuilt every pass so hints show what changed in a submenu (filters,
+        # the download folder, credentials) without leaving the screen.
         from torrent_finder.constants import get_download_dir
-        from torrent_finder.launcher_alias import current_status
+        from torrent_finder.state import load_history
 
-        command_status = current_status()
-        command_item = SelectItem(
-            label=f"Terminal command: {command_status.name}",
-            value="__terminal_command__",
-            is_action=True,
-            hint="ready" if command_status.available else "setup needed",
-            description=(
-                "Choose a preferred quick-launch command for new terminal sessions. "
-                "The canonical torrent-finder command always remains available."
-            ),
-        )
-        dir_item = SelectItem(
-            label="Download folder",
-            value="__download_dir__",
-            is_action=True,
-            description=(
-                f"Current: {escape(get_download_dir())}\nThe default folder for aria2c / webtorrent / "
-                "peerflix downloads, subtitle saves, and Online-Fix / Madokami / Libgen / F-Droid files.\n"
-                "Also here: unpack downloaded manga archives into folders of pages."
-            ),
-        )
-        items = (
-            provider_items
-            + [separator]
-            + ([update_item] if update_available else [])
-            + [SelectItem("Quick actions", value="__actions__", hint="Tab", is_action=True),
-               tips_item, info_item, creds_item, command_item, dir_item]
-        )
+        try:
+            history = load_history()
+        except (OSError, ValueError):
+            history = []
+        continue_item = _continue_item(history[0]) if history else None
+        items: list[SelectItem] = []
+        if continue_item is not None:
+            items += [_section_row("Continue"), continue_item]
+        items.append(_section_row("Search"))
+        items += [
+            SelectItem(label=p.label, value=p, hint=provider_hint(p), description=getattr(p, "search_note", ""))
+            for p in PROVIDER_MENU
+        ]
+        items.append(_section_row("Tools"))
+        if update_available:
+            items.append(SelectItem(label="Install update", value="__update__", hint="U",
+                                    description="Install the new version now; the app reopens when it is done."))
+        items += [
+            SelectItem("Quick actions", value="__actions__", hint="Tab",
+                       description="Bookmarks, alternate titles, topic discovery, backup and more."),
+            SelectItem("Credentials", value="__credentials__", hint=_credentials_hint(),
+                       description="Manage subtitle logins (OpenSubtitles / Addic7ed / Jimaku), search-provider "
+                                   "logins (RuTracker / Online-Fix / Madokami), and the optional TMDB / IGDB "
+                                   "creator-search upgrades."),
+            SelectItem("Download folder", value="__download_dir__", hint=_folder_hint(get_download_dir()),
+                       description=(
+                           f"Current: {escape(get_download_dir())}\nThe default folder for aria2c / webtorrent / "
+                           "peerflix downloads, subtitle saves, and Online-Fix / Madokami / Libgen / F-Droid files.\n"
+                           "Also here: unpack downloaded manga archives into folders of pages.")),
+            SelectItem("Settings", value="__settings__", hint="theme · command · network",
+                       description="Theme and spacing, the quick-launch terminal command, and the network check."),
+        ]
+        if start is None:
+            start = 1  # the continue row when there is one, else the first provider
 
         # Fresh tip each time we enter the selector — but NOT on every render
         # (that would re-roll on every keypress and make the footer jitter).
@@ -2045,15 +2148,16 @@ def provider_select_prompt(
             # between the full footer (with the tip) and a compact one.
             if console.size.height < 24 or console.size.width < 60:
                 return ((notice + "\n" if notice else "")
-                        + "↑/↓ move • Enter select • Tab actions • Esc cancel\nF filters • H history • S stats")
+                        + "↑/↓ move • Enter select • Tab actions • Esc quit\nF filters • H history • S stats")
             return ((notice + "\n" if notice else "")
                     + "↑/↓ navigate  •  Enter select  •  F filters  •  H history  •  "
-                    "S stats  •  T tips  •  Tab actions  •  Esc cancel"
+                    "S stats  •  T tips  •  Tab actions  •  Esc quit"
                     + (f"\n\n{tip_line}" if tip_line and console.size.height >= _TIP_MIN_HEIGHT else ""))
 
         result = arrow_select(
             items,
             title="Select Provider",
+            status=lambda: home_status(update_status),
             footer=footer,
             banner=_make_banner_panel(),
             start_index=start,
@@ -2105,45 +2209,31 @@ def provider_select_prompt(
             if action == "update":
                 return "__update__"
 
-        if items[result].value == "__tips__":
-            from torrent_finder.ui.tips_page import tips_page
-            tips_page()
-            start = result
-            continue
-
-        if items[result].value == "__network_info__":
-            from torrent_finder.security import show_security_warning
-            show_security_warning(force=True)
-            start = result
-            continue
-
-        if items[result].value == "__credentials__":
+        value = items[result].value
+        start = result
+        if isinstance(value, tuple) and value[0] in ("history", "continue"):
+            return value
+        if value in ("__update__", "__actions__"):
+            return value
+        if value == "__credentials__":
             credentials_menu()
-            start = result
             continue
-
-        if items[result].value == "__terminal_command__":
-            from torrent_finder.ui.launcher import terminal_command_prompt
-
-            terminal_command_prompt()
-            start = result
-            continue
-
-        if items[result].value == "__download_dir__":
+        if value == "__download_dir__":
             download_dir_prompt()
-            start = result
+            continue
+        if value == "__settings__":
+            settings_menu()
             continue
 
         # A group row — drill into its submenu. Picking a child returns it to
         # the caller; backing out stays on the provider screen.
-        if isinstance(items[result].value, ProviderGroup):
-            chosen = _provider_group_menu(items[result].value)
+        if isinstance(value, ProviderGroup):
+            chosen = _provider_group_menu(value)
             if chosen is None:
-                start = result
                 continue
             return chosen
 
-        return items[result].value
+        return value
 
 
 def download_complete_prompt(message: str = "Download action finished", *, summary: str = "") -> str:

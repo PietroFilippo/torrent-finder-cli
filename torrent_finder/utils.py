@@ -65,6 +65,41 @@ def start_esc_listener(cancel_event: "threading.Event", *, finish_event=None) ->
     return stop
 
 
+def parse_timestamp(iso_ts: object):
+    """The moment an ISO-8601 timestamp names, or None when it is missing, malformed or has no timezone.
+
+    Saved times are always recorded in UTC. A timezone-less value (hand-edited
+    or from elsewhere) has no reliable moment, so callers treat it as unknown.
+    """
+    from datetime import datetime
+    try:
+        moment = datetime.fromisoformat(iso_ts)
+    except (TypeError, ValueError):
+        return None
+    return moment if moment.utcoffset() is not None else None
+
+
+def relative_time(iso_ts: object, now=None) -> str:
+    """``just now``, ``5m ago``, ``2h ago``, ``3d ago``, ``4mo ago``; empty when the time is unknown."""
+    from datetime import datetime, timezone
+    moment = parse_timestamp(iso_ts)
+    if moment is None:
+        return ""
+    seconds = int(((now or datetime.now(timezone.utc)) - moment).total_seconds())
+    if seconds < 60:
+        return "just now"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours}h ago"
+    days = hours // 24
+    if days < 30:
+        return f"{days}d ago"
+    return f"{days // 30}mo ago"
+
+
 def format_size(size_bytes: int) -> str:
     """Convert bytes to a human-readable string."""
     if size_bytes <= 0:

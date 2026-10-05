@@ -2,34 +2,15 @@
 
 from datetime import datetime, timedelta, timezone
 
-from torrent_finder.constants import console
 from torrent_finder.providers import PROVIDERS, display_name_for
 from torrent_finder.state import clear_history, load_history
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.ui.prompts import _make_banner_panel, confirm_prompt
+from torrent_finder.utils import parse_timestamp, relative_time
 
 # Helpers
 
-def _relative_time(iso_ts: str) -> str:
-    """Turn an ISO-8601 timestamp into a human-friendly relative string."""
-    dt = _parse_ts(iso_ts)
-    if dt is None:
-        return ""
-    secs = int((datetime.now(timezone.utc) - dt).total_seconds())
-
-    if secs < 60:
-        return "just now"
-    mins = secs // 60
-    if mins < 60:
-        return f"{mins}m ago"
-    hours = mins // 60
-    if hours < 24:
-        return f"{hours}h ago"
-    days = hours // 24
-    if days < 30:
-        return f"{days}d ago"
-    months = days // 30
-    return f"{months}mo ago"
+_relative_time = relative_time  # shared with bookmarks and the main menu
 
 
 def _option_label(provider: str | None) -> str:
@@ -38,17 +19,8 @@ def _option_label(provider: str | None) -> str:
 
 
 def _parse_ts(iso_ts: str) -> datetime | None:
-    """The entry's moment, or None when the timestamp is missing, malformed or has no timezone.
-
-    History is always recorded in UTC. A timezone-less value (hand-edited or
-    from elsewhere) has no reliable moment, so it sorts as oldest and matches
-    no date range instead of guessing one.
-    """
-    try:
-        dt = datetime.fromisoformat(iso_ts)
-    except (TypeError, ValueError):
-        return None
-    return dt if dt.utcoffset() is not None else None
+    """The entry's moment; a timezone-less one sorts as oldest and matches no date range."""
+    return parse_timestamp(iso_ts)
 
 
 # Filter definitions

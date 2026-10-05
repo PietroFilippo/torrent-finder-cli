@@ -54,8 +54,7 @@ class ClearHistoryNavigationTests(unittest.TestCase):
         with patch.object(selector, "console", quiet_console()), \
              patch.object(selector.sys, "stdout", io.StringIO()), \
              patch.object(selector.readchar, "readkey", side_effect=keys), \
-             patch.object(history_ui, "confirm_prompt", return_value=True), \
-             patch.object(history_ui, "console", quiet_console()):
+             patch.object(history_ui, "confirm_prompt", return_value=True):
             return history_ui.history_select_prompt()
 
     def test_every_key_works_after_clearing(self):

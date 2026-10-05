@@ -106,8 +106,9 @@ class CompactScreenTests(unittest.TestCase):
     def test_resizing_the_open_main_menu_keeps_the_focused_row_on_screen(self):
         items, kw = self.main_menu()
         folder = next(i for i, item in enumerate(items) if item.value == "__download_dir__")
-        large_footer, _ = self.frame(items, kw, 0, 100, 32)
-        for focus in (0, folder):
+        first = next(i for i, item in enumerate(items) if item.enabled)  # sections head the list
+        large_footer, _ = self.frame(items, kw, first, 100, 32)
+        for focus in (first, folder):
             for width, height in ((100, 32), (60, 20), (40, 16), (100, 32)):
                 with self.subTest(focus=focus, width=width, height=height):
                     footer, rendered = self.frame(items, kw, focus, width, height)

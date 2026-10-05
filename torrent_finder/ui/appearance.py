@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import os
 
+from rich.text import Text
+
 from torrent_finder.ui import theme
 
 SETTING = "appearance"
@@ -97,3 +99,123 @@ def save(theme_name: str, focus: str, density: str) -> None:
     from torrent_finder.state import commit_setting
     commit_setting(SETTING, normalize({"theme": theme_name, "focus": focus, "density": density}))
     _session["source"] = "saved"
+
+
+def _swatches(palette) -> Text:
+    """The palette's four shades as blocks, then sample words in its own colours."""
+    hint = Text()
+    for shade in (palette.accent, palette.sky, palette.steel, palette.deep):
+        hint.append(theme.BAR * 2, style=shade)
+        hint.append(" ")
+    hint.append(" Heading", style=f"bold {palette.sky}")
+    hint.append(" · ", style=palette.steel)
+    hint.append("On", style=palette.good)
+    hint.append(" ")
+    hint.append("Auto", style=palette.warn)
+    hint.append(" ")
+    hint.append("Off", style=palette.steel)
+    return hint
+
+
+_FOCUS_HINTS = {"bar": f"{theme.CURSOR} beside the focused row", "fill": "the focused row on a tint"}
+_FOCUS_HELP = {
+    "bar": "A bar in the gutter and bold text mark the focused row.",
+    "fill": "The focused row also gets a tinted background across the screen; easier to follow in long lists.",
+}
+_DENSITY_HINTS = {"comfortable": "rules and spacing when there is room", "compact": "more rows in every window"}
+_DENSITY_HELP = {
+    "comfortable": "Rules under the header and above the keys, and spacer lines, whenever the window has room.",
+    "compact": "The short-window layout at every size: no rules or spacer lines, so lists show more rows.",
+}
+
+
+def appearance_menu() -> None:
+    """Settings › Appearance: pick a theme (Space previews it), a focus style and a density.
+
+    Enter applies a choice and saves it for later runs; Esc leaves, putting
+    back the theme that was applied when the screen opened if a preview was
+    showing.
+    """
+    from rich.markup import escape
+
+    from torrent_finder.ui.selector import SelectItem, arrow_select
+
+    palette, focus, density = theme.current()
+    chosen = {"theme": palette.key, "focus": focus, "density": density}
+    state = {"preview": palette.key, "notice": ""}
+
+    def build() -> list:
+        items = [SelectItem("─── Theme ───", "section_header", enabled=False, is_action=True)]
+        for key, option in theme.THEMES.items():
+            items.append(SelectItem(option.name, ("theme", key), hint=_swatches(option), is_action=True,
+                                    marker="●" if key == chosen["theme"] else "○",
+                                    marker_style="" if key == chosen["theme"] else theme.MUTED,
+                                    description=option.note))
+        items.append(SelectItem("─── Focus ───", "section_header", enabled=False, is_action=True))
+        for key, label in theme.FOCUS_STYLES.items():
+            items.append(SelectItem(label, ("focus", key), hint=_FOCUS_HINTS[key], is_action=True,
+                                    marker="●" if key == chosen["focus"] else "○",
+                                    marker_style="" if key == chosen["focus"] else theme.MUTED,
+                                    description=_FOCUS_HELP[key]))
+        items.append(SelectItem("─── Density ───", "section_header", enabled=False, is_action=True))
+        for key, label in theme.DENSITIES.items():
+            items.append(SelectItem(label, ("density", key), hint=_DENSITY_HINTS[key], is_action=True,
+                                    marker="●" if key == chosen["density"] else "○",
+                                    marker_style="" if key == chosen["density"] else theme.MUTED,
+                                    description=_DENSITY_HELP[key]))
+        items.append(SelectItem("Back", None, is_action=True))
+        return items
+
+    def persist() -> None:
+        try:
+            save(chosen["theme"], chosen["focus"], chosen["density"])
+            state["notice"] = ""
+        except (OSError, ValueError) as error:
+            state["notice"] = f"[error]Applied for this session, but not saved:[/error] {escape(str(error))}"
+
+    def choose(index: int, items: list) -> bool:
+        value = items[index].value
+        if value is None:
+            return False  # Back
+        kind, key = value
+        chosen[kind] = key
+        if kind == "theme":
+            state["preview"] = key
+        theme.apply(chosen["theme"], focus=chosen["focus"], density=chosen["density"])
+        persist()
+        items[:] = build()  # the same rows with the markers moved
+        return True  # stay: the screen redraws in the new appearance
+
+    def preview(index: int, items: list) -> bool:
+        value = items[index].value
+        if not value:
+            return True
+        if value[0] != "theme":
+            return choose(index, items)
+        state["preview"] = value[1]
+        theme.apply(value[1])
+        return True
+
+    def status() -> str:
+        if state["preview"] != chosen["theme"]:
+            return f"previewing {theme.THEMES[state['preview']].name}"
+        return f"saved: {theme.THEMES[chosen['theme']].name}"
+
+    def footer() -> str:
+        lines = []
+        if state["notice"]:
+            lines.append(state["notice"])
+        source = override_source()
+        if source == "env":
+            lines.append(f"{ENV} chooses the theme at startup; the saved theme applies when it is unset.")
+        elif source == "cli":
+            lines.append("This run uses --theme; the saved theme applies to later runs.")
+        lines.append("↑/↓ navigate  •  Enter apply  •  Space preview  •  Esc back")
+        return "\n".join(lines)
+
+    items = build()
+    start = next(i for i, item in enumerate(items) if item.value == ("theme", chosen["theme"]))
+    result = arrow_select(items, title="Settings › Appearance", status=status, footer=footer,
+                          start_index=start, on_action=choose, key_actions={" ": preview})
+    if result is None and state["preview"] != chosen["theme"]:
+        theme.apply(chosen["theme"])  # Esc during a preview: back to the applied theme

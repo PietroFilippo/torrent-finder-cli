@@ -17,6 +17,25 @@ from torrent_finder.ui.selector import _render
 
 DISMISSED_KEY = "security_warning_dismissed"
 
+# What this session's check found: "vpn", "exposed", or None when it did not
+# run (skipped, dismissed) or could not reach the lookup service.
+_exposure: dict = {"state": None}
+
+
+def exposure() -> "str | None":
+    """``"vpn"`` or ``"exposed"`` once this session's network check ran, else None."""
+    return _exposure["state"]
+
+
+def exposure_label() -> str:
+    """Markup for the main menu's status: ``VPN`` in green, ``IP visible`` in yellow, or nothing."""
+    state = exposure()
+    if state == "vpn":
+        return "[good]VPN[/good]"
+    if state == "exposed":
+        return "[warn]IP visible[/warn]"
+    return ""
+
 # Substring tokens suggesting a VPN/proxy in the ipinfo `org` field.
 VPN_ORG_HINTS = (
     "vpn", "mullvad", "proton", "nordvpn", "nord ",
@@ -113,6 +132,8 @@ def show_security_warning(force: bool = False) -> bool:
             rows.append(("Location", loc, True))
 
         # Trust API flags first, fall back to keyword heuristic.
+        protected = is_proxy or is_hosting or _looks_like_vpn(f"{isp} {org} {asname}")
+        _exposure["state"] = "vpn" if protected else "exposed"
         if is_proxy:
             verdict = Text("✓ Proxy/VPN flagged by network database.", style=f"bold {theme.GOOD}")
         elif is_hosting:

@@ -163,6 +163,16 @@ def _banner(headline: str, action: str) -> str:
     return f"[banner] {headline} [/banner] [banner.action]{action}[/banner.action]"
 
 
+def status_label(info: "dict | None") -> str:
+    """A few words for a header status: ``update 0.8.2 ready``, ``3 commits behind``; '' when current."""
+    if not info:
+        return ""
+    if info.get("kind") == "git":
+        count = info.get("behind", 0)
+        return f"{count} commit{'s' if count != 1 else ''} behind"
+    return f"update {info.get('latest')} ready" if info.get("latest") else "update ready"
+
+
 def notice_line(info: "dict | None") -> str:
     """Rich-markup line for an update info dict (no network), or '' if None."""
     if not info:
