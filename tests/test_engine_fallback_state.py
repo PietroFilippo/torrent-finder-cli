@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder import state
 

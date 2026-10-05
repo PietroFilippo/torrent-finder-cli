@@ -281,5 +281,43 @@ class RoundTwoTests(unittest.TestCase):
         self.assertEqual(chrome.take_message(), "A raven arrives.")
 
 
+class SecondRoundSolTests(unittest.TestCase):
+    """Found in the second review round (GPT-6.1-Sol)."""
+
+    def setUp(self):
+        isolate_store(self)
+
+    def provider(self):
+        engines = [SimpleNamespace(name="Nyaa", mode="on", description="")]
+        return SimpleNamespace(slug="anime", engines=engines, active_presets=[], preferred_presets=[])
+
+    def test_unreadable_stats_leave_the_rest_of_the_pane(self):
+        from torrent_finder.ui import inspector
+        for stats in ({"searches_by_provider": None}, {"searches_by_provider": {"anime": "x"}}, None):
+            with self.subTest(stats=stats), patch("torrent_finder.stats.get_all_stats", return_value=stats):
+                lines = [line.plain for line in inspector.provider(self.provider())]
+            self.assertEqual(lines[0], "ENGINES")
+            self.assertNotIn("THIS SHELF", lines)
+
+    def test_continue_names_a_combined_search_providers_and_keywords(self):
+        from torrent_finder.ui import inspector
+        entry = {"query": "dune", "provider": "all", "timestamp": "2026-10-05T10:00:00+00:00",
+                 "search_profile": {"selected": ["anime", "books"],
+                                    "shared": {"include_keywords": ["1080p"], "exclude_keywords": []}}}
+        lines = [line.plain for line in inspector.continue_search(entry)]
+        self.assertTrue(any(line.startswith("  Providers") and "Anime" in line and "Books" in line for line in lines))
+        self.assertIn("  Include     1080p", lines)
+        self.assertFalse(any("Exclude" in line for line in lines))
+
+    def test_a_relative_folder_not_made_yet_reports_its_drive(self):
+        from torrent_finder.ui import inspector
+        asked = []
+        with patch.object(inspector.shutil, "disk_usage",
+                          side_effect=lambda path: asked.append(path) or SimpleNamespace(free=1, total=2)):
+            lines = [line.plain for line in inspector.download_folder("not-made-yet/sub")]
+        self.assertTrue(asked and Path(asked[0]).is_absolute())
+        self.assertTrue(any("Free" in line for line in lines))
+
+
 if __name__ == "__main__":
     unittest.main()

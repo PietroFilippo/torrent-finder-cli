@@ -9,6 +9,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 from rich.text import Text
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import updates
 from torrent_finder.updates import _is_newer, notice_line
 

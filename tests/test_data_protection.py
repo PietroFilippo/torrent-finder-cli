@@ -13,6 +13,7 @@ from unittest.mock import Mock, patch
 
 import requests
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import bookmarks, libgen, madokami, settings_backup, state, stats, store
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.search_profiles import ProfileLibrary

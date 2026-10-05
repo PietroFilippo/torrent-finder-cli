@@ -4,6 +4,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import requests
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import knaben
 from torrent_finder.ui.table import _selected_metadata, _table_layout
 

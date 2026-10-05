@@ -1,5 +1,6 @@
 import unittest
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.main import _build_parser
 from torrent_finder.providers import (
     PROVIDERS,

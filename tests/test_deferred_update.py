@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import updates, update_worker
 from torrent_finder import main as app
 

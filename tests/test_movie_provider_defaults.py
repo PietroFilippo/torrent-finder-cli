@@ -6,6 +6,7 @@ from urllib.parse import parse_qs
 warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.providers.movie_provider import MovieProvider
 
 

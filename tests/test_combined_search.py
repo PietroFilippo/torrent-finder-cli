@@ -3,6 +3,7 @@ import time
 import unittest
 from unittest.mock import patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers import get_provider, provider_for_result
 from torrent_finder.providers.anime_provider import AnimeProvider

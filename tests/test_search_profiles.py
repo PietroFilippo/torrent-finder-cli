@@ -4,6 +4,7 @@ import threading
 import unittest
 from unittest.mock import patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import main, state, store
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.manga_provider import MangaProvider

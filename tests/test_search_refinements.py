@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import fitgirl, online_fix
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.result_view import matches_name, result_indices, title_score, timestamp

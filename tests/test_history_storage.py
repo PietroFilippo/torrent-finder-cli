@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import settings_backup, state, store
 from isolation import isolate_store, restart_store
 

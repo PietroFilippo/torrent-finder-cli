@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from rich.console import Console
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import main, settings_backup, state, store
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.combined_provider import CombinedProvider

@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from isolation import isolate_store, restart_store
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import stats, store
 from torrent_finder.search_profiles import ProfileError, ProfileLibrary
 from torrent_finder.state import load_setting

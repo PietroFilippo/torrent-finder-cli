@@ -1,5 +1,6 @@
 import unittest
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.book_provider import BookProvider
 from torrent_finder.providers.game_provider import GameProvider

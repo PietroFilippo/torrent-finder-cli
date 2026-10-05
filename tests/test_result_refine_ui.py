@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import readchar
 from rich.console import Console
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.ui import table, selector, prompts
 from torrent_finder.ui.selector import SelectItem
 

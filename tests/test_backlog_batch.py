@@ -10,6 +10,7 @@ import readchar
 from rich.console import Console, Group
 from rich.text import Text
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import bookmarks, credentials, settings_backup as backup, store
 from torrent_finder.name_rules import NameRules
 from torrent_finder.providers import PROVIDERS

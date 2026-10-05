@@ -6,6 +6,7 @@ from urllib.parse import parse_qs
 
 import requests as requests_mod
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import apibay_cache
 from torrent_finder.providers.game_provider import GameProvider
 

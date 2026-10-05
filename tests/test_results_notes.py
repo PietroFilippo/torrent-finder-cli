@@ -12,6 +12,7 @@ import readchar
 from rich.console import Console
 from rich.text import Text
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.providers.combined_provider import CombinedProvider
 from torrent_finder.providers.game_provider import GameProvider
 from torrent_finder.providers.movie_provider import MovieProvider

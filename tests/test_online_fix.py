@@ -6,6 +6,7 @@ import unittest
 from contextlib import ExitStack
 from unittest.mock import Mock, patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import online_fix, search_control
 from torrent_finder.search_control import SearchControl, SearchInterrupted
 from torrent_finder.search_errors import SearchError

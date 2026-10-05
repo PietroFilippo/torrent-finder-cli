@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.providers.movie_provider import MovieProvider

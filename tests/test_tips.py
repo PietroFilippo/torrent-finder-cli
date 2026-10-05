@@ -1,5 +1,6 @@
 import unittest
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.ui.tips import find_tips
 
 

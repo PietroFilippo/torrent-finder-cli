@@ -85,11 +85,19 @@ def _when(entry: dict) -> str:
     return relative_time(entry.get("timestamp")) or ""
 
 
+def _count(stats: dict, key: str, slug: str) -> int:
+    """One saved counter, or 0 when that part of the stats is unreadable."""
+    counts = stats.get(key)
+    value = counts.get(slug, 0) if isinstance(counts, dict) else 0
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+
 def _counts(slug: str) -> list[Text]:
     from torrent_finder.stats import get_all_stats
     stats = get_all_stats()
-    searches = int(stats.get("searches_by_provider", {}).get(slug, 0) or 0)
-    picked = int(stats.get("torrents_picked_by_provider", {}).get(slug, 0) or 0)
+    stats = stats if isinstance(stats, dict) else {}
+    searches = _count(stats, "searches_by_provider", slug)
+    picked = _count(stats, "torrents_picked_by_provider", slug)
     if not searches and not picked:
         return []
     line = Text("  ")
@@ -166,6 +174,7 @@ def continue_search(entry: dict) -> list[Text]:
     presets = [_one_line(preset) for preset in entry.get("presets") or []]
     if presets:
         lines.append(pair("Presets", ", ".join(presets)))
+    lines += _profile(entry.get("search_profile"))
     before = _recent(skip=1, limit=_RECENT)
     if before:
         lines += ([Text("")] if lines else []) + [heading("Recent searches")]
@@ -178,6 +187,23 @@ def continue_search(entry: dict) -> list[Text]:
         hint.append("H", style=theme.KEY)
         hint.append(" opens the whole history", style=theme.MUTED)
         lines.append(hint)
+    return lines
+
+
+def _profile(profile: object) -> list[Text]:
+    """A combined search's saved profile: the providers it searched and its shared keyword rules."""
+    from torrent_finder.providers import display_name_for
+    if not isinstance(profile, dict):
+        return []
+    lines = []
+    selected = [display_name_for(str(slug)) for slug in profile.get("selected") or [] if isinstance(slug, str)]
+    if selected:
+        lines.append(pair("Providers", ", ".join(_one_line(name) for name in selected)))
+    shared = profile.get("shared") if isinstance(profile.get("shared"), dict) else {}
+    for label, key in (("Include", "include_keywords"), ("Exclude", "exclude_keywords")):
+        words = [_one_line(word) for word in shared.get(key) or [] if isinstance(word, str) and word.strip()]
+        if words:
+            lines.append(pair(label, ", ".join(words)))
     return lines
 
 
@@ -197,7 +223,7 @@ def download_folder(path: str) -> list[Text]:
     from torrent_finder import unpack
     from torrent_finder.utils import format_size
     def usage():
-        existing = path
+        existing = os.path.abspath(path) if path else ""  # a relative folder lives under the current one
         while existing and not os.path.isdir(existing):
             parent = os.path.dirname(existing)
             existing = "" if parent == existing else parent

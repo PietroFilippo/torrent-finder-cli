@@ -5,6 +5,7 @@ from unittest.mock import patch
 warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.launcher_alias import LauncherStatus
 from torrent_finder.ui import launcher, prompts
 from isolation import isolate_store

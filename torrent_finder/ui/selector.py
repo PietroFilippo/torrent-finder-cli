@@ -809,6 +809,8 @@ def arrow_select(
                     message=announcement,
                     tip=tip,
                 )
+                if stop_event.is_set():
+                    return False  # the menu closed while this frame was built: never paint over what follows
                 if _render(
                     banner,
                     panel,

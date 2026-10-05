@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import requests
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import acquisition, qbittorrent as qb
 from torrent_finder.ui.qbittorrent import progress_text
 from torrent_finder.ui import qbittorrent as ui

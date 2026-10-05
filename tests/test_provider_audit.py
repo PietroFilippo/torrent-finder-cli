@@ -1,5 +1,6 @@
 """Offline checks for evidence grading and secret-safe serialization."""
 import unittest
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from scripts.provider_audit import candidate, safe_url, serial_row
 from scripts.provider_audit_corpus import build
 from scripts.provider_audit_report import score

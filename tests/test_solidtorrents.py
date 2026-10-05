@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 from unittest.mock import Mock, patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.providers import base
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.book_provider import BookProvider

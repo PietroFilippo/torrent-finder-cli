@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import credentials, madokami, rutracker
 from torrent_finder.providers.madokami_provider import MadokamiProvider
 from torrent_finder.search_errors import SearchError

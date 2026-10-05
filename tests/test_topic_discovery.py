@@ -2,6 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.providers import get_provider
 from torrent_finder.providers.combined_provider import CombinedProvider
 from torrent_finder.resolvers import topics

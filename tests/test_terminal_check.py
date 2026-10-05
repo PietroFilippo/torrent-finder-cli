@@ -5,6 +5,7 @@ from unittest.mock import PropertyMock, patch
 warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import terminal_check
 from torrent_finder.constants import console
 

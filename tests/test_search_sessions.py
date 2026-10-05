@@ -8,6 +8,7 @@ import readchar
 import requests
 from rich.console import Console
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.name_rules import NameRules
 from torrent_finder.providers.base import BaseProvider, SearchEngine

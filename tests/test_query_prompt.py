@@ -9,6 +9,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 import readchar
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.ui import prompts
 
 _ESC = readchar.key.ESC

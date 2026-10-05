@@ -12,6 +12,7 @@ import requests
 from rich.cells import cell_len
 from rich.console import Console
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.providers.combined_provider import EngineProgress, ProviderProgress, SearchProgress
 from torrent_finder.search_diagnostics import Diagnostic

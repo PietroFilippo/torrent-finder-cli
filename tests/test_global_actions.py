@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from rich.console import Console
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import main
 from torrent_finder.ui import prompts, selector, table, theme
 from isolation import isolate_store

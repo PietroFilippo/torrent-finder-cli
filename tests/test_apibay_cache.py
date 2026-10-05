@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import apibay_cache
 from torrent_finder.search_result import SearchResult
 from torrent_finder.ui.table import _source_label, _table_caption, _table_layout

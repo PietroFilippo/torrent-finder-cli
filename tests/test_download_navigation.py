@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 from rich.console import Console
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import acquisition, main
 from torrent_finder.torrent_session import TorrentSession
 from torrent_finder.ui import prompts, selector

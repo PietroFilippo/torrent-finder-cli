@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.ui import prompts, selector, streaming, table, theme
 from torrent_finder.ui.selector import SelectItem
 

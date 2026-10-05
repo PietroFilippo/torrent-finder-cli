@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 from rich.text import Text
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.search_diagnostics import Diagnostic
 from torrent_finder.ui import search_diagnostics as screen, theme
 

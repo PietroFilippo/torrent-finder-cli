@@ -3,6 +3,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
+import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.providers import base
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.movie_provider import MovieProvider
