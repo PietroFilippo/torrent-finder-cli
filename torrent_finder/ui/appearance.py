@@ -338,7 +338,7 @@ def appearance_menu() -> None:
         """Save the chosen painting in the colours on screen."""
         try:
             path = paintings.export(chosen["painting"], theme.THEMES[state["preview"]], paintings.export_folder())
-            state["notice"] = f"[good]Saved[/good] {escape(str(path))}"
+            state["notice"] = f"[good]Saved[/good] {escape(path.name)} in {escape(str(path.parent))}"
         except (OSError, ValueError, KeyError) as error:
             state["notice"] = f"[error]The painting was not saved:[/error] {escape(str(error))}"
 
