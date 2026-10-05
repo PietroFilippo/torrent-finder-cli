@@ -387,19 +387,25 @@ key bar parsed from the footer string; prose in a footer is shown above the
 keys. Main-screen logs start at column 0. Short viewports drop the spacer lines.
 Windowed selectors show position in the header instead of extra “more
 above/below” rows and accept PgUp/PgDn/Home/End. Action-only menus scroll too.
-See [ADR-0020](docs/adr/0020-quiet-terminal-design.md).
+See [ADR-0020](docs/adr/0020-quiet-terminal-design.md). In the Athanor design,
+`ui/chrome.py` puts that content in a double-line frame whose top edge carries
+the header, with a message line above and a status line below; screens ask
+`theme.view_height()` for their rows. See [ADR-0022](docs/adr/0022-athanor-design.md).
 Search notices collapse to one line in short windows; `n` opens a notice
 browser without resetting the result selection. Mixed results show provider
 labels and selected-row provenance even when columns collapse.
 
 A **theme** is a `theme.Palette`: one colour per fixed role (accent, sky,
-steel, deep, fill, good/warn/bad). `theme.apply()` rebinds the roles and the
+steel, deep, fill, good/warn/bad), belonging to a **design**: Athanor (framed,
+five colourways that add page, text, ink, frame and bar colours) or Simple. `theme.apply()` rebinds the roles and the
 consoles' markup styles; screens read roles at render time and name roles in
 markup, never colours. The appearance also has a focus style (cursor bar or
 filled row) and a density (compact keeps the short-window layout at every
 size via `theme.roomy`). Startup resolves `--theme`, `TORRENT_FINDER_THEME`,
-the saved `settings.appearance`, then Quiet Blue; Settings › Appearance
-previews and saves. See [ADR-0021](docs/adr/0021-themes.md).
+the saved `settings.appearance`, then Citrinitas; Settings › Appearance
+previews and saves. See [ADR-0021](docs/adr/0021-themes.md). Athanor's
+**painting** is a separate saved choice, recoloured by the colourway; the
+terminal shows it, through the Windows Terminal profile or an exported image.
 
 Rows may carry styled labels and hints; an `intro` summary sits under a
 header; `?` lists a screen's keys. The main menu groups CONTINUE (the newest

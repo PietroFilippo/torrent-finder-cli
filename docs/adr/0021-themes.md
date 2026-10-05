@@ -1,7 +1,8 @@
 # ADR-0021: Themes: fixed colour roles, palettes as data
 
 Status: accepted (2026-10-04). Amends the colour paragraph of ADR-0020; its
-layout rules stand.
+layout rules stand. Amended by [ADR-0022](0022-athanor-design.md): these six
+palettes form the Simple design, and Athanor's Citrinitas is the default.
 
 ## Context
 
