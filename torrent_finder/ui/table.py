@@ -19,7 +19,7 @@ from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 from torrent_finder.utils import format_size, leech_style, seed_style
 from torrent_finder.result_view import SORT_ORDERS, result_indices, timestamp
 from torrent_finder.ui.result_filters import refine_results
-from torrent_finder.result_details import detail_lines
+from torrent_finder.result_details import detail_lines, release_tags, tag_matches
 
 
 # Marquee timing for the selected-row name
@@ -144,16 +144,41 @@ def _age(uploaded: int, now: float | None = None) -> str:
     return f"{int(days // 365)}y"
 
 
+def _tags_line(name: str, preferred, room: int) -> "Text | None":
+    """``Tags: 1080p ✓ · WEB-DL · H.264 · group FLUX``: release tags, those a preferred preset asks for ticked."""
+    tags = release_tags(name)
+    if not tags:
+        return None
+    line = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
+    line.append("Tags: ", style=theme.MUTED)
+    for index, tag in enumerate(tags):
+        if index:
+            line.append(" · ", style=theme.MUTED)
+        if tag_matches(tag, preferred):
+            line.append(f"{tag} {theme.CHECK}", style=theme.GOOD)
+        else:
+            line.append(tag)
+    if cell_len(line.plain) > room + len(theme.MARGIN):
+        line.truncate(room + len(theme.MARGIN), overflow="ellipsis")
+    return line
+
+
 def _selected_metadata(
-    results: list[dict], selected_idx: int, layout: _TableLayout, show_from: bool
+    results: list[dict], selected_idx: int, layout: _TableLayout, show_from: bool, describe=None,
 ) -> Text:
-    """Render metadata hidden by the active column layout for the selected row."""
+    """Render metadata hidden by the active column layout for the selected row.
+
+    *describe* gives the row's ranking reason and the preferred presets it
+    matches (see ``result_view.ranking_notes``): the reason joins the
+    metadata as "Ranked:", the presets tick the matching release tags.
+    """
     details = Text()
     if not (0 <= selected_idx < len(results)):
         return details
 
     item = results[selected_idx]
     room = theme.inner_width(console.size.width)
+    reason, preferred = describe(item) if describe else ("", ())
     parts: list[str] = []
     origin: list[str] = []
     if item.get("provider_label"):
@@ -172,17 +197,26 @@ def _selected_metadata(
         parts.append(f"Seeds: {int(item.get('seeders', 0) or 0)}")
     if not layout.leeches:
         parts.append(f"Leeches: {int(item.get('leechers', 0) or 0)}")
+    if reason:
+        parts.append(f"Ranked: {reason}")
     if _tiny():
-        lines = [ellipsize_cells(" · ".join(origin + parts), room)]
+        lines = [theme.labelled(ellipsize_cells(" · ".join(origin + parts), room), theme.MARGIN)]
     else:
-        lines = (_pack(origin, room) if origin else []) + _pack(parts, room)
+        tags = _tags_line(str(item.get("name", "")), preferred, room)
+        lines = ([theme.labelled(line, theme.MARGIN) for line in (_pack(origin, room) if origin else [])]
+                 + ([tags] if tags is not None else [])
+                 + [theme.labelled(line, theme.MARGIN) for line in _pack(parts, room)])
         cap = _metadata_cap()
         if len(lines) > cap:  # very long values (a long "From" title) stop at the cap
             lines = lines[:cap]
-            lines[-1] = ellipsize_cells(lines[-1] + " …", room) if cell_len(lines[-1]) + 2 <= room \
-                else ellipsize_cells(lines[-1], room - 1) + "…"
+            last = lines[-1]
+            if cell_len(last.plain) + 2 <= room + len(theme.MARGIN):
+                last.append(" …", style=theme.MUTED)
+            else:
+                last.truncate(room + len(theme.MARGIN) - 1)
+                last.append("…")
     for line in lines:
-        details.append_text(theme.labelled(line, theme.MARGIN))
+        details.append_text(line)
         details.append("\n")
     return details
 
@@ -207,7 +241,7 @@ def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = Fa
     if expanded:
         return "i close • [/] scroll details • b bookmark • Esc back"
     enter = f"Enter download {len(picked)} selected" if picked else "Enter open"
-    if console.size.width < 52:
+    if console.size.width < 52:  # "? keys" lists what the short names leave out
         enter = f"Enter download {len(picked)}" if picked else "Enter open"
         keys = f"↑/↓ move • Space pick • {enter} • i details • b save • f refine"
     else:
@@ -218,6 +252,13 @@ def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = Fa
     return keys + " • Esc back"
 
 
+# Keys the results key bar has no room to name; the ? list shows them all.
+RESULT_EXTRA_KEYS = (("←/→", "previous / next page"), ("0-9", "jump to a result number"),
+                     ("d", "download the picked results"), ("n", "search notices and diagnostics"),
+                     ("r", "retry failed sources"), ("m", "load more results"),
+                     ("[/]", "scroll the details (with i)"), ("Esc", "back"))
+
+
 def _table_caption(
     results: list[dict],
     selected_idx: int,
@@ -226,6 +267,7 @@ def _table_caption(
     total_pages: int,
     picked: "frozenset[int]",
     expanded: bool = False,
+    describe=None,
 ) -> Text:
     """Details for the focused row, then the key bar, under the left margin."""
     width = console.size.width
@@ -236,7 +278,7 @@ def _table_caption(
             name = ellipsize_cells(str(results[selected_idx].get("name", "Unknown")),
                                    theme.inner_width(width))
             caption.append("\n" + theme.MARGIN + name + "\n", style="bold")
-        caption.append_text(_selected_metadata(results, selected_idx, layout, show_from))
+        caption.append_text(_selected_metadata(results, selected_idx, layout, show_from, describe))
     if not expanded and not tiny and any(item.get("apibay_cached_at") for item in results):
         room = theme.inner_width(width)
         legend = "Apibay* = cached last-known-good results"
@@ -246,8 +288,8 @@ def _table_caption(
     if theme.roomy(console.size.height, 20):  # short windows keep the row for results
         caption.append_text(theme.rule(width))
         caption.append("\n")
-    caption.append_text(Text("\n").join(theme.wrap_keys(
-        theme.parse_footer(Text(_result_keys(total_pages, picked, expanded))).keys, width)))
+    segments = theme.parse_footer(Text(_result_keys(total_pages, picked, expanded))).keys
+    caption.append_text(Text("\n").join(theme.wrap_keys(theme.with_help(segments, width), width)))
     return caption
 
 
@@ -282,20 +324,20 @@ def _note_line_count(note: str, width: int) -> int:
 _METADATA_LINES = {"full": 1, "medium": 1, "compact": 2, "minimal": 3}
 
 
-def _details_lines(rows: list[dict], layout: _TableLayout, show_from: bool) -> int:
+def _details_lines(rows: list[dict], layout: _TableLayout, show_from: bool, describe=None) -> int:
     """The most lines the focused-row details take on this page: name plus metadata."""
     if _tiny():
         return 1  # one shortened metadata line, no name line
     most = 0
     for index in range(len(rows)):
-        metadata = _selected_metadata(rows, index, layout, show_from).plain.rstrip("\n")
+        metadata = _selected_metadata(rows, index, layout, show_from, describe).plain.rstrip("\n")
         most = max(most, len(metadata.split("\n")) if metadata else 0)
     return 1 + most
 
 
 def _visible_count(
     total: int, height: int, width: int, note: str, show_from: bool, show_provider: bool = False,
-    heading: str = "", rows: list[dict] | None = None, indexes=(),
+    heading: str = "", rows: list[dict] | None = None, indexes=(), describe=None,
 ) -> int:
     """Return rows that fit after the header, notices, details and key bar.
 
@@ -306,7 +348,7 @@ def _visible_count(
     tiny = height < 16
     if rows is not None:
         layout = _page_layout(rows, width, show_from, indexes)
-        details = _details_lines(rows, layout, show_from)
+        details = _details_lines(rows, layout, show_from, describe)
     else:
         layout = _table_layout(width, show_from, show_provider)
         details = 1 if tiny else 1 + _METADATA_LINES[layout.mode] + (2 if show_provider else 0)
@@ -341,6 +383,7 @@ def build_table(
     original_indices: list[int] | None = None,
     expanded: bool = False,
     detail_offset: int = 0,
+    describe=None,
 ) -> Table:
     """Build a borderless result table whose columns collapse by width."""
     width = console.size.width
@@ -358,7 +401,7 @@ def build_table(
         show_lines=False,
         width=width - 1 if layout.mode == "minimal" else None,
         caption=_table_caption(
-            results, selected_idx, layout, show_from, total_pages, picked, expanded
+            results, selected_idx, layout, show_from, total_pages, picked, expanded, describe
         ),
         caption_justify="left",
     )
@@ -421,6 +464,8 @@ def build_table(
                 name_cell.append("\n")
                 name_cell.append(line)
         row_style = theme.FOCUS if is_selected else ""
+        if is_selected and theme.FILL_FOCUS:
+            row_style += f" on {theme.FILL}"
         seed_text = Text(str(seeds), style=seed_style(seeds))
         leech_text = Text(str(leeches), style=leech_style(leeches))
 
@@ -433,8 +478,8 @@ def build_table(
             continue
 
         cells: list[object] = [lead]
-        if layout.source:
-            cells.append(Text(_source_label(item)))
+        if layout.source:  # provenance, not the thing chosen: steel unless focused
+            cells.append(Text(_source_label(item), style="" if is_selected else theme.MUTED))
         if layout.provider:
             cells.append(Text(str(item.get("provider_label", ""))))
         if layout.from_work:
@@ -477,8 +522,20 @@ def _pick_result(picked: set[int]) -> tuple:
     return ("one", idxs[0]) if len(idxs) == 1 else ("many", idxs)
 
 
+def _source_counts(rows: list[dict], most: int = 4) -> str:
+    """``Apibay 3 · Knaben 3 · YTS 1``: rows per source in this view, the biggest first."""
+    counts: dict[str, int] = {}
+    for row in rows:
+        label = _source_label(row)
+        counts[label] = counts.get(label, 0) + 1
+    ranked = sorted(counts.items(), key=lambda pair: -pair[1])
+    text = " · ".join(f"{label} {count}" for label, count in ranked[:most])
+    return text + (f" · +{len(ranked) - most}" if len(ranked) > most else "")
+
+
 def interactive_select(results: list[dict], note: str = "", *, initial_order: str = "relevance",
-                       search_summary: str = "", on_bookmark=None, heading: str = "") -> "tuple | None":
+                       search_summary: str = "", on_bookmark=None, heading: str = "",
+                       describe=None) -> "tuple | None":
     """Interactive torrent results table with multi-select.
 
     Navigate with arrows; Left/Right switch pages; type a number to jump.
@@ -490,8 +547,20 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
       - ``("many", [global_idx, ...])`` — Enter/``d`` with two or more checked
         (batch hand-off);
       - ``None`` if cancelled (Esc).
+
+    *describe* (``result_view.ranking_notes``) explains the focused row's
+    place: its title match and the preferred presets it matches, shown under
+    it while the order is Recommended. ``?`` lists every key.
     """
     view_query, view_mode, view_order = "", "contains", initial_order
+
+    def notes():
+        """The focused-row notes for the current order: the reason only means something for Recommended."""
+        if describe is None:
+            return None
+        if view_order == "relevance":
+            return describe
+        return lambda row: ("", describe(row)[1])
     session = getattr(results, "session", None)
     if session is not None:
         # Reserve one compact line for diagnostics/actions even with zero rows.
@@ -525,14 +594,14 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         """Result rows that fit now, measuring this page's tallest details block."""
         return _visible_count(total, console.size.height, console.size.width, note, show_from,
                               show_provider, heading=heading, rows=page_items,
-                              indexes=view_indexes[global_offset:global_offset + total])
+                              indexes=view_indexes[global_offset:global_offset + total], describe=notes())
 
     # Reserve room for the header, notices, details and key bar.
     visible_count = _fit_rows()
 
     scroll_offset = 0
     expanded, detail_offset, saved_scroll = False, 0, 0
-    feedback = ""
+    feedback, feedback_style = "", theme.WARN  # a one-line outcome; green when it worked
 
     # Marquee state shared with the ticker thread
     marquee_state = {
@@ -554,10 +623,16 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         order_label = SORT_ORDERS.get(view_order, view_order)
         if view_order != "relevance":
             order_label += " (overrides preferences)"
-        view_status = theme.labelled(f"Sort: {order_label} • {view_mode.capitalize()}: {view_query or 'all names'}"
-                                     + (f" • {search_summary}" if search_summary else ""), theme.MARGIN)
+        view_parts = [f"Sort: {order_label}"]
+        if view_query:
+            view_parts.append(f"{view_mode.capitalize()}: {view_query}")
+        if search_summary and search_summary != "No presets":
+            view_parts.append(search_summary)
+        if all_results:
+            view_parts.append("Sources: " + _source_counts(all_results))
+        view_status = theme.labelled(" · ".join(view_parts), theme.MARGIN)
         if feedback:
-            view_status = Text(theme.MARGIN + feedback, style=theme.WARN, no_wrap=True, overflow="ellipsis")
+            view_status = Text(theme.MARGIN + feedback, style=feedback_style, no_wrap=True, overflow="ellipsis")
         if session is not None:
             failures = sum(d.retryable for d in session.diagnostics)
             retry_label = f"r retry ({failures})" if failures else "r retry"
@@ -585,7 +660,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
             current_page, total_pages, global_offset, tick=0,
             picked=frozenset(picked), show_from=show_from,
             original_indices=view_indexes[global_offset:global_offset + total],
-            expanded=expanded, detail_offset=detail_offset,
+            expanded=expanded, detail_offset=detail_offset, describe=notes(),
         )),
         console=console,
         refresh_per_second=15,
@@ -641,7 +716,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         current_page, total_pages, global_offset, tick=new_tick,
                         picked=frozenset(picked), show_from=show_from,
                         original_indices=view_indexes[global_offset:global_offset + total],
-                        expanded=expanded, detail_offset=detail_offset,
+                        expanded=expanded, detail_offset=detail_offset, describe=notes(),
                     ))
                 )
 
@@ -721,9 +796,9 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                 elif key in ("b", "B") and on_bookmark and total:
                     ids = sorted(picked) if picked else [view_indexes[global_offset + current]]
                     try:
-                        feedback = on_bookmark([results[i] for i in ids])
+                        feedback, feedback_style = theme.CHECK + " " + on_bookmark([results[i] for i in ids]), theme.GOOD
                     except (OSError, ValueError) as error:
-                        feedback = "Bookmark not saved: " + str(error)
+                        feedback, feedback_style = "Bookmark not saved: " + str(error), theme.BAD
                 elif key.lower() in ("n", "r", "m") and session is not None:
                     from torrent_finder.ui.search_diagnostics import diagnostics_menu, run_action
                     from torrent_finder.providers.combined_provider import result_identity
@@ -743,10 +818,12 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                                     results[:] = updated
                                     results.notices = updated.notices
                                     feedback = f"{len(results) - old_count} added • {len(results)} total • n: diagnostics"
+                                    feedback_style = theme.GOOD
                                 if error:
-                                    feedback = error
+                                    feedback, feedback_style = error, theme.WARN
                             else:
                                 feedback = "No failed sources to retry" if action == "retry" else "No more pages available • n: details"
+                                feedback_style = theme.WARN
                     except KeyboardInterrupt:
                         pass
                     view_indexes = result_indices(results, view_query, view_mode, view_order)
@@ -779,6 +856,21 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     except KeyboardInterrupt:
                         pass
                     visible_count = _fit_rows()
+                    live.start()
+                    stop_event.clear()
+                    ticker_thread = threading.Thread(target=ticker, daemon=True)
+                    ticker_thread.start()
+                elif key == "?":
+                    num_buffer = ""
+                    stop_event.set()
+                    ticker_thread.join(timeout=1)
+                    live.stop()
+                    try:
+                        from torrent_finder.ui.selector import show_keys
+                        show_keys(Text(heading or "Results"), Text(_result_keys(total_pages, frozenset(picked))),
+                                  extra=RESULT_EXTRA_KEYS)
+                    except KeyboardInterrupt:
+                        pass
                     live.start()
                     stop_event.clear()
                     ticker_thread = threading.Thread(target=ticker, daemon=True)
@@ -862,7 +954,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         tick=marquee_state["tick"],
                         picked=frozenset(picked), show_from=show_from,
                         original_indices=view_indexes[global_offset:global_offset + total],
-                        expanded=expanded, detail_offset=detail_offset,
+                        expanded=expanded, detail_offset=detail_offset, describe=notes(),
                     ))
                 )
         finally:

@@ -456,6 +456,14 @@ def has_key(segments: list[Text], key: str) -> bool:
     return any(segment.plain.split(" ", 1)[0] == key for segment in segments)
 
 
+def with_help(segments: list[Text], width: int) -> list[Text]:
+    """*segments* plus "? keys" when it fits on the lines the keys already take."""
+    if has_key(segments, "?"):
+        return segments
+    candidate = segments + [key_segment("?", "keys")]
+    return candidate if len(wrap_keys(candidate, width)) == len(wrap_keys(segments, width)) else segments
+
+
 def wrap_keys(segments: list[Text], width: int, margin: str = MARGIN) -> list[Text]:
     """Lay key segments out in as few lines as fit; never split a segment.
 

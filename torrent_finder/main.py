@@ -486,10 +486,12 @@ def _browse_results(provider, results, note: str = "") -> str:
         from rich.markup import escape
         # Headers are Rich markup; queries are user text and may hold brackets.
         crumbs = [escape(getattr(provider, "name", "") or "Results"), escape(", ".join(queries))]
+        from torrent_finder.result_view import ranking_notes
         choice = interactive_select(results, note=note, initial_order=provider.result_sort,
                                     search_summary=provider.filter_summary(),
                                     on_bookmark=lambda rows: save_results(provider, rows),
-                                    heading=" › ".join(part for part in crumbs if part))
+                                    heading=" › ".join(part for part in crumbs if part),
+                                    describe=ranking_notes(provider, queries))
         if choice is None:
             return "back"
 

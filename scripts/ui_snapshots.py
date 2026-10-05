@@ -130,8 +130,17 @@ def _scenarios():
 
     def table(results, note=""):
         def run():
+            from torrent_finder.result_view import ranking_notes
             from torrent_finder.ui.table import interactive_select
-            interactive_select(results, note=note, search_summary="Prefer 1080p")
+            provider = get_provider("movies")
+            preset = next(p for p in provider.presets if p.name == "1080p")
+            provider.preferred_presets.append(preset)
+            try:
+                interactive_select(results, note=note, search_summary="Prefer: 1080p",
+                                   heading="Movies & Series › dune part two",
+                                   describe=ranking_notes(provider, ["dune part two"]))
+            finally:
+                provider.preferred_presets.remove(preset)
         return run
 
     def info_screen():

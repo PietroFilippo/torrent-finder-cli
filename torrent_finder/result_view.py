@@ -514,6 +514,41 @@ def timestamp(value) -> int:
         return 0
 
 
+# What a title score means, for the "Ranked:" note under a focused result.
+TITLE_REASONS = {4: "exact title and author", 3: "exact title", 2: "title starts with the search",
+                 1: "every searched word", 0: "title differs from the search"}
+
+
+def ranking_notes(provider, queries):
+    """``describe(row) -> (reason, preferred preset names)`` for the results table.
+
+    The reason names how well the row's title matches the searched one (only
+    for providers ranked by title, scored by the row's own provider) and the
+    preferred presets it matches, which also break ties.
+    """
+    from torrent_finder.filters import apply_filters
+    queries = [query for query in queries or () if query and query.strip()]
+    combined = getattr(provider, "is_combined", False)
+    children = {child.slug: child for child in provider.children} if combined else {}
+
+    def describe(row):
+        owner = children.get(row.get("provider_slug"), provider) if combined else provider
+        preferred = tuple(preset.name for preset in getattr(owner, "preferred_presets", ())
+                          if preset not in getattr(owner, "active_presets", ())
+                          and apply_filters([row], preset.config))
+        reason = ""
+        if queries and (combined or getattr(owner, "prefer_title_matches", False)):
+            try:
+                reason = TITLE_REASONS.get(max(owner.title_relevance(row, query) for query in queries), "")
+            except Exception:  # a dict row (a saved bookmark) or a scorer problem: no title note
+                reason = ""
+        if preferred:
+            reason = ", ".join(filter(None, (reason, "prefers " + ", ".join(preferred))))
+        return reason, preferred
+
+    return describe
+
+
 def result_indices(results, query: str = "", mode: str = "contains", order: str = "relevance") -> list[int]:
     """Return original indexes, so sorting/filtering cannot change a picked row."""
     indexes = [i for i, row in enumerate(results) if matches_name(row.get("name", ""), query, mode)]

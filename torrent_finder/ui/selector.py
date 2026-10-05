@@ -358,12 +358,7 @@ def _build_panel(
                 + context_lines + len(theme.wrap_keys(key_segments, width)) + len(alert_lines))
 
     def with_help(segments: list[Text]) -> list[Text]:
-        if not help_key or theme.has_key(segments, "?"):
-            return segments
-        candidate = segments + [theme.key_segment("?", "keys")]
-        if len(theme.wrap_keys(candidate, width)) == len(theme.wrap_keys(segments, width)):
-            return candidate
-        return segments
+        return theme.with_help(segments, width) if help_key else segments
 
     def windowed_keys() -> list[Text]:
         if theme.has_key(keys, "PgUp/PgDn"):
