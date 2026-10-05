@@ -250,9 +250,12 @@ def appearance_details() -> list[Text]:
         lines.append(pair("Painting", shown.title if shown else "none"))
     lines += [pair("Focus", theme.FOCUS_STYLES[focus]), pair("Density", theme.DENSITIES[density])]
     if terminal_profile.supported():
-        lines.append(pair("Terminal", "torrent-finder profile" if terminal_profile.installed() else "no profile"))
-        font, size = appearance.font(palette.design)
-        lines.append(pair("Font", f"{font.face} · {font.size_label(size)}"))
+        plain = appearance.profile_look(palette.design) == "plain"
+        profile = "torrent-finder profile" + (" · plain look" if plain else "")
+        lines.append(pair("Terminal", profile if terminal_profile.installed() else "no profile"))
+        if not plain:
+            font, size = appearance.font(palette.design)
+            lines.append(pair("Font", f"{font.face} · {font.size_label(size)}"))
     return lines
 
 

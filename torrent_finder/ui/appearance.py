@@ -26,8 +26,12 @@ ENV = "TORRENT_FINDER_THEME"
 DEFAULT_FONTS = {design: {"font": terminal_profile.default_font(design).key,
                            "size": terminal_profile.default_font(design).default_size}
                  for design in theme.DESIGNS}
+# The Windows Terminal profile: Athanor's full look (page, painting, pixel font) or a plain one (Windows
+# Terminal's own page and font, as in any other tab), and whether the command opens the profile's tab.
+LOOKS = ("full", "plain")
+DEFAULT_PROFILE = {"look": "full", "open_from_tabs": False}
 DEFAULTS = {"theme": theme.DEFAULT_THEME, "focus": "fill", "density": "comfortable", "painting": paintings.DEFAULT,
-            "fonts": DEFAULT_FONTS}
+            "fonts": DEFAULT_FONTS, "profile": DEFAULT_PROFILE}
 
 
 def theme_key(name: object) -> str | None:
@@ -55,12 +59,15 @@ def normalize(value: object) -> dict:
     """A complete, valid appearance dict; anything unknown falls back to its default."""
     value = value if isinstance(value, dict) else {}
     fonts = value.get("fonts") if isinstance(value.get("fonts"), dict) else {}
+    profile = value.get("profile") if isinstance(value.get("profile"), dict) else {}
     return {
         "theme": theme_key(value.get("theme")) or DEFAULTS["theme"],
         "focus": value.get("focus") if value.get("focus") in theme.FOCUS_STYLES else DEFAULTS["focus"],
         "density": value.get("density") if value.get("density") in theme.DENSITIES else DEFAULTS["density"],
         "painting": paintings.painting_key(value.get("painting")) or DEFAULTS["painting"],
         "fonts": {design: _font_choice(design, fonts.get(design)) for design in theme.DESIGNS},
+        "profile": {"look": profile.get("look") if profile.get("look") in LOOKS else DEFAULT_PROFILE["look"],
+                    "open_from_tabs": profile.get("open_from_tabs") is True},
     }
 
 
@@ -102,7 +109,7 @@ def resolve(cli_theme: str | None = None, environ=None, base: dict | None = None
     return appearance, source, notice
 
 
-_session = {"source": "saved", "painting": DEFAULTS["painting"], "fonts": DEFAULT_FONTS}
+_session = {"source": "saved", "painting": DEFAULTS["painting"], "fonts": DEFAULT_FONTS, "profile": DEFAULT_PROFILE}
 
 
 def apply_startup(cli_theme: str | None = None, environ=None, saved_settings: bool = True) -> str:
@@ -115,6 +122,7 @@ def apply_startup(cli_theme: str | None = None, environ=None, saved_settings: bo
     _session["source"] = source
     _session["painting"] = appearance["painting"]
     _session["fonts"] = appearance["fonts"]
+    _session["profile"] = appearance["profile"]
     theme.apply(appearance["theme"], focus=appearance["focus"], density=appearance["density"])
     return notice
 
@@ -136,17 +144,30 @@ def font(design: str | None = None) -> tuple["terminal_profile.Font", float]:
     return terminal_profile.FONTS[choice["font"]], choice["size"]
 
 
+def profile_look(design: str | None = None) -> str:
+    """``"plain"`` when the profile shows *design* (the current one) on Windows Terminal's own page and font."""
+    design = design or theme.PALETTE.design
+    return _session["profile"]["look"] if design == "athanor" else "full"
+
+
+def open_from_tabs() -> bool:
+    """Whether the command, typed in another Windows Terminal tab, opens the app in the profile's tab."""
+    return _session["profile"]["open_from_tabs"]
+
+
 def save(theme_name: str, focus: str, density: str, painting_name: str | None = None,
-         fonts: dict | None = None) -> None:
+         fonts: dict | None = None, profile: dict | None = None) -> None:
     """Save an explicit appearance choice now; raises ``ValueError``/``OSError`` when that fails.
 
-    Without *painting_name* the current painting is kept, without *fonts* the current fonts.
+    Without *painting_name* the current painting is kept, without *fonts* and *profile* the current ones.
     """
     from torrent_finder.state import commit_setting
     value = normalize({"theme": theme_name, "focus": focus, "density": density,
-                       "painting": painting_name or _session["painting"], "fonts": fonts or _session["fonts"]})
+                       "painting": painting_name or _session["painting"], "fonts": fonts or _session["fonts"],
+                       "profile": profile or _session["profile"]})
     _session["painting"] = value["painting"]  # in use this session even if saving fails
     _session["fonts"] = value["fonts"]
+    _session["profile"] = value["profile"]
     commit_setting(SETTING, value)
     _session["source"] = "saved"
 
@@ -218,6 +239,17 @@ FOLLOWS_LATER = "The Windows Terminal profile follows; it changes when Windows T
 NEW_FONTS = "Installed the pixel fonts for your account: a tab opened before now shows them once you open a new one."
 FONT_SAVED = "Saved. The torrent-finder profile uses it: add it at the end of this list."
 FONT_HELP = "The torrent-finder profile in Windows Terminal draws the app in it; other terminals keep their own font."
+LOOK_HINTS = {"full": "the colourway's page, the painting, a pixel font",
+              "plain": "Windows Terminal's own page and font"}
+LOOK_HELP = {
+    "full": "The profile shows Athanor on its colourway's page, with the painting behind the text and the font "
+            "and text size chosen above.",
+    "plain": "The profile shows Athanor as any other tab does: the frame and colours on Windows Terminal's own "
+             "page and font, without the painting.",
+}
+OPEN_HELP = ("When you type the command in another Windows Terminal tab, the app opens in a torrent-finder tab of "
+             "the same window, with its look, and the other tab gets its prompt back. Windows Terminal keeps "
+             "pictures and fonts in profiles, and a running program cannot change them in its own tab.")
 SIZE_HELP = ("How large the profile draws text. Larger text fills a big window with fewer, bigger rows; "
              "whole multiples keep pixel letters sharp at 100% display scaling.")
 
@@ -239,16 +271,21 @@ def _size_hint(option, size) -> str:
     return "Windows Terminal's default" if size == 12 else ""
 
 
-def _painting_help() -> str:
-    return PROFILE_PAINTING_HELP if terminal_profile.supported() else PAINTING_HELP
+PLAIN_PAINTING_HELP = "The profile's plain look leaves it out; its full look (at the end of this list) shows it."
 
 
-def _painting_rows(chosen: str) -> list:
+def _painting_help(plain: bool = False) -> str:
+    if not terminal_profile.supported():
+        return PAINTING_HELP
+    return PLAIN_PAINTING_HELP if plain else PROFILE_PAINTING_HELP
+
+
+def _painting_rows(chosen: str, plain: bool = False) -> list:
     """The Painting section's rows: every engraving, then none."""
     rows = []
     for key, entry in paintings.catalog().items():
         rows.append(_choice(entry.title, ("painting", key), key == chosen, f"{entry.artist}, {entry.year}",
-                            f"{entry.credit}; public domain. Recoloured in the colourway's ink. {_painting_help()}"))
+                            f"{entry.credit}; public domain. Recoloured in the colourway's ink. {_painting_help(plain)}"))
     rows.append(_choice("None", ("painting", paintings.NONE), chosen == paintings.NONE, "a plain page",
                         "No painting behind the app."))
     return rows
@@ -280,7 +317,8 @@ def appearance_menu() -> None:
 
     palette, focus, density = theme.current()
     chosen = {"theme": palette.key, "focus": focus, "density": density, "painting": painting(),
-              "fonts": {design: dict(choice) for design, choice in _session["fonts"].items()}}
+              "fonts": {design: dict(choice) for design, choice in _session["fonts"].items()},
+              "profile": dict(_session["profile"])}
     state = {"preview": palette.key, "notice": ""}
 
     def design_of(key: str) -> str:
@@ -289,6 +327,9 @@ def appearance_menu() -> None:
     def chosen_font(design: str):
         choice = _font_choice(design, chosen["fonts"].get(design))
         return terminal_profile.FONTS[choice["font"]], choice["size"]
+
+    def plain(design: str) -> bool:
+        return design == "athanor" and chosen["profile"]["look"] == "plain"
 
     def build() -> list:
         design = design_of(state["preview"])
@@ -302,12 +343,13 @@ def appearance_menu() -> None:
                                  _swatches(option), _theme_help(option)))
         if design == "athanor" and paintings.catalog():
             items.append(_section("Painting"))
-            items += _painting_rows(chosen["painting"])
+            items += _painting_rows(chosen["painting"], plain(design))
             if chosen["painting"] != paintings.NONE:
                 items.append(SelectItem("Save the painting as an image", ("export", None), is_action=True,
                                         hint=f"a PNG in the {theme.THEMES[state['preview']].name} colours",
                                         description=f"Into {paintings.export_folder()}. {PAINTING_HELP}"))
-        if terminal_profile.supported():  # the app sets a font only through the Windows Terminal profile
+        # The app sets a font only through the Windows Terminal profile, and the plain look keeps its own.
+        if terminal_profile.supported() and not plain(design):
             current, size = chosen_font(design)
             items.append(_section("Font"))
             for option in terminal_profile.fonts(design):
@@ -326,7 +368,16 @@ def appearance_menu() -> None:
                                  _DENSITY_HELP[key]))
         if terminal_profile.supported():
             items.append(_section("Windows Terminal"))
+            if design == "athanor":
+                for key in LOOKS:
+                    items.append(_choice(f"{key.capitalize()} look", ("look", key), key == chosen["profile"]["look"],
+                                         LOOK_HINTS[key], LOOK_HELP[key]))
             if terminal_profile.installed():
+                opening = chosen["profile"]["open_from_tabs"]
+                items.append(SelectItem("Open from other tabs", ("open", not opening), is_action=True,
+                                        hint=Text("On" if opening else "Off",
+                                                  style=theme.state_style("On" if opening else "Off")),
+                                        description=OPEN_HELP))
                 items.append(SelectItem("Remove the torrent-finder profile", ("profile", "remove"), is_action=True,
                                         hint="it follows the choices above",
                                         description=f"{PROFILE_HELP} Removing it deletes "
@@ -339,12 +390,13 @@ def appearance_menu() -> None:
 
     def persist(kind: str) -> None:
         try:
-            save(chosen["theme"], chosen["focus"], chosen["density"], chosen["painting"], chosen["fonts"])
+            save(chosen["theme"], chosen["focus"], chosen["density"], chosen["painting"], chosen["fonts"],
+                 chosen["profile"])
             state["notice"] = ""
         except (OSError, ValueError) as error:
             state["notice"] = f"[error]Applied for this session, but not saved:[/error] {escape(str(error))}"
             return
-        if kind not in ("design", "theme", "painting", "font", "size"):
+        if kind not in ("design", "theme", "painting", "font", "size", "look"):
             return
         if not terminal_profile.installed():
             state["notice"] = FONT_SAVED if kind in ("font", "size") else ""
@@ -352,7 +404,8 @@ def appearance_menu() -> None:
         try:
             installed = terminal_profile.install_fonts() if kind == "font" else []
             current, size = chosen_font(design_of(chosen["theme"]))
-            terminal_profile.write(theme.THEMES[chosen["theme"]], chosen["painting"], font=current, size=size)
+            terminal_profile.write(theme.THEMES[chosen["theme"]], chosen["painting"], font=current, size=size,
+                                   plain=plain(design_of(chosen["theme"])))
             state["notice"] = FOLLOWS_NOW if terminal_profile.refresh() else FOLLOWS_LATER
             if installed:
                 state["notice"] += " " + NEW_FONTS
@@ -366,6 +419,8 @@ def appearance_menu() -> None:
         parts = [f"the {palette.name} colours"] + ([f"{escape(shown.title)} behind the text"] if shown else [])
         current, size = chosen_font(palette.design)
         parts.append(f"{current.face} at {current.size_label(size)}")
+        if plain(palette.design):
+            parts = [f"the {palette.name} colours on Windows Terminal's own page and font"]
         if terminal_profile.missing_fonts():
             parts.append("the PxPlus pixel fonts installed for your account")
         listed = parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
@@ -374,7 +429,8 @@ def appearance_menu() -> None:
         if not confirm_prompt(message, title="Windows Terminal profile"):
             return
         try:
-            terminal_profile.write(palette, chosen["painting"], font=current, size=size, add_font=True)
+            terminal_profile.write(palette, chosen["painting"], font=current, size=size, add_font=True,
+                                   plain=plain(palette.design))
             if terminal_profile.refresh():
                 state["notice"] = "[good]Added[/good] the torrent-finder profile: open it from the ▾ menu next to the tabs."
             else:
@@ -416,6 +472,10 @@ def appearance_menu() -> None:
             return True
         if kind in ("design", "theme"):
             chosen["theme"] = state["preview"] = target(value)
+        elif kind == "look":
+            chosen["profile"]["look"] = key
+        elif kind == "open":
+            chosen["profile"]["open_from_tabs"] = key
         elif kind in ("font", "size"):
             design = design_of(state["preview"])  # the sections show the design on screen
             current, size = chosen_font(design)

@@ -8,7 +8,7 @@ import tempfile
 import unittest
 import warnings
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
@@ -264,6 +264,51 @@ class FontTests(ProfileCase):
         self.assertIn("PxPlus IBM VGA 8x16 · ×1 · 12 pt", text)
 
 
+class PlainLookTests(ProfileCase):
+    def test_a_plain_profile_keeps_windows_terminals_page_and_font(self):
+        terminal_profile.font_installed.return_value = True
+        terminal_profile.write(theme.THEMES["citrinitas"], "dore-satan")
+        self.assertEqual(len(self.pictures()), 1)
+        terminal_profile.write(theme.THEMES["citrinitas"], "dore-satan", plain=True)
+        data = self.fragment()
+        profile = data["profiles"][0]
+        for key in ("colorScheme", "backgroundImage", "font", "antialiasingMode"):
+            self.assertNotIn(key, profile)
+        self.assertEqual(data["schemes"], [])
+        self.assertEqual(self.pictures(), [])  # the picture goes with the look
+        self.assertEqual(profile["guid"], terminal_profile.PROFILE_GUID)
+
+    def test_only_another_profiles_tab_counts_as_another_tab(self):
+        other = {"WT_SESSION": "{1}", "WT_PROFILE_ID": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}"}
+        self.assertTrue(terminal_profile.in_other_tab(other))
+        self.assertFalse(terminal_profile.in_other_tab({**other, "WT_PROFILE_ID": terminal_profile.PROFILE_GUID}))
+        self.assertFalse(terminal_profile.in_other_tab({"WT_PROFILE_ID": "{1}"}))  # not in Windows Terminal
+
+    def test_opening_a_tab_names_the_profile_and_passes_the_arguments(self):
+        terminal_profile.shutil.which.return_value = r"C:\wt.exe"
+        with patch.object(terminal_profile.subprocess, "Popen") as popen:
+            self.assertTrue(terminal_profile.open_tab([]))
+            self.assertEqual(popen.call_args.args[0], [r"C:\wt.exe", "-w", "0", "new-tab", "-p", "torrent-finder"])
+            self.assertTrue(terminal_profile.open_tab(["-q", "dune; part two"]))
+            tab = popen.call_args.args[0]
+        self.assertEqual(tab[:6], [r"C:\wt.exe", "-w", "0", "new-tab", "-p", "torrent-finder"])
+        self.assertEqual(tab[-2:], ["-q", "dune\\; part two"])  # ";" would start Windows Terminal's next command
+        self.assertEqual(tab[6:-2], terminal_profile.command())
+
+    def test_without_windows_terminal_or_when_it_fails_the_app_stays(self):
+        terminal_profile.shutil.which.return_value = None
+        self.assertFalse(terminal_profile.open_tab([]))
+        terminal_profile.shutil.which.return_value = r"C:\wt.exe"
+        with patch.object(terminal_profile.subprocess, "Popen", side_effect=OSError("gone")):
+            self.assertFalse(terminal_profile.open_tab([]))
+
+    def test_saved_profile_choices_are_checked(self):
+        self.assertEqual(appearance.normalize({"profile": {"look": "neon", "open_from_tabs": "yes"}})["profile"],
+                         {"look": "full", "open_from_tabs": False})
+        self.assertEqual(appearance.normalize({"profile": {"look": "plain", "open_from_tabs": True}})["profile"],
+                         {"look": "plain", "open_from_tabs": True})
+
+
 class AppearanceRowTests(ProfileCase):
     def setUp(self):
         super().setUp()
@@ -365,6 +410,32 @@ class AppearanceRowTests(ProfileCase):
         self.assertFalse(terminal_profile.folder().exists())
         self.install_font.assert_not_called()
 
+    def test_athanor_offers_a_plain_look_that_drops_the_page_painting_and_font(self):
+        values = [item.value for item in self.capture()]
+        self.assertIn(("look", "plain"), values)
+        self.assertNotIn(("open", True), values)  # only once the profile exists
+        self.run_menu(("profile", "add"))
+        self.run_menu(("look", "plain"))
+        self.assertNotIn("colorScheme", self.fragment()["profiles"][0])
+        self.assertEqual(appearance.saved()["profile"]["look"], "plain")
+        items = self.capture()
+        self.assertFalse([item for item in items if isinstance(item.value, tuple) and item.value[0] in ("font", "size")])
+        painting = next(item for item in items if item.value == ("painting", "dore-satan"))
+        self.assertIn(appearance.PLAIN_PAINTING_HELP, painting.description)
+        self.run_menu(("look", "full"))
+        self.assertEqual(self.fragment()["profiles"][0]["colorScheme"], "torrent-finder Citrinitas")
+
+    def test_simple_has_no_look_choice(self):
+        theme.apply("quiet")
+        self.assertFalse([item for item in self.capture()
+                          if isinstance(item.value, tuple) and item.value[0] == "look"])
+
+    def test_opening_from_other_tabs_is_a_saved_switch(self):
+        self.run_menu(("profile", "add"))
+        self.run_menu(("open", True))
+        self.assertTrue(appearance.saved()["profile"]["open_from_tabs"])
+        self.assertIn(("open", False), [item.value for item in self.capture()])
+
     def test_other_systems_get_no_profile_rows(self):
         terminal_profile.supported.return_value = False
         values = [item.value for item in self.capture()]
@@ -372,6 +443,41 @@ class AppearanceRowTests(ProfileCase):
         self.assertFalse([value for value in values if isinstance(value, tuple) and value[0] in ("font", "size")])
         self.assertIn(appearance.PAINTING_HELP, next(item for item in self.capture()
                                                      if item.value == ("painting", "dore-satan")).description)
+
+
+class HandOffTests(unittest.TestCase):
+    """The command typed in another Windows Terminal tab opens the profile's tab, when asked to."""
+
+    def run_main(self, *, other_tab=True, tty=True, setting=True, installed=True, opened=True):
+        from torrent_finder import main as app
+        saved = {**appearance.DEFAULTS, "profile": {"look": "full", "open_from_tabs": setting}}
+        with patch.object(terminal_profile, "supported", return_value=True), \
+             patch.object(terminal_profile, "in_other_tab", return_value=other_tab), \
+             patch.object(terminal_profile, "installed", return_value=installed), \
+             patch.object(terminal_profile, "open_tab", return_value=opened) as open_tab, \
+             patch.object(appearance, "saved", return_value=saved), \
+             patch.object(app.sys, "stdin", Mock(isatty=Mock(return_value=tty))), \
+             patch("sys.argv", ["tf", "-q", "dune"]), \
+             patch.object(app, "_main_loop") as loop, \
+             patch.object(app, "record_session_start") as stats, \
+             patch.object(app, "add_runtime_seconds"), patch.object(app, "console"):
+            app.main()
+        return open_tab, loop, stats
+
+    def test_the_app_moves_to_the_profiles_tab_with_its_arguments(self):
+        open_tab, loop, stats = self.run_main()
+        open_tab.assert_called_once_with(["-q", "dune"])
+        loop.assert_not_called()
+        stats.assert_not_called()  # the new tab's run counts the session
+
+    def test_otherwise_it_runs_here(self):
+        for case in ({"other_tab": False}, {"tty": False}, {"setting": False}, {"installed": False},
+                     {"opened": False}):
+            with self.subTest(**case):
+                open_tab, loop, _ = self.run_main(**case)
+                loop.assert_called_once()
+                if "opened" not in case:
+                    open_tab.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ Usage:
     python main.py -q "query"   # Direct search
 """
 import argparse
+import sys
 import threading
 import time
 import warnings
@@ -1547,6 +1548,25 @@ def _main_loop(args=None) -> None:
             cli_facet, pending_creator_name = _hf, _hn
         continue
 
+def _opened_in_profile_tab() -> bool:
+    """Typed in another Windows Terminal tab with "Open from other tabs" on: hand over to the profile's tab.
+
+    Windows Terminal keeps pictures and fonts in profiles, so the profile's
+    look needs its own tab; this one gets its prompt back. Anything that
+    stops the hand-over runs the app here instead.
+    """
+    from torrent_finder import terminal_profile
+    if not (terminal_profile.supported() and terminal_profile.in_other_tab() and sys.stdin.isatty()):
+        return False
+    from torrent_finder.ui import appearance
+    if not (appearance.saved()["profile"]["open_from_tabs"] and terminal_profile.installed()):
+        return False
+    if not terminal_profile.open_tab(sys.argv[1:]):
+        return False
+    console.print("[muted]Opened in a torrent-finder tab.[/muted]")
+    return True
+
+
 def main() -> None:
     from torrent_finder.search_profiles import ProfileError
     args = _build_parser().parse_args()
@@ -1556,6 +1576,8 @@ def main() -> None:
             preview_update(args.preview_update)
         except (KeyboardInterrupt, EOFError):
             pass
+        return
+    if _opened_in_profile_tab():
         return
     record_session_start()
     t0 = time.monotonic()

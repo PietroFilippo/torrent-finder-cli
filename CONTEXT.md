@@ -411,7 +411,11 @@ fonts for Athanor, Windows' own for Simple; `terminal_profile.FONTS`). The
 profile is a fragment Windows Terminal re-reads whenever its settings.json
 changes; `terminal_profile.refresh()` updates that file's modification time
 after each write so open tabs follow at once. See
-[ADR-0026](docs/adr/0026-profile-fonts.md).
+[ADR-0026](docs/adr/0026-profile-fonts.md). Athanor's profile has a full or a plain
+look (no scheme, picture or font), and "Open from other tabs" makes the
+command started in another Windows Terminal tab hand over to a profile tab
+(`terminal_profile.open_tab`, `main._opened_in_profile_tab`). See
+[ADR-0027](docs/adr/0027-profile-look-and-other-tabs.md).
 
 Rows may carry styled labels and hints; an `intro` summary sits under a
 header; `?` lists a screen's keys. From 150 columns a selector whose rows have

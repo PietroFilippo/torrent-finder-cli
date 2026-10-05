@@ -241,6 +241,34 @@ def command() -> list[str]:
     return [launcher] if launcher else [sys.executable, "-m", "torrent_finder"]
 
 
+def in_other_tab(environ=None) -> bool:
+    """Whether this run is in a Windows Terminal tab of another profile."""
+    environ = os.environ if environ is None else environ
+    return bool(environ.get("WT_SESSION")) and not in_profile(environ)
+
+
+def open_tab(args: list[str]) -> bool:
+    """Start the app in a torrent-finder tab of this Windows Terminal window, with *args*; False when that failed.
+
+    Windows Terminal keeps pictures and fonts in profiles, and no escape
+    sequence lets a running program change them in its own tab: the profile's
+    look needs the profile's tab.
+    """
+    terminal = shutil.which("wt")
+    if not terminal:
+        return False
+    tab = [terminal, "-w", "0", "new-tab", "-p", NAME]
+    if args:
+        # The profile's own command, with the arguments; ";" would start Windows Terminal's next command.
+        tab += [*command(), *(arg.replace(";", "\\;") for arg in args)]
+    try:
+        subprocess.Popen(tab, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         close_fds=True)
+    except OSError:
+        return False
+    return True
+
+
 def _hex(colour: str, fallback: str) -> str:
     if colour.startswith("#"):
         return colour
@@ -274,8 +302,12 @@ def _number(value: float) -> "int | float":
 
 
 def fragment(palette, image: "Path | None", font: "Font | None", launch: list[str], starting: str,
-             size: "float | None" = None) -> dict:
-    """The fragment: one profile and its colour scheme; *font* at *size* when Windows has it."""
+             size: "float | None" = None, *, plain: bool = False) -> dict:
+    """The fragment: one profile and its colour scheme; *font* at *size* when Windows has it.
+
+    A *plain* profile keeps Windows Terminal's own page and font: no scheme,
+    picture or font, as the app looks in any other tab.
+    """
     colours = scheme(palette)
     profile = {
         "guid": PROFILE_GUID,
@@ -285,6 +317,9 @@ def fragment(palette, image: "Path | None", font: "Font | None", launch: list[st
         "colorScheme": colours["name"],
         "tabTitle": NAME,
     }
+    if plain:
+        del profile["colorScheme"]
+        return {"profiles": [profile], "schemes": []}
     if image:
         # A bare file name: Windows Terminal looks for it beside the fragment.
         profile.update(backgroundImage=image.name, backgroundImageStretchMode="uniform",
@@ -362,7 +397,7 @@ def install_fonts(environ=None) -> list[Font]:
 
 
 def write(palette, painting: str, environ=None, *, font: "Font | None" = None, size: "float | None" = None,
-          add_font: bool = False) -> Path:
+          add_font: bool = False, plain: bool = False) -> Path:
     """Write (or rewrite) the profile for *palette*, *painting* and *font* at *size*; returns the fragment's path.
 
     The painting shows only with an Athanor colourway; *font* defaults to the
@@ -377,11 +412,11 @@ def write(palette, painting: str, environ=None, *, font: "Font | None" = None, s
         install_fonts(environ)
     font = font or default_font(palette.design)
     image = None
-    if palette.design == "athanor" and painting in paintings.catalog():
+    if palette.design == "athanor" and painting in paintings.catalog() and not plain:
         image = paintings.export(painting, palette, target)
     launch = command()
     starting = str(Path(__file__).resolve().parent.parent) if launch[1:2] == ["-m"] else "%USERPROFILE%"
-    data = fragment(palette, image, font if font_installed(font) else None, launch, starting, size)
+    data = fragment(palette, image, font if font_installed(font) else None, launch, starting, size, plain=plain)
     path = fragment_path(environ)
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")

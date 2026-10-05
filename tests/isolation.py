@@ -69,6 +69,7 @@ def restore_baseline() -> None:
         theme.apply(BASELINE[0], focus=BASELINE[1], density=BASELINE[2])
     appearance._session["painting"] = paintings.DEFAULT
     appearance._session["fonts"] = appearance.DEFAULT_FONTS
+    appearance._session["profile"] = appearance.DEFAULT_PROFILE
 
 
 def _screens_closed() -> None:
