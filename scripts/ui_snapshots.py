@@ -405,15 +405,19 @@ def _size(name: str) -> tuple[int, int]:
     return int(match.group(1)), int(match.group(2))
 
 
-def check(label: str) -> int:
-    """Report every frame in one capture that overflows its terminal, and every scenario that failed."""
-    problems = 0
+def _failed(label: str) -> int:
+    """Print and count the scenarios of one capture that raised instead of drawing."""
     report = OUT / label / "_report.log"
     failed = [line for line in report.read_text(encoding="utf-8").splitlines() if " error: " in line] \
         if report.exists() else []
     for line in failed:
-        problems += 1
-        print(f"--- scenario failed: {line}")
+        print(f"--- scenario failed in {label}: {line}")
+    return len(failed)
+
+
+def check(label: str) -> int:
+    """Report every frame in one capture that overflows its terminal, and every scenario that failed."""
+    problems = _failed(label)
     for path in sorted((OUT / label).glob("*.txt")):
         found = _overflow(path.read_text(encoding="utf-8"), *_size(path.name))
         if found:
@@ -465,6 +469,7 @@ def themes() -> int:
     for spec in specs:
         base = "theme-" + DEFAULT_THEMES[THEMES[spec.split(":")[0]].design]
         label = "theme-" + spec.replace(":", "-")
+        problems += _failed(label)
         if label != base:
             problems += compare(base, label) + compare(label, base)
     print(f"\n{problems} difference(s) across {len(specs)} appearances")

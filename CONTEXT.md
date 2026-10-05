@@ -408,7 +408,11 @@ previews and saves. See [ADR-0021](docs/adr/0021-themes.md). Athanor's
 terminal shows it, through the Windows Terminal profile or an exported image.
 
 Rows may carry styled labels and hints; an `intro` summary sits under a
-header; `?` lists a screen's keys. The main menu groups CONTINUE (the newest
+header; `?` lists a screen's keys. From 150 columns a selector whose rows have
+help shows an **inspector pane** for the focused row (its help, then
+`SelectItem.inspect` lines; the main menu's come from `ui/inspector.py`), beside
+a list column laid out at that narrower width. See
+[ADR-0023](docs/adr/0023-inspector-pane.md). The main menu groups CONTINUE (the newest
 search; a plain keyword search reopens the field with its query), SEARCH and
 TOOLS, with hints saying what each row will search, and a header status for
 the version, a pending update and this session's network verdict. Search
