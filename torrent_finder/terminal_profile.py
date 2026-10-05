@@ -10,7 +10,15 @@ in the colourway's ink) as its background picture, and the PxPlus IBM VGA
 asks; afterwards the profile follows their appearance choices, and removing
 it deletes the folder. Windows Terminal 1.24 and later load a fragment's
 pictures from its own folder; earlier versions show the colours and font
-without the picture. See docs/adr/0022-athanor-design.md.
+without the picture.
+
+Python from the Microsoft Store runs in an app container that keeps the
+folders it creates under AppData in a private copy (%LOCALAPPDATA%\Packages\
+<its package>\LocalCache\Local\…), which Windows Terminal never reads. Files
+written into a folder that exists outside the container do land there, and
+child processes are not redirected, so the folders are made with ``cmd``
+and a private copy left by an earlier version is removed. See
+docs/adr/0022-athanor-design.md.
 """
 
 from __future__ import annotations
@@ -21,6 +29,7 @@ import shutil
 import subprocess
 import sys
 import uuid
+from functools import lru_cache
 from pathlib import Path
 
 from torrent_finder import paintings
@@ -69,8 +78,79 @@ def fragment_path(environ=None) -> Path:
 
 
 def installed(environ=None) -> bool:
-    """Whether the user added the profile (its fragment exists)."""
-    return supported(environ) and fragment_path(environ).is_file()
+    """Whether the user added the profile where Windows Terminal reads it."""
+    if not (supported(environ) and fragment_path(environ).is_file()):
+        return False
+    private = _private_copy(fragment_path(environ), environ)
+    return private is None or not private.exists()  # a copy only this Python sees is not installed
+
+
+# --- the Microsoft Store's Python ----------------------------------------------------------
+
+@lru_cache(maxsize=1)
+def _package_family() -> str:
+    """The app package this Python runs in, or "" outside one."""
+    if sys.platform != "win32":
+        return ""
+    try:
+        import ctypes
+        get = ctypes.windll.kernel32.GetCurrentPackageFamilyName
+        length = ctypes.c_uint32(0)
+        if get(ctypes.byref(length), None) != 122:  # ERROR_INSUFFICIENT_BUFFER means there is a package
+            return ""
+        name = ctypes.create_unicode_buffer(length.value)
+        return name.value if get(ctypes.byref(length), name) == 0 else ""
+    except (AttributeError, OSError):
+        return ""
+
+
+def _private_copy(path: Path, environ=None) -> "Path | None":
+    """Where the app container keeps its own copy of *path* (under LOCALAPPDATA); None outside one."""
+    family = _package_family()
+    if not family:
+        return None
+    environ = os.environ if environ is None else environ
+    local = Path(environ["LOCALAPPDATA"])
+    try:
+        relative = path.relative_to(local)
+    except ValueError:
+        return None
+    return local / "Packages" / family / "LocalCache" / "Local" / relative
+
+
+def _make_folder(target: Path) -> None:
+    """Create *target* where other programs see it: inside a container, cmd makes it."""
+    if _package_family():
+        subprocess.run(["cmd", "/d", "/c", "mkdir", str(target)], capture_output=True, check=False)
+    target.mkdir(parents=True, exist_ok=True)
+
+
+def _drop_private_copy(path: Path, environ=None) -> None:
+    """Delete what an earlier write left in the container's private copy, and its empty parents."""
+    private = _private_copy(path, environ)
+    if private is None or not private.exists():
+        return
+    if private.is_dir():
+        shutil.rmtree(private)
+    else:
+        private.unlink()
+    environ = os.environ if environ is None else environ
+    root = _private_copy(Path(environ["LOCALAPPDATA"]), environ)
+    for parent in private.parents:
+        if parent == root:
+            break
+        try:
+            parent.rmdir()
+        except OSError:
+            break
+
+
+def _check_real(path: Path, environ=None) -> None:
+    """Raise when Windows kept *path* in the container's private copy, out of other programs' sight."""
+    private = _private_copy(path, environ)
+    if private is not None and private.exists():
+        raise OSError(f"Windows kept {path.name} in Python's private folder ({private.parent}), where "
+                      "Windows Terminal cannot see it; Python from python.org does not have this limit")
 
 
 def in_profile(environ=None) -> bool:
@@ -160,8 +240,9 @@ def install_font(environ=None) -> Path:
     import winreg
     environ = os.environ if environ is None else environ
     target = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "Windows" / "Fonts" / FONT_FILE
-    target.parent.mkdir(parents=True, exist_ok=True)
+    _make_folder(target.parent)
     shutil.copyfile(FONTS / FONT_FILE, target)
+    _check_real(target, environ)
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _FONTS_KEY) as key:
         winreg.SetValueEx(key, f"{FONT_FACE} (TrueType)", 0, winreg.REG_SZ, str(target))
     try:
@@ -178,7 +259,8 @@ def write(palette, painting: str, environ=None, *, add_font: bool = False) -> Pa
     font is installed first when Windows does not have it.
     """
     target = folder(environ)
-    target.mkdir(parents=True, exist_ok=True)
+    _drop_private_copy(target, environ)
+    _make_folder(target)
     if add_font and not font_installed():
         install_font(environ)
     image = None
@@ -194,11 +276,15 @@ def write(palette, painting: str, environ=None, *, add_font: bool = False) -> Pa
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     temporary.replace(path)
+    _check_real(path, environ)
     return path
 
 
 def remove(environ=None) -> None:
     """Delete the profile's folder; Windows Terminal drops the profile when it next starts."""
     target = folder(environ)
+    _drop_private_copy(target, environ)
+    if target.exists() and _package_family():
+        subprocess.run(["cmd", "/d", "/c", "rmdir", "/s", "/q", str(target)], capture_output=True, check=False)
     if target.exists():
         shutil.rmtree(target)

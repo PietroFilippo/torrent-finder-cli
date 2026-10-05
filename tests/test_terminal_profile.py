@@ -2,6 +2,8 @@
 
 import io
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 import warnings
@@ -29,6 +31,7 @@ class ProfileCase(unittest.TestCase):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)
         self.environ = {"LOCALAPPDATA": folder.name, "WT_PROFILE_ID": ""}
+        self.patch(terminal_profile, "_package_family", return_value="")
         self.install_font = self.patch(terminal_profile, "install_font")
         self.patch(terminal_profile, "supported", return_value=True)
         self.patch(terminal_profile, "font_installed", return_value=False)
@@ -108,6 +111,56 @@ class FragmentTests(ProfileCase):
     def test_in_profile_reads_windows_terminals_profile_id(self):
         self.assertTrue(terminal_profile.in_profile({"WT_PROFILE_ID": terminal_profile.PROFILE_GUID.upper()}))
         self.assertFalse(terminal_profile.in_profile({"WT_PROFILE_ID": "{0000}"}))
+
+
+class StorePythonTests(ProfileCase):
+    """Python from the Microsoft Store keeps the folders it makes under AppData in a private copy."""
+
+    def setUp(self):
+        super().setUp()
+        self.patch(terminal_profile, "_package_family", return_value="Python.Store_x")
+        self.commands = []
+        self.patch(terminal_profile.subprocess, "run", side_effect=self.cmd)
+
+    def cmd(self, args, **_kwargs):
+        """cmd runs outside the container: its folders are real."""
+        self.commands.append(args[3])
+        if args[3] == "mkdir":
+            Path(args[4]).mkdir(parents=True, exist_ok=True)
+        elif args[3] == "rmdir":
+            shutil.rmtree(args[-1], ignore_errors=True)
+        return subprocess.CompletedProcess(args, 0)
+
+    def private(self, path: Path) -> Path:
+        return terminal_profile._private_copy(path)
+
+    def test_the_private_copy_sits_in_the_package_cache(self):
+        self.assertEqual(self.private(terminal_profile.fragment_path()),
+                         Path(self.environ["LOCALAPPDATA"], "Packages", "Python.Store_x", "LocalCache", "Local",
+                              "Microsoft", "Windows Terminal", "Fragments", "torrent-finder", "torrent-finder.json"))
+
+    def test_a_profile_only_python_sees_is_replaced_by_a_real_one(self):
+        stale = self.private(terminal_profile.fragment_path())
+        stale.parent.mkdir(parents=True)
+        stale.write_text("{}", encoding="utf-8")
+        terminal_profile.fragment_path().parent.mkdir(parents=True)  # the merged view Python reads
+        terminal_profile.fragment_path().write_text("{}", encoding="utf-8")
+        self.assertFalse(terminal_profile.installed())  # Windows Terminal cannot see it: Add again
+        terminal_profile.write(theme.THEMES["rubedo"], "smith-hermit")
+        self.assertEqual(self.commands, ["mkdir"])
+        self.assertFalse(Path(self.environ["LOCALAPPDATA"], "Packages", "Python.Store_x", "LocalCache",
+                              "Local", "Microsoft").exists())  # the stale copy and its empty parents
+        self.assertTrue(terminal_profile.installed())
+        terminal_profile.remove()
+        self.assertEqual(self.commands, ["mkdir", "rmdir"])
+        self.assertFalse(terminal_profile.folder().exists())
+
+    def test_a_write_windows_kept_private_is_an_error(self):
+        path = terminal_profile.fragment_path()
+        self.private(path).parent.mkdir(parents=True)
+        self.private(path).write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(OSError, "Windows Terminal cannot see it"):
+            terminal_profile._check_real(path)
 
 
 class AppearanceRowTests(ProfileCase):

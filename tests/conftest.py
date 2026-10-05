@@ -9,7 +9,7 @@ test; tests of Athanor apply it themselves.
 import pytest
 
 from torrent_finder import paintings, terminal_profile
-from torrent_finder.ui import appearance, theme
+from torrent_finder.ui import appearance, display, theme
 
 BASELINE = ("quiet", "bar", "comfortable")
 
@@ -35,3 +35,13 @@ def simple_design():
 def no_terminal_profile(monkeypatch):
     """Keep tests away from the real Windows Terminal folder; profile tests opt in with their own."""
     monkeypatch.setattr(terminal_profile, "supported", lambda environ=None: False)
+    monkeypatch.setattr(terminal_profile, "_package_family", lambda: "")  # no cmd calls on real folders
+
+
+@pytest.fixture(autouse=True)
+def screens_closed():
+    """Every full-screen view a test opens is closed again."""
+    yield
+    left_open = display.depth()
+    display._views.clear()
+    assert left_open == 0, f"{left_open} full-screen view(s) left open"
