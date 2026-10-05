@@ -1,12 +1,17 @@
 """Stats viewer — arrow-select menu showing usage counters.
 
 Mirrors the history screen layout: one SelectItem per metric, grouped by
-section headers. arrow_select's built-in windowing handles scrolling, so
-there's no bespoke redraw/overscroll logic and no flicker.
+section headers; counts that compare (per provider, per method, top queries)
+carry a bar scaled to their section's largest. First use, sessions and
+runtime sit in the header. arrow_select's built-in windowing handles
+scrolling, so there's no bespoke redraw/overscroll logic and no flicker.
 """
+
+from rich.text import Text
 
 from torrent_finder.constants import console
 from torrent_finder.providers import display_name_for
+from torrent_finder.ui import theme
 from torrent_finder.stats import (
     average_seeders,
     days_since_first_use,
@@ -55,7 +60,7 @@ def _header(label: str) -> SelectItem:
     )
 
 
-def _metric(label: str, value: str) -> SelectItem:
+def _metric(label: str, value: "str | Text") -> SelectItem:
     """Read-only metric row: cursor CAN stop here (so window scrolls) but Enter is a no-op."""
     return SelectItem(
         label=label,
@@ -66,57 +71,102 @@ def _metric(label: str, value: str) -> SelectItem:
     )
 
 
+# Method keys as the download menu names them.
+METHOD_NAMES = {
+    "open_magnet": "Open in client",
+    "aria": "aria2c download",
+    "webtorrent_download": "webtorrent download",
+    "peerflix_download": "peerflix download",
+    "stream_webtorrent": "Stream · webtorrent",
+    "stream_peerflix": "Stream · peerflix",
+    "subtitles": "Subtitle search",
+}
+_BAR_MAX = 20
+
+
+def _bar_width(note_width: int, count_width: int) -> int:
+    """Bar cells that keep a bar, its count and note inline beside the label (half the content width)."""
+    room = theme.inner_width(console.size.width) // 2 - 2 - count_width - 2 - (note_width + 2 if note_width else 0)
+    return max(4, min(_BAR_MAX, room))
+
+
+def _bar_hint(value: int, largest: int, width: int, count_width: int, note: str = "") -> Text:
+    """``▇▇▇▇▇▇      64  note``: a deep-shade bar, the count in text colour, an optional steel note."""
+    hint = Text()
+    cells = theme.bar(value, largest, width)
+    hint.append(cells, style=theme.DEEP)
+    hint.append(" " * (width - len(cells) + 2))
+    hint.append(str(value).rjust(count_width), style="default")
+    if note:
+        hint.append("  " + note)
+    return hint
+
+
+def _bars(title: str, rows: list[tuple[str, int, str]]) -> list[SelectItem]:
+    """A section of (label, count, note) rows, each with a bar scaled to the largest count."""
+    if not rows:
+        return []
+    largest = max(count for _, count, _ in rows)
+    count_width = max(len(str(count)) for _, count, _ in rows)
+    width = _bar_width(max(len(note) for _, _, note in rows), count_width)
+    return [_header(title)] + [_metric(label, _bar_hint(count, largest, width, count_width, note))
+                               for label, count, note in rows]
+
+
+def header_status(stats: dict) -> str:
+    """``since 2026-06-11 · 41 sessions · 6h 12m``."""
+    parts = []
+    first = _fmt_first_use(stats.get("first_use"))
+    if first != "—":
+        parts.append(f"since {first}")
+    sessions = int(stats.get("session_count", 0) or 0)
+    parts.append(f"{sessions} session{'s' if sessions != 1 else ''}")
+    parts.append(_fmt_runtime(stats.get("total_runtime_s", 0.0)))
+    return " · ".join(parts)
+
+
+def _value(text: str) -> Text:
+    return Text.assemble((text, "default"))  # a figure reads in the text colour, like a count beside a bar
+
+
 def _summary_items(stats: dict) -> list[SelectItem]:
     avg = average_seeders()
     return [
         _header("Summary"),
-        _metric("First use", _fmt_first_use(stats.get("first_use"))),
-        _metric("Days since first use", str(days_since_first_use())),
-        _metric("Sessions", str(stats.get("session_count", 0))),
-        _metric("Total runtime", _fmt_runtime(stats.get("total_runtime_s", 0.0))),
-        _metric("Searches", str(stats.get("searches_total", 0))),
-        _metric("Torrents picked", str(stats.get("picked_count", 0))),
-        _metric("Avg seeders of picks", f"{avg:.1f}" if avg else "—"),
-        _metric("Episode picker uses", str(stats.get("episode_picker_uses", 0))),
-        _metric("Magnet dispatches", str(stats.get("magnet_dispatches", 0))),
+        _metric("Searches", _value(str(stats.get("searches_total", 0)))),
+        _metric("Torrents picked", _value(str(stats.get("picked_count", 0)))),
+        _metric("Avg seeders of picks", _value(f"{avg:.1f}" if avg else "—")),
+        _metric("Episode picker uses", _value(str(stats.get("episode_picker_uses", 0)))),
+        _metric("Magnet dispatches", _value(str(stats.get("magnet_dispatches", 0)))),
+        _metric("Days since first use", _value(str(days_since_first_use()))),
     ]
 
 
 def _method_items(stats: dict) -> list[SelectItem]:
     picks = stats.get("method_picks", {})
     done = stats.get("method_completed", {})
-    rows = sorted(set(picks) | set(done))
-    if not rows:
-        return []
-
     completable = {"aria", "peerflix_download", "webtorrent_download", "subtitles"}
-
-    out: list[SelectItem] = [_header("Methods (picks • completions • rate)")]
-    for m in rows:
-        p = picks.get(m, 0)
-        c = done.get(m, 0)
-        if m in completable:
-            rate = f"{(c / p * 100):.0f}%" if p else "—"
-            value = f"picked {p}  •  done {c}  •  {rate}"
-        elif m == "open_magnet":
-            value = f"dispatched {p}"
+    rows = []
+    for method in sorted(set(picks) | set(done), key=lambda m: (-picks.get(m, 0), m)):
+        picked, completed = picks.get(method, 0), done.get(method, 0)
+        if method in completable:
+            note = f"{completed} done · {completed / picked * 100:.0f}%" if picked else f"{completed} done"
+        elif method == "open_magnet":
+            note = "handed to the client"
         else:  # streams
-            value = f"started {p}"
-        out.append(_metric(m, value))
-    return out
+            note = "started"
+        rows.append((METHOD_NAMES.get(method, method.replace("_", " ")), picked, note))
+    return _bars("Download methods", rows)
 
 
 def _kv_items(title: str, data: dict, top_n: int | None = None) -> list[SelectItem]:
-    """Build a title + one row per (k, v) pair. Empty data → empty list (section omitted)."""
+    """A title + one bar row per (k, v) pair, biggest first. Empty data → empty list (section omitted)."""
     if not data:
         return []
     items = sorted(data.items(), key=lambda kv: kv[1], reverse=True)
     if top_n:
         items = items[:top_n]
-    out: list[SelectItem] = [_header(title)]
-    for k, v in items:
-        out.append(_metric(str(k), str(v)))
-    return out
+    return _bars(title, [(str(key), int(value or 0), "") for key, value in items])
 
 
 def _build_items(stats: dict) -> list[SelectItem]:
@@ -181,6 +231,7 @@ def stats_page() -> None:
         result = arrow_select(
             items,
             title="Usage stats",
+            status=header_status(stats),
             banner=_make_banner_panel(),
             on_action=on_action,
             footer=lambda: (notice + "\n" if notice else "") + "↑/↓ scroll  •  Enter on action  •  Esc back",

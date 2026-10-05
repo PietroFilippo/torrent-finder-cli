@@ -81,7 +81,9 @@ def _hint_text(item: "SelectItem") -> Text:
         hint = item.hint.copy()
         hint.stylize_before(theme.MUTED)
         return hint
-    return Text(item.hint, style=theme.KEY if theme.is_key(item.hint) else theme.MUTED)
+    # A shortcut letter reads as a key; a number (a count, a size) is a value, not a key.
+    is_key = theme.is_key(item.hint) and not item.hint.strip().isdigit()
+    return Text(item.hint, style=theme.KEY if is_key else theme.MUTED)
 
 
 def _toggle_badge(item: "SelectItem") -> str:
