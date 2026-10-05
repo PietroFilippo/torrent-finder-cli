@@ -1,7 +1,8 @@
 # ADR-0023: An inspector pane beside lists in wide windows
 
 Status: accepted (2026-10-05). Extends ADR-0020's layout rules; applies to both
-designs of ADR-0022.
+designs of ADR-0022. Extended by [ADR-0025](0025-tall-windows.md): tall windows
+without room for the pane show its details below the list.
 
 ## Context
 

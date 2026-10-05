@@ -4,6 +4,8 @@ Status: accepted (2026-10-04). Amends the presentation details of ADR-0008;
 its responsive rules (one-line selectable rows, progressive table columns,
 live resize) stand. The colour paragraph below is amended by
 [ADR-0021](0021-themes.md): the roles stay, the shades come from a palette.
+Extended by [ADR-0023](0023-inspector-pane.md) (the inspector pane) and
+[ADR-0025](0025-tall-windows.md) (tall windows: the key bar on the bottom rows).
 
 ## Context
 
