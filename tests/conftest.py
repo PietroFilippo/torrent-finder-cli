@@ -8,7 +8,7 @@ test; tests of Athanor apply it themselves.
 
 import pytest
 
-from torrent_finder import paintings
+from torrent_finder import paintings, terminal_profile
 from torrent_finder.ui import appearance, theme
 
 BASELINE = ("quiet", "bar", "comfortable")
@@ -29,3 +29,9 @@ def simple_design():
     _restore()
     yield
     _restore()
+
+
+@pytest.fixture(autouse=True)
+def no_terminal_profile(monkeypatch):
+    """Keep tests away from the real Windows Terminal folder; profile tests opt in with their own."""
+    monkeypatch.setattr(terminal_profile, "supported", lambda environ=None: False)

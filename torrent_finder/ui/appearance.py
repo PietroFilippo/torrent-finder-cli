@@ -16,7 +16,7 @@ import sys
 
 from rich.text import Text
 
-from torrent_finder import paintings
+from torrent_finder import paintings, terminal_profile
 from torrent_finder.ui import theme
 
 SETTING = "appearance"
@@ -170,8 +170,17 @@ _DENSITY_HELP = {
 }
 _DESIGN_HINTS = {"athanor": "frame · message and status lines · painting", "simple": "header line · rules · no frame"}
 
-# Where a painting shows: terminals draw background images, apps cannot.
+# Where a painting shows: terminals draw background pictures, apps cannot.
 PAINTING_HELP = "Set the saved image as your terminal's background picture to see it behind the app."
+PROFILE_PAINTING_HELP = "The Windows Terminal profile (at the end of this list) shows it behind the app."
+PROFILE_HELP = ("A torrent-finder profile in Windows Terminal opens the app on the theme's own page: its colours, "
+                "the painting behind the text (Windows Terminal 1.24 or later) and the PxPlus IBM VGA font, "
+                "installed for your account. It follows what you choose here.")
+PROFILE_NOTE = "This tab is the torrent-finder profile: its background follows the theme after a restart."
+
+
+def _painting_help() -> str:
+    return PROFILE_PAINTING_HELP if terminal_profile.supported() else PAINTING_HELP
 
 
 def _painting_rows(chosen: str) -> list:
@@ -179,7 +188,7 @@ def _painting_rows(chosen: str) -> list:
     rows = []
     for key, entry in paintings.catalog().items():
         rows.append(_choice(entry.title, ("painting", key), key == chosen, f"{entry.artist}, {entry.year}",
-                            f"{entry.credit}; public domain. Recoloured in the colourway's ink. {PAINTING_HELP}"))
+                            f"{entry.credit}; public domain. Recoloured in the colourway's ink. {_painting_help()}"))
     rows.append(_choice("None", ("painting", paintings.NONE), chosen == paintings.NONE, "a plain page",
                         "No painting behind the app."))
     return rows
@@ -240,15 +249,58 @@ def appearance_menu() -> None:
         for key, label in theme.DENSITIES.items():
             items.append(_choice(label, ("density", key), key == chosen["density"], _DENSITY_HINTS[key],
                                  _DENSITY_HELP[key]))
+        if terminal_profile.supported():
+            items.append(_section("Windows Terminal"))
+            if terminal_profile.installed():
+                items.append(SelectItem("Remove the torrent-finder profile", ("profile", "remove"), is_action=True,
+                                        hint="it follows the choices above",
+                                        description=f"{PROFILE_HELP} Removing it deletes "
+                                                    f"{terminal_profile.folder()}; the font stays installed."))
+            else:
+                items.append(SelectItem("Add a torrent-finder profile", ("profile", "add"), is_action=True,
+                                        hint="the painting behind the app", description=PROFILE_HELP))
         items.append(SelectItem("Back", None, is_action=True))
         return items
 
-    def persist() -> None:
+    def persist(kind: str) -> None:
         try:
             save(chosen["theme"], chosen["focus"], chosen["density"], chosen["painting"])
             state["notice"] = ""
         except (OSError, ValueError) as error:
             state["notice"] = f"[error]Applied for this session, but not saved:[/error] {escape(str(error))}"
+            return
+        if kind in ("design", "theme", "painting") and terminal_profile.installed():
+            try:
+                terminal_profile.write(theme.THEMES[chosen["theme"]], chosen["painting"])
+                state["notice"] = "The Windows Terminal profile follows; it changes when Windows Terminal restarts."
+            except OSError as error:
+                state["notice"] = f"[error]The Windows Terminal profile was not updated:[/error] {escape(str(error))}"
+
+    def add_profile() -> None:
+        from torrent_finder.ui.prompts import confirm_prompt
+        palette = theme.THEMES[chosen["theme"]]
+        shown = paintings.catalog().get(chosen["painting"]) if palette.design == "athanor" else None
+        parts = [f"the {palette.name} colours"] + ([f"{escape(shown.title)} behind the text"] if shown else [])
+        if not terminal_profile.font_installed():
+            parts.append("the PxPlus IBM VGA 8x16 font, installed for your account")
+        listed = parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
+        message = ("Add a [bold]torrent-finder[/bold] profile to Windows Terminal?\n\n"
+                   f"It opens the app with {listed}. It appears when Windows Terminal restarts.")
+        if not confirm_prompt(message, title="Windows Terminal profile"):
+            return
+        try:
+            terminal_profile.write(palette, chosen["painting"], add_font=True)
+            state["notice"] = ("[good]Added[/good] the torrent-finder profile: restart Windows Terminal, "
+                               "then open it from the ▾ menu next to the tabs.")
+        except OSError as error:
+            state["notice"] = f"[error]The profile was not added:[/error] {escape(str(error))}"
+
+    def remove_profile() -> None:
+        try:
+            terminal_profile.remove()
+            state["notice"] = "Removed the torrent-finder profile; Windows Terminal drops it when it restarts."
+        except OSError as error:
+            state["notice"] = f"[error]The profile was not removed:[/error] {escape(str(error))}"
 
     def target(value) -> str:
         """The palette a design or colourway row stands for."""
@@ -266,12 +318,19 @@ def appearance_menu() -> None:
         if kind == "export":
             export_painting()
             return True
+        if kind == "profile":
+            if key == "add":
+                add_profile()
+            else:
+                remove_profile()
+            items[:] = build()
+            return True
         if kind in ("design", "theme"):
             chosen["theme"] = state["preview"] = target(value)
         else:
             chosen[kind] = key
         theme.apply(chosen["theme"], focus=chosen["focus"], density=chosen["density"])
-        persist()
+        persist(kind)
         items[:] = build()  # markers move; a new design brings its own colours
         return True  # stay: the screen redraws in the new appearance
 
@@ -308,7 +367,7 @@ def appearance_menu() -> None:
             lines.append(f"{ENV} chooses the theme at startup; the saved theme applies when it is unset.")
         elif source == "cli":
             lines.append("This run uses --theme; the saved theme applies to later runs.")
-        lines.append(BACKGROUND_NOTE)
+        lines.append(PROFILE_NOTE if terminal_profile.in_profile() else BACKGROUND_NOTE)
         lines.append("↑/↓ navigate  •  Enter apply  •  Space preview  •  Esc back")
         return "\n".join(lines)
 
