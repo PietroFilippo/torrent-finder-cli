@@ -31,7 +31,7 @@ from torrent_finder.providers import (
     provider_for_result,
 )
 from torrent_finder.security import show_security_warning
-from torrent_finder.state import history_queries, load_state
+from torrent_finder.state import history_notes, history_queries, load_state
 from torrent_finder.stats import (
     add_runtime_seconds,
     record_magnet_dispatch,
@@ -1323,6 +1323,8 @@ def _main_loop(args=None) -> None:
                 notice=notice_msg or "",
                 scope_label="Providers" if getattr(provider, "is_combined", False) else "Engines",
                 title=provider.name,
+                provider=provider,
+                recent_hints=history_notes(provider.slug),
             )
             notice_msg = None
             initial, pending_query = pending_query, ""

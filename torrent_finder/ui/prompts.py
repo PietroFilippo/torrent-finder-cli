@@ -42,7 +42,7 @@ MULTI_ADD_KEY_LABEL = "Ctrl+N"
 
 def search_shortcuts_line(has_history: bool) -> str:
     """Build the search-screen key line in display-priority order."""
-    history = "  •  ↑/↓ past searches" if has_history else ""
+    history = "  •  ↑/↓ recent" if has_history else ""
     return (
         "Enter search  •  Ctrl+F filters"
         f"  •  {MULTI_ADD_KEY_LABEL} add another title  •  Tab actions "
@@ -98,6 +98,89 @@ def input_screen(
     return render
 
 
+_LABEL_GAP = "  "
+_RECENT_ROWS = 5
+
+
+def _join(parts: list[Text], separator: str = " · ") -> Text:
+    joined = Text()
+    for index, part in enumerate(parts):
+        if index:
+            joined.append(separator, style=theme.MUTED)
+        joined.append_text(part)
+    return joined
+
+
+def engines_line(provider) -> Text:
+    """``Engines  Apibay On · Knaben Auto · Nyaa On · YTS, SolidTorrents off``, states in their colours.
+
+    Engines a preset turns On for its searches count as On here, as they do in
+    the search itself.
+    """
+    effective = {engine.name for engine in provider.effective_engines}
+    parts, off = [], []
+    for engine in provider.engines:
+        state = "On" if engine.name in effective else "Auto" if engine.mode == "auto" else ""
+        if state:
+            parts.append(Text.assemble(engine.name + " ", (state, theme.state_style(state))))
+        else:
+            off.append(engine.name)
+    if off:
+        parts.append(Text(", ".join(off) + " off", style=theme.MUTED))
+    line = Text.assemble(("Engines" + _LABEL_GAP, theme.MUTED))
+    line.append_text(_join(parts) if parts else Text("none", style=theme.MUTED))
+    return line
+
+
+def filters_line(provider) -> Text:
+    """``Filters  Require x · Prefer y · Names: … · Ctrl+F to change``; "no presets" when none apply."""
+    parts = []
+    for word, presets in (("Require", provider.active_presets), ("Prefer", provider.preferred_presets)):
+        if presets:
+            parts.append(Text.assemble((word, theme.state_style(word)), " " + ", ".join(p.name for p in presets)))
+    if provider.name_rules.summary():
+        parts.append(Text.assemble(("Names ", theme.MUTED), provider.name_rules.summary()))
+    categories = getattr(provider, "nyaa_categories", None)
+    if categories:
+        parts.append(Text.assemble(("Nyaa ", theme.MUTED), categories[provider.nyaa_category]))
+    parts.append(Text.assemble(("Ctrl+F", theme.KEY), (" to change", theme.MUTED)))
+    if len(parts) == 1:
+        parts.insert(0, Text("no presets", style=theme.MUTED))
+    line = Text.assemble(("Filters" + _LABEL_GAP, theme.MUTED))
+    line.append_text(_join(parts))
+    return line
+
+
+def combined_lines(provider) -> list[Text]:
+    """``Providers  …`` and ``Profile  …`` for Search across providers."""
+    selection, details = provider.summary()
+    first = Text.assemble(("Providers" + _LABEL_GAP, theme.MUTED), selection)
+    second = Text.assemble(("Profile" + _LABEL_GAP, theme.MUTED), details, (" · ", theme.MUTED))
+    second.append_text(Text.assemble(("Ctrl+F", theme.KEY), (" to change", theme.MUTED)))
+    return [first, second]
+
+
+def matching_history(history: list[str], typed: str) -> list[str]:
+    """Past searches containing *typed* (any case), newest first; all of them when nothing is typed."""
+    needle = typed.strip().casefold()
+    return [entry for entry in history if needle in entry.casefold()] if needle else list(history)
+
+
+def _recent_row(text: str, needle: str, selected: bool, label_width: int, hint: str) -> Text:
+    row = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
+    row.append(theme.CURSOR if selected else " ", style=theme.ACCENT)
+    row.append(" ")
+    label = Text(text, style=theme.FOCUS if selected else "")
+    start = text.casefold().find(needle) if needle else -1
+    if start >= 0:
+        label.stylize(theme.ACCENT, start, start + len(needle))
+    row.append_text(label)
+    if hint:
+        row.append(" " * (label_width - cell_len(text) + 2))
+        row.append(hint, style=theme.MUTED)
+    return row
+
+
 def make_search_screen_renderer(
     engine_names: str,
     active_filters: str,
@@ -105,14 +188,27 @@ def make_search_screen_renderer(
     notice: str = "",
     scope_label: str = "Engines",
     title: str = "Search",
+    provider=None,
+    recent_hints: "dict[str, str] | None" = None,
 ) -> Callable[[Console], None]:
     """Return the responsive renderer used by the search editor.
 
-    The header names the provider; engines and filters sit on its right when
-    they fit, else on their own line. Keys go below the field.
+    The header names the provider. With *provider*, the lines under it show
+    each engine's mode and the presets in their state colours (providers and
+    profile for Search across providers); without it, *engine_names* and
+    *active_filters* are shown as plain labelled text. Below the field, a
+    RECENT list shows past searches matching what is typed (*recent_hints*
+    maps a search to a note such as when it ran); ↑/↓ walks it. Keys go last.
     """
     from rich.markup import escape
-    status = f"{scope_label}: {escape(engine_names)} · Filters: {escape(active_filters)}"
+    if provider is not None and getattr(provider, "is_combined", False):
+        info = combined_lines(provider)
+    elif provider is not None:
+        info = [engines_line(provider), filters_line(provider)]
+    else:
+        info = [theme.labelled(f"{scope_label}: {escape(engine_names)} · Filters: {escape(active_filters)}",
+                               wrap=True)]
+    hints = recent_hints or {}
     compact_shortcuts = (
         f"Enter search  •  Ctrl+F filters  •  {MULTI_ADD_KEY_LABEL} add title  •  "
         "Tab actions  •  Esc back"
@@ -121,19 +217,39 @@ def make_search_screen_renderer(
 
     def render(target: Console) -> None:
         width, height = target.size.width, target.size.height
-        status_plain = Text.from_markup(status).plain
-        in_header = cell_len(theme.APP_NAME) + cell_len(title) + cell_len(status_plain) + 12 <= width
-        for line in theme.header_lines(title, status if in_header else "", width):
+        for line in theme.header_lines(title, "", width):
             target.print(line)
         if theme.roomy(height, 14):
             target.print(theme.rule(width))
-        if not in_header and theme.roomy(height, 12):
-            for line in theme.wrap_block(theme.labelled(Text.from_markup(status).plain, wrap=True), width, target):
-                target.print(line)
+        if height >= 12:
+            for block in info:
+                for line in theme.wrap_block(block, width, target):
+                    target.print(line)
         if notice:
             _print_lines(target, theme.strip_text(Text.from_markup(notice)))
-        if theme.roomy(height, 12) and (notice or not in_header):
+        if theme.roomy(height, 12):
             target.print()
+
+    def recent(target: Console, typed: str, candidates: list[str], selected: int) -> None:
+        """The RECENT list under the field; the cursor bar marks the search ↑/↓ put in it."""
+        if not candidates:
+            return
+        needle = typed.strip().casefold()
+        first = max(0, selected - _RECENT_ROWS + 1)
+        shown = candidates[first:first + _RECENT_ROWS]
+        if theme.roomy(target.size.height, 12):
+            target.print()
+        heading = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
+        heading.append("RECENT", style=theme.SECTION)
+        if needle:
+            heading.append("  matching ", style=theme.MUTED)
+            heading.append(typed.strip())
+        if len(candidates) > len(shown):
+            heading.append(f"  {first + 1}–{first + len(shown)} of {len(candidates)}", style=theme.MUTED)
+        target.print(heading)
+        label_width = max(cell_len(text) for text in shown)
+        for index, text in enumerate(shown, first):
+            target.print(_recent_row(text, needle, index == selected, label_width, hints.get(text, "")))
 
     def footer(target: Console) -> None:
         if theme.roomy(target.size.height, 12):
@@ -141,6 +257,7 @@ def make_search_screen_renderer(
         _print_keys(target, full_shortcuts if target.size.height >= 18 else compact_shortcuts)
 
     render.footer = footer
+    render.recent = recent
     return render
 
 
@@ -190,18 +307,24 @@ def _render_query_frame(
     pos: int,
     width: int,
     height: int,
+    recall: "tuple[str, list[str], int] | None" = None,
 ) -> tuple[str, int, int]:
     """Pre-render one complete text-field frame and its absolute cursor position.
 
-    The frame never exceeds *height*: when it would, help lines above the field
-    go first (the header line stays), then the oldest queued titles, then key
-    lines. The row being edited always stays on screen, and the cursor is
-    computed on the same character-folded rows that are drawn.
+    The frame never exceeds *height*: when it would, the list of past searches
+    under the field goes first (*recall* is what was typed, the matching
+    searches and the one ↑/↓ chose), then help lines above the field (the
+    header line stays), then the oldest queued titles, then key lines. The row
+    being edited always stays on screen, and the cursor is computed on the
+    same character-folded rows that are drawn.
     """
     width, height = max(1, width), max(1, height)
     top = _capture_lines(screen_renderer, width, height)
     render_footer = getattr(screen_renderer, "footer", None)
     footer = _capture_lines(render_footer, width, height) if render_footer is not None else []
+    render_recent = getattr(screen_renderer, "recent", None)
+    below = (_capture_lines(lambda target: render_recent(target, *recall), width, height)
+             if render_recent is not None and recall is not None else [])
 
     prompt = Text.from_markup(theme.MARGIN + prompt_str)
     queued: list[Text] = []
@@ -221,8 +344,12 @@ def _render_query_frame(
             rows.append(Text(""))
 
     def total() -> int:
-        return len(top) + len(queued) + len(rows) + len(footer)
+        return len(top) + len(queued) + len(rows) + len(below) + len(footer)
 
+    if total() > height:  # the past searches give way first, all of them below a heading and a row
+        room = height - (len(top) + len(queued) + len(rows) + len(footer))
+        blank = 1 if below and not Text.from_ansi(below[0]).plain.strip() else 0
+        below = below[:room] if room - blank >= 2 else []
     if total() > height:
         top = top[:max(1, height - (len(queued) + len(rows) + len(footer)))]
     if total() > height:  # keep the newest queued titles
@@ -238,7 +365,7 @@ def _render_query_frame(
         rows = rows[first_row:first_row + visible]
         top = top[:max(0, height - len(rows))]
 
-    lines = top + [_ansi(row, width) for row in queued + rows] + footer
+    lines = top + [_ansi(row, width) for row in queued + rows] + below + footer
     row_number = len(top) + len(queued) + (cursor_row - first_row) + 1
     return (
         "\n".join(lines),
@@ -298,8 +425,9 @@ def get_query_with_shortcut(
     committed: list[str] = []
 
     hist = history or []
-    hpos = -1
-    stash = ""
+    hpos = -1          # the chosen past search in `matches`, -1 while typing
+    stash = ""         # what was typed before ↑ started walking past searches
+    matches: list[str] = []
 
     stop_event = threading.Event()
     render_lock = threading.Lock()
@@ -318,6 +446,7 @@ def get_query_with_shortcut(
                     pos,
                     frame_size.width,
                     frame_size.height,
+                    recall=recall_state(),
                 )
                 if _write_query_frame(
                     content,
@@ -327,6 +456,14 @@ def get_query_with_shortcut(
                 ):
                     return True
             return False
+
+    def recall_state() -> "tuple[str, list[str], int] | None":
+        if not hist:
+            return None
+        if hpos >= 0:
+            return stash, matches, hpos
+        typed = "".join(buffer)
+        return typed, matching_history(hist, typed), -1
 
     def watcher() -> None:
         nonlocal observed_size
@@ -472,17 +609,19 @@ def get_query_with_shortcut(
                 continue
 
             if key == readchar.key.UP:
-                if hist and hpos < len(hist) - 1:
-                    if hpos == -1:
-                        stash = "".join(buffer)
+                # Walk the past searches that contain what was typed, newest first.
+                if hpos == -1:
+                    stash = "".join(buffer)
+                    matches = matching_history(hist, stash)
+                if hpos < len(matches) - 1:
                     hpos += 1
-                    recall(hist[hpos])
+                    recall(matches[hpos])
                 continue
 
             if key == readchar.key.DOWN:
                 if hpos >= 0:
                     hpos -= 1
-                    recall(hist[hpos] if hpos >= 0 else stash)
+                    recall(matches[hpos] if hpos >= 0 else stash)
                 continue
 
             if key == readchar.key.HOME or key == readchar.key.CTRL_A:
@@ -514,6 +653,7 @@ def get_query_with_shortcut(
                     prev_col, prev_len = pos, len(buffer)
                     del buffer[pos - 1]
                     pos -= 1
+                    hpos = -1  # editing ends the walk; the list matches the new text
                     repaint(prev_col, prev_len)
                 continue
 
@@ -521,6 +661,7 @@ def get_query_with_shortcut(
                 if pos < len(buffer):
                     prev_col, prev_len = pos, len(buffer)
                     del buffer[pos]
+                    hpos = -1
                     repaint(prev_col, prev_len)
                 continue
 
@@ -538,6 +679,7 @@ def get_query_with_shortcut(
                 prev_col, prev_len = pos, len(buffer)
                 buffer.insert(pos, key)
                 pos += 1
+                hpos = -1
                 repaint(prev_col, prev_len)
     except (KeyboardInterrupt, EOFError):  # typed Ctrl+C / Ctrl+D (raised above) or readkey's
         if propagate_interrupt:

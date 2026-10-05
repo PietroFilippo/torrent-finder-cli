@@ -307,6 +307,24 @@ def history_queries(provider_slug: str) -> list[str]:
     ]
 
 
+def history_notes(provider_slug: str) -> dict[str, str]:
+    """A short note per past search of one provider, for the search screen's RECENT list.
+
+    ``2h ago``, plus ``3 names`` when it searched several names of one work.
+    The newest entry of a query wins.
+    """
+    from torrent_finder.utils import relative_time
+    notes: dict[str, str] = {}
+    for entry in _saved_history():
+        query = entry.get("query") if isinstance(entry, dict) else None
+        if entry.get("provider") != provider_slug or not isinstance(query, str) or query in notes:
+            continue
+        names = entry.get("queries")
+        extra = f"{len(names)} names" if isinstance(names, list) and len(names) > 1 else ""
+        notes[query] = " · ".join(filter(None, (relative_time(entry.get("timestamp")), extra)))
+    return notes
+
+
 def creator_history(provider_slug: str, facet_key: str) -> list[str]:
     """Past creator names searched for one provider+facet, newest first — derived
     from the main history's creator entries (powers ↑/↓ recall in the name

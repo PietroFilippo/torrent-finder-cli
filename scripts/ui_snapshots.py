@@ -121,9 +121,10 @@ def _scenarios():
             renderer = prompts.make_search_screen_renderer(
                 ", ".join(e.name for e in provider.effective_engines) or "None",
                 provider.filter_summary(), has_history=True, notice=notice, title=provider.name,
+                provider=provider, recent_hints={"dune part two": "2h ago", "dune 2021 remux": "1d ago"},
             )
             prompts.get_query_with_shortcut(
-                prompts.PROMPT, initial="dune", history=["dune"],
+                prompts.PROMPT, initial="dune", history=["dune part two", "dune 2021 remux", "dune prophecy", "frieren"],
                 filters_shortcut=True, multi=True, screen_renderer=renderer)
         return run
 
