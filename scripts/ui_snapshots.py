@@ -281,15 +281,17 @@ def _scenarios():
 
     def diagnostics():
         from types import SimpleNamespace
+        from torrent_finder.search_diagnostics import Diagnostic
         from torrent_finder.ui.search_diagnostics import diagnostics_menu
         session = SimpleNamespace(
-            can_retry=True, can_load_more=True, queries=["dune", "dune part two"],
-            diagnostics=[SimpleNamespace(provider="Movies & Series", engine=name, status=status, raw=raw,
-                                         kept=kept, seconds=secs, retryable=status != "results")
+            can_retry=True, can_load_more=True, queries=["dune part two"],
+            diagnostics=[Diagnostic("Movies & Series", name, "dune part two", 0, status, raw=raw, kept=kept,
+                                    seconds=secs)
                          for name, status, raw, kept, secs in (("Apibay", "results", 28, 20, 0.9),
-                                                               ("Knaben", "timed_out", 0, 0, 30.0),
+                                                               ("Knaben", "timeout", 0, 0, 30.0),
                                                                ("YTS", "blocked", 0, 0, 1.2))],
-            page_status=lambda: ["Apibay: page 1 of 3", "Knaben: unavailable"])
+            page_status=lambda: ["Movies & Series / Apibay · dune part two: next page: 2",
+                                 "Movies & Series / Knaben · dune part two: page incomplete; retry failed sources first"])
         diagnostics_menu(session)
 
     scenarios += [("creator-works", creator_works), ("diagnostics", diagnostics)]

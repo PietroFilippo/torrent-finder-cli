@@ -26,15 +26,27 @@ REDRAW_S = 0.1
 _DOTS = SPINNERS["dots"]
 _LABEL_MAX = 20
 
-# What an engine's status reads as on its provider's line.
-_STATUS_WORDS = {
-    "searching": "searching", "auto": "auto, if needed", "skipped": "not needed", "empty": "none",
-    "filtered": "filtered out", "timeout": "timed out", "interrupted": "stopped", "error": "failed",
-    "blocked": "blocked", "missing_login": "login needed", "rejected_login": "login rejected",
-    "login_error": "login failed",
+# What an engine's status reads as, here and on the diagnostics screen.
+STATUS_WORDS = {
+    "searching": "searching", "pending": "not finished", "auto": "auto, if needed", "skipped": "not needed",
+    "results": "results", "empty": "none", "filtered": "filtered out", "off": "off",
+    "timeout": "timed out", "interrupted": "stopped", "error": "failed", "blocked": "blocked",
+    "missing_login": "login needed", "rejected_login": "login rejected", "login_error": "login failed",
 }
+_STATUS_WORDS = STATUS_WORDS
 _WARN_STATUSES = {"timeout", "interrupted", "missing_login", "rejected_login", "login_error"}
 _BAD_STATUSES = {"blocked", "error"}
+
+
+def status_style(status: str) -> str:
+    """Green for rows, yellow for failures worth retrying or a login to fix, red for blocks and errors."""
+    if status == "results":
+        return theme.GOOD
+    if status in _WARN_STATUSES:
+        return theme.WARN
+    if status in _BAD_STATUSES:
+        return theme.BAD
+    return theme.MUTED
 
 
 def spinner_frame(elapsed: float) -> str:
