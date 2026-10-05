@@ -392,6 +392,24 @@ Search notices collapse to one line in short windows; `n` opens a notice
 browser without resetting the result selection. Mixed results show provider
 labels and selected-row provenance even when columns collapse.
 
+A **theme** is a `theme.Palette`: one colour per fixed role (accent, sky,
+steel, deep, fill, good/warn/bad). `theme.apply()` rebinds the roles and the
+consoles' markup styles; screens read roles at render time and name roles in
+markup, never colours. The appearance also has a focus style (cursor bar or
+filled row) and a density (compact keeps the short-window layout at every
+size via `theme.roomy`). Startup resolves `--theme`, `TORRENT_FINDER_THEME`,
+the saved `settings.appearance`, then Quiet Blue; Settings › Appearance
+previews and saves. See [ADR-0021](docs/adr/0021-themes.md).
+
+Rows may carry styled labels and hints; an `intro` summary sits under a
+header; `?` lists a screen's keys. The main menu groups CONTINUE (the newest
+search; a plain keyword search reopens the field with its query), SEARCH and
+TOOLS, with hints saying what each row will search, and a header status for
+the version, a pending update and this session's network verdict. Search
+progress has a line per provider (`SearchProgress.providers`); the focused
+result shows `result_details.release_tags` and, under Recommended order,
+`result_view.ranking_notes`.
+
 ## Credentials
 
 Optional per-site logins/API keys, read from environment variables or

@@ -2,7 +2,8 @@
 
 Status: accepted (2026-10-04). Amends the presentation details of ADR-0008;
 its responsive rules (one-line selectable rows, progressive table columns,
-live resize) stand.
+live resize) stand. The colour paragraph below is amended by
+[ADR-0021](0021-themes.md): the roles stay, the shades come from a palette.
 
 ## Context
 
