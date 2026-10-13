@@ -164,6 +164,7 @@ class ProfileTests(unittest.TestCase):
              patch.object(main, "record_search"), patch.object(state, "add_history_entry"), \
              patch.object(main, "browse_results", return_value="next"), \
              patch.object(main, "_handle_whats_next", return_value="EXIT"), patch.object(main, "_goodbye"), \
+             patch.object(main, "ProgressScreen"), \
              patch.object(provider, "search_many", return_value=CombinedResults([{"name": "Example"}])):
             main._main_loop(args)
         self.assertEqual(provider.selected_slugs, {"manga"})

@@ -113,6 +113,7 @@ class CredentialRecoveryTests(unittest.TestCase):
              patch.object(app, "consume_update_report", return_value=""), \
              patch.object(app, "history_queries", return_value=[]), \
              patch.object(app, "make_search_screen_renderer") as renderer, \
+             patch.object(app, "ProgressScreen"), \
              patch.object(app, "get_query_with_shortcut", side_effect=RuntimeError("reached prompt")):
             with self.assertRaisesRegex(RuntimeError, "reached prompt"):
                 app._main_loop()
