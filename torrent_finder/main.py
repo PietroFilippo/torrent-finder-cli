@@ -1588,6 +1588,8 @@ def _opened_in_profile_tab() -> bool:
 
 def main() -> None:
     from torrent_finder.search_profiles import ProfileError
+    from torrent_finder.ui import keyboard
+    keyboard.install()  # on Windows a typed "à" stays a letter instead of a special-key prefix
     args = _build_parser().parse_args()
     if args.preview_update:
         _apply_appearance(args)
