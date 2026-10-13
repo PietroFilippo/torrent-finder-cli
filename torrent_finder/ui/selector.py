@@ -454,6 +454,8 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     if message and not bar_message and theme.FRAMED:
         # No message line in this window (compact, or short): the announcement goes under the keys.
         alert_lines += theme.wrap_block(theme._as_text(message), width, console)
+    # Simple has no message line: the announcement is a notice above the key bar.
+    notice = [frames.notice_line(message, width)] if message and not theme.FRAMED else []
     intro_lines = []
     for block in (intro if isinstance(intro, list) else [intro]):
         text = (block.copy() if isinstance(block, Text) else Text.from_markup(block)) if block else Text()
@@ -495,7 +497,7 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
         if context_lines and not compact:
             spacing += 1  # between the context and the keys
         return (header_count + spacing + len(intro_lines) + always_visible_rows + separators
-                + context_lines + len(theme.wrap_keys(key_segments, width)) + len(alert_lines))
+                + context_lines + len(notice) + len(theme.wrap_keys(key_segments, width)) + len(alert_lines))
 
     def with_help(segments: list[Text]) -> list[Text]:
         return theme.with_help(segments, width) if help_key else segments
@@ -603,7 +605,7 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
         lines.append(_row(item, i, i == cursor, multi, geometry, tick))
 
     # The line above the key bar is a rule in roomy windows; spacing stays the same.
-    has_context = bool(item_lines or notice_lines)
+    has_context = bool(item_lines or notice_lines or notice)
     footer_start = len(lines)  # the help, notices and keys
     lines.append(theme.rule(width) if not compact and not has_context else Text(""))
     for block in item_blocks:
@@ -615,6 +617,7 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     bottom_start = len(lines) if item_blocks or detail_lines else footer_start
     for block in context:
         lines.extend(theme.wrap_block(block, width, console))
+    lines.extend(notice)
     if has_context and not compact:
         lines.append(theme.rule(width))
     lines.extend(theme.wrap_keys(shown_keys, width))

@@ -377,18 +377,25 @@ def _render_query_frame(
     if framed and cursor_row:
         cursor_col += 1  # a continuation row starts one cell further in
 
+    # Simple shows the announcement on a notice line above the keys; Athanor on its message line.
+    notice = [_ansi(frames.notice_line(message, width), width)] if message and not theme.FRAMED else []
+    if notice and theme.roomy(height, 12):
+        notice.insert(0, "")  # a row between the field (or the past searches) and the notice
+
     def total() -> int:
-        return len(top) + len(queued) + len(rows) + len(below) + len(footer)
+        return len(top) + len(queued) + len(rows) + len(below) + len(notice) + len(footer)
 
     if total() > height:  # the past searches give way first, all of them below a heading and a row
-        room = height - (len(top) + len(queued) + len(rows) + len(footer))
+        room = height - (len(top) + len(queued) + len(rows) + len(notice) + len(footer))
         blank = 1 if below and not Text.from_ansi(below[0]).plain.strip() else 0
         below = below[:room] if room - blank >= 2 else []
     if total() > height:
-        top = top[:max(1, height - (len(queued) + len(rows) + len(footer)))]
+        top = top[:max(1, height - (len(queued) + len(rows) + len(notice) + len(footer)))]
     if total() > height:  # keep the newest queued titles
-        room = height - len(top) - len(rows) - len(footer)
+        room = height - len(top) - len(rows) - len(notice) - len(footer)
         queued = queued[-room:] if room > 0 else []
+    if total() > height:  # then the notice
+        notice = []
     if total() > height:  # keep the key lines, losing the spacer above them first
         room = height - len(top) - len(queued) - len(rows)
         footer = footer[-room:] if room > 0 else []
@@ -399,7 +406,7 @@ def _render_query_frame(
         rows = rows[first_row:first_row + visible]
         top = top[:max(0, height - len(rows))]
 
-    lines = top + [_ansi(row, width) for row in queued + rows] + below + footer
+    lines = top + [_ansi(row, width) for row in queued + rows] + below + notice + footer
     row_number = len(top) + len(queued) + (cursor_row - first_row) + 1
     if framed:
         texts = [Text.from_ansi(line) for line in lines]
@@ -465,7 +472,8 @@ def get_query_with_shortcut(
     hist = history or []
     # Taken only when this screen has a message line to show it on; otherwise it waits for one.
     announcement = (frames.take_message()
-                    if screen_renderer is not None and theme.bars(console.size.width, console.size.height) else "")
+                    if screen_renderer is not None and frames.shows_message(console.size.width, console.size.height)
+                    else "")
     hpos = -1          # the chosen past search in `matches`, -1 while typing
     stash = ""         # what was typed before ↑ started walking past searches
     matches: list[str] = []

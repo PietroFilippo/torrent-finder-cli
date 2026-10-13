@@ -130,6 +130,25 @@ def message_line(message: "str | Text", width: int) -> Text:
     return line
 
 
+def shows_message(width: int, height: int) -> bool:
+    """True when a screen this size has a place for an announcement.
+
+    Athanor shows it on the message line, so a framed window needs its bars;
+    Simple shows it on a notice line above the key bar at any size.
+    """
+    return theme.bars(width, height) or not theme.FRAMED
+
+
+def notice_line(message: "str | Text", width: int) -> Text:
+    """Simple's notice: the newest announcement on one line above the key bar, in the text colour."""
+    line = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
+    line.append_text(theme._as_text(message))
+    line.stylize_before("bold")
+    if cell_len(line.plain) > width:
+        line.truncate(width, overflow="ellipsis")
+    return line
+
+
 def _figures() -> list[tuple[str, str]]:
     """``Searches 128``, ``Picked 37``, ``Bookmarks 3``, ``T 842``: what the status line counts."""
     figures = []

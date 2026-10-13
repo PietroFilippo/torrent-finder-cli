@@ -277,8 +277,13 @@ def _table_caption(
     picked: "frozenset[int]",
     expanded: bool = False,
     describe=None,
+    announcement: str = "",
 ) -> Text:
-    """Details for the focused row, then the key bar, under the left margin."""
+    """Details for the focused row, then the key bar, under the left margin.
+
+    *announcement* is Simple's notice line above the key bar (Athanor shows it
+    on the message line instead).
+    """
     width = console.size.width
     caption = Text(no_wrap=False, overflow="fold")
     tiny = _tiny()
@@ -294,6 +299,10 @@ def _table_caption(
         if cell_len(legend) > room:  # one line, always: the row budget counts one
             legend = ellipsize_cells("Apibay* = cached results", room)
         caption.append(theme.MARGIN + legend + "\n", style=theme.WARN)
+    if announcement:  # set apart from the details by a row when the window has one
+        caption.append("\n" if theme.roomy(_rows(), 20) else "")
+        caption.append_text(frames.notice_line(announcement, width))
+        caption.append("\n")
     if theme.roomy(_rows(), 20):  # short windows keep the row for results
         caption.append_text(theme.rule(width))
         caption.append("\n")
@@ -346,7 +355,7 @@ def _details_lines(rows: list[dict], layout: _TableLayout, show_from: bool, desc
 
 def _visible_count(
     total: int, height: int, width: int, note: str, show_from: bool, show_provider: bool = False,
-    heading: str = "", rows: list[dict] | None = None, indexes=(), describe=None,
+    heading: str = "", rows: list[dict] | None = None, indexes=(), describe=None, announcement: str = "",
 ) -> int:
     """Return rows that fit after the header, notices, details and key bar.
 
@@ -374,6 +383,7 @@ def _visible_count(
         + 1                                  # table header row
         + (0 if tiny else 1) + details       # spacer, name and metadata
         + (0 if tiny else 1) + (0 if compact else 1) + keys  # cached note, spacer, keys
+        + ((2 if not compact else 1) if announcement else 0)  # Simple's notice line and its spacer
     )
     available = max(1, height - chrome)
     return min(total, available)
@@ -395,6 +405,7 @@ def build_table(
     expanded: bool = False,
     detail_offset: int = 0,
     describe=None,
+    announcement: str = "",
 ) -> Table:
     """Build a borderless result table whose columns collapse by width."""
     width = console.size.width
@@ -414,7 +425,7 @@ def build_table(
         show_lines=False,
         width=width - 1 if layout.mode == "minimal" else None,
         caption=_table_caption(
-            results, selected_idx, layout, show_from, total_pages, picked, expanded, describe
+            results, selected_idx, layout, show_from, total_pages, picked, expanded, describe, announcement
         ),
         caption_justify="left",
     )
@@ -616,12 +627,17 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     page_items = page_results()
     total = len(page_items)
     global_offset = current_page * RESULTS_PER_PAGE
+    # The Athanor message line while the table is open (Simple: a notice above the keys); without one, the
+    # message waits for a screen that has it.
+    announcement = frames.take_message() if frames.shows_message(console.size.width, console.size.height) else ""
+    simple_notice = "" if theme.FRAMED else announcement
 
     def _fit_rows() -> int:
         """Result rows that fit now, measuring this page's tallest details block."""
         return _visible_count(total, console.size.height, console.size.width, note, show_from,
                               show_provider, heading=heading, rows=page_items,
-                              indexes=view_indexes[global_offset:global_offset + total], describe=notes())
+                              indexes=view_indexes[global_offset:global_offset + total], describe=notes(),
+                              announcement=simple_notice)
 
     # Reserve room for the header, notices, details and key bar.
     visible_count = _fit_rows()
@@ -630,8 +646,6 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     scroll_offset = min(current, max(scroll_offset, current - visible_count + 1))
     expanded, detail_offset, saved_scroll = False, 0, 0
     feedback, feedback_style = "", theme.WARN  # a one-line outcome; green when it worked
-    # The Athanor message line while the table is open; without one, the message waits for a screen that has it.
-    announcement = frames.take_message() if theme.bars(console.size.width, console.size.height) else ""
 
     # Marquee state shared with the ticker thread
     marquee_state = {
@@ -694,7 +708,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
             current_page, total_pages, global_offset, tick=0,
             picked=frozenset(picked), show_from=show_from,
             original_indices=view_indexes[global_offset:global_offset + total],
-            expanded=expanded, detail_offset=detail_offset, describe=notes(),
+            expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice,
         )),
         console=console,
         refresh_per_second=15,
@@ -750,7 +764,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         current_page, total_pages, global_offset, tick=new_tick,
                         picked=frozenset(picked), show_from=show_from,
                         original_indices=view_indexes[global_offset:global_offset + total],
-                        expanded=expanded, detail_offset=detail_offset, describe=notes(),
+                        expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice,
                     ))
                 )
 
@@ -1019,7 +1033,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         tick=marquee_state["tick"],
                         picked=frozenset(picked), show_from=show_from,
                         original_indices=view_indexes[global_offset:global_offset + total],
-                        expanded=expanded, detail_offset=detail_offset, describe=notes(),
+                        expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice,
                     ))
                 )
         finally:
