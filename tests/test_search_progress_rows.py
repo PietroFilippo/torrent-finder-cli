@@ -83,8 +83,7 @@ class ProgressFrameTests(unittest.TestCase):
         screen = Console(file=io.StringIO(), width=width, height=height, color_system=None)
         with patch.object(search_progress, "console", screen):
             frame = search_progress.progress_frame("Search across providers › dune",
-                                                   "Searching 3 providers for: dune",
-                                                   ["Results appear when the search finishes or after 30 seconds."],
+                                                   "", ["3 providers · results appear when the search finishes or after 30 seconds."],
                                                    progress, 4.2, "Contacting providers…")
         screen.print(frame)
         return frame, screen.file.getvalue().rstrip("\n").split("\n")

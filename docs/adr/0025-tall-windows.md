@@ -22,15 +22,23 @@ grid.
 In roomy windows (comfortable density, past the selector's short-window
 threshold), every selector screen:
 
-- **keeps its footer on the bottom rows**: the focused row's help, notices,
-  the rule and the key bar sit at the bottom of the frame, above the tip;
-  the list stays at the top. The key bar is in the same place on every
-  screen, whatever the length of the list. With the inspector pane, the
-  footer is at the bottom of the list column.
+- **keeps its key bar on the bottom rows**: the screen's notices, the rule
+  and the key bar sit at the bottom of the frame, above the tip; the list
+  stays at the top. The key bar is in the same place on every screen,
+  whatever the length of the list. With the inspector pane, the key bar is
+  at the bottom of the list column.
 - **shows the focused row's details below the list when there is no room
   beside it**: the `SelectItem.inspect` lines the pane shows in wide windows
-  go above the key bar, in rows the list leaves empty (one row stays between
-  them), cut with "…" when they do not fit. They never cost list rows.
+  go under the focused row's help, in rows the list leaves empty (one row
+  stays between them), cut with "…" when they do not fit. They never cost
+  list rows.
+
+*Amended 2026-10-13.* At first the focused row's help and its details sat
+with the key bar on the bottom rows, so a four-row menu in a 36-row window
+put its help seventeen rows below the row it described. Now the help and
+details follow the list, one row under it, and the rows the list leaves
+empty come after them, before the notices, rule and keys. Short windows and
+compact density are unchanged: they had no empty rows to move.
 
 Settings' rows got such details (the appearance in use, the terminal command,
 the network check), split out of the main menu's Settings row.

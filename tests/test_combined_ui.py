@@ -121,7 +121,7 @@ class CombinedUITests(unittest.TestCase):
         self.assertEqual(history.call_args.kwargs["search_profile"], provider.snapshot())
         output = "\n".join(str(call.args[0]) for call in console.print.call_args_list)
         output += Text.from_ansi(frames.getvalue()).plain  # the progress screen's frames
-        self.assertIn("Searching 2 providers for:", output)
+        self.assertIn("2 providers · results appear", output)  # the frame names the search; the note counts
         self.assertIn("Enter view results so far", output)
         self.assertNotIn("Searching Search across providers", output)
         self.assertNotIn("Ctrl+F", output)

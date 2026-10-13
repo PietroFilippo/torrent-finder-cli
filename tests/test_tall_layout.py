@@ -45,8 +45,11 @@ class FooterTests(unittest.TestCase):
                 self.assertLessEqual(row_of(lines, "Appearance"), 3)
                 keys = row_of(lines, "Enter select")
                 self.assertGreaterEqual(keys, 33)  # the last rows, above the Athanor frame's bottom lines
-                self.assertLess(row_of(lines, "Back"), row_of(lines, "Theme colours and spacing.") - 5)
-                self.assertEqual(row_of(lines, "Theme colours and spacing."), keys - 2)  # help, rule, keys
+                # The focused row's help stays under the list; the empty rows come before the rule and keys.
+                self.assertEqual(row_of(lines, "Theme colours and spacing."), row_of(lines, "Back") + 2)
+                rule = lines[keys - 1].strip("║ ")
+                self.assertEqual(rule, theme.RULE * len(rule))
+                self.assertTrue(all(not line.strip("║ ") for line in lines[row_of(lines, "Back") + 3:keys - 1]))
 
     def test_the_tip_stays_on_the_last_rows_below_the_keys(self):
         theme.apply("quiet", focus="bar", density="comfortable")
@@ -78,10 +81,10 @@ class DetailsBelowTests(unittest.TestCase):
     def setUp(self):
         theme.apply("quiet", focus="bar", density="comfortable")
 
-    def test_a_tall_narrow_window_shows_the_details_above_the_keys(self):
+    def test_a_tall_narrow_window_shows_the_details_under_the_help(self):
         lines = frame(menu(self.DETAILS), 0, 100, 40)
-        self.assertLess(row_of(lines, "Theme colours"), row_of(lines, "APPEARANCE"))
-        self.assertLess(row_of(lines, "Focus       Cursor bar"), row_of(lines, "Enter select"))
+        self.assertEqual(row_of(lines, "APPEARANCE"), row_of(lines, "Theme colours") + 2)
+        self.assertLess(row_of(lines, "Focus       Cursor bar"), row_of(lines, "Enter select") - 5)
         self.assertTrue(lines[row_of(lines, "APPEARANCE")].startswith(theme.MARGIN + "APPEARANCE"))
 
     def test_details_never_cost_list_rows(self):
@@ -92,7 +95,9 @@ class DetailsBelowTests(unittest.TestCase):
         self.assertNotIn("detail 39", "\n".join(lines))
         lines = frame(menu([f"detail {n}" for n in range(40)]), 0, 100, 40)
         self.assertIn("detail 0", "\n".join(lines))
-        self.assertEqual(lines[row_of(lines, "Enter select") - 2].strip(), "…")  # cut short above the rule
+        keys = row_of(lines, "Enter select")
+        self.assertEqual(lines[keys - 3].strip(), "…")  # cut short; one empty row stays above the rule and keys
+        self.assertEqual(lines[keys - 2].strip(), "")
 
     def test_wide_windows_keep_them_in_the_pane_and_short_ones_leave_them_out(self):
         wide = frame(menu(self.DETAILS), 0, 200, 40)

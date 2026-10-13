@@ -848,8 +848,9 @@ apps, so:
   your recent searches there and how often you searched and picked from it;
   Continue's earlier searches; which logins are set; the download folder's free
   space; the appearance in use. Other menus show the row's help there.
-- **Tall windows** put those details under the list, and the help and key bar
-  on the bottom rows, in the same place on every screen.
+- **Tall windows** put those details under the list: the row's help and
+  details follow the list, and the key bar sits on the bottom rows, in the
+  same place on every screen.
 - **Narrow or short windows** wrap hints without changing row height, drop
   spacer lines, continue long screen names on a second header line, and scroll
   long names when focused. Very small windows (about 20×8) crop the results

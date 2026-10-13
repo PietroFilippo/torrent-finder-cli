@@ -1475,14 +1475,16 @@ def _main_loop(args=None) -> None:
         # by-creator search path.
         shown = ", ".join(queries)
         combined = getattr(provider, "is_combined", False)
+        # The header names the provider and the search (``Provider › query``);
+        # the intro adds only what it does not say.
         if combined:
             # CLI -q can reach this screen before the lazy profile is loaded.
             count = sum(p.slug in provider.selected_slugs for p in provider.children)
-            intro = (f"Searching {count} provider{'s' if count != 1 else ''} for: "
-                     f"[highlight]{escape(shown)}[/highlight]")
-            notes = ["Results appear when the search finishes or after 30 seconds."]
+            intro = ""
+            notes = [f"{count} provider{'s' if count != 1 else ''} · "
+                     "results appear when the search finishes or after 30 seconds."]
         else:
-            intro = f"Searching {escape(provider.name)} for: [highlight]{escape(shown)}[/highlight]"
+            intro = ""
             notes = [escape(provider.search_note)] if getattr(provider, "search_note", "") else []
             notes.append("30 s search limit; Enter shows the results received so far.")
 

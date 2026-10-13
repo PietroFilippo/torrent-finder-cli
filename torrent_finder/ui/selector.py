@@ -604,11 +604,15 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
 
     # The line above the key bar is a rule in roomy windows; spacing stays the same.
     has_context = bool(item_lines or notice_lines)
-    footer_start = len(lines)  # the help, notices and keys: in roomy windows they sit at the bottom
+    footer_start = len(lines)  # the help, notices and keys
     lines.append(theme.rule(width) if not compact and not has_context else Text(""))
     for block in item_blocks:
         lines.extend(theme.wrap_block(block, width, console))
     lines.extend(detail_lines)
+    # In roomy windows the focused row's help and details stay under the list,
+    # and the rows the list leaves empty go between them and the bottom block:
+    # the screen's notices, the rule and the key bar.
+    bottom_start = len(lines) if item_blocks or detail_lines else footer_start
     for block in context:
         lines.extend(theme.wrap_block(block, width, console))
     if has_context and not compact:
@@ -636,7 +640,7 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
             tip_lines = []
         if len(pane) > rows:
             pane = pane[:max(0, rows - 1)] + [Text("…", style=theme.MUTED)]
-        body = settle(body, rows - (1 if tip_lines else 0), footer_start - body_start)
+        body = settle(body, rows - (1 if tip_lines else 0), bottom_start - body_start)
         rows = max(rows, len(body))
         lines = lines[:body_start] + [_beside(body[i] if i < len(body) else None,
                                               pane[i] if i < len(pane) else None, width)
@@ -645,7 +649,7 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
         if tip_lines and height - len(lines) - len(tip_lines) < 1:
             tip_lines = []
         below = [Text("")] + tip_lines if tip_lines else []
-        lines = settle(lines, height - len(below), footer_start)
+        lines = settle(lines, height - len(below), bottom_start)
         if tip_lines:
             lines += [Text("")] * (height - len(lines) - len(tip_lines)) + tip_lines
     lines = lines[:height]  # a window too small for every control keeps its top rather than scrolling

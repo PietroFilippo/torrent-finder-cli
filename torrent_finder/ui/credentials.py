@@ -372,8 +372,7 @@ def credentials_menu() -> None:
             banner=_make_banner_panel(),
             footer=(
                 (escape(problem) + "\n" if problem else "")
-                + t("Stored in subtitle_credentials.json (gitignored, plaintext) — "
-                    "holds all of these. Env vars override the file.")
+                + t("Stored in plaintext in subtitle_credentials.json; environment variables override it.")
             ),
             start_index=1,
         )

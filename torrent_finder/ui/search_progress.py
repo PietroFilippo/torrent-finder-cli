@@ -159,7 +159,7 @@ def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: 
     height = theme.view_height(full_height, width)  # rows inside the Athanor chrome
     seconds = int(elapsed)
     top: list[Text] = theme.frame_header(title, f"{seconds}s", width, full_height)
-    intro_lines = theme.wrap_block(Text.from_markup(intro), width, console)
+    intro_lines = theme.wrap_block(Text.from_markup(intro), width, console) if intro else []
     note_lines = [line for note in notes
                   for line in theme.wrap_block(Text.from_markup(note, style=theme.MUTED), width, console)]
 

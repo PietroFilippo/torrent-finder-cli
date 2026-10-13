@@ -192,8 +192,7 @@ def _scenarios():
         )
         progress = SearchProgress(2, 3, 28, ("Anime",), providers)
         frame = progress_frame("Search across providers › dune part two",
-                               "Searching 3 providers for: [highlight]dune part two[/highlight]",
-                               ["Results appear when the search finishes or after 30 seconds."],
+                               "", ["3 providers · results appear when the search finishes or after 30 seconds."],
                                progress, 4.2, "Contacting selected providers…")
         buffer_console(sys.stdout, console.size.width, console.size.height).print(frame)
 

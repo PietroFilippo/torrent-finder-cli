@@ -53,8 +53,7 @@ def search_shortcuts_line(has_history: bool) -> str:
     history = "  •  ↑/↓ recent" if has_history else ""
     return (
         "Enter search  •  Ctrl+F filters"
-        f"  •  {MULTI_ADD_KEY_LABEL} add another title  •  Tab actions "
-        f"(bookmarks, backup, history, more){history}  •  "
+        f"  •  {MULTI_ADD_KEY_LABEL} add another title  •  Tab actions{history}  •  "
         "Esc back / undo title"
     )
 
@@ -1709,13 +1708,13 @@ def download_method_prompt(
             ep_label = (
                 f"Change selection ({n_sel} picked)"
                 if has_selection
-                else "Browse torrent files… (episode selection, useful for anime/series)"
+                else "Browse torrent files…"
             )
             items.append(SelectItem(
                 label=ep_label,
                 value="pick_episodes",
                 is_action=True,
-                hint=_install_hint("aria2c", aria_available),
+                hint=_install_hint("aria2c", aria_available) or ("" if has_selection else "pick episodes or files"),
                 passive=not aria_available,
                 description=(
                     "Browse every file in the torrent and pick any subset. "
@@ -2267,9 +2266,15 @@ def _section_row(label: str) -> SelectItem:
 
 
 def home_status(update_status: str = "") -> str:
-    """The main menu's header status: version, a pending update, the network check's verdict."""
+    """The main menu's header status: version, a pending update, the network check's verdict.
+
+    The Athanor status line already ends in the version and the network verdict,
+    so under it the header keeps only the update.
+    """
     from torrent_finder import __version__
     from torrent_finder.security import exposure_label
+    if theme.bars(console.size.width, console.size.height):
+        return f"[warn]{escape(update_status)}[/warn]" if update_status else ""
     parts = [f"v{escape(str(__version__))}"]
     if update_status:
         parts.append(f"[warn]{escape(update_status)}[/warn]")

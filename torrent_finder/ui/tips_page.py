@@ -27,8 +27,7 @@ def _tip_item(category: TipCategory, tip: Tip) -> SelectItem:
         value=("tip", category.name, tip),
         enabled=True,
         passive=True,
-        hint=", ".join(tip.tags),
-        description=f"Category: {category.name}",
+        hint=", ".join(tip.tags),  # the category is the section header above the tip
     )
 
 
@@ -131,9 +130,9 @@ def tips_page() -> None:
 
     def _footer() -> str:
         category = _CATEGORY_OPTIONS[state["category_idx"]]
-        query_label = escape(state["query"]) if state["query"] else "none"
+        search = f"Search: {escape(state['query'])}\n" if state["query"] else ""  # the key bar says / search
         return (
-            f"Search: {query_label}\n"
+            f"{search}"
             "↑/↓ scroll  •  / search  •  "
             f"C category: {escape(category)}  •  X clear  •  Esc back"
         )
