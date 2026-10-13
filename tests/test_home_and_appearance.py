@@ -298,6 +298,27 @@ class AppearanceMenuTests(unittest.TestCase):
         self.assertIn("iTerm2", appearance.light_scheme_help("darwin"))
         self.assertIn("preferences", appearance.light_scheme_help("linux"))
 
+    def test_the_background_note_shows_only_while_it_is_true(self):
+        from torrent_finder import terminal_profile
+
+        def footer(installed: bool, in_profile: bool = False) -> str:
+            captured = {}
+            with patch("torrent_finder.ui.selector.arrow_select",
+                       side_effect=lambda items, **kw: captured.update(kw, items=items)), \
+                 patch.object(terminal_profile, "installed", return_value=installed), \
+                 patch.object(terminal_profile, "in_profile", return_value=in_profile):
+                appearance.appearance_menu()
+                return captured["footer"]()  # the footer is a closure: read it while the patches hold
+
+        theme.apply("quiet")  # Simple: the terminal's own background, profile or not
+        self.assertIn(appearance.BACKGROUND_NOTE, footer(installed=False))
+        self.assertIn(appearance.BACKGROUND_NOTE, footer(installed=True))
+        theme.apply("citrinitas")  # Athanor: true until the profile gives the page and painting
+        self.assertIn(appearance.BACKGROUND_NOTE, footer(installed=False))
+        self.assertNotIn(appearance.BACKGROUND_NOTE, footer(installed=True))
+        self.assertNotIn(appearance.PROFILE_NOTE, footer(installed=True))
+        self.assertIn(appearance.PROFILE_NOTE, footer(installed=True, in_profile=True))
+
 
 if __name__ == "__main__":
     unittest.main()

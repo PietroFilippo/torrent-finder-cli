@@ -562,7 +562,11 @@ def appearance_menu() -> None:
             lines.append(f"{ENV} chooses the theme at startup; the saved theme applies when it is unset.")
         elif source == "cli":
             lines.append("This run uses --theme; the saved theme applies to later runs.")
-        lines.append(PROFILE_NOTE if terminal_profile.in_profile() else BACKGROUND_NOTE)
+        if terminal_profile.in_profile():
+            lines.append(PROFILE_NOTE)
+        elif design_of(state["preview"]) != "athanor" or not terminal_profile.installed():
+            # True for Simple, and for Athanor until its profile gives the page and painting.
+            lines.append(BACKGROUND_NOTE)
         lines.append("↑/↓ navigate  •  Enter apply  •  Space preview  •  Esc back")
         return "\n".join(lines)
 
