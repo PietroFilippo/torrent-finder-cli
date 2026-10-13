@@ -438,6 +438,10 @@ class EntryCheckTests(unittest.TestCase):
     def test_context_terms_budgets_and_plural_shapes(self):
         self.assertIn("glossary", self.problems("Off", "Desligado", ctx="engine mode"))
         self.assertIn("glossary", self.problems("Download finished", "Transferência concluída"))
+        # A menu label led by a word that is also a key name is not a key bar.
+        self.assertEqual(self.problems("Delete current profile…", "Excluir perfil atual…"), [])
+        self.assertEqual(self.problems("Enter known names manually", "Digitar nomes conhecidos manualmente"), [])
+        self.assertIn("keys", self.problems("Esc back", "Voltar", ctx="key bar"))
         self.assertEqual(self.problems("Copied to the clipboard", "Copiado para a área de transferência"), [])
         self.assertEqual(self.problems("Off", "Nunca", ctx="engine mode"), [])
         self.assertIn("budget", self.problems("Age", "Idade aproximada", budget=5))

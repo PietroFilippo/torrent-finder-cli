@@ -538,8 +538,13 @@ def _tags(text: str) -> list[str]:
     return [tag for slashes, tag in _RICH_TAG.findall(text) if len(slashes) % 2 == 0]
 
 
-def _key_bar(text: str) -> list[str] | None:
-    """The keys of a key-bar message, as the app's footer parser reads them; None for prose."""
+def _key_bar(text: str, ctx: str = "") -> list[str] | None:
+    """The keys of a key-bar message, as the app's footer parser reads them; None for prose.
+
+    One segment led by a key that is also an English word ("Delete current
+    profile…", "Enter known names manually") is a menu label unless its
+    context says ``key bar``.
+    """
     from torrent_finder.ui import theme
     try:
         footer = theme.parse_footer(text)
@@ -549,7 +554,8 @@ def _key_bar(text: str) -> list[str] | None:
         return None
     keys = [segment.plain.split(" ", 1) for segment in footer.keys]
     lone = len(keys) == 1 and len(keys[0][0]) == 1 and len(keys[0][1].split()) > 3
-    return None if lone else [key for key, _action in keys]  # "A raven arrives: …" is prose
+    worded = len(keys) == 1 and keys[0][0].isalpha() and len(keys[0][0]) > 1 and ctx != "key bar"
+    return None if lone or worded else [key for key, _action in keys]  # "A raven arrives: …" is prose
 
 
 def pair_problems(english: str, text: str, where: str, message: Message, form: str = "") -> list[Problem]:
@@ -588,8 +594,8 @@ def pair_problems(english: str, text: str, where: str, message: Message, form: s
     for key in _PRESS_KEY.findall(english):
         if not re.search(rf"(?<![\w+]){re.escape(key)}(?![\w+])", text):
             report("protected", f"keep the key {key!r}")
-    english_keys = _key_bar(english)
-    if english_keys is not None and _key_bar(text) != english_keys:
+    english_keys = _key_bar(english, message.ctx)
+    if english_keys is not None and _key_bar(text, message.ctx) != english_keys:
         report("keys", f"must read as the keys {english_keys} in the same order (an action starts with a plain "
                        f"letter: A-Z, a digit or '(')")
     if message.budget is not None and _cells(text) > message.budget:
