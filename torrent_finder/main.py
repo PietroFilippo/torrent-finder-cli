@@ -599,6 +599,7 @@ def browse_results(provider, results, note: str = "") -> str:
     child process or cancel event. This boundary catches any remaining nested
     menu/status interrupt so it can never fall through to ``main()`` and exit.
     """
+    note = _history_notice(provider, note)
     while True:
         try:
             return _browse_results(provider, results, note=note)
@@ -976,8 +977,28 @@ def _history_pick(entry):
     stored facet is gone (caller then treats ``value`` as a keyword fallback).
     """
     prov = get_provider(entry.get("provider", "") or "")
-    if getattr(prov, "is_combined", False) and isinstance(entry.get("search_profile"), dict):
-        prov.restore_history(entry["search_profile"])
+    if prov is not None and not entry.get("_history_current_filters"):
+        if getattr(prov, "is_combined", False):
+            if isinstance(entry.get("search_profile"), dict):
+                prov.restore_history(entry["search_profile"])
+        else:
+            # Only required preset names were recorded. Keep engines, preferences
+            # and other settings current, on a copy confined to this replay.
+            from copy import copy
+            current = prov
+            prov = copy(current)
+            prov._history_original = current
+            names = entry.get("presets", [])
+            available = {p.name: p for p in prov.presets}
+            prov.active_presets = [p for p in prov.presets if p.name in names]
+            missing = [name for name in names if name not in available]
+            prov._history_notice = ""
+            if set(names) != {p.name for p in current.active_presets} or missing:
+                labels = ", ".join(p.label for p in prov.active_presets) or t("No presets")
+                prov._history_notice = (
+                    t("Using the filters from then: {names}; skipped missing filters: {missing}. Your saved filters are unchanged.",
+                      names=labels, missing=", ".join(missing)) if missing else
+                    t("Using the filters from then: {names}. Your saved filters are unchanged.", names=labels))
     if entry.get("kind") == "creator":
         facet = None
         if prov:
@@ -986,6 +1007,19 @@ def _history_pick(entry):
     aliases = entry.get("queries")
     return prov, None, (aliases if isinstance(aliases, list) and aliases and
                        all(isinstance(q, str) and q.strip() for q in aliases) else entry.get("query", ""))
+
+
+def _history_notice(provider, note: str = "") -> str:
+    """Surface a replay's explanation on the current design's notice line."""
+    from rich.markup import escape
+    from torrent_finder.ui import chrome as frames
+    message = escape(getattr(provider, "_history_notice", ""))
+    if message:
+        if theme.FRAMED:
+            frames.announce(message)
+        else:
+            note = "\n".join(filter(None, (message, note)))
+    return note
 
 
 def _bookmarks_flow(cli_filters=None):
@@ -1116,6 +1150,7 @@ def _handle_whats_next(current_provider, cli_filters=None, on_update=None):
     seeds the by-creator one-shot); otherwise it's None and ``query`` drives a
     normal search.
     """
+    current_provider = getattr(current_provider, "_history_original", current_provider)
     while True:
         choice = search_again_prompt()
         if choice in (None, "exit"):
@@ -1494,6 +1529,8 @@ def _main_loop(args=None) -> None:
 
     while True:
         poll_update()
+        if not query and cli_facet is None:
+            current_provider = getattr(current_provider, "_history_original", current_provider)
         # One-shot CLI creator search (--by/--name): jump into the by-creator
         # flow, then fall into the normal what's-next / keyword loop.
         if cli_facet is not None and pending_creator_name is not None:
@@ -1507,6 +1544,7 @@ def _main_loop(args=None) -> None:
                 )
             except KeyboardInterrupt:
                 creator_outcome = "back"
+            current_provider = getattr(current_provider, "_history_original", current_provider)
             if creator_outcome == "next":
                 res = _handle_whats_next(current_provider, cli_filters, run_pending_update if update_info else None)
                 if res == "EXIT":
@@ -1775,7 +1813,7 @@ def _main_loop(args=None) -> None:
             stop_listener.set()
 
         if cancel_event.is_set():
-            notice_msg = t('[warning] Search cancelled — returning to the prompt.[/warning]\n')
+            notice_msg = _history_notice(provider, t('[warning] Search cancelled — returning to the prompt.[/warning]\n'))
             clear_screen()
             query = None
             continue
@@ -1787,7 +1825,7 @@ def _main_loop(args=None) -> None:
         if not results and getattr(results, "session", None) is None:
             from rich.markup import escape
             message = search_result.get("error") or "\n".join([t('No results found.'), *notices])
-            notice_msg = f"[warning] {escape(message)}[/warning]\n"
+            notice_msg = _history_notice(provider, f"[warning] {escape(message)}[/warning]\n")
             clear_screen()
             query = None
             continue
@@ -1823,10 +1861,11 @@ def _main_loop(args=None) -> None:
         # results table steps back to the keyword prompt; a completed download
         # proceeds to "what's next?".
         frames.clear_messages()
-        frames.announce(tn('You find {n} result for {queries}.',
-            'You find {n} results for {queries}.',
-            len(results),
-            queries=escape(', '.join(queries))))
+        if not getattr(provider, "_history_notice", ""):
+            frames.announce(tn('You find {n} result for {queries}.',
+                'You find {n} results for {queries}.',
+                len(results),
+                queries=escape(', '.join(queries))))
         if browse_results(provider, results, note=note) == "back":
             query = None
             clear_screen()

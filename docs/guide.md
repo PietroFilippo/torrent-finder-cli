@@ -780,8 +780,10 @@ the other providers index few anime fansubs.
 **H** on the main menu (or **Tab → H**). Each entry shows the provider, when, and
 the presets active then; filter by provider (**P**), date (**D**: today, week,
 month) or kind (**T**: keyword or by-creator) and change the sort (**S**).
-Picking one runs it again; a search across providers brings back its profile's
-settings. The last 2,000 distinct searches are kept, and repeating a search
+**Enter** runs it with the presets recorded then for that run only; **C** uses
+current filters instead. Missing presets are skipped and named in a notice;
+saved filters stay unchanged, and Enter on a search across providers still
+brings back its profile's settings in memory. The last 2,000 distinct searches are kept, and repeating a search
 moves it to the top. **/** finds searches by text, **X** (or **Delete**)
 removes the focused one and **U** puts the last removed one back. Clearing all
 history asks first.

@@ -123,6 +123,7 @@ def history_select_prompt() -> dict | None:
     history = load_history()
     notice = ""  # shown above the footer, e.g. a failed Clear history
     removed: "tuple[dict, int] | None" = None  # the last entry removed with x, and where it was: u puts it back
+    current_filters = False  # selection metadata only; never written into history
 
     # --- helpers to build / rebuild the items list in place ---
 
@@ -203,8 +204,8 @@ def history_select_prompt() -> dict | None:
     def _footer():
         prov_filter, date_filter, sort_order, type_filter = _current_filters()
         search = t("Search: {query}\n", query=escape(fstate["search"])) if fstate["search"] else ""
-        keys = (t("↑/↓ navigate  •  Enter re-run  •  / search  •  X remove  •  U undo  •  Esc back")
-                if removed else t("↑/↓ navigate  •  Enter re-run  •  / search  •  X remove  •  Esc back"))
+        keys = (t("↑/↓ navigate  •  Enter saved filters  •  C current filters  •  / search  •  X remove  •  U undo  •  Esc back")
+                if removed else t("↑/↓ navigate  •  Enter saved filters  •  C current filters  •  / search  •  X remove  •  Esc back"))
         return (
             (notice + "\n" if notice else "")
             + search
@@ -215,6 +216,13 @@ def history_select_prompt() -> dict | None:
         )
 
     # --- key_action callbacks (cycle filter + rebuild in-place) ---
+
+    def _current(cursor, items_list):
+        nonlocal current_filters
+        if not isinstance(items_list[cursor].value, dict):
+            return True
+        current_filters = True
+        return cursor
 
     def _cycle(key_name: str, options_len: int):
         """Return a key_action callback that cycles fstate[key_name]."""
@@ -316,6 +324,8 @@ def history_select_prompt() -> dict | None:
         on_action=on_action,
         footer=_footer,
         key_actions={
+            "C": _current,
+            "c": _current,
             "P": _cycle("prov_idx", len(_PROVIDER_OPTIONS)),
             "p": _cycle("prov_idx", len(_PROVIDER_OPTIONS)),
             "D": _cycle("date_idx", len(_DATE_OPTIONS)),
@@ -338,7 +348,7 @@ def history_select_prompt() -> dict | None:
 
     selected = items[result].value
     if isinstance(selected, dict):
-        return selected
+        return dict(selected, _history_current_filters=True) if current_filters else selected
 
     return None
 

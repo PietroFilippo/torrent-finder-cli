@@ -16,8 +16,6 @@
   "Clear history": "Limpar histórico",
   "Search History": "Histórico de buscas",
   "Search: {query}\n": "Busca: {query}\n",
-  "↑/↓ navigate  •  Enter re-run  •  / search  •  X remove  •  U undo  •  Esc back": "↑/↓ navegar  •  Enter repetir  •  / buscar  •  X remover  •  U desfazer  •  Esc voltar",
-  "↑/↓ navigate  •  Enter re-run  •  / search  •  X remove  •  Esc back": "↑/↓ navegar  •  Enter repetir  •  / buscar  •  X remover  •  Esc voltar",
   "P provider: {provider}  •  T type: {type}  •  D date: {date}  •  S sort: {sort}": "P categoria: {provider}  •  T tipo: {type}  •  D data: {date}  •  S ordenar: {sort}",
   "Search history": "Histórico de buscas",
   "Matches the search text, saved names, creator names and providers; empty clears the search.": "Busca no texto, nos nomes salvos, nos criadores e nas categorias; vazio limpa a busca.",

@@ -1,0 +1,6 @@
+{
+  "↑/↓ navigate  •  Enter saved filters  •  C current filters  •  / search  •  X remove  •  U undo  •  Esc back": "↑/↓ navegar  •  Enter usar filtros de antes  •  C usar filtros atuais  •  / buscar  •  X remover  •  U desfazer  •  Esc voltar",
+  "↑/↓ navigate  •  Enter saved filters  •  C current filters  •  / search  •  X remove  •  Esc back": "↑/↓ navegar  •  Enter usar filtros de antes  •  C usar filtros atuais  •  / buscar  •  X remover  •  Esc voltar",
+  "Using the filters from then: {names}. Your saved filters are unchanged.": "Usando os filtros de antes: {names}. Seus filtros salvos continuam iguais.",
+  "Using the filters from then: {names}; skipped missing filters: {missing}. Your saved filters are unchanged.": "Usando os filtros de antes: {names}; filtros ausentes ignorados: {missing}. Seus filtros salvos continuam iguais."
+}
