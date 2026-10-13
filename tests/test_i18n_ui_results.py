@@ -186,7 +186,7 @@ class ResultsLanguageTests(unittest.TestCase):
             def __init__(self, renderable, **kwargs): frames.append(renderable)
             def __enter__(self): return self
             def __exit__(self, *args): pass
-            def update(self, renderable): frames.append(renderable)
+            def update(self, renderable, *, refresh=False): frames.append(renderable)
 
         def draw(summary):
             frames.clear()

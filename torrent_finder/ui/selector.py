@@ -13,7 +13,7 @@ from rich.console import Group
 from rich.text import Text
 
 from torrent_finder.constants import buffer_console, console
-from torrent_finder.i18n import N_, t
+from torrent_finder.i18n import N_, t, current as current_language
 from torrent_finder.ui import chrome as frames, display, theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 
@@ -187,12 +187,6 @@ def _screen_width() -> int:
     return getattr(_layout, "width", None) or console.size.width
 
 
-def _list_width(items: list["SelectItem"]) -> "int | None":
-    """The list column's width when the window shows the inspector beside *items*, else None."""
-    pane = theme.inspector_width(console.size.width) if any(_has_details(item) for item in items) else 0
-    return console.size.width - pane - _PANE_GAP if pane else None
-
-
 def _inner_width() -> int:
     """Usable content width inside the left and right margins."""
     return theme.inner_width(_screen_width())
@@ -273,17 +267,49 @@ def _label_avail_width(item: "SelectItem", multi: bool, geometry: _Geometry | No
     return max(4, available)
 
 
-def _cursor_overflows(items: list["SelectItem"], cursor: int, multi: bool) -> bool:
-    if not (0 <= cursor < len(items)):
-        return False
-    item = items[cursor]
-    if _is_section_header(item):
-        return False
-    _layout.width = _list_width(items)  # measured in the column the row is drawn in
+@dataclass(frozen=True)
+class _MeasuredLayout:
+    size: object
+    width: int
+    pane_width: int
+    geometry: _Geometry
+    overflows: bool
+
+
+def _measure_layout(items: list["SelectItem"], cursor: int, multi: bool, size) -> _MeasuredLayout:
+    """Measure the list once, in the same column used for drawing and marquee."""
+    pane = theme.inspector_width(size.width) if any(_has_details(item) for item in items) else 0
+    width = size.width - pane - _PANE_GAP if pane else size.width
+    previous_width = getattr(_layout, "width", None)
+    _layout.width = width
     try:
-        return cell_len(_plain(item.label)) > _label_avail_width(item, multi, _geometry(items, multi))
+        geometry = _geometry(items, multi)
+        item = items[cursor] if 0 <= cursor < len(items) else None
+        overflows = bool(item is not None and not _is_section_header(item) and
+                         cell_len(_plain(item.label)) > _label_avail_width(item, multi, geometry))
+        return _MeasuredLayout(size, width, pane, geometry, overflows)
     finally:
-        _layout.width = None
+        _layout.width = previous_width
+
+
+class _LayoutCache:
+    """One menu's measurements; in-place edits invalidate through actions/refresh."""
+
+    def __init__(self):
+        self.revision = 0
+        self.key = None
+        self.measurement = None
+
+    def invalidate(self) -> None:
+        self.revision += 1
+
+    def get(self, items, cursor: int, multi: bool, size) -> _MeasuredLayout:
+        key = (id(items), len(items), self.revision, size, cursor, multi,
+               theme.current(), theme.FRAMED, current_language())
+        if key != self.key:
+            self.measurement = _measure_layout(items, cursor, multi, size)
+            self.key = key
+        return self.measurement
 
 
 def _wrapped_line_count(text: Text, width: int) -> int:
@@ -378,6 +404,7 @@ def _build_panel(
     help_key: bool = False,
     message: "str | Text" = "",
     tip: str = "",
+    measurement: _MeasuredLayout | None = None,
 ) -> Group:
     """Render one complete selector frame: header, intro, windowed list, context, keys, alert, tip.
 
@@ -399,17 +426,17 @@ def _build_panel(
     and ``SelectItem.inspect`` lines, beside a list column laid out as if the
     window were that narrow.
     """
-    screen_width = console.size.width
-    full_height = console.size.height
+    size = measurement.size if measurement is not None else console.size
+    screen_width, full_height = size.width, size.height
     if frames.too_small(screen_width, full_height):
         return Group(*frames.enlarge_notice(screen_width, full_height))
     cursor = min(cursor, len(items) - 1)  # a live list that shrank under the cursor keeps it on its last row
-    pane_width = theme.inspector_width(screen_width) if any(_has_details(item) for item in items) else 0
-    width = screen_width - pane_width - _PANE_GAP if pane_width else screen_width  # the list column
-    _layout.width = width if pane_width else None
+    measurement = measurement or _measure_layout(items, cursor, multi, size)
+    pane_width, width = measurement.pane_width, measurement.width
+    _layout.width = width
     try:
         return _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help_key, message, tip,
-                      screen_width, full_height, width, pane_width)
+                      screen_width, full_height, width, pane_width, measurement.geometry)
     finally:
         _layout.width = None
 
@@ -473,13 +500,12 @@ def _beside(left: "Text | None", right: "Text | None", width: int) -> Text:
 
 
 def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help_key, message, tip,
-           screen_width: int, full_height: int, width: int, pane_width: int) -> Group:
+           screen_width: int, full_height: int, width: int, pane_width: int, geometry: _Geometry) -> Group:
     height = theme.view_height(full_height, screen_width)  # the chrome's rows come off first
     framed = theme.framed(screen_width, full_height)
     inner_width = _inner_width()
     compact = not theme.roomy(height, _COMPACT_HEIGHT)
     has_actions = any(item.is_action for item in items)
-    geometry = _geometry(items, multi)
 
     parsed = theme.parse_footer(footer or _default_footer(multi))
     keys = parsed.keys or theme.parse_footer(_default_footer(multi)).keys
@@ -882,6 +908,7 @@ def arrow_select(
         "paused": False,  # another screen (the key list) owns the terminal
     }
     help_enabled = help and "?" not in (hotkeys or {}) and "?" not in (key_actions or {})
+    layout_cache = _LayoutCache()  # shared only while render_lock is held
 
     def aside(callback, *args):
         """Run a callback that may open another view, with this screen's redraws paused."""
@@ -890,7 +917,9 @@ def arrow_select(
         try:
             return callback(*args)
         finally:
-            state["paused"] = False
+            with render_lock:
+                layout_cache.invalidate()  # callbacks may edit labels, hints or markers in place
+                state["paused"] = False
     # Background downloads: a finished one announces itself before the first
     # frame, and the figure on the status line (and this screen's rows, when
     # it shows them) follow the jobs while the screen waits for a key.
@@ -907,6 +936,7 @@ def arrow_select(
         if downloads_ui.poll(watched):
             changed = True
         if changed:
+            layout_cache.invalidate()
             announcement = frames.take_message() or announcement
         return changed
 
@@ -931,6 +961,7 @@ def arrow_select(
                     help_key=help_enabled,
                     message=announcement,
                     tip=tip,
+                    measurement=layout_cache.get(items, state["cursor"], multi, frame_size),
                 )
                 if stop_event.is_set():
                     return False  # the menu closed while this frame was built: never paint over what follows
@@ -945,7 +976,7 @@ def arrow_select(
 
     def watcher():
         last_cursor = state["cursor"]
-        last_rendered_tick = -1
+        last_rendered_tick = state["tick"]
         while not stop_event.is_set():
             if stop_event.wait(_TICK_INTERVAL_S):
                 break
@@ -956,29 +987,30 @@ def arrow_select(
                 if state["paused"]:
                     continue
                 content_changed = refresh_content()
+                size = console.size
+                size_changed = resize.observe(size)
+                previous = layout_cache.measurement
+                measurement = layout_cache.get(items, state["cursor"], multi, size)
+                layout_changed = previous is not None and previous is not measurement
 
-            now = time.monotonic()
-            size_changed = resize.observe(console.size)
+                # Input already reset the dwell and painted tick zero on a cursor move.
+                if state["cursor"] != last_cursor:
+                    last_cursor = state["cursor"]
+                    last_rendered_tick = 0
 
-            # Reset marquee on cursor move
-            if state["cursor"] != last_cursor:
-                last_cursor = state["cursor"]
-                state["cursor_changed_at"] = now
-                state["tick"] = 0
-                last_rendered_tick = -1
+                new_tick = 0
+                if measurement.overflows:
+                    elapsed = time.monotonic() - state["cursor_changed_at"]
+                    if elapsed > _MARQUEE_DWELL_S:
+                        new_tick = int((elapsed - _MARQUEE_DWELL_S) * _MARQUEE_RATE)
 
-            elapsed = now - state["cursor_changed_at"]
-            overflows = _cursor_overflows(items, state["cursor"], multi)
-            new_tick = 0
-            if overflows and elapsed > _MARQUEE_DWELL_S:
-                new_tick = int((elapsed - _MARQUEE_DWELL_S) * _MARQUEE_RATE)
-
-            need_redraw = content_changed or size_changed or (
-                overflows and new_tick != last_rendered_tick
-            )
+                need_redraw = content_changed or size_changed or layout_changed or (
+                    measurement.overflows and new_tick != last_rendered_tick
+                )
+                if need_redraw:
+                    state["tick"] = new_tick
+                    last_rendered_tick = new_tick
             if need_redraw:
-                state["tick"] = new_tick
-                last_rendered_tick = new_tick
                 draw(new_tick)
 
     display.enter_screen()
@@ -1026,7 +1058,9 @@ def arrow_select(
                     else:
                         # Toggle/cycle the item
                         if items[cursor].enabled:
-                            items[cursor].cycle_toggle()
+                            with render_lock:
+                                items[cursor].cycle_toggle()
+                                layout_cache.invalidate()
                 else:
                     if items[cursor].enabled:
                         if items[cursor].passive:
@@ -1065,11 +1099,11 @@ def arrow_select(
             cursor = _valid_cursor(items, cursor)
 
             # Reset marquee state on cursor move
-            if cursor != prev_cursor:
-                state["tick"] = 0
-                state["cursor_changed_at"] = time.monotonic()
-
-            state["cursor"] = cursor
+            with render_lock:
+                if cursor != prev_cursor:
+                    state["tick"] = 0
+                    state["cursor_changed_at"] = time.monotonic()
+                state["cursor"] = cursor
             draw(state["tick"])
 
     finally:

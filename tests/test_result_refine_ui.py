@@ -82,7 +82,7 @@ class ResultRefineUITests(unittest.TestCase):
             def __exit__(self, *args): pass
             def start(self): pass
             def stop(self): pass
-            def update(self, renderable):
+            def update(self, renderable, *, refresh=False):
                 out = io.StringIO()
                 Console(file=out, width=100, height=30).print(renderable)
                 frames.append(out.getvalue())

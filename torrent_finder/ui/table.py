@@ -15,7 +15,7 @@ from rich.table import Table
 from rich.text import Text
 
 from torrent_finder.constants import RESULTS_PER_PAGE, console
-from torrent_finder.i18n import N_, t, tn
+from torrent_finder.i18n import N_, t, tn, current as current_language
 from torrent_finder.ui import chrome as frames, theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 from torrent_finder.utils import format_size, leech_style, seed_style
@@ -638,6 +638,9 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         note = note or t("Search diagnostics")
     view_indexes = result_indices(results, view_query, view_mode, view_order)
     all_results = [results[i] for i in view_indexes]
+    view_revision = 0
+    counts_revision = None
+    source_counts = ""
     total_all = len(all_results)
     # Provenance "From" column: only when results came from more than one searched
     # title (multi-title search); redundant for a single query.
@@ -690,6 +693,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
 
     def framed(tbl):
         """The whole results screen: header, view line, notices, table, details, keys."""
+        nonlocal counts_revision, source_counts
         status = results_status(current if expanded else scroll_offset, 1 if expanded else visible_count,
                                 total, current_page, total_pages, frozenset(picked))
         width, full_height = console.size.width, console.size.height
@@ -713,7 +717,11 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         if search_summary and search_summary != "No presets":
             view_parts.append(search_summary_label if search_summary_label is not None else search_summary)
         if all_results:
-            view_parts.append(t("Sources: {sources}", sources=_source_counts(all_results)))
+            revision = (view_revision, current_language())
+            if counts_revision != revision:
+                source_counts = _source_counts(all_results)
+                counts_revision = revision
+            view_parts.append(t("Sources: {sources}", sources=source_counts))
         view_status = theme.labelled(" · ".join(view_parts), theme.MARGIN)
         if feedback:
             view_status = Text(theme.MARGIN + feedback, style=feedback_style, no_wrap=True, overflow="ellipsis")
@@ -748,6 +756,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         )),
         console=console,
         refresh_per_second=15,
+        auto_refresh=False,  # the ticker/input redraw only when the frame changes
         transient=False,
         screen=True,
     ) as live:
@@ -756,6 +765,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
             nonlocal scroll_offset, visible_count
             last_tick = 0
             previous_size = console.size
+            measured_key = None
+            overflows = False
             while not stop_event.is_set():
                 if stop_event.wait(_TICK_INTERVAL_S):
                     break
@@ -764,7 +775,6 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                 size_changed = current_size != previous_size
                 previous_size = current_size
                 cur = current
-                has_current = 0 <= cur < len(page_items)
 
                 if size_changed:
                     visible_count = _fit_rows()
@@ -773,14 +783,21 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     elif cur >= scroll_offset + visible_count:
                         scroll_offset = max(0, cur - visible_count + 1)
 
-                layout = _page_layout(page_items, current_size.width, show_from,
-                                      view_indexes[global_offset:global_offset + total])
-                name = _result_name(page_items[cur]) if has_current else ""
-                if has_current and show_provider and not layout.provider:
-                    name = f"{_provider_label(page_items[cur])} · {name}"
+                key = (view_revision, current_page, cur, current_size,
+                       theme.current(), theme.FRAMED, current_language())
+                layout_changed = measured_key is not None and measured_key != key
+                if key != measured_key:
+                    layout = _page_layout(page_items, current_size.width, show_from,
+                                          view_indexes[global_offset:global_offset + total])
+                    has_current = 0 <= cur < len(page_items)
+                    name = _result_name(page_items[cur]) if has_current else ""
+                    if has_current and show_provider and not layout.provider:
+                        name = f"{_provider_label(page_items[cur])} · {name}"
+                    overflows = cell_len(name) > layout.name_width
+                    measured_key = key
                 tick_changed = False
                 new_tick = 0
-                if cell_len(name) > layout.name_width:
+                if overflows:
                     elapsed = time.monotonic() - marquee_state["cursor_changed_at"]
                     if elapsed > _MARQUEE_DWELL_S:
                         new_tick = int(
@@ -790,7 +807,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                 elif last_tick:
                     tick_changed = True
 
-                if not size_changed and not tick_changed:
+                if not size_changed and not tick_changed and not layout_changed:
                     continue
                 last_tick = new_tick
                 marquee_state["tick"] = new_tick
@@ -801,7 +818,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         picked=frozenset(picked), show_from=show_from,
                         original_indices=view_indexes[global_offset:global_offset + total],
                         expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice,
-                    ))
+                    )), refresh=True
                 )
 
         ticker_thread = threading.Thread(target=ticker, daemon=True)
@@ -931,6 +948,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         pass
                     view_indexes = result_indices(results, view_query, view_mode, view_order)
                     all_results = [results[i] for i in view_indexes]
+                    view_revision += 1
                     picked = {i for i in view_indexes if result_identity(results[i]) in checked_ids}
                     total_all = len(all_results)
                     total_pages = max(1, math.ceil(total_all / RESULTS_PER_PAGE))
@@ -992,6 +1010,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         pass
                     view_indexes = result_indices(results, view_query, view_mode, view_order)
                     all_results = [results[i] for i in view_indexes]
+                    view_revision += 1
                     cleared = len(picked.difference(view_indexes))
                     picked.intersection_update(view_indexes)
                     if cleared:
@@ -1071,7 +1090,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         picked=frozenset(picked), show_from=show_from,
                         original_indices=view_indexes[global_offset:global_offset + total],
                         expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice,
-                    ))
+                    )), refresh=True
                 )
         finally:
             stop_event.set()
