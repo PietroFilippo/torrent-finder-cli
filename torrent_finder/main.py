@@ -1037,6 +1037,7 @@ def _run_update_flow(info: dict) -> None:
 def _restart_args(args) -> list[str]:
     """The options the restarted app keeps: this session's, not its first search."""
     kept = ["--skip-warning"] if args.skip_warning else []
+    kept += ["--lang", args.lang] if getattr(args, "lang", None) else []
     return kept + (["--theme", args.theme] if args.theme else [])
 
 
@@ -1064,7 +1065,37 @@ def _build_parser() -> argparse.ArgumentParser:
     from torrent_finder.ui.theme import THEMES
     parser.add_argument("--theme", choices=tuple(THEMES), type=str.lower,
                         help="Colour theme for this run (saved choice: Settings › Appearance)")
+    from torrent_finder import i18n
+    parser.add_argument("--lang", type=_language_arg, metavar="{" + ",".join((i18n.AUTO, *i18n.languages())) + "}",
+                        help="Interface language for this run (auto: the system's display language)")
     return parser
+
+
+def _language_arg(value: str) -> str:
+    """``--lang``: ``auto``, a shipped language in any spelling ``i18n.normalise`` takes, or the
+    ``qps`` pseudo-locale (accepted for development, not listed)."""
+    from torrent_finder import i18n
+    code = i18n.AUTO if value.strip().casefold() == i18n.AUTO else i18n.normalise(value)
+    if code is None:
+        choices = ", ".join((i18n.AUTO, *i18n.languages()))
+        raise argparse.ArgumentTypeError(f"invalid choice: {value!r} (choose from {choices})")
+    return code
+
+
+def _apply_language(args) -> str:
+    """Choose the interface language before the first frame; returns a notice for the main menu.
+
+    Like the appearance, the update preview reads no settings.
+    """
+    from torrent_finder import i18n
+    saved = None
+    if not getattr(args, "preview_update", None):
+        try:
+            from torrent_finder.state import load_setting
+            saved = load_setting(i18n.SETTING, None)
+        except Exception:  # an unreadable store must never stop the app from drawing
+            saved = None
+    return i18n.apply_startup(getattr(args, "lang", None), saved=saved)
 
 
 def _apply_appearance(args) -> str:
@@ -1079,7 +1110,8 @@ def _apply_appearance(args) -> str:
 def _main_loop(args=None) -> None:
     parser = _build_parser()
     args = args or parser.parse_args()
-    theme_notice = _apply_appearance(args)
+    # Either one names an environment value it ignored; both rare, so they share the notice.
+    theme_notice = " ".join(filter(None, (_apply_language(args), _apply_appearance(args))))
     if args.preview_update:
         preview_update(args.preview_update)
         return
@@ -1592,6 +1624,7 @@ def main() -> None:
     keyboard.install()  # on Windows a typed "à" stays a letter instead of a special-key prefix
     args = _build_parser().parse_args()
     if args.preview_update:
+        _apply_language(args)
         _apply_appearance(args)
         try:
             preview_update(args.preview_update)
