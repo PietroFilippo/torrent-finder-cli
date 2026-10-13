@@ -355,6 +355,8 @@ class CommandLineTests(unittest.TestCase):
 GLOSSARY = {
     "terms": [{"term": "search", "use": "buscar", "forbidden": ["pesquis*"]},
               {"term": "file", "use": "arquivo", "forbidden": ["ficheiro"]},
+              {"term": "download", "use": "baixar", "forbidden": ["transferênc*"],
+               "allowed": ["área de transferência"]},
               {"term": "Off", "ctx": "engine mode", "use": "Nunca"}],
     "keep": ["Athanor"],
 }
@@ -435,6 +437,8 @@ class EntryCheckTests(unittest.TestCase):
 
     def test_context_terms_budgets_and_plural_shapes(self):
         self.assertIn("glossary", self.problems("Off", "Desligado", ctx="engine mode"))
+        self.assertIn("glossary", self.problems("Download finished", "Transferência concluída"))
+        self.assertEqual(self.problems("Copied to the clipboard", "Copiado para a área de transferência"), [])
         self.assertEqual(self.problems("Off", "Nunca", ctx="engine mode"), [])
         self.assertIn("budget", self.problems("Age", "Idade aproximada", budget=5))
         self.assertEqual(self.problems("Age", "Idade", budget=5), [])

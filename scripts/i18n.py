@@ -604,8 +604,11 @@ def glossary_problems(text: str, where: str, message: Message, glossary: dict) -
             if term["ctx"] == message.ctx and term["term"] == message.msgid and text != term["use"]:
                 problems.append(Problem(where, "glossary", f"{message.key!r} is {term['use']!r} in the glossary"))
             continue
+        scan = plain
+        for phrase in term.get("allowed", []):  # set phrases that contain a forbidden word
+            scan = re.sub(rf"(?<!\w){re.escape(phrase)}(?!\w)", " ", scan, flags=re.IGNORECASE)
         for pattern in term.get("forbidden", []):
-            match = _forbidden(pattern).search(plain)
+            match = _forbidden(pattern).search(scan)
             if match:
                 problems.append(Problem(where, "glossary", f"{match.group()!r}: the glossary says {term['term']} → "
                                                            f"{term['use']}"))
