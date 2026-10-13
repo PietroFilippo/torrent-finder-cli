@@ -391,6 +391,9 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
                 skipped)
         )
 
+    if _background_on():
+        return _batch_background(provider, picked, magnets, skipped)
+
     ok = download_many_with_aria2(magnets)
     if ok:
         record_method_complete("aria")
@@ -410,6 +413,83 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
         paths = [path for magnet in magnets for path in unpack.torrent_files(get_download_dir(), magnet=magnet)]
         summary = "\n".join(filter(None, (summary, _unpack_downloaded(paths))))
     return download_complete_prompt(t('Batch download finished'), summary=summary)
+
+
+def _background_on() -> bool:
+    """The saved setting: aria2c downloads run as background jobs instead of taking the screen."""
+    from torrent_finder.ui.downloads import enabled
+    return enabled()
+
+
+def _background_single(session, provider) -> str:
+    """Queue this torrent's aria2c download in the background and confirm; "next" or "back".
+
+    A download already running for the same torrent, folder and files, or an
+    engine that cannot start, is said on the next screen's message line and
+    the download options stay open.
+    """
+    from rich.markup import escape
+    from torrent_finder import downloads
+    from torrent_finder.ui import chrome as frames
+    from torrent_finder.ui.downloads import background_started_prompt
+    name = str(session.result.get("name") or t("Unknown"))
+    manager = downloads.manager()
+    ahead = len(manager.active())
+    try:
+        job = manager.enqueue_aria2(name, session.magnet, session.download_indexes,
+                                    source=str(session.result.get("source") or ""),
+                                    provider_slug=provider.slug, method="aria")
+    except downloads.DuplicateDownloadError as error:
+        frames.announce(f"[warn]{escape(str(error))}[/warn]")
+        return "back"
+    except Exception as error:  # the engine could not start, or the folder is unusable
+        frames.announce(t("[warn]Could not start the background download: {error}[/warn]", error=escape(str(error))))
+        return "back"
+    return background_started_prompt(name, job.target_dir, size_bytes=int(session.result.get("size", 0) or 0),
+                                     ahead=ahead)
+
+
+def _batch_background(provider, picked: list, magnets: list[str], skipped: int) -> str:
+    """Queue every selected magnet as one batch of background jobs and confirm; "next" or "back"."""
+    import uuid
+    from rich.markup import escape
+    from torrent_finder import downloads
+    from torrent_finder.ui import chrome as frames
+    from torrent_finder.ui.downloads import background_started_prompt
+    manager = downloads.manager()
+    ahead = len(manager.active())
+    queued: list = []
+    duplicates = 0
+    failure = ""
+    with manager.batch():
+        group = uuid.uuid4().hex
+        for result, magnet in zip(picked, magnets):
+            name = str(result.get("name") or t("Unknown"))
+            try:
+                queued.append(manager.enqueue_aria2(name, magnet, None, source=str(result.get("source") or ""),
+                                                    provider_slug=provider_for_result(result, provider).slug,
+                                                    method="aria", group=group))
+            except downloads.DuplicateDownloadError:
+                duplicates += 1
+            except Exception as error:
+                failure = str(error)
+                break
+            record_torrent_picked(provider_for_result(result, provider).slug, int(result.get("seeders", 0) or 0))
+    if not queued:
+        if failure:
+            frames.announce(t("[warn]Could not start the background download: {error}[/warn]", error=escape(failure)))
+        else:
+            frames.announce(t("[warn]Every selected torrent is already downloading to this folder.[/warn]"))
+        return "back"
+    facts = []
+    if duplicates:
+        facts.append(tn("{n} already downloading", "{n} already downloading", duplicates))
+    if skipped:
+        facts.append(tn("{n} skipped (no magnet)", "{n} skipped (no magnet)", skipped))
+    if failure:
+        facts.append(t("the rest could not start: {error}", error=failure))
+    return background_started_prompt(tn("{n} torrent queued", "{n} torrents queued", len(queued)),
+                                     queued[0].target_dir, ahead=ahead, facts=facts)
 
 
 def _batch_flow(provider, results: list, idxs: list[int]) -> str:
@@ -734,6 +814,11 @@ def _browse_results(provider, results, note: str = "") -> str:
                 console.print(t('\n[muted]Press [key]any key[/key] to continue…[/muted]'))
                 readchar.readkey()
                 continue
+            elif method == "aria" and _background_on():
+                if _background_single(session, selected_provider) == "next":
+                    return "next"
+                clear_screen()
+                continue
             elif method == "aria":
                 clear_screen()
                 ok = download_with_aria2(session.magnet, session.download_indexes)
@@ -990,6 +1075,9 @@ def _quick_actions_flow(provider=None, cli_filters=None, typed="", on_update=Non
         elif action == "qbittorrent":
             from torrent_finder.ui.qbittorrent import client_menu
             client_menu()
+        elif action == "downloads":
+            from torrent_finder.ui.downloads import downloads_screen
+            downloads_screen()
         elif action == "backup":
             from torrent_finder.ui.backup import backup_menu
             if backup_menu():
@@ -1028,12 +1116,10 @@ def _handle_whats_next(current_provider, cli_filters=None, on_update=None):
     seeds the by-creator one-shot); otherwise it's None and ``query`` drives a
     normal search.
     """
-    from torrent_finder.ui.prompts import confirm_prompt
-
     while True:
         choice = search_again_prompt()
         if choice in (None, "exit"):
-            if confirm_prompt(t('Quit torrent-finder?'), title=t('Quit')):
+            if _confirm_quit():
                 return "EXIT"
             clear_screen()
             continue
@@ -1056,12 +1142,43 @@ def _handle_whats_next(current_provider, cli_filters=None, on_update=None):
                 return outcome
 
 
-def _run_update_flow(info: dict) -> None:
+def _confirm_quit(guarded: bool = False) -> bool:
+    """True when the app may quit now.
+
+    With background downloads running, every way out asks the same question:
+    keep Torrent Finder open (the default) or stop them and quit; stopping
+    shuts the engine down here, so the caller only says goodbye. Without
+    them, the main menu's second Esc (*guarded*) quits at once and the other
+    exits ask the plain confirmation.
+    """
+    from torrent_finder import downloads
+    from torrent_finder.ui.downloads import quit_prompt, stop_all
+    from torrent_finder.ui.prompts import confirm_prompt
+    if downloads.busy():
+        if not quit_prompt():
+            return False
+        stop_all()
+        return True
+    return guarded or confirm_prompt(t('Quit torrent-finder?'), title=t('Quit'))
+
+
+def _run_update_flow(info: dict) -> bool:
     """Run the install-appropriate update (git pull / pip and pipx / open Releases) in this terminal.
 
     A successful package or checkout update raises ``RestartRequested`` after a
     key press, and ``main()`` starts the new version in the same window.
+    Returns False, having changed nothing, while background downloads run:
+    a restart would stop them (and on POSIX the exec keeps the PID aria2c
+    watches), so the update waits for them and the menu keeps its row.
     """
+    from torrent_finder import downloads
+    if downloads.busy():
+        from torrent_finder.ui import chrome as frames
+        running = len(downloads.manager().active())
+        frames.announce(tn("[warn]The update waits: {n} download is running. Let it finish or stop it in Downloads (D), then update.[/warn]",
+                           "[warn]The update waits: {n} downloads are running. Let them finish or stop them in Downloads (D), then update.[/warn]",
+                           running))
+        return False
     clear_screen()
     try:
         with UpdateDisplay(console, current=info.get("current", ""), latest=info.get("latest", "")) as display:
@@ -1073,7 +1190,7 @@ def _run_update_flow(info: dict) -> None:
     except KeyboardInterrupt:
         console.print(t('\n[warning]Update cancelled.[/warning]'))
         clear_screen()
-        return
+        return True
     console.print("\n" + theme.any_key(t('restart Torrent Finder') if result.restart else t("continue")))
     try:
         readchar.readkey()
@@ -1083,6 +1200,7 @@ def _run_update_flow(info: dict) -> None:
     if result.restart:
         raise RestartRequested
     clear_screen()
+    return True
 
 
 def _restart_args(args) -> list[str]:
@@ -1302,8 +1420,8 @@ def _main_loop(args=None) -> None:
 
     def run_pending_update():
         nonlocal update_info, update_msg
-        if update_info:
-            _run_update_flow(update_info)
+        if update_info and not _run_update_flow(update_info):
+            return  # refused while downloads run: the update stays offered
         update_info, update_msg = None, ""
 
     # One-line status (e.g. "No results", "cancelled") carried to the next
@@ -1375,15 +1493,18 @@ def _main_loop(args=None) -> None:
             pending_open_group = None
             if result is None:
                 if quit_guard.armed:
-                    _goodbye()
-                    break
+                    if _confirm_quit(guarded=True):
+                        _goodbye()
+                        break
+                    quit_guard.armed = False  # kept open for the downloads
+                    continue
                 quit_guard.armed = True
                 continue
             quit_guard.armed = False
             if result == "__update__":
-                _run_update_flow(update_info)
-                update_info = None   # consumed → drop the notice + menu row
-                update_msg = ""
+                if _run_update_flow(update_info):
+                    update_info = None   # consumed → drop the notice + menu row
+                    update_msg = ""
                 continue
             if result == "__actions__":
                 outcome = _quick_actions_flow(cli_filters=cli_filters, on_update=run_pending_update if update_info else None)
@@ -1728,6 +1849,10 @@ def main() -> None:
         # and the frozen binary — exits cleanly instead of dumping a traceback.
         _goodbye()
     finally:
+        # Background downloads never outlive the app: the engine's --stop-with-process
+        # covers a crash, this covers every ordinary way out.
+        from torrent_finder import downloads
+        downloads.shutdown_all()
         add_runtime_seconds(time.monotonic() - t0)
     if restart:
         # This process still runs the old code: save its last changes now, so

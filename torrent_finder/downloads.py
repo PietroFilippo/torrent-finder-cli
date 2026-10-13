@@ -507,6 +507,11 @@ class JobManager:
                 self._finishing.discard(job_id)
             self._notify()
 
+    def is_busy(self) -> bool:
+        """True while a job is unfinished, or a stopped finisher has not returned yet."""
+        with self._lock:
+            return bool(self._finishing) or any(j.state in ACTIVE_STATES for j in self._jobs.values())
+
     def shutdown(self, graceful: bool = True) -> None:
         """Stop jobs, save partials via aria2 shutdown, and join both workers.
 
@@ -550,11 +555,20 @@ def manager() -> JobManager:
         return _manager
 
 
+def current() -> JobManager | None:
+    """The session's manager when a job has been enqueued, else None; starts nothing."""
+    with _manager_lock:
+        return _manager
+
+
 def busy() -> bool:
     """Update/quit guard, including a finisher still returning after stop."""
-    with _manager_lock:
-        current = _manager
-    if current is None:
-        return False
-    with current._lock:
-        return bool(current._finishing) or any(j.state in ACTIVE_STATES for j in current._jobs.values())
+    manager_now = current()
+    return manager_now is not None and manager_now.is_busy()
+
+
+def shutdown_all(graceful: bool = True) -> None:
+    """Stop the session's jobs and workers, if a manager was ever started."""
+    manager_now = current()
+    if manager_now is not None:
+        manager_now.shutdown(graceful)

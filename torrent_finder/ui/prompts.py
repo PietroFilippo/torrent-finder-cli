@@ -773,6 +773,7 @@ def quick_actions_menu(update_available: bool = False, provider=None) -> "str | 
         (t("Bookmark current search"), "save_search", "L"),
         (t("Settings backup / import"), "backup", "E"),
         (t("qBittorrent connection / progress"), "qbittorrent", "Q"),
+        (t("Background downloads"), "downloads", "G"),  # D is Discover here
         (t("Usage stats"), "stats", "S"),
         (t("Tips & shortcuts"), "tips", "T"),
     ]
@@ -1947,6 +1948,15 @@ def download_method_prompt(
             "a minimal spinner instead. Persists across runs.")
         ),
     ))
+    # Persistent toggle: aria2c downloads (single and batch) as background
+    # jobs, followed from the Downloads screen, instead of taking this screen.
+    from torrent_finder.ui import downloads as downloads_ui
+    items.append(SelectItem(
+        label=downloads_ui.setting_label(),
+        value="toggle_background",
+        is_action=True,
+        description=t(downloads_ui.SETTING_HELP),
+    ))
     from torrent_finder.unpack import SETTING as UNPACK_SETTING
     items.append(SelectItem(
         label=_unpack_label(bool(load_setting(UNPACK_SETTING, False))),
@@ -1995,6 +2005,9 @@ def download_method_prompt(
             return True  # Stay in menu
         if items[idx].value == "toggle_unpack":
             _toggle_unpack(items[idx])
+            return True
+        if items[idx].value == "toggle_background":
+            downloads_ui.toggle_setting(items[idx])
             return True
         if items[idx].value == "toggle_quiet":
             from torrent_finder.state import load_setting, save_setting
@@ -2333,9 +2346,13 @@ def home_status(update_status: str = "") -> str:
     """
     from torrent_finder import __version__
     from torrent_finder.security import exposure_label
+    from torrent_finder.ui.downloads import badge
     if theme.bars(console.size.width, console.size.height):
         return f"[warn]{escape(update_status)}[/warn]" if update_status else ""
     parts = [f"v{escape(str(__version__))}"]
+    downloading = badge()
+    if downloading:
+        parts.insert(0, downloading)  # Simple has no status line: the downloads figure leads the header
     if update_status:
         parts.append(f"[warn]{escape(update_status)}[/warn]")
     network = exposure_label()
@@ -2559,10 +2576,17 @@ def provider_select_prompt(
                        description=(
                            t('Current: {value}\nThe default folder for aria2c / webtorrent / peerflix downloads, subtitle saves, and Online-Fix / Madokami / Libgen / F-Droid files.\nAlso here: unpack downloaded manga archives into folders of pages.', value=escape(get_download_dir()))),
                        inspect=lambda: inspector.download_folder(get_download_dir())),
+        ]
+        # Downloads, once a background download was started this session: a
+        # live count beside the name, and D opens the screen.
+        from torrent_finder.ui import downloads as downloads_ui
+        downloads_row = downloads_ui.menu_row()
+        if downloads_row is not None:
+            items.append(downloads_row)
+        items.append(
             SelectItem(t("Settings"), value="__settings__", hint=t("theme · command · network"),
                        description=t("Theme and spacing, the quick-launch terminal command, and the network check."),
-                       inspect=inspector.settings),
-        ]
+                       inspect=inspector.settings))
         if start is None:
             start = 1  # the continue row when there is one, else the first provider
 
@@ -2573,8 +2597,12 @@ def provider_select_prompt(
         def footer():
             # Re-evaluated on every render: resizing the open menu switches
             # between the full key bar and a compact one.
-            full = t("↑/↓ navigate  •  Enter select  •  F filters  •  H history  •  S stats  •  T tips  •  Tab actions  •  Esc quit")
-            compact = t("↑/↓ move • Enter select • Tab actions • Esc quit\nF filters • H history • S stats")
+            if downloads_row is not None:
+                full = t("↑/↓ navigate  •  Enter select  •  F filters  •  H history  •  S stats  •  T tips  •  Tab actions  •  D downloads  •  Esc quit")
+                compact = t("↑/↓ move • Enter select • Tab actions • Esc quit\nF filters • H history • S stats • D downloads")
+            else:
+                full = t("↑/↓ navigate  •  Enter select  •  F filters  •  H history  •  S stats  •  T tips  •  Tab actions  •  Esc quit")
+                compact = t("↑/↓ move • Enter select • Tab actions • Esc quit\nF filters • H history • S stats")
             keys = compact if console.size.height < 24 or _keybar_wraps(full, console.size.width, items) else full
             return (notice + "\n" if notice else "") + keys
 
@@ -2582,15 +2610,22 @@ def provider_select_prompt(
                    "T": "tips", "t": "tips", "\t": "actions"}
         if update_available:
             hotkeys.update({"U": "update", "u": "update"})
+        if downloads_row is not None:
+            hotkeys.update({"D": "downloads", "d": "downloads"})
+        downloads_seen = {"revision": downloads_ui.revision()}
 
         def refresh_menu():
             nonlocal update_available, update_status, notice
+            changed = False
+            if downloads_row is not None and downloads_ui.poll(downloads_seen):
+                downloads_ui.update_menu_row(downloads_row)
+                changed = True
             if refresh_update is None:
-                return False
+                return changed
             from torrent_finder.updates import status_label
             info, message = refresh_update()
             if not info or update_available:
-                return False
+                return changed
             update_available, update_status = True, status_label(info)
             notice = "" if theme.FRAMED else message
             # Append within Tools so an idle refresh never shifts the focused row.
@@ -2610,7 +2645,7 @@ def provider_select_prompt(
             alert=quit_guard.hint if quit_guard else "",
             tip=tip_line,
             hotkeys=hotkeys,
-            refresh=refresh_menu if refresh_update is not None else None,
+            refresh=refresh_menu if refresh_update is not None or downloads_row is not None else None,
             key_actions={"F": _handle_f, "f": _handle_f},
         )
 
@@ -2647,6 +2682,10 @@ def provider_select_prompt(
                 tips_page()
                 start = cursor
                 continue
+            if action == "downloads":
+                downloads_ui.downloads_screen()
+                start = cursor
+                continue
             if action == "update":
                 return "__update__"
 
@@ -2656,6 +2695,9 @@ def provider_select_prompt(
             return value
         if value in ("__update__", "__actions__"):
             return value
+        if value == "__downloads__":
+            downloads_ui.downloads_screen()
+            continue
         if value == "__credentials__":
             credentials_menu()
             continue
@@ -2714,6 +2756,7 @@ def search_again_prompt() -> str | tuple | None:
         - ``'exit'`` when the Exit row is chosen.
         - ``None`` when Esc or Ctrl+C cancels the menu.
     """
+    from torrent_finder.ui import downloads as downloads_ui
     choices = [
         (t("Search again"), "search", "R"),
         (t("Change provider"), "provider", "P"),
@@ -2723,8 +2766,11 @@ def search_again_prompt() -> str | tuple | None:
         (t("Usage stats"), "stats", "S"),
         (t("Tips & shortcuts"), "tips", "T"),
         (t("Credentials"), "credentials", "C"),
-        (t("Exit"), "exit", "Q"),
     ]
+    with_downloads = downloads_ui.current() is not None  # once a background download was started
+    if with_downloads:
+        choices.append((t("Downloads"), "downloads", "D"))
+    choices.append((t("Exit"), "exit", "Q"))
     items = [SelectItem(label=label, value=value, hint=key) for label, value, key in choices]
     hotkeys = {}
     for _label, value, key in choices:
@@ -2742,8 +2788,12 @@ def search_again_prompt() -> str | tuple | None:
         tip_line = random_tip()
 
         def footer():
-            full = t("↑/↓ navigate • Enter select • R/P/M/Tab/H/S/T/C/Q jump • Esc request exit")
-            compact = t("↑/↓ move • Enter select • Esc exit\nR/P/M/Tab/H/S/T/C/Q jump")
+            if with_downloads:
+                full = t("↑/↓ navigate • Enter select • R/P/M/Tab/H/S/T/C/D/Q jump • Esc request exit")
+                compact = t("↑/↓ move • Enter select • Esc exit\nR/P/M/Tab/H/S/T/C/D/Q jump")
+            else:
+                full = t("↑/↓ navigate • Enter select • R/P/M/Tab/H/S/T/C/Q jump • Esc request exit")
+                compact = t("↑/↓ move • Enter select • Esc exit\nR/P/M/Tab/H/S/T/C/Q jump")
             return compact if console.size.height < 24 or _keybar_wraps(full, console.size.width, items) else full
 
         idx = arrow_select(
@@ -2786,6 +2836,11 @@ def search_again_prompt() -> str | tuple | None:
 
         if selected == "credentials":
             credentials_menu()
+            start = idx
+            continue
+
+        if selected == "downloads":
+            downloads_ui.downloads_screen()
             start = idx
             continue
 

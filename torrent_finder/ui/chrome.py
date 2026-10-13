@@ -14,6 +14,7 @@ from __future__ import annotations
 
 # i18n: converted
 import datetime as _dt
+import threading
 from dataclasses import dataclass, field
 
 from rich.cells import cell_len
@@ -39,6 +40,9 @@ class _Session:
 
 
 _session = _Session()
+# Background downloads announce from a menu's watcher thread while the main
+# thread opens the next screen: the queue is read and written under this lock.
+_messages_lock = threading.Lock()
 
 
 def turn() -> None:
@@ -48,21 +52,24 @@ def turn() -> None:
 
 def announce(message: str) -> None:
     """Queue a message (Rich markup) for the message line of the next screens; repeats are dropped."""
-    if message and message not in _session.messages and message != _session.shown:
-        _session.messages.append(message)
+    with _messages_lock:
+        if message and message not in _session.messages and message != _session.shown:
+            _session.messages.append(message)
 
 
 def take_message() -> str:
     """The announcement a new screen shows on its message line, with --More-- when others wait."""
-    if not _session.messages:
-        return ""
-    _session.shown = _session.messages.pop(0)
-    return _session.shown + (t(" [reverse]--More--[/reverse]") if _session.messages else "")
+    with _messages_lock:
+        if not _session.messages:
+            return ""
+        _session.shown = _session.messages.pop(0)
+        return _session.shown + (t(" [reverse]--More--[/reverse]") if _session.messages else "")
 
 
 def clear_messages() -> None:
-    _session.messages.clear()
-    _session.shown = ""
+    with _messages_lock:
+        _session.messages.clear()
+        _session.shown = ""
 
 
 # --- the pieces ------------------------------------------------------------------------
@@ -219,7 +226,13 @@ def status_line(width: int, now: "_dt.datetime | None" = None) -> Text:
     """The line under the frame: session figures on the left; date, network and version on the right."""
     from torrent_finder import __version__
     from torrent_finder.security import exposure
+    from torrent_finder.ui.downloads import figure as downloads_figure
     left = Text(" ")
+    downloading = downloads_figure()
+    if downloading is not None:  # ``↓ 2 · 43% · 3.1 MB/s`` first, like a roguelike's hit points
+        left.append("↓ ", style=theme.MUTED)
+        left.append_text(downloading)
+        left.append("  ")
     for index, (label, value) in enumerate(_figures()):
         if index:
             left.append("  ")

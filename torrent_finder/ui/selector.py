@@ -403,6 +403,7 @@ def _build_panel(
     full_height = console.size.height
     if frames.too_small(screen_width, full_height):
         return Group(*frames.enlarge_notice(screen_width, full_height))
+    cursor = min(cursor, len(items) - 1)  # a live list that shrank under the cursor keeps it on its last row
     pane_width = theme.inspector_width(screen_width) if any(_has_details(item) for item in items) else 0
     width = screen_width - pane_width - _PANE_GAP if pane_width else screen_width  # the list column
     _layout.width = width if pane_width else None
@@ -890,6 +891,11 @@ def arrow_select(
             return callback(*args)
         finally:
             state["paused"] = False
+    # Background downloads: a finished one announces itself before the first
+    # frame, and the figure on the status line (and this screen's rows, when
+    # it shows them) follow the jobs while the screen waits for a key.
+    from torrent_finder.ui import downloads as downloads_ui
+    watched = downloads_ui.watch()
     announcement = frames.take_message()  # the message line's text while this screen is open
     stop_event = threading.Event()
     render_lock = threading.Lock()
@@ -897,10 +903,12 @@ def arrow_select(
 
     def refresh_content() -> bool:
         nonlocal announcement
-        if refresh is not None and refresh():
+        changed = refresh is not None and refresh()
+        if downloads_ui.poll(watched):
+            changed = True
+        if changed:
             announcement = frames.take_message() or announcement
-            return True
-        return False
+        return changed
 
     def draw(tick: int) -> bool:
         """Write a complete frame only when it matches the current viewport."""
