@@ -121,7 +121,7 @@ def _manage_profiles(draft, library):
     items.extend([
         SelectItem(t("Save a copy as a new profile…"), ("copy", None)),
         SelectItem(t("Rename current profile…"), ("rename", None)),
-        SelectItem(t("Remove current profile…"), ("delete", None), enabled=len(library.entries) > 1,
+        SelectItem(t("Delete current profile…"), ("delete", None), enabled=len(library.entries) > 1,
                    description=t("Keep at least one profile. Deletion takes effect only after Save and return.")),
         SelectItem(t("Back"), ("back", None)),
     ])
@@ -141,7 +141,7 @@ def _manage_profiles(draft, library):
         else:
             library.rename(library.current["id"], name)
     elif action == "delete":
-        if not confirm_prompt(t("Remove profile '{profile}'?", profile=escape(profile_label(library.current))), title=t("Remove profile")):
+        if not confirm_prompt(t("Delete profile '{profile}'?", profile=escape(profile_label(library.current))), title=t("Delete profile")):
             return
         library.delete(library.current["id"])
     else:
@@ -165,7 +165,7 @@ def combined_filter_menu(provider):
                        hint=", ".join(draft.shared_filters.include_keywords) or t("any name"),
                        description=t("Keep names matching any listed phrase. Enter for examples and editing. Empty allows any name.")),
             SelectItem(t("All providers: exclude name phrases…"), "exclude_keywords",
-                       hint=", ".join(draft.shared_filters.exclude_keywords) or t("none"),
+                       hint=", ".join(draft.shared_filters.exclude_keywords) or t("none", ctx="keywords"),
                        description=t("Hide names matching any listed phrase, even if included. Enter for examples and editing.")),
             SelectItem(t("Provider engines and presets…"), "configure",
                        description=t("Each provider keeps its own settings. Resolution and language presets stay scoped to that provider.")),

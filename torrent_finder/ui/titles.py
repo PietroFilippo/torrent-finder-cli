@@ -64,7 +64,7 @@ def title_search_flow(provider, cli_filters, browse_fn, initial=""):
         items = [SelectItem(t(c.label), value=c,
                             description=(t("Needs {credentials}. Configure in Credentials.", credentials=", ".join(c.missing_credentials()))
                                          if c.missing_credentials() else t("Identify a work by year/type, then choose its release names."))) for c in catalogs]
-        items.append(SelectItem(t("Type known names manually"), value="manual",
+        items.append(SelectItem(t("Enter known names manually"), value="manual",
                                 description=t("Use names you know. Catalogs are unavailable for Desktop/Mobile Software; manual names work with every provider.")))
         items.append(SelectItem(t("Back"), value=None, is_action=True))
         picked = arrow_select(items, title=t("Alternate-title search"), banner=_make_banner_panel(),
