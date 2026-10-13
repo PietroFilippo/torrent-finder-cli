@@ -1,14 +1,17 @@
 """Scrollable tips browser with search and category filtering."""
 
+# i18n: converted
+
 from __future__ import annotations
 
 from rich.markup import escape
 
+from torrent_finder.i18n import N_, t
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.ui.tips import TIP_CATEGORIES, Tip, TipCategory, find_tips
 
 
-_CATEGORY_OPTIONS = ("All",) + tuple(category.name for category in TIP_CATEGORIES)
+_CATEGORY_OPTIONS = (N_("All"),) + tuple(category.name for category in TIP_CATEGORIES)
 
 
 def _header(label: str) -> SelectItem:
@@ -23,11 +26,11 @@ def _header(label: str) -> SelectItem:
 def _tip_item(category: TipCategory, tip: Tip) -> SelectItem:
     """Read-only tip row: navigable for scrolling, Enter is a no-op."""
     return SelectItem(
-        label=tip.text,
+        label=tip.display_text(),
         value=("tip", category.name, tip),
         enabled=True,
         passive=True,
-        hint=", ".join(tip.tags),  # the category is the section header above the tip
+        hint=", ".join(tip.tags),  # i18n: ignore — English search keywords
     )
 
 
@@ -68,41 +71,41 @@ def _build_items(query: str, category_idx: int) -> list[SelectItem]:
 
     if not grouped:
         items.append(SelectItem(
-            label="No tips match the current search/filter",
+            label=t("No tips match the current search/filter"),
             value="empty_placeholder",
             enabled=False,
             is_action=True,
         ))
     else:
         for category, tips in grouped:
-            items.append(_header(category.name))
+            items.append(_header(t(category.name)))
             for tip in tips:
                 items.append(_tip_item(category, tip))
 
     items.append(SelectItem(label="", value="spacer", enabled=False))
     items.append(SelectItem(
-        label="Search tips",
+        label=t("Search tips"),
         value="search",
         is_action=True,
         hint="/",
-        description="Type text to match against categories, tip text, and tags.",
+        description=t("Type text to match against categories, tip text, and tags."),
     ))
     items.append(SelectItem(
-        label=f"Category: {_CATEGORY_OPTIONS[category_idx]}",
+        label=t("Category: {category}", category=t(_CATEGORY_OPTIONS[category_idx])),
         value="category",
         is_action=True,
         hint="c",
-        description="Cycle the category filter.",
+        description=t("Cycle the category filter."),
     ))
     items.append(SelectItem(
-        label="Clear search/filter",
+        label=t("Clear search/filter"),
         value="clear",
         is_action=True,
         hint="x",
         enabled=bool(query.strip()) or category_idx != 0,
-        description="Reset the search text and category filter.",
+        description=t("Reset the search text and category filter."),
     ))
-    items.append(SelectItem(label="Back", value="back", is_action=True))
+    items.append(SelectItem(label=t("Back"), value="back", is_action=True))
     return items
 
 
@@ -120,22 +123,19 @@ def tips_page() -> None:
         parts = []
         category = _CATEGORY_OPTIONS[state["category_idx"]]
         if category != "All":
-            parts.append(escape(category))
+            parts.append(escape(t(category)))
         if state["query"]:
             parts.append(f'"{escape(state["query"])}"')
-        return " › ".join(["Tips & shortcuts", " · ".join(parts)] if parts else ["Tips & shortcuts"])
+        return " › ".join([t("Tips & shortcuts"), " · ".join(parts)] if parts else [t("Tips & shortcuts")])
 
     def _status() -> str:
-        return f"{_match_count(state['query'], state['category_idx'])} shown"
+        return t("{count} shown", count=_match_count(state["query"], state["category_idx"]))
 
     def _footer() -> str:
         category = _CATEGORY_OPTIONS[state["category_idx"]]
-        search = f"Search: {escape(state['query'])}\n" if state["query"] else ""  # the key bar says / search
-        return (
-            f"{search}"
-            "↑/↓ scroll  •  / search  •  "
-            f"C category: {escape(category)}  •  X clear  •  Esc back"
-        )
+        search = t("Search: {query}\n", query=escape(state["query"])) if state["query"] else ""
+        return search + t("↑/↓ scroll  •  / search  •  C category: {category}  •  X clear  •  Esc back",
+                          category=escape(t(category)))
 
     def _cycle_category(cursor: int, items_list: list[SelectItem]):
         state["category_idx"] = (state["category_idx"] + 1) % len(_CATEGORY_OPTIONS)
@@ -185,7 +185,7 @@ def tips_page() -> None:
         if action == "search":
             from torrent_finder.ui.prompts import PROMPT, get_query_with_shortcut, input_screen
             query = get_query_with_shortcut(PROMPT, screen_renderer=input_screen(
-                "Search tips", "Matches categories, tip text and tags; empty clears the search."))
+                t("Search tips"), t("Matches categories, tip text and tags; empty clears the search.")))
             if not isinstance(query, str) or query == "GO_BACK":
                 continue
             state["query"] = query.strip()

@@ -18,7 +18,7 @@ class ResultRefineUITests(unittest.TestCase):
         with patch.object(table, "console", screen), \
              patch.object(table, "refine_results", return_value=("Keep", "contains", "name")), \
              patch.object(table.readchar, "readkey", side_effect=["f", table.readchar.key.RIGHT] +
-                          [table.readchar.key.DOWN] * 8 + [" ", table.readchar.key.ENTER]):
+                          [table.readchar.key.DOWN] * 12 + [" ", table.readchar.key.ENTER]):
             first = table.interactive_select(rows, view_state=state)
         focused = rows[first[1]]
         before = (state.page, state.scroll)
@@ -61,8 +61,8 @@ class ResultRefineUITests(unittest.TestCase):
         with patch.object(table, "console", screen), \
              patch.object(table, "build_table", side_effect=record), \
              patch.object(table, "refine_results", side_effect=lambda *args: args), \
-             patch.object(table.readchar, "readkey", side_effect=[readchar.key.DOWN] * 8 + ["f", readchar.key.ENTER]):
-            self.assertEqual(table.interactive_select(rows, view_state=state), ("one", 8))
+             patch.object(table.readchar, "readkey", side_effect=[readchar.key.DOWN] * 12 + ["f", readchar.key.ENTER]):
+            self.assertEqual(table.interactive_select(rows, view_state=state), ("one", 12))
         self.assertEqual(frames[-1], frames[-2])
         self.assertGreater(state.scroll, 0)
 

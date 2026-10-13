@@ -1,5 +1,7 @@
 """Interactive table selection UI for torrent results."""
 
+# i18n: converted
+
 import math
 import threading
 import time
@@ -14,12 +16,13 @@ from rich.table import Table
 from rich.text import Text
 
 from torrent_finder.constants import RESULTS_PER_PAGE, console
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder.ui import chrome as frames, theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
 from torrent_finder.utils import format_size, leech_style, seed_style
-from torrent_finder.result_view import SORT_ORDERS, result_indices, timestamp
+from torrent_finder.result_view import match_mode_label, sort_label, result_indices, timestamp
 from torrent_finder.ui.result_filters import refine_results
-from torrent_finder.result_details import detail_lines, release_tags, tag_matches
+from torrent_finder.result_details import detail_lines, release_tags, tag_label, tag_matches
 from torrent_finder.providers.combined_provider import result_identity
 
 
@@ -30,8 +33,21 @@ _TICK_INTERVAL_S = 0.12
 
 
 def _source_label(item: dict) -> str:
-    source = str(item.get("source") or "Unknown")
+    source = str(item.get("source") or t("Unknown"))
     return f"{source}*" if item.get("apibay_cached_at") else source
+
+
+def _result_name(item: dict) -> str:
+    """Draw library folder labels without changing names saved in result rows."""
+    if item.get("mdk_path"):
+        from torrent_finder.madokami import localized_display_name
+        return localized_display_name(item["mdk_path"])
+    return str(item.get("name", t("Unknown")))
+
+
+def _provider_label(item: dict) -> str:
+    label = str(item.get("provider_label", ""))
+    return t(label)
 
 
 @dataclass(frozen=True)
@@ -56,6 +72,15 @@ _SIZE_W, _SEEDS_W, _LEECHES_W, _AGE_W = 9, 6, 7, 4
 _RIGHT_MARGIN = 3
 
 
+def _column_widths() -> dict[str, int]:
+    """Measure translated headers at render time, including after a language switch."""
+    return {header: max(minimum, cell_len(t(header))) for header, minimum in (
+        (N_("Source"), _SOURCE_W), (N_("Provider"), _PROVIDER_W), (N_("From"), _FROM_W),
+        (N_("Size"), _SIZE_W), (N_("Seeds"), _SEEDS_W), (N_("Leeches"), _LEECHES_W),
+        (N_("Age"), _AGE_W),
+    )}
+
+
 def _fixed(*widths: int) -> int:
     """Cells used by the given fixed columns, the name's padding and the right margin."""
     return sum(widths) + 2 * len(widths) + _RIGHT_MARGIN
@@ -74,21 +99,22 @@ def _table_layout(width: int, show_from: bool, show_provider: bool = False,
                   show_age: bool = False, digits: int = 2) -> _TableLayout:
     """Choose progressively smaller result columns for the terminal width."""
     lead = _lead_width(digits)
-    full = [lead, _SOURCE_W, _SIZE_W, _SEEDS_W, _LEECHES_W]
+    widths = _column_widths()
+    full = [lead, widths["Source"], widths["Size"], widths["Seeds"], widths["Leeches"]]
     if show_provider:
-        full.append(_PROVIDER_W)
+        full.append(widths["Provider"])
     if show_from:
-        full.append(_FROM_W)
+        full.append(widths["From"])
     if show_age:
-        full.append(_AGE_W)
+        full.append(widths["Age"])
     if width - _fixed(*full) >= 36:
         return _TableLayout(
             "full", width - _fixed(*full), True, show_from, True, True, True, show_provider, show_age
         )
-    medium = _fixed(lead, _SOURCE_W, _SIZE_W, _SEEDS_W)
+    medium = _fixed(lead, widths["Source"], widths["Size"], widths["Seeds"])
     if width - medium >= 29:
         return _TableLayout("medium", width - medium, True, False, True, True, False)
-    compact = _fixed(lead, _SEEDS_W)
+    compact = _fixed(lead, widths["Seeds"])
     if width - compact >= 25:
         return _TableLayout("compact", width - compact, False, False, False, True, False)
     return _TableLayout(
@@ -139,15 +165,15 @@ def _age(uploaded: int, now: float | None = None) -> str:
     seconds = max(0, (now if now is not None else time.time()) - uploaded)
     hours = seconds / 3600
     if hours < 24:
-        return f"{max(1, int(hours))}h"
+        return t("{n}h", n=max(1, int(hours)), ctx="age")
     days = hours / 24
     if days < 14:
-        return f"{int(days)}d"
+        return t("{n}d", n=int(days), ctx="age")
     if days < 60:
-        return f"{int(days // 7)}w"
+        return t("{n}w", n=int(days // 7), ctx="age")
     if days < 730:
-        return f"{int(days // 30)}mo"
-    return f"{int(days // 365)}y"
+        return t("{n}mo", n=int(days // 30), ctx="age")
+    return t("{n}y", n=int(days // 365), ctx="age")
 
 
 def _tags_line(name: str, preferred, room: int) -> "Text | None":
@@ -156,16 +182,16 @@ def _tags_line(name: str, preferred, room: int) -> "Text | None":
     if not tags:
         return None
     line = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
-    line.append("Tags: ", style=theme.MUTED)
+    line.append(t("Tags: "), style=theme.MUTED)
     for index, tag in enumerate(tags):
         if index:
             line.append(" · ", style=theme.MUTED)
         if tag_matches(tag, preferred):
-            line.append(f"{tag} {theme.CHECK}", style=theme.GOOD)
+            line.append(f"{tag_label(tag)} {theme.CHECK}", style=theme.GOOD)
         else:
-            line.append(tag)
-    if cell_len(line.plain) > room + len(theme.MARGIN):
-        line.truncate(room + len(theme.MARGIN), overflow="ellipsis")
+            line.append(tag_label(tag))
+    if cell_len(line.plain) > room + cell_len(theme.MARGIN):
+        line.truncate(room + cell_len(theme.MARGIN), overflow="ellipsis")
     return line
 
 
@@ -188,23 +214,25 @@ def _selected_metadata(
     parts: list[str] = []
     origin: list[str] = []
     if item.get("provider_label"):
-        origin = [f"Provider: {item['provider_label']}", f"Source: {_source_label(item)}"]
+        origin = [t("Provider: {provider}", provider=t(item["provider_label"])),
+                  t("Source: {source}", source=_source_label(item))]
     uploaded = timestamp(item.get("uploaded_at"))
-    parts.append("Uploaded: " + (datetime.fromtimestamp(uploaded, timezone.utc).strftime("%Y-%m-%d") if uploaded else "unknown"))
+    parts.append(t("Uploaded: {date}", date=datetime.fromtimestamp(uploaded, timezone.utc).strftime("%Y-%m-%d")
+                   if uploaded else t("unknown")))
     if not layout.source and not item.get("provider_label"):
-        parts.append(f"Source: {_source_label(item)}")
+        parts.append(t("Source: {source}", source=_source_label(item)))
     if item.get("source") == "Knaben" and item.get("knaben_tracker"):
-        parts.append(f"Knaben tracker: {item.get('knaben_tracker')}")
+        parts.append(t("Knaben tracker: {tracker}", tracker=item.get("knaben_tracker")))
     if show_from and not layout.from_work and item.get("from_work"):
-        parts.append(f"From: {item.get('from_work')}")
+        parts.append(t("From: {work}", work=item.get("from_work")))
     if not layout.size:
-        parts.append(f"Size: {format_size(int(item.get('size', 0) or 0))}")
+        parts.append(t("Size: {size}", size=format_size(int(item.get("size", 0) or 0))))
     if not layout.seeds:
-        parts.append(f"Seeds: {int(item.get('seeders', 0) or 0)}")
+        parts.append(t("Seeds: {count}", count=int(item.get("seeders", 0) or 0)))
     if not layout.leeches:
-        parts.append(f"Leeches: {int(item.get('leechers', 0) or 0)}")
+        parts.append(t("Leeches: {count}", count=int(item.get("leechers", 0) or 0)))
     if reason:
-        parts.append(f"Ranked: {reason}")
+        parts.append(t("Ranked: {reason}", reason=reason))
     if _tiny():
         lines = [theme.labelled(ellipsize_cells(" · ".join(origin + parts), room), theme.MARGIN)]
     else:
@@ -218,10 +246,10 @@ def _selected_metadata(
         if len(lines) > cap:  # very long values (a long "From" title) stop at the cap
             lines = lines[:cap]
             last = lines[-1]
-            if cell_len(last.plain) + 2 <= room + len(theme.MARGIN):
+            if cell_len(last.plain) + 2 <= room + cell_len(theme.MARGIN):
                 last.append(" …", style=theme.MUTED)
             else:
-                last.truncate(room + len(theme.MARGIN) - 1)
+                last.truncate(room + cell_len(theme.MARGIN) - 1)
                 last.append("…")
     for line in lines:
         details.append_text(line)
@@ -247,25 +275,26 @@ def _detail_count():
 def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = False) -> str:
     """The results key bar as plain text (it contains "[/]"), most frequent keys first."""
     if expanded:
-        return "i close • [/] scroll details • b bookmark • Esc back"
-    enter = f"Enter download {len(picked)} selected" if picked else "Enter open"
-    if console.size.width < 52:  # "? keys" lists what the short names leave out
-        enter = f"Enter download {len(picked)}" if picked else "Enter open"
-        keys = f"↑/↓ move • Space pick • {enter} • i details • b save • f refine"
-    else:
-        keys = f"↑/↓ navigate • Space select • {enter} • i details • f refine/sort • b bookmark"
-    keys += " • a all • c clear"
+        return t("i close • {scroll} scroll details • b bookmark • Esc back", scroll="[/]")
+    enter = tn("Enter download {n} selected", "Enter download {n} selected", len(picked)) if picked else t("Enter open")
+    keys = t("↑/↓ navigate • Space select • {enter} • i details • f refine/sort • b bookmark", enter=enter)
+    tail = " • " + t("a all • c clear")
     if total_pages > 1:
-        keys += " • ←/→ page"
-    return keys + " • Esc back"
+        tail += " • " + t("←/→ page")
+    tail += " • " + t("Esc back")
+    # Measure the rendered key bar: spacing is owned by the theme, and labels vary by language.
+    if len(theme.wrap_keys(theme.parse_footer(Text(keys + tail)).keys, console.size.width)) > 1:
+        enter = t("Enter download {count}", count=len(picked)) if picked else t("Enter open")
+        keys = t("↑/↓ move • Space pick • {enter} • i details • b save • f refine", enter=enter)
+    return keys + tail
 
 
 # Keys the results key bar has no room to name; the ? list shows them all.
-RESULT_EXTRA_KEYS = (("←/→", "previous / next page"), ("0-9", "jump to a result number"),
-                     ("Home/End", "first / last result"), ("PgUp/PgDn", "move a page of rows"),
-                     ("d", "download the picked results"), ("n", "search notices and diagnostics"),
-                     ("r", "retry failed sources"), ("m", "load more results"),
-                     ("[/]", "scroll the details (with i)"), ("Esc", "back"))
+RESULT_EXTRA_KEYS = (("←/→", N_("previous / next page")), ("0-9", N_("jump to a result number")),
+                     ("Home/End", N_("first / last result")), ("PgUp/PgDn", N_("move a page of rows")),
+                     ("d", N_("download the picked results")), ("n", N_("search notices and diagnostics")),
+                     ("r", N_("retry failed sources")), ("m", N_("load more results")),
+                     ("[/]", N_("scroll the details (with i)")), ("Esc", N_("back")))
 
 
 def _table_caption(
@@ -289,15 +318,15 @@ def _table_caption(
     tiny = _tiny()
     if not expanded and 0 <= selected_idx < len(results):
         if not tiny:  # the row itself shows the name; tiny windows keep rows instead
-            name = ellipsize_cells(str(results[selected_idx].get("name", "Unknown")),
+            name = ellipsize_cells(_result_name(results[selected_idx]),
                                    theme.inner_width(width))
             caption.append("\n" + theme.MARGIN + name + "\n", style="bold")
         caption.append_text(_selected_metadata(results, selected_idx, layout, show_from, describe))
     if not expanded and not tiny and any(item.get("apibay_cached_at") for item in results):
         room = theme.inner_width(width)
-        legend = "Apibay* = cached last-known-good results"
+        legend = t("Apibay* = cached last-known-good results")
         if cell_len(legend) > room:  # one line, always: the row budget counts one
-            legend = ellipsize_cells("Apibay* = cached results", room)
+            legend = ellipsize_cells(t("Apibay* = cached results"), room)
         caption.append(theme.MARGIN + legend + "\n", style=theme.WARN)
     if announcement:  # set apart from the details by a row when the window has one
         caption.append("\n" if theme.roomy(_rows(), 20) else "")
@@ -315,12 +344,12 @@ def _note_preview(note: str) -> Text:
     """Keep partial-search notices from crowding results out of short windows."""
     count = len(note.splitlines())
     if _rows() < 28 or count > 2:
-        return Text(f"{theme.MARGIN}{count} search notice{'s' if count != 1 else ''} — n to read",
+        return Text(theme.MARGIN + tn("{n} search notice — n to read", "{n} search notices — n to read", count),
                     style=theme.WARN, no_wrap=True, overflow="ellipsis")
     preview = Text(style=theme.WARN, overflow="fold")
     for line in note.splitlines():
         preview.append(theme.MARGIN + line + "\n")
-    preview.append(theme.MARGIN + "n: read search notices")
+    preview.append(theme.MARGIN + t("n: read search notices"))
     return preview
 
 
@@ -329,8 +358,8 @@ def _show_search_notices(note: str) -> None:
     from torrent_finder.ui.selector import SelectItem, arrow_select
     items = [SelectItem(line.split(":", 1)[0], description=escape(line), passive=True)
              for line in note.splitlines() if line.strip()]
-    items.append(SelectItem("Back to results", is_action=True))
-    arrow_select(items, title="Search notices", footer="↑/↓ read notices • Esc back to results")
+    items.append(SelectItem(t("Back to results"), is_action=True))
+    arrow_select(items, title=t("Search notices"), footer=t("↑/↓ read notices • Esc back to results"))
 
 
 def _note_line_count(note: str, width: int) -> int:
@@ -373,7 +402,7 @@ def _visible_count(
         layout = _table_layout(width, show_from, show_provider)
         details = 1 if tiny else 1 + _METADATA_LINES[layout.mode] + (2 if show_provider else 0)
     header = 0 if framed else 1 if tiny else len(theme.header_lines(
-        heading or "Results", "888–888 of 888 · page 88/88 · 888 picked", width))
+        heading or t("Results"), results_status(887, 1, 888, 87, 88, frozenset(range(888))), width))
     compact = not theme.roomy(height, 20) or framed
     keys = len(theme.wrap_keys(theme.parse_footer(
         Text(_result_keys(2, frozenset(range(100))))).keys, width))
@@ -413,6 +442,7 @@ def build_table(
                     else range(global_offset, global_offset + max(total, 1)))
     digits = _index_digits(page_indexes)
     layout = _page_layout(results, width, show_from, page_indexes)
+    widths = _column_widths()
     end_idx = min(scroll_offset + visible_count, total)
     table = Table(
         box=None,
@@ -430,29 +460,29 @@ def build_table(
         caption_justify="left",
     )
     if not total:
-        notice = Text(f"\n{theme.MARGIN}No matching results — f to refine\n", style=theme.WARN)
+        notice = Text("\n" + theme.MARGIN + t("No matching results — f to refine") + "\n", style=theme.WARN)
         notice.append_text(table.caption)
         table.caption = notice
 
     if layout.mode == "minimal":
-        table.add_column("Result", no_wrap=not expanded, overflow="fold" if expanded else "ellipsis")
+        table.add_column(t("Result"), no_wrap=not expanded, overflow="fold" if expanded else "ellipsis")
     else:
         table.add_column("#", justify="right", width=_lead_width(digits), no_wrap=True)
         if layout.source:
-            table.add_column("Source", width=_SOURCE_W, no_wrap=True, overflow="ellipsis")
+            table.add_column(t("Source"), width=widths["Source"], no_wrap=True, overflow="ellipsis")
         if layout.provider:
-            table.add_column("Provider", width=_PROVIDER_W, no_wrap=True, overflow="ellipsis")
+            table.add_column(t("Provider"), width=widths["Provider"], no_wrap=True, overflow="ellipsis")
         if layout.from_work:
-            table.add_column("From", width=_FROM_W, no_wrap=True, overflow="ellipsis")
-        table.add_column("Name", width=layout.name_width, no_wrap=not expanded)
+            table.add_column(t("From"), width=widths["From"], no_wrap=True, overflow="ellipsis")
+        table.add_column(t("Name"), width=layout.name_width, no_wrap=not expanded)
         if layout.size:
-            table.add_column("Size", justify="right", width=_SIZE_W, no_wrap=True)
+            table.add_column(t("Size"), justify="right", width=widths["Size"], no_wrap=True)
         if layout.seeds:
-            table.add_column("Seeds", justify="right", width=_SEEDS_W, no_wrap=True)
+            table.add_column(t("Seeds"), justify="right", width=widths["Seeds"], no_wrap=True)
         if layout.leeches:
-            table.add_column("Leeches", justify="right", width=_LEECHES_W, no_wrap=True)
+            table.add_column(t("Leeches"), justify="right", width=widths["Leeches"], no_wrap=True)
         if layout.age:
-            table.add_column("Age", justify="right", style=theme.MUTED, width=_AGE_W, no_wrap=True)
+            table.add_column(t("Age"), justify="right", style=theme.MUTED, width=widths["Age"], no_wrap=True)
 
     now = time.time()
     for visible_idx, item in enumerate(results[scroll_offset:end_idx]):
@@ -461,9 +491,9 @@ def build_table(
         seeds = int(item.get("seeders", 0) or 0)
         leeches = int(item.get("leechers", 0) or 0)
         size = int(item.get("size", 0) or 0)
-        name = str(item.get("name", "Unknown"))
+        name = _result_name(item)
         if item.get("provider_label") and not layout.provider:
-            name = f"{item['provider_label']} · {name}"
+            name = f"{t(item['provider_label'])} · {name}"
         is_selected = index == selected_idx
         checked = global_index in picked
 
@@ -482,14 +512,15 @@ def build_table(
             lines = _wrapped_details(item, layout)
             count = _detail_count()
             offset = min(detail_offset, max(0, len(lines) - count))
-            name_cell.append(f"\nDetails {offset + 1}-{min(len(lines), offset + count)}/{len(lines)} ([/])",
+            name_cell.append("\n" + t("Details {start}-{end}/{total} ({scroll})", start=offset + 1,
+                                      end=min(len(lines), offset + count), total=len(lines), scroll="[/]"),
                              style=theme.ACCENT)
             for line in lines[offset:offset + count]:
                 name_cell.append("\n")
                 name_cell.append(line)
         row_style = theme.FOCUS if is_selected else ""
         if is_selected and theme.FILL_FOCUS:
-            row_style += f" on {theme.FILL}"
+            row_style += f" on {theme.FILL}"  # i18n: ignore — Rich style syntax
         seed_text = Text(str(seeds), style=seed_style(seeds))
         leech_text = Text(str(leeches), style=leech_style(leeches))
 
@@ -505,7 +536,7 @@ def build_table(
         if layout.source:  # provenance, not the thing chosen: steel unless focused
             cells.append(Text(_source_label(item), style="" if is_selected else theme.MUTED))
         if layout.provider:
-            cells.append(Text(str(item.get("provider_label", ""))))
+            cells.append(Text(_provider_label(item)))
         if layout.from_work:
             cells.append(Text(str(item.get("from_work", "") or "")))
         cells.append(name_cell)
@@ -516,7 +547,7 @@ def build_table(
         if layout.leeches:
             cells.append(leech_text)
         if layout.age:
-            cells.append(_age(timestamp(item.get("uploaded_at")), now))
+            cells.append(ellipsize_cells(_age(timestamp(item.get("uploaded_at")), now), widths["Age"]))
         table.add_row(*cells, style=row_style)
 
     return table
@@ -526,13 +557,13 @@ def results_status(scroll_offset: int, visible_count: int, total: int, current_p
                    total_pages: int, picked: "frozenset[int]") -> str:
     """Header status: visible rows, page and picks."""
     if not total:
-        return "no matching results"
+        return t("no matching results")
     end_idx = min(scroll_offset + visible_count, total)
-    parts = [f"{scroll_offset + 1}–{end_idx} of {total}"]
+    parts = [t("{start}–{end} of {total}", start=scroll_offset + 1, end=end_idx, total=total)]
     if total_pages > 1:
-        parts.append(f"page {current_page + 1}/{total_pages}")
+        parts.append(t("page {page}/{pages}", page=current_page + 1, pages=total_pages))
     if picked:
-        parts.append(f"{len(picked)} picked")
+        parts.append(tn("{n} picked", "{n} picked", len(picked)))
     return " · ".join(parts)
 
 
@@ -571,7 +602,8 @@ class ResultsViewState:
 
 def interactive_select(results: list[dict], note: str = "", *, initial_order: str = "relevance",
                        search_summary: str = "", on_bookmark=None, heading: str = "",
-                       describe=None, view_state: ResultsViewState | None = None) -> "tuple | None":
+                       describe=None, view_state: ResultsViewState | None = None,
+                       search_summary_label: str | None = None) -> "tuple | None":
     """Interactive torrent results table with multi-select.
 
     Navigate with arrows; Left/Right switch pages; type a number to jump.
@@ -587,6 +619,9 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     *describe* (``result_view.ranking_notes``) explains the focused row's
     place: its title match and the preferred presets it matches, shown under
     it while the order is Recommended. ``?`` lists every key.
+
+    *search_summary* keeps the English sentinel; *search_summary_label* is
+    its separately translated display text, supplied by the provider's caller.
     """
     workspace = view_state if view_state is not None else ResultsViewState()
     view_query, view_mode, view_order = workspace.query, workspace.mode, workspace.order or initial_order
@@ -601,7 +636,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     session = getattr(results, "session", None)
     if session is not None:
         # Reserve one compact line for diagnostics/actions even with zero rows.
-        note = note or "Search diagnostics"
+        note = note or t("Search diagnostics")
     view_indexes = result_indices(results, view_query, view_mode, view_order)
     all_results = [results[i] for i in view_indexes]
     total_all = len(all_results)
@@ -661,7 +696,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         width, full_height = console.size.width, console.size.height
         if frames.too_small(width, full_height):
             return Group(*frames.enlarge_notice(width, full_height))
-        title = heading or "Results"
+        title = heading or t("Results")
         if theme.framed(width, full_height):
             parts: list[object] = []  # the frame's top edge names the screen
         elif _tiny():
@@ -670,29 +705,29 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
             parts = list(theme.header_lines(title, status, width))
         if theme.roomy(_rows(), 20):
             parts += theme.frame_rule(width, full_height)
-        order_label = SORT_ORDERS.get(view_order, view_order)
+        order_label = sort_label(view_order)
         if view_order != "relevance":
-            order_label += " (overrides preferences)"
-        view_parts = [f"Sort: {order_label}"]
+            order_label = t("{order} (overrides preferences)", order=order_label)
+        view_parts = [t("Sort: {order}", order=order_label)]
         if view_query:
-            view_parts.append(f"{view_mode.capitalize()}: {view_query}")
+            view_parts.append(f"{match_mode_label(view_mode)}: {view_query}")
         if search_summary and search_summary != "No presets":
-            view_parts.append(search_summary)
+            view_parts.append(search_summary_label if search_summary_label is not None else search_summary)
         if all_results:
-            view_parts.append("Sources: " + _source_counts(all_results))
+            view_parts.append(t("Sources: {sources}", sources=_source_counts(all_results)))
         view_status = theme.labelled(" · ".join(view_parts), theme.MARGIN)
         if feedback:
             view_status = Text(theme.MARGIN + feedback, style=feedback_style, no_wrap=True, overflow="ellipsis")
         if session is not None:
             failures = sum(d.retryable for d in session.diagnostics)
-            retry_label = f"r retry ({failures})" if failures else "r retry"
+            retry_label = t("r retry ({count})", count=failures) if failures else t("r retry")
             controls = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
-            for i, segment in enumerate(theme.parse_footer(f"n diagnostics • {retry_label} • m more").keys):
+            for i, segment in enumerate(theme.parse_footer(t("n diagnostics • {retry} • m more", retry=retry_label)).keys):
                 if i:
                     controls.append(theme.KEY_GAP)
                 controls.append_text(segment)
             if not results and not feedback:
-                view_status = Text(theme.MARGIN + "No results • n explains the search", style=theme.WARN,
+                view_status = Text(theme.MARGIN + t("No results • n explains the search"), style=theme.WARN,
                                    no_wrap=True, overflow="ellipsis")
             return frames.Framed(Group(*parts, view_status, controls, tbl), title, status, announcement)
         if note:
@@ -741,9 +776,9 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
 
                 layout = _page_layout(page_items, current_size.width, show_from,
                                       view_indexes[global_offset:global_offset + total])
-                name = str(page_items[cur].get("name", "")) if has_current else ""
+                name = _result_name(page_items[cur]) if has_current else ""
                 if has_current and show_provider and not layout.provider:
-                    name = f"{page_items[cur].get('provider_label', '')} · {name}"
+                    name = f"{_provider_label(page_items[cur])} · {name}"
                 tick_changed = False
                 new_tick = 0
                 if cell_len(name) > layout.name_width:
@@ -867,7 +902,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     try:
                         feedback, feedback_style = theme.CHECK + " " + on_bookmark([results[i] for i in ids]), theme.GOOD
                     except (OSError, ValueError) as error:
-                        feedback, feedback_style = "Bookmark not saved: " + str(error), theme.BAD
+                        feedback, feedback_style = t("Bookmark not saved: {error}", error=str(error)), theme.BAD
                 elif key.lower() in ("n", "r", "m") and session is not None:
                     from torrent_finder.ui.search_diagnostics import diagnostics_menu, run_action
                     selected_id = result_identity(page_items[current]) if total else None
@@ -885,12 +920,13 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                                     old_count = len(results)
                                     results[:] = updated
                                     results.notices = updated.notices
-                                    feedback = f"{len(results) - old_count} added • {len(results)} total • n: diagnostics"
+                                    feedback = t("{added} added • {total} total • n: diagnostics",
+                                                 added=len(results) - old_count, total=len(results))
                                     feedback_style = theme.GOOD
                                 if error:
                                     feedback, feedback_style = error, theme.WARN
                             else:
-                                feedback = "No failed sources to retry" if action == "retry" else "No more pages available • n: details"
+                                feedback = t("No failed sources to retry") if action == "retry" else t("No more pages available • n: details")
                                 feedback_style = theme.WARN
                     except KeyboardInterrupt:
                         pass
@@ -935,8 +971,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     live.stop()
                     try:
                         from torrent_finder.ui.selector import show_keys
-                        show_keys(Text(heading or "Results"), Text(_result_keys(total_pages, frozenset(picked))),
-                                  extra=RESULT_EXTRA_KEYS)
+                        show_keys(Text(heading or t("Results")), Text(_result_keys(total_pages, frozenset(picked))),
+                                  extra=tuple((key, t(action)) for key, action in RESULT_EXTRA_KEYS))
                     except KeyboardInterrupt:
                         pass
                     live.start()
@@ -960,7 +996,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     cleared = len(picked.difference(view_indexes))
                     picked.intersection_update(view_indexes)
                     if cleared:
-                        feedback = f"{cleared} hidden selection{'s' if cleared != 1 else ''} cleared"
+                        feedback = tn("{n} hidden selection cleared", "{n} hidden selections cleared", cleared)
                         feedback_style = theme.WARN
                     total_all = len(all_results)
                     total_pages = max(1, math.ceil(total_all / RESULTS_PER_PAGE))
