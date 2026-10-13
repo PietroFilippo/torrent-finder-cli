@@ -257,6 +257,11 @@ class AppearanceMenuTests(unittest.TestCase):
                                               "painting": "dore-satan", "placement": "right", "fonts": appearance.DEFAULT_FONTS,
                                               "profile": appearance.DEFAULT_PROFILE})
 
+    def test_space_does_not_apply_focus_or_density(self):
+        self.run_menu([K.DOWN] * 7 + [" "] + [K.DOWN] * 2 + [" ", K.ESC])
+        self.assertEqual(theme.current()[1:], ("bar", "comfortable"))
+        self.assertIsNone(state.load_setting(appearance.SETTING))
+
     def test_every_theme_row_shows_its_own_colours(self):
         for design, current in (("simple", "quiet"), ("athanor", "citrinitas")):
             theme.apply(current)

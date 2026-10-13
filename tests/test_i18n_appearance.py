@@ -125,6 +125,32 @@ class AppearanceLanguageTests(unittest.TestCase):
                              ["dore-raven", "facing", "bar", "compact"])
             self.assertEqual(saved["profile"], {"look": "plain", "open_from_tabs": True})
 
+    def test_space_on_every_non_theme_row_has_no_side_effects(self):
+        kinds = set()
+
+        def preview_rows(items, kwargs):
+            before = copy.deepcopy(appearance._session)
+            colours = theme.current()
+            rows = copy.deepcopy(items)
+            for index, row in enumerate(items):
+                if not isinstance(row.value, tuple) or row.value[0] in ("theme", "design"):
+                    continue
+                kinds.add(row.value[0])
+                with self.subTest(row=row.value):
+                    kwargs["key_actions"][" "](index, items)
+                    self.assertEqual(appearance._session, before)
+                    self.assertEqual(theme.current(), colours)
+                    self.assertEqual(items, rows)
+
+        for installed in (False, True):
+            with patch.object(appearance, "save") as save:
+                with menu_fixture(installed=installed, action=preview_rows) as menu:
+                    for operation in ("write", "remove", "export", "confirm", "install_fonts", "refresh"):
+                        menu[operation].assert_not_called()
+                save.assert_not_called()
+        self.assertEqual(kinds, {"painting", "placement", "export", "font", "size", "focus", "density",
+                                 "look", "open", "profile"})
+
     def test_terminal_fragment_is_identical_in_every_language(self):
         data = []
         for language in ("en", "pt-BR", "qps"):

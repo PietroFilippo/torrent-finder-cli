@@ -163,7 +163,7 @@ class PseudoLocaleTests(unittest.TestCase):
         self.assertIn("1 résúlt", i18n.tn("{n} result", "{n} results", 1))
 
     def test_key_bars_still_read_as_the_same_keys(self):
-        for bar in ("↑/↓ navigate  •  Enter apply  •  Space preview  •  Esc back", "R reveal",
+        for bar in ("↑/↓ navigate  •  Enter apply  •  Space preview colours  •  Esc back", "R reveal",
                     "Tab actions  •  ? keys", "Ctrl+F filters  •  a all  •  i invert", "PgUp/PgDn page  •  Home top"):
             english, pseudo = theme.parse_footer(bar), theme.parse_footer(i18n.t(bar))
             self.assertEqual([segment.plain.split(" ", 1)[0] for segment in pseudo.keys],

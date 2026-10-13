@@ -832,8 +832,8 @@ which still take precedence after import.
 
 ## Appearance
 
-**Settings › Appearance** chooses the design and its colours. Each row previews
-its own colours; **Space** previews on the whole screen and **Enter** saves.
+**Settings › Appearance** chooses the design and its colours. Each colour row previews
+its own colours; **Space** previews colours only (other rows ignore it), and **Enter** applies and saves.
 
 - **Athanor** (the default) frames each screen like a roguelike scriptorium: a
   double-line frame whose top edge names the screen (`torrent-finder » Movies &

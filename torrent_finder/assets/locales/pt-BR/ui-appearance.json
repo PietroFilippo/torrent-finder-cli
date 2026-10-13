@@ -65,7 +65,7 @@
   "Removed the torrent-finder profile.": "Perfil torrent-finder removido.",
   "Removed the torrent-finder profile; Windows Terminal drops it when it restarts.": "Perfil torrent-finder removido; o Windows Terminal deixa de exibi-lo ao reiniciar.",
   "This run uses --theme; the saved theme applies to later runs.": "Esta sessão usa --theme; o tema salvo vale nas próximas sessões.",
-  "↑/↓ navigate  •  Enter apply  •  Space preview  •  Esc back": "↑/↓ navegar  •  Enter aplicar  •  Space visualizar  •  Esc voltar",
+  "↑/↓ navigate  •  Enter apply  •  Space preview colours  •  Esc back": "↑/↓ navegar  •  Enter aplicar  •  Space prévia das cores  •  Esc voltar",
   "Settings › Appearance": "Configurações › Aparência",
   "The IBM PC's VGA text mode: the classic letters.": "O modo de texto VGA do IBM PC: as letras clássicas.",
   "VGA with its ninth column: wider letters with more space between them.": "VGA com a nona coluna: letras mais largas e mais espaço entre elas.",

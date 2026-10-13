@@ -573,7 +573,7 @@ def appearance_menu() -> None:
         if not value:
             return True
         if value[0] not in ("design", "theme"):
-            return choose(index, items)
+            return True  # Space only previews colours; other choices need Enter.
         state["preview"] = target(value)
         theme.apply(state["preview"])
         items[:] = build()
@@ -598,7 +598,7 @@ def appearance_menu() -> None:
         elif design_of(state["preview"]) != "athanor" or not terminal_profile.installed():
             # True for Simple, and for Athanor until its profile gives the page and painting.
             lines.append(t(BACKGROUND_NOTE))
-        lines.append(t("↑/↓ navigate  •  Enter apply  •  Space preview  •  Esc back"))
+        lines.append(t("↑/↓ navigate  •  Enter apply  •  Space preview colours  •  Esc back"))
         return "\n".join(lines)
 
     items = build()
