@@ -950,29 +950,36 @@ def arrow_select(
     # it shows them) follow the jobs while the screen waits for a key.
     from torrent_finder.ui import downloads as downloads_ui
     watched = downloads_ui.watch()
-    announcement = frames.take_message()  # the message line's text while this screen is open
+    # The message line's text while this screen is open. A window too small for any
+    # screen shows none: the message stays queued and the first usable frame takes it.
+    owed = frames.too_small(console.size.width, console.size.height)
+    announcement = "" if owed else frames.take_message()
     stop_event = threading.Event()
     render_lock = threading.Lock()
     resize = _ResizeRedraw(console.size)
 
     def refresh_content() -> bool:
-        nonlocal announcement
+        nonlocal announcement, owed
         focused = _focused_value(items, state["cursor"]) if refresh is not None else None
         changed = refresh is not None and refresh()
         if changed and items:
             state["cursor"] = _follow(items, focused, state["cursor"])
         if downloads_ui.poll(watched):
             changed = True
+        if changed or owed:
+            owed = frames.too_small(console.size.width, console.size.height)
+            taken = "" if owed else frames.take_message()
+            if taken:
+                announcement, changed = taken, True
         if changed:
             layout_cache.invalidate()
-            announcement = frames.take_message() or announcement
         return changed
 
     def draw(tick: int) -> bool:
         """Write a complete frame only when it matches the current viewport."""
         with render_lock:
-            if state["paused"]:
-                return False  # another view owns the screen
+            if state["paused"] or state["holding"]:
+                return False  # another view owns the screen, or a key is acting on the list as it was
             refresh_content()
             for _ in range(3):
                 frame_size = console.size

@@ -9,9 +9,12 @@ warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 import isolation  # noqa: F401  # redirects saved settings before anything reads them
+import readchar
+from rich.color import ColorSystem
 from rich.console import Console
 from rich.text import Text
 
+from torrent_finder import constants
 from torrent_finder.ui import chrome, prompts, selector, table, theme
 from torrent_finder.ui.selector import SelectItem
 
@@ -66,6 +69,14 @@ class NoticeLineTests(unittest.TestCase):
         self.assertTrue(chrome.shows_message(80, 24))
         self.assertTrue(chrome.shows_message(40, 12))
         self.assertFalse(chrome.shows_message(20, 5))  # only "Enlarge the window" fits: the message waits
+        chrome.clear_messages()
+        chrome.announce(MESSAGE)
+        tiny = Console(file=io.StringIO(), width=20, height=5)
+        with patch.object(constants.console, "_color_system", ColorSystem.TRUECOLOR), \
+             patch.object(selector, "console", tiny), patch.object(selector.sys, "stdout", io.StringIO()), \
+             patch.object(selector.readchar, "readkey", side_effect=[readchar.key.ESC]):
+            selector.arrow_select([selector.SelectItem("One", "one")], title="Menu")
+        self.assertEqual(chrome.take_message(), MESSAGE)  # a menu too small to show it left it for the next screen
         theme.apply("citrinitas")
         self.assertTrue(chrome.shows_message(80, 24))
         self.assertFalse(chrome.shows_message(80, 20))  # no bars: the message waits for a screen with them
