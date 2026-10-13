@@ -99,6 +99,22 @@ class ResultRefineUITests(unittest.TestCase):
     def test_empty_filter_does_not_open_an_invalid_row(self):
         self.assertIsNone(self._select([{"name":"Other"}], ("Saki", "title", "name"), ["f", readchar.key.ENTER, readchar.key.ESC]))
 
+    def test_navigation_keys_cross_pages_and_clamp_at_view_ends(self):
+        k = readchar.key
+        rows = [{"name": f"Row {i}"} for i in range(25)]
+        cases = [([k.END], 24), ([k.END, k.HOME], 0), ([k.PAGE_DOWN], 5),
+                 ([k.DOWN] * 8 + [k.PAGE_DOWN], 13), ([k.END, k.PAGE_UP], 19),
+                 ([k.PAGE_UP], 0), ([k.END, k.PAGE_DOWN], 24)]
+        with patch.object(table, "RESULTS_PER_PAGE", 10), patch.object(table, "_visible_count", return_value=5):
+            for keys, expected in cases:
+                with self.subTest(keys=keys):
+                    self.assertEqual(self._select(rows, ("", "contains", "relevance"), keys + [k.ENTER]),
+                                     ("one", expected))
+            self.assertIsNone(self._select([], ("", "contains", "relevance"),
+                              [k.HOME, k.END, k.PAGE_UP, k.PAGE_DOWN, k.ESC]))
+        self.assertEqual(self._select([{"name": "Keep Z"}, {"name": "Other"}, {"name": "Keep A"}],
+                         ("Keep", "contains", "name"), ["f", k.HOME, k.ENTER]), ("one", 2))
+
     def test_numeric_jump_uses_the_displayed_id_after_sorting(self):
         rows = [{"name":"Old", "uploaded_at":10}, {"name":"New", "uploaded_at":30}]
         self.assertEqual(self._select(rows, ("", "contains", "newest"), ["f", "0", readchar.key.ENTER]), ("one", 0))

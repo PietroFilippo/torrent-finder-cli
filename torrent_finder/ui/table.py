@@ -262,6 +262,7 @@ def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = Fa
 
 # Keys the results key bar has no room to name; the ? list shows them all.
 RESULT_EXTRA_KEYS = (("←/→", "previous / next page"), ("0-9", "jump to a result number"),
+                     ("Home/End", "first / last result"), ("PgUp/PgDn", "move a page of rows"),
                      ("d", "download the picked results"), ("n", "search notices and diagnostics"),
                      ("r", "retry failed sources"), ("m", "load more results"),
                      ("[/]", "scroll the details (with i)"), ("Esc", "back"))
@@ -773,6 +774,24 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     num_buffer = ""
                 elif key == readchar.key.DOWN:
                     current = max(0, min(total - 1, current + 1))
+                    num_buffer = ""
+                elif key in (readchar.key.HOME, readchar.key.END, readchar.key.PAGE_UP, readchar.key.PAGE_DOWN):
+                    position = global_offset + current
+                    if key == readchar.key.HOME:
+                        position = 0
+                    elif key == readchar.key.END:
+                        position = max(0, total_all - 1)
+                    else:
+                        step = max(1, visible_count)
+                        position += step if key == readchar.key.PAGE_DOWN else -step
+                        position = max(0, min(max(0, total_all - 1), position))
+                    current_page, current = divmod(position, RESULTS_PER_PAGE)
+                    page_items = page_results()
+                    total = len(page_items)
+                    global_offset = current_page * RESULTS_PER_PAGE
+                    visible_count = _fit_rows()
+                    if current_page != prev_page:
+                        scroll_offset = 0
                     num_buffer = ""
                 elif key == readchar.key.LEFT:
                     if current_page > 0:
