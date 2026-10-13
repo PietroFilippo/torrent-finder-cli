@@ -48,7 +48,18 @@ BUDGET_MARK = re.compile(r"#\s*i18n:\s*budget\s*=\s*(\d+)")
 # Shared messages the seed catalogue (common.json) holds before code uses them:
 # the screens that do are converted in later phases. Listed so the catalogue
 # check does not call them obsolete; harmless once code uses them too.
-RESERVED = [
+# argparse's own words, looked up through t(…, ctx="argparse") by main._speak_argparse:
+# the standard library says them, so no t() call in this tree names them.
+ARGPARSE = [
+    "usage: ", "options", "positional arguments", "show this help message and exit",
+    "show program's version number and exit", "%(prog)s: error: %(message)s\n",
+    "argument %(argument_name)s: %(message)s", "invalid choice: %(value)r (choose from %(choices)s)",
+    "expected one argument", "expected at least one argument", "expected at most one argument",
+    "unrecognized arguments: %s", "the following arguments are required: %s",
+    "invalid %(type)s value: %(value)r", "ambiguous option: %(option)s could match %(matches)s",
+    "not allowed with argument %s", "ignored explicit argument %r", "one of the arguments %s is required",
+]
+RESERVED = [*((message, "argparse") for message in ARGPARSE),
     ("Back", ""),
     ("Settings", ""),
     ("Press [key]any key[/key] to continue…", ""),

@@ -1211,33 +1211,33 @@ def _restart_args(args) -> list[str]:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    # Language is applied after parsing in this checkout; CLI help stays English.
-    parser = argparse.ArgumentParser(description="Search and download torrents.")  # i18n: ignore — before language resolution
+    # main() chooses the language first (_early_language), so --help speaks it.
+    parser = argparse.ArgumentParser(description=t("Search and download torrents."))
     parser.add_argument("--version", action="version", version=f"%(prog)s {torrent_finder.__version__}")
     parser.add_argument("--preview-update", nargs="?", const="success", choices=("success", "failure"),
-                        help="Preview the update display without installing anything")  # i18n: ignore — before language resolution
+                        help=t("Preview the update display without installing anything"))
     parser.add_argument("--providers", nargs="+", metavar="PROVIDER", choices=[p for p in provider_cli_choices() if p != "all"],
-                        help="Providers for -t all (for example: --providers anime manga)")  # i18n: ignore — before language resolution
-    parser.add_argument("--profile", metavar="NAME", help="Use a named search profile (implies -t all)")  # i18n: ignore — before language resolution
-    parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")  # i18n: ignore — before language resolution
+                        help=t("Providers for -t all (for example: --providers anime manga)"))
+    parser.add_argument("--profile", metavar="NAME", help=t("Use a named search profile (implies -t all)"))
+    parser.add_argument("-q", "--query", type=str, help=t("Search query (skip prompt)"))
     parser.add_argument(
         "-t", "--type", type=str, choices=provider_cli_choices(),
-        help="Search provider (default: movie if used with -q)",  # i18n: ignore — before language resolution
+        help=t("Search provider (default: movie if used with -q)"),
     )
-    parser.add_argument("-f", "--filter", action="append", help="Include keyword in results")  # i18n: ignore — before language resolution
-    parser.add_argument("-x", "--exclude", action="append", help="Exclude keyword from results")  # i18n: ignore — before language resolution
-    parser.add_argument("-y", "--skip-warning", action="store_true", help="Skip network exposure warning")  # i18n: ignore — before language resolution
+    parser.add_argument("-f", "--filter", action="append", help=t("Include keyword in results"))
+    parser.add_argument("-x", "--exclude", action="append", help=t("Exclude keyword from results"))
+    parser.add_argument("-y", "--skip-warning", action="store_true", help=t("Skip network exposure warning"))
     parser.add_argument(
         "--by", choices=creator_facet_choices(),
-        help="Search by creator role (use with --name and -t), e.g. --by director",  # i18n: ignore — before language resolution
+        help=t("Search by creator role (use with --name and -t), e.g. --by director"),
     )
-    parser.add_argument("--name", type=str, help='Creator name for --by, e.g. --name "Hayao Miyazaki"')  # i18n: ignore — before language resolution
+    parser.add_argument("--name", type=str, help=t('Creator name for --by, e.g. --name "Hayao Miyazaki"'))
     from torrent_finder.ui.theme import THEMES
     parser.add_argument("--theme", choices=tuple(THEMES), type=str.lower,
-                        help="Colour theme for this run (saved choice: Settings › Appearance)")  # i18n: ignore — before language resolution
+                        help=t("Colour theme for this run (saved choice: Settings › Appearance)"))
     from torrent_finder import i18n
     parser.add_argument("--lang", type=_language_arg, metavar="{" + ",".join((i18n.AUTO, *i18n.languages())) + "}",
-                        help="Interface language for this run (auto: the system's display language)")  # i18n: ignore — before language resolution
+                        help=t("Interface language for this run (auto: the system's display language)"))
     return parser
 
 
@@ -1248,8 +1248,50 @@ def _language_arg(value: str) -> str:
     code = i18n.AUTO if value.strip().casefold() == i18n.AUTO else i18n.normalise(value)
     if code is None:
         choices = ", ".join((i18n.AUTO, *i18n.languages()))
-        raise argparse.ArgumentTypeError(f"invalid choice: {value!r} (choose from {choices})")  # i18n: ignore — before language resolution
+        raise argparse.ArgumentTypeError(t("invalid choice: {value} (choose from {choices})",
+                                           value=repr(value), choices=choices))
     return code
+
+
+def _early_language(argv=None) -> None:
+    """Choose the language before the parser is built, so --help and argument errors speak it.
+
+    Reads only ``--lang`` (a malformed one is left for the full parser to
+    report), the environment and the saved choice, as ``_apply_language``
+    does later; the update preview reads no settings.
+    """
+    from torrent_finder import i18n
+    early = argparse.ArgumentParser(add_help=False)
+    early.add_argument("--lang")
+    early.add_argument("--preview-update", nargs="?", const="success")
+    known, _rest = early.parse_known_args(argv)
+    try:
+        lang = _language_arg(known.lang) if known.lang else None
+    except argparse.ArgumentTypeError:
+        lang = None
+    saved = None
+    if not known.preview_update:
+        try:
+            from torrent_finder.state import load_setting
+            saved = load_setting(i18n.SETTING, None)
+        except Exception:  # an unreadable store must never stop --help
+            saved = None
+    i18n.apply_startup(lang, saved=saved)
+
+
+def _speak_argparse() -> None:
+    """argparse's own words ("usage:", "options", its errors) through the catalogue, in the language of the moment."""
+    from torrent_finder import i18n
+    if getattr(argparse._, "torrent_finder", False):
+        return
+    english = argparse._
+
+    def translate(message):
+        text = english(message)
+        return i18n.t(text, ctx="argparse")
+
+    translate.torrent_finder = True
+    argparse._ = translate
 
 
 def _apply_language(args) -> str:
@@ -1822,6 +1864,8 @@ def main() -> None:
     from torrent_finder.search_profiles import ProfileError
     from torrent_finder.ui import keyboard
     keyboard.install()  # on Windows a typed "à" stays a letter instead of a special-key prefix
+    _early_language()
+    _speak_argparse()
     args = _build_parser().parse_args()
     if args.preview_update:
         _apply_language(args)

@@ -172,7 +172,10 @@ Athanor, are never translated.
   test. A test of a translated screen applies its language itself.
 - Key bars stay parseable: a translated action starts with an ASCII letter,
   a digit or `(` (ui/theme.py's footer parser), which the check enforces.
-- `--help` stays English for now (argparse's own words are English), and so
-  does the profile-tab hand-off line printed before the language is applied.
+- `--help` and argument errors speak the language too: `main._early_language`
+  resolves it (from `--lang`, the environment and the saved choice) before the
+  parser is built, and `main._speak_argparse` looks argparse's own words up
+  under the context `argparse` (listed in `scripts/i18n.py`'s `ARGPARSE`, since
+  no `t()` call in this tree names them).
 - Numbers keep the decimal point; a decimal comma for pt-BR is a later
   option.

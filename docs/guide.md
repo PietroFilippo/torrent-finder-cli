@@ -907,7 +907,7 @@ applies at once and is saved. `--lang CODE` (`auto`, `en`, `pt-BR`) and
 choice.
 
 - Keys are the same in every language; yes/no questions also take **S** or
-  **sim** in Portuguese.
+  **sim** in Portuguese. `--help` and command-line errors use the language too.
 - Names of sources, release tags, search words and file names are never
   translated, and searches send what you type.
 - Windows in English with the region set to Brazil starts in English and says
