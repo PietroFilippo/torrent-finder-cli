@@ -119,13 +119,13 @@ class SearchSessionTests(unittest.TestCase):
         def fetch(q):
             calls.append(q)
             if len(calls) == 1:
-                release.wait(2)
+                release.wait(30)
                 return [row("Late stale result", 1)]
             return [row("Retry result", 2)]
         p = self.provider(SearchEngine("Slow", "", fetch))
         session = SearchSession([p], ["Example"])
         try:
-            results = session.run(timeout=0.06)
+            results = session.run(timeout=0.5)  # long enough for the request to start on a busy machine
             self.assertEqual(results, [])
             self.assertTrue(session.can_retry)
             fresh = session.run("retry")
@@ -395,11 +395,11 @@ class SearchSessionTests(unittest.TestCase):
         def fetch(query):
             calls.append(query)
             started.set()
-            release.wait(1)
+            release.wait(30)
             return [row()]
         session = SearchSession([self.provider(SearchEngine("Slow", "", fetch))], ["Example"], workers=1)
         try:
-            session.run(timeout=0.06)
+            session.run(timeout=5, finish_event=started)  # stops waiting once the request is under way
             self.assertTrue(started.is_set())
             session.run("retry", timeout=0.06)
             self.assertEqual(calls, ["Example"])
