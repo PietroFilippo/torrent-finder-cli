@@ -101,7 +101,7 @@ class SearchNavigationTests(unittest.TestCase):
         self.record.assert_not_called()
         self.browse.assert_not_called()
 
-    def test_multi_title_success_records_each_title_and_carries_missing_and_engine_notes(self):
+    def test_multi_title_success_keeps_every_title_in_history_counts_those_found_and_notes_the_rest(self):
         class Rows(list):
             notices = ("Fixture timed out",)
         rows = Rows([{"name": "one", "matched_queries": ["one"]}])
@@ -111,7 +111,7 @@ class SearchNavigationTests(unittest.TestCase):
         self.assertEqual((outcome, notice), ("back", None))
         self.assertEqual(self.provider.last_queries, queries)
         self.assertEqual([call.args[0] for call in self.history.call_args_list], queries)
-        self.assertEqual([call.args[1] for call in self.record.call_args_list], queries)
+        self.assertEqual([call.args[1] for call in self.record.call_args_list], ["one"])  # "two" found nothing
         self.assertIs(self.browse.call_args.args[1], rows)
         self.assertIn("No torrents for 1 of 2 titles: two", self.browse.call_args.kwargs["note"])
         self.assertIn("Fixture timed out", self.browse.call_args.kwargs["note"])

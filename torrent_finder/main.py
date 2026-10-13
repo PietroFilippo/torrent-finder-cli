@@ -1615,10 +1615,15 @@ def _search_and_browse(provider, queries: list[str],
     # individually so ↑/↓ recall offers them separately.
     from torrent_finder.state import add_history_entry
     active_preset_names = [pr.name for pr in getattr(provider, "active_presets", [])]
+    # Stats count searches that found something: in a multi-title search, only
+    # the titles the results came from (history keeps every title).
+    found = ({q for r in results for q in r.get("matched_queries", [r.get("from_work")])}
+             if len(queries) > 1 else set(queries))
     for q in queries:
         extra = {"search_profile": provider.snapshot()} if getattr(provider, "is_combined", False) else {}
         add_history_entry(q, provider.slug, active_preset_names, **extra)
-        record_search(provider.slug, q, active_preset_names)
+        if q in found:
+            record_search(provider.slug, q, active_preset_names)
 
     # Note any searched titles that returned nothing (multi-title only). It
     # rides above the results table (a pre-table print would be wiped by the
