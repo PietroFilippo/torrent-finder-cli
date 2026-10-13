@@ -24,6 +24,9 @@ nothing is written, and ``problem()`` describes it until ``retry_load()`` or
 ``set_aside_unreadable()`` recovers.
 """
 
+# i18n: converted
+from torrent_finder.i18n import N_, t
+
 import atexit
 import json
 import os
@@ -74,8 +77,16 @@ class StorageProblem:
         self.path, self.reason, self.damaged = path, reason, damaged
 
     def message(self) -> str:
-        return (f"Saved settings could not be read ({self.reason}): {self.path}. "
-                "The file was left untouched, and changes are not saved until it can be read.")
+        return t("Saved settings could not be read ({reason}): {path}. "
+                 "The file was left untouched, and changes are not saved until it can be read.",
+                 reason=self.reason_label(), path=self.path)
+
+    def reason_label(self) -> str:
+        """Display the app's marked reason; OS errors stay as supplied by the system."""
+        return t(self.reason) if self.reason == _INVALID_DATA else self.reason
+
+
+_INVALID_DATA = N_("the file is not valid settings data")
 
 
 class _Unreadable(Exception):
@@ -103,9 +114,9 @@ def _read_document(path: str, *, patient: bool = False) -> dict | None:
     try:
         data = json.loads(raw.decode("utf-8-sig"))  # an editor may have added a BOM
     except (UnicodeError, ValueError) as error:
-        raise _Unreadable("the file is not valid settings data", damaged=True) from error
+        raise _Unreadable(_INVALID_DATA, damaged=True) from error
     if not isinstance(data, dict):
-        raise _Unreadable("the file is not valid settings data", damaged=True)
+        raise _Unreadable(_INVALID_DATA, damaged=True)
     return data
 
 
@@ -410,7 +421,7 @@ def _file_lock(path: str, timeout: float):
         deadline = time.monotonic() + timeout
         while not _try_lock(fd):
             if time.monotonic() >= deadline:
-                raise SaveError("Another Torrent Finder window is saving settings. Try again in a moment.")
+                raise SaveError(t("Another Torrent Finder window is saving settings. Try again in a moment."))
             time.sleep(0.05)
         try:
             yield
@@ -452,13 +463,13 @@ def _save(extra_op, timeout: float):
         try:
             document = _read_document(STATE_PATH, patient=True) or {}
         except _Unreadable as error:
-            raise ValueError("Existing settings cannot be read; the file was preserved.") from error
+            raise ValueError(t("Existing settings cannot be read; the file was preserved.")) from error
         _apply_pending(document)
         if extra_op is not None:
             try:
                 extra_op(document)
             except (AttributeError, KeyError, TypeError) as error:
-                raise ValueError("Saved settings have an unexpected shape; nothing was changed.") from error
+                raise ValueError(t("Saved settings have an unexpected shape; nothing was changed.")) from error
         atomic_json(STATE_PATH, document)
         return document, _file_signature(STATE_PATH)
 
@@ -481,7 +492,8 @@ def commit(change) -> None:
         except SaveError:
             raise
         except OSError as error:
-            raise SaveError(f"Couldn't save settings ({error.strerror or error}). Nothing was changed.") from error
+            raise SaveError(t("Couldn't save settings ({error}). Nothing was changed.",
+                              error=error.strerror or error)) from error
         _cache, _signature = document, signature
         _pending.clear()
 

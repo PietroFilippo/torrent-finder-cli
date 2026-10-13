@@ -1,5 +1,9 @@
 """Versioned local transfer files with validation, preview and atomic restoration."""
 
+# i18n: converted
+from torrent_finder.i18n import t, tn
+
+
 from copy import deepcopy
 from datetime import datetime
 import json
@@ -18,17 +22,17 @@ PREFERENCES = {"download_dir", "hide_stream_output", "search_profiles", "combine
 
 def _object(value, allowed=None):
     if not isinstance(value, dict) or (allowed is not None and set(value) - set(allowed)):
-        raise ValueError("Invalid or unsupported backup fields; nothing was imported.")
+        raise ValueError(t("Invalid or unsupported backup fields; nothing was imported."))
 
 
 def _strings(value):
     if not isinstance(value, list) or any(not isinstance(v, str) for v in value):
-        raise ValueError("Expected a list of text values; nothing was imported.")
+        raise ValueError(t("Expected a list of text values; nothing was imported."))
 
 
 def _sort(data):
     if "result_sort" in data and (not isinstance(data["result_sort"], str) or data["result_sort"] not in SORT_ORDERS):
-        raise ValueError("Invalid result order")
+        raise ValueError(t("Invalid result order"))
     NameRules.restore(data.get("name_rules", {}))
 
 
@@ -42,9 +46,9 @@ def validate_provider(data):
     _object(engines)
     _object(modes)
     if any(type(v) is not bool for v in engines.values()) or any(v not in ("on", "off", "auto") for v in modes.values()):
-        raise ValueError("Invalid engine settings")
+        raise ValueError(t("Invalid engine settings"))
     if "nyaa_category" in data and data["nyaa_category"] not in ("1_0", "1_2", "1_3", "1_4"):
-        raise ValueError("Invalid Nyaa Anime category")
+        raise ValueError(t("Invalid Nyaa Anime category"))
 
 
 def validate_profile(data):
@@ -53,7 +57,7 @@ def validate_profile(data):
     if "selected" in data:
         _strings(data["selected"])
         if not data["selected"]:
-            raise ValueError("A profile must select at least one provider")
+            raise ValueError(t("A profile must select at least one provider"))
     providers = data.get("providers", {})
     _object(providers)
     for state in providers.values():
@@ -71,22 +75,22 @@ def _validate_appearance(value):
     _object(value, {"theme", "focus", "density", "painting", "fonts", "profile"})
     for key in ("theme", "focus", "density", "painting"):
         if key in value and not isinstance(value[key], str):
-            raise ValueError("Invalid appearance settings")
+            raise ValueError(t("Invalid appearance settings"))
     fonts = value.get("fonts", {})
     _object(fonts, theme.DESIGNS)
     for design, choice in fonts.items():
         _object(choice, {"font", "size"})
         if not isinstance(choice.get("font"), str):
-            raise ValueError("Invalid appearance font")
+            raise ValueError(t("Invalid appearance font"))
         font = terminal_profile.FONTS.get(choice["font"])
         if (font is None or font.design != design or type(choice.get("size")) not in (int, float)
                 or choice["size"] not in font.sizes):
-            raise ValueError("Invalid appearance font or size")
+            raise ValueError(t("Invalid appearance font or size"))
     profile = value.get("profile", {})
     _object(profile, {"look", "open_from_tabs"})
     if ("look" in profile and profile["look"] not in appearance.LOOKS
             or "open_from_tabs" in profile and type(profile["open_from_tabs"]) is not bool):
-        raise ValueError("Invalid terminal profile settings")
+        raise ValueError(t("Invalid terminal profile settings"))
 
 
 def validate_payload(data):
@@ -98,11 +102,11 @@ def validate_payload(data):
         validate_provider(value)
     for key, value in settings.items():
         if key == "download_dir" and value is not None and not isinstance(value, str):
-            raise ValueError("Invalid download folder")
+            raise ValueError(t("Invalid download folder"))
         if key == "hide_stream_output" and type(value) is not bool:
-            raise ValueError("Invalid stream preference")
+            raise ValueError(t("Invalid stream preference"))
         if key == "language" and value != i18n.AUTO and value not in i18n.LANGUAGES:
-            raise ValueError("Invalid interface language")
+            raise ValueError(t("Invalid interface language"))
         if key == "appearance":
             _validate_appearance(value)
         if key == "combined_search":
@@ -115,22 +119,22 @@ def validate_payload(data):
                 validate_profile(entry["settings"])
     if "history" in data:
         if not isinstance(data["history"], list):
-            raise ValueError("Invalid history")
+            raise ValueError(t("Invalid history"))
         for entry in data["history"]:
             _object(entry, {"query", "provider", "timestamp", "presets", "kind", "facet", "name", "search_profile", "queries"})
             if "queries" in entry:
                 queries = entry["queries"]
                 if not isinstance(queries, list) or not 1 <= len(queries) <= 6 or any(not isinstance(q, str) or not q.strip() for q in queries):
-                    raise ValueError("Invalid alternate-title history queries")
+                    raise ValueError(t("Invalid alternate-title history queries"))
             for key in ("query", "provider", "timestamp"):
                 if not isinstance(entry.get(key), str):
-                    raise ValueError("Invalid history entry")
+                    raise ValueError(t("Invalid history entry"))
             if not _has_timezone(entry["timestamp"]):
-                raise ValueError(f"Invalid history timestamp {entry['timestamp']!r}: use ISO 8601 with a "
-                                 "timezone, e.g. 2026-10-03T12:00:00+00:00")
+                raise ValueError(t("Invalid history timestamp {timestamp!r}: use ISO 8601 with a "
+                                   "timezone, e.g. 2026-10-03T12:00:00+00:00", timestamp=entry['timestamp']))
             for key in ("kind", "facet", "name"):
                 if key in entry and entry[key] is not None and not isinstance(entry[key], str):
-                    raise ValueError("Invalid history entry")
+                    raise ValueError(t("Invalid history entry"))
             _strings(entry.get("presets", []))
             if "search_profile" in entry:
                 validate_profile(entry["search_profile"])
@@ -145,7 +149,7 @@ def _has_timezone(timestamp):
 
 def export_settings(path, *, history=False):
     if store.problem() is not None:
-        raise ValueError("Existing settings cannot be read; repair them before exporting.")
+        raise ValueError(t("Existing settings cannot be read; repair them before exporting."))
     current = store.read()
     data = {"providers": deepcopy(current.get("providers", {})),
             "settings": {k: deepcopy(v) for k, v in current.get("settings", {}).items() if k in PREFERENCES}}
@@ -162,7 +166,7 @@ def _export(path, document):
     target = Path(path).expanduser().resolve()
     # Export never overwrites an existing file, including the app's own state.
     if target.exists():
-        raise ValueError("Export file already exists. Choose a new filename.")
+        raise ValueError(t("Export file already exists. Choose a new filename."))
     # Exclusive creation prevents a second process racing the existence check.
     with target.open("x", encoding="utf-8") as stream:
         try:
@@ -181,18 +185,18 @@ def _export(path, document):
 def read_backup(path, *, credentials=False):
     target = Path(path).expanduser()
     if target.stat().st_size > 10_000_000:
-        raise ValueError("Backup is larger than the 10 MB limit")
+        raise ValueError(t("Backup is larger than the 10 MB limit"))
     document = json.loads(target.read_text(encoding="utf-8-sig"))
     _object(document, {"format", "version", "data"})
     expected = "torrent-finder-credentials" if credentials else "torrent-finder-settings"
     if document.get("format") != expected or document.get("version") != 1:
-        raise ValueError("Wrong backup type or unsupported version")
+        raise ValueError(t("Wrong backup type or unsupported version"))
     data = document.get("data")
     if credentials:
         from torrent_finder.credentials import _FILE_KEYS
         _object(data, _FILE_KEYS)
         if any(not isinstance(v, str) for v in data.values()):
-            raise ValueError("Invalid credential values")
+            raise ValueError(t("Invalid credential values"))
     else:
         validate_payload(data)
     return deepcopy(data)
@@ -218,7 +222,7 @@ def import_change(data, mode="merge"):
 def _check_import(data, mode):
     validate_payload(data)
     if mode not in ("merge", "replace"):
-        raise ValueError("Choose merge or replace")
+        raise ValueError(t("Choose merge or replace"))
 
 
 def _apply_import(result, data, mode):
@@ -228,8 +232,8 @@ def _apply_import(result, data, mode):
     appearance = previous.get("appearance", {})
     local_profile = ({"profile": deepcopy(appearance["profile"])}
                      if isinstance(appearance, dict) and "profile" in appearance else {})
-    changes = ["Merge: imported provider/preferences win; other settings stay." if mode == "merge"
-               else "Replace: replace portable provider/preferences; keep machine settings, stats and bookmarks."]
+    changes = [t("Merge: imported provider/preferences win; other settings stay.") if mode == "merge"
+               else t("Replace: replace portable provider/preferences; keep machine settings, stats and bookmarks.")]
     if mode == "replace":
         result["providers"] = incoming.get("providers", {})
         for key in PREFERENCES:
@@ -244,22 +248,22 @@ def _apply_import(result, data, mode):
             settings.pop("appearance")
     if "combined_search" in settings and "search_profiles" not in settings:
         settings["search_profiles"] = {"version": 1, "active": "default", "profiles": [
-            {"id": "default", "name": "Default", "settings": deepcopy(settings["combined_search"])}]}
+            {"id": "default", "name": "Default", "settings": deepcopy(settings["combined_search"])}]}  # i18n: ignore (persisted identity or shell/registry syntax)
     if mode == "merge" and "search_profiles" in settings:
         existing = previous.get("search_profiles")
         if existing is None:
             existing = {"version": 1, "active": "default", "profiles": [
-                {"id": "default", "name": "Default", "settings": previous.get("combined_search", {})}]}
+                {"id": "default", "name": "Default", "settings": previous.get("combined_search", {})}]}  # i18n: ignore (persisted identity or shell/registry syntax)
         library = ProfileLibrary(existing)
         for entry in settings["search_profiles"]["profiles"]:
             match = library.find(entry["name"])
             if match:
                 match["settings"] = entry["settings"]
-                changes.append("Replace profile: " + entry["name"])
+                changes.append(t("Replace profile: {name}", name=entry["name"]))
             else:
                 entry["id"] = uuid4().hex
                 library.entries.append(entry)
-                changes.append("Add profile: " + entry["name"])
+                changes.append(t("Add profile: {name}", name=entry["name"]))
         settings["search_profiles"] = library.data
     previous.update(settings)
     if local_profile:
@@ -267,25 +271,29 @@ def _apply_import(result, data, mode):
     if "search_profiles" in settings:
         for entry in settings["search_profiles"]["profiles"]:
             config = entry["settings"]
-            changes.append(f"Profile {entry['name']}: " + ", ".join(config.get("selected", ["all default providers"])))
+            changes.append(t("Profile {name}: {providers}", name=entry['name'],
+                             providers=", ".join(config["selected"]) if "selected" in config else t("all default providers")))
             rules = NameRules.restore(config.get("name_rules", {})).summary()
             if rules:
-                changes.append(f"Name rules ({entry['name']}): {rules}")
+                changes.append(t("Name rules ({name}): {rules}", name=entry['name'], rules=rules))
     if "search_profiles" in previous:
         previous["combined_search"] = deepcopy(ProfileLibrary(previous["search_profiles"]).current["settings"])
-    changes += ["Provider settings: " + (", ".join(incoming.get("providers", {})) or "none"),
-                "Preferences: " + (", ".join(settings) or "none"),
-                "Credentials are separate and will not change."]
+    changes += [t("Provider settings: {providers}", providers=", ".join(incoming.get("providers", {})) or t("none")),
+                t("Preferences: {preferences}", preferences=", ".join(settings) or t("none")),
+                t("Credentials are separate and will not change.")]
     if "history" in incoming:
         result["history"] = (store._merge_history([(0, {"history": result.get("history", [])}),
                                                   (1, {"history": incoming["history"]})]) if mode == "merge"
                              else incoming["history"][:store.HISTORY_LIMIT])
         compact_history(result)
-        changes.append(f"History: {len(result['history'])} entries after {mode}")
+        changes.append(tn("History: {n} entry after merge", "History: {n} entries after merge", len(result['history']))
+                       if mode == "merge" else
+                       tn("History: {n} entry after replace", "History: {n} entries after replace", len(result['history'])))
     else:
-        changes.append("History: unchanged (not included)")
+        changes.append(t("History: unchanged (not included)"))
     if "download_dir" in settings:
-        changes.append("Download folder: " + str(settings["download_dir"] or "default") + " (check it exists on this computer)")
+        changes.append(t("Download folder: {folder} (check it exists on this computer)",
+                         folder=str(settings["download_dir"] or t("default", ctx="download folder"))))
     return changes
 
 

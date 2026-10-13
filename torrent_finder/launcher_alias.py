@@ -6,6 +6,9 @@ records its path in application state. Ownership markers ensure cleanup never
 deletes an unrelated command.
 """
 
+# i18n: converted
+from torrent_finder.i18n import t
+
 from dataclasses import dataclass
 import ctypes
 import os
@@ -22,7 +25,7 @@ from torrent_finder.updates import install_kind
 DEFAULT_COMMAND = "torrent-finder"
 COMMAND_CHOICES = (DEFAULT_COMMAND, "tf", "torrent", "find-torrent", "tfind")
 SETTING_KEY = "terminal_command"
-MANAGED_MARKER = "Managed by torrent-finder-cli"
+MANAGED_MARKER = "Managed by torrent-finder-cli"  # i18n: ignore (persisted identity or shell/registry syntax)
 
 _SOURCE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -118,24 +121,24 @@ def _render_launcher(target: LaunchTarget, platform: str | None = None) -> str:
         command = " ".join(
             [_cmd_quote(target.argv[0]), subprocess.list2cmdline(target.argv[1:])]
         ).rstrip()
-        lines = ["@echo off", f"rem {MANAGED_MARKER}"]
+        lines = ["@echo off", f"rem {MANAGED_MARKER}"]  # i18n: ignore (persisted identity or shell/registry syntax)
         if target.cwd:
             lines.extend([
-                f"pushd {_cmd_quote(target.cwd)}",
+                f"pushd {_cmd_quote(target.cwd)}",  # i18n: ignore (persisted identity or shell/registry syntax)
                 f"{command} %*",
-                'set "_TF_EXIT=%ERRORLEVEL%"',
+                'set "_TF_EXIT=%ERRORLEVEL%"',  # i18n: ignore (persisted identity or shell/registry syntax)
                 "popd",
-                "exit /b %_TF_EXIT%",
+                "exit /b %_TF_EXIT%",  # i18n: ignore (persisted identity or shell/registry syntax)
             ])
         else:
-            lines.extend([f"{command} %*", "exit /b %ERRORLEVEL%"])
+            lines.extend([f"{command} %*", "exit /b %ERRORLEVEL%"])  # i18n: ignore (persisted identity or shell/registry syntax)
         return "\r\n".join(lines) + "\r\n"
 
     command = " ".join(shlex.quote(part) for part in target.argv)
     lines = ["#!/bin/sh", f"# {MANAGED_MARKER}"]
     if target.cwd:
-        lines.append(f"cd {shlex.quote(target.cwd)} || exit 1")
-    lines.append(f'exec {command} "$@"')
+        lines.append(f"cd {shlex.quote(target.cwd)} || exit 1")  # i18n: ignore (persisted identity or shell/registry syntax)
+    lines.append(f'exec {command} "$@"')  # i18n: ignore (persisted identity or shell/registry syntax)
     return "\n".join(lines) + "\n"
 
 
@@ -195,7 +198,7 @@ def _commit_setting(value) -> None:
     try:
         commit_setting(SETTING_KEY, value)
     except (OSError, ValueError) as error:
-        raise LauncherError(f"The command changed, but saving that choice failed: {error}") from error
+        raise LauncherError(t("The command changed, but saving that choice failed: {error}", error=error)) from error
 
 
 def set_terminal_command(
@@ -207,7 +210,7 @@ def set_terminal_command(
 ) -> LauncherStatus:
     """Select a preset command, installing a managed shim when necessary."""
     if name not in COMMAND_CHOICES:
-        raise ValueError(f"Unsupported terminal command: {name}")
+        raise ValueError(t("Unsupported terminal command: {name}", name=name))
     if name == DEFAULT_COMMAND:
         return reset_terminal_command()
 
@@ -221,13 +224,13 @@ def set_terminal_command(
         return LauncherStatus(name, path, False, True, True)
     if existing and not (_is_managed(existing) or _is_repo_launcher(name, existing)):
         raise LauncherConflict(
-            f"'{name}' already resolves to another program: {os.path.abspath(existing)}"
+            t("'{name}' already resolves to another program: {path}", name=name, path=os.path.abspath(existing))
         )
 
     directory = directory or launcher_dir()
     path = _shim_path(name, directory, platform)
     if os.path.exists(path) and not _is_managed(path):
-        raise LauncherConflict(f"Refusing to overwrite existing file: {path}")
+        raise LauncherConflict(t("Refusing to overwrite existing file: {path}", path=path))
 
     target = target or resolve_target()
     try:
@@ -237,7 +240,7 @@ def set_terminal_command(
         if platform != "win32":
             os.chmod(path, os.stat(path).st_mode | 0o755)
     except OSError as exc:
-        raise LauncherError(f"Could not create launcher at {path}: {exc}") from exc
+        raise LauncherError(t("Could not create launcher at {path}: {error}", path=path, error=exc)) from exc
 
     _remove_previous(previous, keep_path=path)
     path = os.path.abspath(path)
@@ -298,22 +301,22 @@ def ensure_launcher_dir_on_path(directory: str) -> bool:
     try:
         import winreg
 
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, "Environment") as key:  # i18n: ignore (persisted identity or shell/registry syntax)
             try:
-                current, value_type = winreg.QueryValueEx(key, "Path")
+                current, value_type = winreg.QueryValueEx(key, "Path")  # i18n: ignore (persisted identity or shell/registry syntax)
             except FileNotFoundError:
                 current, value_type = "", winreg.REG_EXPAND_SZ
             entries = [entry for entry in current.split(os.pathsep) if entry]
             if not any(_normal_path(entry.strip('"')) == _normal_path(directory) for entry in entries):
                 entries.append(directory)
-                winreg.SetValueEx(key, "Path", 0, value_type, os.pathsep.join(entries))
+                winreg.SetValueEx(key, "Path", 0, value_type, os.pathsep.join(entries))  # i18n: ignore (persisted identity or shell/registry syntax)
 
         os.environ["PATH"] = os.pathsep.join(
             [entry for entry in (os.environ.get("PATH", ""), directory) if entry]
         )
         try:
             ctypes.windll.user32.SendMessageTimeoutW(
-                0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None
+                0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None  # i18n: ignore (persisted identity or shell/registry syntax)
             )
         except Exception:
             pass

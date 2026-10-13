@@ -6,6 +6,7 @@ session is saved, so counters from two open windows add up instead of one
 overwriting the other. Timestamps are taken once, outside the operation.
 """
 
+# i18n: converted
 from datetime import datetime, timezone
 import math
 

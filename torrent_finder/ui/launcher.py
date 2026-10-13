@@ -1,5 +1,9 @@
 """Terminal-command preset selector and launcher installation feedback."""
 
+# i18n: converted
+from torrent_finder.i18n import N_, t
+
+
 import os
 import sys
 
@@ -19,11 +23,11 @@ from torrent_finder.ui.selector import SelectItem, arrow_select
 
 
 _DESCRIPTIONS = {
-    DEFAULT_COMMAND: "Canonical command installed by the package.",
-    "tf": "Shortest quick-launch command.",
-    "torrent": "Readable short form; also included with pip and pipx installs.",
-    "find-torrent": "Explicit name with a low chance of colliding with another tool.",
-    "tfind": "Compact while remaining distinctive.",
+    DEFAULT_COMMAND: N_("Canonical command installed by the package."),
+    "tf": N_("Shortest quick-launch command."),
+    "torrent": N_("Readable short form; also included with pip and pipx installs."),
+    "find-torrent": N_("Explicit name with a low chance of colliding with another tool."),
+    "tfind": N_("Compact while remaining distinctive."),
 }
 
 
@@ -31,12 +35,12 @@ def _command_items(selected: str, available: bool) -> list[SelectItem]:
     items = []
     for name in COMMAND_CHOICES:
         is_current = name == selected
-        description = _DESCRIPTIONS[name]
+        description = t(_DESCRIPTIONS[name])
         hint = ""
         if is_current:
-            hint = "current" if available else "not on PATH yet"
+            hint = t("current") if available else t("not on PATH yet")
             if not available:  # what the command is first, then what to do about its status
-                description += "\nSelected, but the launcher is not on PATH yet: open a new terminal, or add its folder to PATH."
+                description += t("\nSelected, but the launcher is not on PATH yet: open a new terminal, or add its folder to PATH.")
         items.append(SelectItem(
             label=f"{'✓' if is_current else ' '}  {name}",
             value=name,
@@ -44,7 +48,7 @@ def _command_items(selected: str, available: bool) -> list[SelectItem]:
             is_action=True,
             description=description,
         ))
-    items.append(SelectItem(label="Back", value="back", is_action=True))
+    items.append(SelectItem(label=t("Back"), value="back", is_action=True))
     return items
 
 
@@ -61,10 +65,10 @@ def terminal_command_prompt() -> None:
 
         result = arrow_select(
             items,
-            title="Terminal Command",
+            title=t("Terminal Command"),
             footer=(
                 (notice + "\n" if notice else "")
-                + "↑/↓ navigate  •  Enter select  •  Esc go back"
+                + t("↑/↓ navigate  •  Enter select  •  Esc go back")
             ),
             start_index=start,
         )
@@ -75,20 +79,20 @@ def terminal_command_prompt() -> None:
         try:
             updated = set_terminal_command(selected)
         except LauncherConflict as exc:
-            notice = f"[warning]Not changed:[/warning] {escape(str(exc))}"
+            notice = t("[warning]Not changed:[/warning] {error}", error=escape(str(exc)))
             continue
         except LauncherError as exc:
-            notice = f"[error]Could not install command:[/error] {escape(str(exc))}"
+            notice = t("[error]Could not install command:[/error] {error}", error=escape(str(exc)))
             continue
 
         if selected == DEFAULT_COMMAND:
-            notice = "[success]Using torrent-finder.[/success] Managed quick-launch alias removed."
+            notice = t("[success]Using torrent-finder.[/success] Managed quick-launch alias removed.")
             continue
 
         if updated.path_ready:
             notice = (
-                f"[success]{selected} is ready.[/success] "
-                "It forwards every option to torrent-finder."
+                t("[success]{command} is ready.[/success] "
+                  "It forwards every option to torrent-finder.", command=escape(selected))
             )
             continue
 
@@ -97,24 +101,25 @@ def terminal_command_prompt() -> None:
             from torrent_finder.ui.prompts import confirm_prompt
 
             add_path = confirm_prompt(
-                "[bold]Add the launcher folder to your Windows user PATH?[/bold]\n\n"
-                f"{escape(directory)}\n\n"
-                "This affects new terminals only and does not require administrator access."
+                t("[bold]Add the launcher folder to your Windows user PATH?[/bold]\n\n"
+                  "{directory}\n\n"
+                  "This affects new terminals only and does not require administrator access.",
+                  directory=escape(directory))
             )
             if add_path and ensure_launcher_dir_on_path(directory):
                 notice = (
-                    f"[success]{selected} is installed.[/success] "
-                    "Open a new terminal before using it."
+                    t("[success]{command} is installed.[/success] "
+                      "Open a new terminal before using it.", command=escape(selected))
                 )
             else:
                 notice = (
-                    f"[warning]{selected} was created but is not on PATH.[/warning] "
-                    f"Add {escape(directory)} to PATH to use it."
+                    t("[warning]{command} was created but is not on PATH.[/warning] "
+                      "Add {directory} to PATH to use it.", command=escape(selected), directory=escape(directory))
                 )
         else:
             notice = (
-                f"[warning]{selected} was created but is not on PATH.[/warning] "
-                f"Add {escape(directory)} to PATH in your shell profile."
+                t("[warning]{command} was created but is not on PATH.[/warning] "
+                  "Add {directory} to PATH in your shell profile.", command=escape(selected), directory=escape(directory))
             )
 
 

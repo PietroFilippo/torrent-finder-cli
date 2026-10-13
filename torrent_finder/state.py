@@ -6,6 +6,9 @@ Explicit user actions (``save_state``, ``clear_history``) are committed at once
 and raise when saving fails; other changes are saved with the session.
 """
 
+# i18n: converted
+from torrent_finder.i18n import tn
+
 from copy import deepcopy
 import hashlib
 import json
@@ -17,10 +20,10 @@ from torrent_finder import store
 # keys on immutable ``slug``. Map covers every display name that ever existed
 # in this codebase. Idempotent — if keys are already slugs, no rewrites.
 _LEGACY_NAME_TO_SLUG = {
-    "Movies": "movies",
-    "Movies & Series": "movies",
-    "Games": "games",
-    "Anime": "anime",
+    "Movies": "movies",  # i18n: ignore (persisted identity or shell/registry syntax)
+    "Movies & Series": "movies",  # i18n: ignore (persisted identity or shell/registry syntax)
+    "Games": "games",  # i18n: ignore (persisted identity or shell/registry syntax)
+    "Anime": "anime",  # i18n: ignore (persisted identity or shell/registry syntax)
 }
 
 
@@ -341,7 +344,7 @@ def history_notes(provider_slug: str) -> dict[str, str]:
         if entry.get("provider") != provider_slug or not isinstance(query, str) or query in notes:
             continue
         names = entry.get("queries")
-        extra = f"{len(names)} names" if isinstance(names, list) and len(names) > 1 else ""
+        extra = tn("{n} name", "{n} names", len(names)) if isinstance(names, list) and len(names) > 1 else ""
         notes[query] = " · ".join(filter(None, (relative_time(entry.get("timestamp")), extra)))
     return notes
 
