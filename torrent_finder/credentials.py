@@ -7,7 +7,7 @@ Credentials are read at runtime from two sources, in order:
 
 The in-program credentials manager writes to source #2 (the JSON file), never
 to environment variables. Real values must NEVER be committed; the JSON file is
-listed in ``.gitignore``. See README for setup.
+listed in ``.gitignore``. See docs/guide.md#credentials for setup.
 """
 
 import json

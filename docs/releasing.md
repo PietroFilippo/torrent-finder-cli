@@ -4,7 +4,8 @@ Package versions come from Git tags through setuptools-scm. Do not edit
 `torrent_finder/_version.py`; it is generated during builds and ignored by Git.
 
 1. Review the commits since the latest release and select an unused version.
-   Update README usage guidance and add `docs/releases/vX.Y.Z.md` with changes,
+   Update the [user guide](guide.md) (and the README's latest-release line and
+   feature summary) and add `docs/releases/vX.Y.Z.md` with changes,
    limitations, and upgrade instructions.
 2. Run `python -m unittest discover -s tests -v` and `git diff --check`.
    Commit the release documentation with the implementation it describes.

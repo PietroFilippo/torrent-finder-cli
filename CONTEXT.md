@@ -2,7 +2,8 @@
 
 The vocabulary this codebase is written in. Code comments point here
 (`torrent_session.py`, `providers/__init__.py`); decisions with history live in
-[docs/adr/](docs/adr/).
+[docs/adr/](docs/adr/). The [code map](#code-map) at the end lists every module;
+user-facing behaviour is described in the [user guide](docs/guide.md).
 
 ## Provider
 
@@ -239,6 +240,13 @@ The Brazilian preset requires explicit regional audio tags: `PT-BR`,
 `Português Brasileiro`, etc. Generic Portuguese/dub tags and Brazilian subtitle
 tags alone do not qualify. Tags remain a heuristic, not proof of track contents.
 
+`NameRules` (`name_rules.py`) is the portable, name-only user rule contract:
+all/any normalized words, a consecutive-word phrase, and excluded words. It
+runs before hash deduplication in both solo and combined searches. Preset
+`FilterConfig` keeps its existing source-aware semantics for repack presets.
+Anime's `nyaa_category` is a saved source scope; Manga expresses scopes through
+separate EN / Non-English / Raw engines (`3_1` / `3_2` / `3_3`).
+
 `result_view.py` owns title matching and index-preserving result refinement.
 The table's `f` menu filters fetched rows and sorts them without changing their
 acquisition identity. `uploaded_at` is a UTC epoch timestamp (0 = unknown),
@@ -303,14 +311,6 @@ to refresh. Client API progress is separate from method-completion statistics.
 
 ## Store
 
-`NameRules` (`name_rules.py`) is the portable, name-only user rule contract:
-all/any normalized words, a consecutive-word phrase, and excluded words. It
-runs before hash deduplication in both solo and combined searches. Preset
-`FilterConfig` keeps its existing source-aware semantics for repack presets.
-Anime's `nyaa_category` is a saved source scope; Manga expresses scopes through
-separate EN / Non-English / Raw engines (`3_1` / `3_2` / `3_3`). Language-name
-checks remain evidence from tags, never track verification.
-
 `bookmarks.py` stores search snapshots or complete result mappings under the
 top-level `bookmarks` list. Stable IDs identify saved entries; canonical result
 identity prevents duplicates and gates refresh updates. Missing refreshed rows
@@ -357,8 +357,9 @@ Main and What's Next menus expose general quick actions, which contain bookmarks
 choose a scope only when it is absent. A provider-bound entry keeps that scope.
 `_bookmarks_flow` shares reopening, saved searches, comparison and refresh across
 these entry points. Expanded result rows retain the normal background and use
-the cursor bar and bold for focus. Random tips need a window at least 30 rows
-tall, so they never cost list rows. What's Next has unique case-insensitive letter shortcuts
+the cursor bar and bold for focus. Random tips (`arrow_select(tip=...)`) take
+the bottom rows only when the screen leaves them empty, so they never cost list
+rows. What's Next has unique case-insensitive letter shortcuts
 and Tab for quick actions; its footer responds to viewport changes.
 
 `ui.prompts.download_complete_prompt` offers Continue or Back after actions from
@@ -487,3 +488,74 @@ time and the detail text; binaries open Releases.
 usage stats, and installers. `scripts/preview_update.py` exports a browser replay
 from the same renderer for visual QA. Neither preview changes update status or
 opens the application.
+
+## Code map
+
+Everything lives in the `torrent_finder/` package; `torrent-finder` and
+`torrent` both map to `torrent_finder.main:main`. Paths are relative to the
+package. The sections above explain the concepts.
+
+**Entry and startup.** `main.py` (argparse and the top-level flows: search loop,
+quick actions, bookmarks, What's Next; `_available_facets` hides a creator facet
+whose credential is missing when it has no keyless fallback). `__main__.py`
+(`python -m torrent_finder` and the PyInstaller binary). `torrent.bat` (repo
+root, Windows launcher for a clone). `terminal_check.py` (plain-ASCII advisory
+for terminals without VT processing or `TERM=dumb`, with the `winget` and
+`VirtualTerminalLevel` fixes). `security.py` (network exposure warning through
+`ip-api.com`). `constants.py` (shared console, trackers, `user_data_dir()`,
+`machine_state_dir()`, legacy-location discovery, `get_download_dir()`).
+`utils.py` (formatting, seed colours, marquee, `build_magnet`).
+
+**Providers and search.** `providers/`: the registry with `ProviderGroup` and
+CLI choices (`__init__.py`), `base.py` (`BaseProvider`, `SearchEngine`, engine
+modes, preset query shaping, and the APIBay, Nyaa RSS and SolidTorrents calls),
+one module per Provider (YTS lives in the movie provider), and
+`combined_provider.py`. A provider may set
+`nyaa_category`, `creator_facets`, `prefer_title_matches` with `title_relevance`,
+and `_sort_results` for ties (Books: Libgen first; Madokami: a series folder
+before its contents). Search runs in `search_session.py`, `search_control.py`
+(deadlines, Retry-After pauses), `search_diagnostics.py` and `search_errors.py`;
+rows are `search_result.py`; `search_profiles.py` holds named profiles. Source
+clients: `knaben.py`, `apibay_cache.py`, `nyaa.py` (catalog supplement),
+`fitgirl.py`, `online_fix.py`, `rutracker.py`, `madokami.py`, `libgen.py`
+(mirror failover, keyed download link, chunked download), `fdroid.py`.
+Filtering and ranking: `filters.py`, `language_tags.py`, `name_rules.py`,
+`result_view.py`, `result_details.py` (listing metadata, filename hints,
+`release_tags`).
+
+**Resolvers.** `resolvers/types.py` (`CreatorFacet`, `Entity`, `Work`); facets
+expose `search_entities(name)` and `list_works(entity, page)` → `(works,
+has_more)`. `anilist.py` (anime director and studio, manga writer), `jikan.py`
+(manga magazines), `wikidata.py` (keyless movie and game fallback),
+`openlibrary.py` (authors, works by edition count), `tmdb.py`, `igdb.py`, and
+`movies.py` / `games.py`, which pick TMDB or IGDB when configured and Wikidata
+otherwise. `titles.py` and `topics.py` serve alternate titles and discovery;
+`creator_search.py` runs the picked works through the search session.
+
+**Acquisition and downloads.** `acquisition.py`, `torrent_session.py`,
+`torrent_meta.py` (file list through aria2c, episode numbers, video and
+subtitle classification, `match_subtitles_for`, `--select-file` ranges),
+`torrent_info.py` (source-page details for Nyaa, APIBay and YTS),
+`downloader.py` (aria2c, webtorrent, peerflix, VLC and quiet mode),
+`direct_download.py` (safe names, `.part` files, numbered names), `unpack.py`,
+`qbittorrent.py`, `subtitles.py` (subliminal) and `jimaku.py`.
+
+**Persistence.** `store.py`, `state.py` (settings and history operations,
+including the migrations from boolean engine toggles and display-name keys),
+`stats.py`, `bookmarks.py`, `settings_backup.py`, `credentials.py` and
+`credential_registry.py`.
+
+**Appearance, launcher and updates.** `paintings.py` (catalogue in
+`assets/paintings`, a dependency-free 1-bit PNG reader and writer, recolouring,
+export; `scripts/build_paintings.py` rebuilds the assets), `terminal_profile.py`,
+`launcher_alias.py`, `updates.py`.
+
+**UI (`ui/`).** Frame and layout: `display.py` (alternate screen, flicker-free
+frames), `theme.py`, `chrome.py`, `layout.py`, `selector.py`, `inspector.py`.
+Screens: `prompts.py` (menus, download method, confirmations, provider source
+menu), `table.py`, `result_filters.py`, `search_progress.py`,
+`search_diagnostics.py`, `streaming.py`, `appearance.py`, `history.py`,
+`stats.py`, `tips.py` and `tips_page.py`, `creator.py`, `titles.py`,
+`discovery.py`, `combined.py`, `name_rules.py`, `bookmarks.py`, `backup.py`,
+`credentials.py`, `qbittorrent.py`, `launcher.py`, `storage.py` (unreadable
+settings at startup) and `update_progress.py`.

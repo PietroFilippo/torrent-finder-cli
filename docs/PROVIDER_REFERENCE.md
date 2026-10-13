@@ -1,15 +1,14 @@
 # Provider reference — tested October 3, 2026
 
-This document describes **each provider as tested in v0.7.0**, with dated
-**Status** notes for the changes released in v0.8.0: its sources,
+This document describes **each provider as tested in v0.7.0**: its sources,
 default settings, observed results, useful search patterns, limitations and
-recommended changes. It is a dated evidence-based reference, not a promise of
-permanent source availability. The [full audit](audits/2026-10-03/README.md)
-contains the raw evidence, methodology and reproduction instructions.
-
-Changes implemented since the audit are recorded in dated **Status** notes under
-each provider. Tables show the defaults that were tested; a note follows where a
-default has changed.
+recommended changes. Dated **Status** notes under each provider record the
+changes released since, in v0.8.0 and v0.8.1 (v0.9.0 changed no sources).
+Tables show the defaults that were tested; a note follows where a default has
+changed. It is a dated evidence-based reference, not a promise of permanent
+source availability. The [full audit](audits/2026-10-03/README.md) contains the
+raw evidence, methodology and reproduction instructions. How to use each
+provider is in the [user guide](guide.md#providers-and-sources).
 
 ## Reading the results
 
@@ -721,7 +720,8 @@ found and fixed these:
   (`Android Studio … Windows`, `[Android + iOS]`).
 - Author matching accepts either name order and ignores "Jr.".
 
-The audit's suggested order, and where it stands after v0.8.0:
+The audit's suggested order, and where it stands after v0.8.1 (unchanged in
+v0.9.0):
 
 1. **Done:** Online-Fix error/result parsing and shared pacing; clearer blocked
    access/rate-limit diagnostics, with bounded retries and partial results.

@@ -144,8 +144,8 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
         provider_configs["addic7ed"] = add_cfg
     if not os_cfg:
         console.print(
-            "[dim]Tip: set OpenSubtitles.com credentials for far better matches "
-            "(see README).[/dim]"
+            "[dim]Tip: set OpenSubtitles.com credentials (main menu › Credentials) "
+            "for far better matches.[/dim]"
         )
 
     try:

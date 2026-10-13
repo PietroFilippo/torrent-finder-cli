@@ -1,118 +1,32 @@
-# Torrent Search CLI
+# Torrent Finder CLI
 
-An interactive command-line application for searching and downloading torrents directly from your terminal. Built with Python and `rich`.
+Search torrents and direct downloads across movies and series, games,
+software, anime, manga and books from one keyboard-driven terminal app, then
+hand the pick to your torrent client, download it in the terminal, or stream it
+to VLC with subtitles. Each category searches several sources at once and puts
+the title you asked for first. Torrent Finder is written in Python with
+[Rich](https://github.com/Textualize/rich).
 
-Install it from PyPI (`pipx install torrent-finder-cli`) or grab a standalone, no-Python binary from [Releases](https://github.com/PietroFilippo/torrent-finder-cli/releases) — see [Installation](#installation).
+The latest release is **v0.9.0**: see its [release notes](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/releases/v0.9.0.md).
+The [user guide](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/guide.md) explains every feature in detail.
 
-See the [v0.8.1 release notes](docs/releases/v0.8.1.md) for the latest release, new features, and upgrade guidance.
+## Install
 
-The [October 2026 provider audit](docs/audits/2026-10-03/README.md) records measured source coverage, access failures, known search gaps, and prioritized recommendations across every provider.
-The separate [provider reference](docs/PROVIDER_REFERENCE.md) details each provider's tested sources, behavior, limitations, and recommendations.
-
-## Features
-
-- **Menus and Bookmarks:** The main screen and **What's Next?** include **Quick actions** (**Tab**), with **Bookmarks / download later** (**B**) inside. **What's Next?** also offers **Main menu** and a shortcut for every option. Opening a search-specific action from a general menu asks you to choose its provider; opening quick actions from a provider's search prompt keeps that provider's scope. Expanded **i** details retain the table's dark background.
-- **qBittorrent WebUI:** Configure **Quick actions → Q → Configure / verify**, or **Credentials → qBittorrent WebUI**, with the WebUI URL and login. Single and batch download menus then offer **Send to qBittorrent WebUI**. Choose a folder on the client's computer and an existing category, then explicitly send. Hash checks detect existing torrents without changing their destination. Magnets, lazy-resolved magnets and Online-Fix torrent files are supported; direct downloads are skipped. Full torrents are added; file selection belongs to qBittorrent. The CLI displays actual client state, progress, speed, ETA and destination; **R** refreshes this snapshot. A submitted request or 100% progress is not reported as verified download completion. The ordinary default-client option remains available. The app does not enable WebUI, change network exposure, or alter client authentication. Environment equivalents: `QBITTORRENT_URL`, `QBITTORRENT_USERNAME`, `QBITTORRENT_PASSWORD`. This uses the [qBittorrent WebUI API v2](https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-%28qBittorrent-5.0%29).
-- **Topic Discovery:** Choose **Quick actions → D** (or the provider's search-mode menu), find one topic phrase at a time, select explicit catalog terms, and browse works matching **all** selected terms. [AniList](https://docs.anilist.co/reference/query) supports Anime/Manga genres and tags; tags require at least 60% catalog relevance. Searching `time travel` finds the catalog term **Time Manipulation**, which you review before using; `mahjong` finds **Mahjong**. [TMDB](https://developer.themoviedb.org/reference/discover-movie) supplies movie/TV genres and keywords with a TMDB key. [IGDB](https://api-docs.igdb.com/) supplies game genres, themes, modes and keywords with Twitch credentials; add `co-op` and `survival` separately. [Open Library](https://openlibrary.org/dev/docs/api/subjects) supports one book subject per search. Other catalogs allow up to three terms. Select at most three works across three catalog pages, then review up to two names per work before searching releases. Combined profiles use only compatible selected providers, shown before searching. Exact chosen names persist in history. English catalog vocabulary works best; arbitrary sentences are not semantic search. Desktop/Mobile Software still use ordinary literal keyword searches. Catalog topics do not guarantee release availability or working multiplayer.
-- **Named Search Profiles:** Under **Search across providers → Ctrl+F → Profile**, save copies of your setup, switch profiles, rename, or delete them. Each profile keeps its selected providers, engine modes, required/preferred presets, shared name rules, and result order. A profile can select just one provider. Existing combined settings become **Default**; solo settings remain independent. All profile edits stay in a draft until **Save and return**; **Esc** discards them. From the CLI: `torrent --profile "Anime + Manga" -q "Saki"`.
-- **Prefer or Require:** Presets cycle **Off → Require → Prefer** with Space or Enter. **Prefer 1080p** ranks matching releases higher while retaining 720p/480p; **Require 1080p** excludes other resolutions. Recommended order preserves title relevance where available, then preferences. Seed/date/name/size sorts override ranking preferences; required filters always apply. Existing enabled presets remain **Require**.
-- **Search Across Providers:** Choose **Search across providers** to search every provider or a saved selection, such as Anime + Manga. **Ctrl+F** chooses providers, shared name rules, and each provider's own engines/presets. The combined profile is saved separately from individual searches. Results retain their provider and source, merge duplicate torrents (one that a broad provider shares with a specific one is listed under the specific one: Anime rather than Movies & Series, whose Knaben search includes anime), and offer the appropriate download/stream actions. Missing logins produce notices while other providers' results remain usable.
-- **Multi-Category Search:** Torrents across different providers (Movies & Series, Games, Software, Anime, Manga, Books), each with its own tailored search backends. The Movies & Series provider handles both films and TV shows — the episode-aware streaming flow kicks in automatically when a torrent contains multiple video files. **Software** is a group on the provider screen: pick it and choose a source — **Desktop** (Windows/macOS/Linux programs: The Pirate Bay's Applications categories and Knaben searched together; SolidTorrents is an opt-in engine), **Mobile** (Android apps — APK/MOD/OBB; Android-only and says so when you search. Knaben's Android category is searched first, with APIBay as the Auto fallback, and the app itself ranks above look-alikes and add-ons. An optional **F-Droid** engine, Off by default, adds free and open-source apps from the official F-Droid repository: rows show the exact package (`VLC [org.videolan.vlc]`), and a pick downloads the current APK straight from f-droid.org), or **RuTracker** (logs into [rutracker.org](https://rutracker.org) and searches it directly — great for software, audio, and rare content; needs an account set under the credentials menu, and warns when no login is configured). On the CLI these stay individually addressable: `-t software`, `-t mobile`, `-t rutracker`. **Games** is likewise a group: pick it and choose **General** (PC, consoles, ROMs & repacks — The Pirate Bay's game categories plus the FitGirl and Online-Fix sites, with Knaben as the Auto fallback and SolidTorrents opt-in), **Online-Fix** (scrapes [online-fix.me](https://online-fix.me) for co-op/online game cracks), or **FitGirl** (searches the official [fitgirl-repacks.site](https://fitgirl-repacks.site) — the one trustworthy source for FitGirl repacks, since fake "FitGirl" uploads on public trackers are a known malware vector; no account needed, the magnet resolves from the post when you pick a result). On the CLI they're `-t game`, `-t online-fix`, and `-t fitgirl`. Online-Fix needs **no account** — both search and download are anonymous (the file host is referer-gated, not login-gated); picking a result downloads the `.torrent` into your download folder and opens it in your system torrent client, showing the archive password (`online-fix.me`) to unpack the game with. **Manga** is also a group: **General** (Nyaa Literature + Apibay Comics) or **Madokami** (the private [manga.madokami.al](https://manga.madokami.al) library — needs an account under the credentials menu; hits are **direct downloads**, no torrent client involved: results name what a pick opens (`[series folder]`, `[folder]`, `[file]`) and list the series named as searched first; picking a folder opens it, so you can step into its release folders and check the volumes you want, and the chosen archives are saved straight to your download folder, two or more from one series together in a folder named after it). On the CLI: `-t manga` and `-t madokami`. **Books** searches **Libgen** (the live libgen mirror family — anonymous, **direct file downloads**: picking a result resolves the download link and streams the file straight to your download folder with a progress bar, no torrent client involved) plus The Pirate Bay's E-books and Audio books categories, with SolidTorrents' eBook category as an opt-in engine. Neither default engine needs a login. Libgen rows show the format and language (e.g. `[epub, English]`), and filter presets cover EPUB / PDF / Kindle (MOBI/AZW3) / Audiobook / English. On the CLI: `-t books` (or `-t book`).
-- **Multi-Engine Fan-Out:** Each provider queries its **On** sources in parallel and merges results, deduplicating by info hash. Movies & Series, Anime, Books, Desktop, Mobile and Madokami rank the searched title first; other providers sort by seeders. **Auto** engines run when the On engines return zero raw rows; Books and Mobile also run them when no row is the requested book or app. **Off** engines are skipped unless an active preset, or a preset word typed after the title, requires them for that search. Movies & Series keeps Apibay + Nyaa live-action On, Anime uses Nyaa, Manga combines Nyaa Literature + Apibay Comics, Books pairs Libgen with Apibay E-books/Audio books, Desktop searches Apibay + Knaben, and Mobile searches Knaben with Apibay as its Auto engine. YTS, SolidTorrents and F-Droid remain available as Off-by-default options.
-- **Search by Creator:** Search by the people and companies behind the content instead of by title. After choosing a provider, a "choose how to search" screen offers normal keyword search **plus** by-creator options — **Anime** and **Movies & Series** by **director** or **studio**, **Manga** by **writer** or serialization **magazine**, **Games** by **developer** or **publisher** (kept separate — a company can be both), **Books** by **author**. You type a name, disambiguate between matches, then multi-select which of that creator's titles to include (a paged checklist, 100 per page with `n`/`p`); the app runs a normal torrent search for each picked title and merges the results — so picking still uses all the usual download/stream/episode options. It works **keyless out of the box** (AniList for anime/manga staff, Jikan for manga magazines, Wikidata for movies/games, OpenLibrary for book authors — works ordered so an author's best-known books come first), and an optional **TMDB** key (Movies & Series) or **Twitch/IGDB** credentials (Games) added under **Credentials** transparently upgrade those two to richer, better-ranked data. Online-Fix is included in the Games developer/publisher results. From the CLI: `--by <role> --name "<creator>"` alongside `-t`, e.g. `torrent -t anime --by director --name "Hayao Miyazaki"`.
-- **Search Several at Once (multi-title):** At the keyword prompt, press **Ctrl+N** to add another title, then `Enter` to search them all together — results fan out across the provider's engines and merge into one list. A **From** column shows which searched title each result came from, so interleaved results are easy to tell apart. `Esc` backs out one step at a time: it clears the line being typed, then restores the last added title for editing, and only leaves the screen once everything is empty.
-- **Multi-Select & Batch Download:** In the results table, press **Space** to tick more than one torrent (`a` select all, `c` clear), then `Enter`. A batch menu lets you **open all in your torrent client**, **download all with `aria2c`** (one parallel process — no client needed), or **copy all magnet links** at once. Works for any results — several releases of one title, or picks spanning a multi-title / by-creator search. A single pick still opens the full per-torrent download menu.
-- **Arrow-Key Driven UI:** Fully interactive, flicker-free terminal interface.
-  - Utilizes an alternate screen buffer so your scrollback history remains flawlessly clean.
-  - **Two designs:** **Athanor** (the default) frames every screen like a roguelike scriptorium: a double-line frame whose top edge names the screen (`torrent-finder » Movies & Series › dune`) and what it is about, a message line above it saying what just happened, and a NetHack-style status line below (searches, picks, bookmarks, keys pressed, the date, the VPN check and the version). **Simple** is the quiet look: no boxes or emoji, one header line that names the screen and, on the right, what it is about (the version and network status on the main menu, counts on Filters and Stats, failures on Search diagnostics), and thin rules around the content. In both, the focused row is highlighted in the accent colour, hints and shortcuts sit in an aligned column, and every screen ends with the same key bar. Press `?` on any menu or on the results for the full list of its keys. Download and stream logs start at column 0, aligned with the output of `aria2c`, `webtorrent` and `peerflix`.
-  - **Themes and paintings:** **Settings › Appearance** picks the design and its colours: Athanor's five colourways, **Citrinitas** (the default: lamplight amber on parchment), **Rubedo**, **Albedo**, **Viriditas** and **Nigredo**, or Simple's six themes, **Quiet Blue** (your terminal's bright blue with three shades of it), **Iris**, **Lagoon**, **Ember**, **Mono** and **Paper** (for light terminal backgrounds). Athanor also has a **painting**, chosen apart from the colours, which recolour it: ten public-domain engravings, six by Gustave Doré, plus Dürer's *Melencolia I*, the Flammarion engraving, Pamela Colman Smith's *Hermit* and an emblem from Maier's *Atalanta Fugiens*. Themes colour the text; the background is your terminal's own. On Windows, **Add a torrent-finder profile** gives Windows Terminal a profile that opens the app on the theme's own page, with the painting behind the text (Windows Terminal 1.24 or later) and a font and text size chosen per design (five bundled pixel fonts for Athanor, such as IBM VGA 8x16 and XGA 12x20, sized in sharp multiples; Cascadia, Consolas or Lucida Console for Simple); it appears at once and follows later choices, open tabs included, without restarting Windows Terminal. For Athanor it has a **full look** (the page, painting and pixel font) or a **plain look** (Windows Terminal's own page and font, as in any other tab). **Open from other tabs** (off by default) makes the command, typed in another Windows Terminal tab, open the app in a torrent-finder tab of the same window: Windows Terminal keeps pictures and fonts in profiles, so a program cannot change them in the tab it started in. Elsewhere, **Save the painting as an image** and set it as your terminal's background picture. Outside that profile, set your terminal to a light colour scheme before choosing Paper (Windows Terminal: `Ctrl+,` › your profile › Appearance › Color scheme). Each row there previews the theme's own colours; `Space` previews it on the whole screen, `Enter` saves it. The same screen picks the focus style (a cursor bar, or the focused row on a tinted background) and the density (**Compact** drops rules and spacer lines at every size, so lists show more rows). `--theme NAME` or `TORRENT_FINDER_THEME=NAME` choose a theme for a run without saving it; `NO_COLOR` is honoured.
-  - **Main menu at a glance:** **Continue** reopens your newest search in the search field; each provider row shows the engines it will search and its preferred or required presets; Credentials counts what is set, and the download folder shows its path.
-  - **Inspector in wide windows:** From 150 columns (a maximised window), menus show an inspector on the right for the focused row: on the main menu, a provider's engines with On/Auto/Off, its presets, your recent searches there and how often you searched and picked from it; Continue's earlier searches; which logins are set; the download folder's free space; the appearance in use. Other menus show the row's help there. Narrower windows keep one column; when they are tall, those details show under the list instead. In every roomy window the help and key bar sit on the bottom rows, in the same place on every screen.
-  - **Explained results:** While a search runs, each provider gets its own line with its engines' states (searching, a row count, timed out, blocked…). Under the focused result, a **Tags** line lists what its name carries (resolution, source, codec, audio, HDR, PT-BR / dual audio, release group) with the tags a preferred preset asks for ticked, and **Ranked:** says why it sits there (exact title, starts with the search, prefers 1080p…). The view line counts results per source.
-  - **Dynamic Viewport Windowing:** Capable of rendering massive 500+ item checklists (like huge anime seasons) by automatically windowing the active selection while pinning crucial action buttons tightly to the top and bottom of your screen to prevent terminal overflow.
-  - **Responsive Narrow Layouts:** Selector hints, descriptions, and controls wrap without changing selectable-row height. Search results progressively collapse to the fields that fit, with hidden metadata kept under the selected row; resizing an open screen recalculates the viewport automatically. Short windows drop the spacer lines, long screen names continue on a second header line, and the header shows your position in a long list instead of “more below” rows. PgUp/PgDn and Home/End move through menus.
-  - **Marquee Scrolling:** Automatically scrolls long torrent names and checklist items that exceed the physical terminal width when hovered over.
-  - **Contextual Footers:** Displays dynamic helper text explaining the trade-offs, speeds, and seeding behaviors of different download options as you highlight them.
-- **Quick-Launch Commands:** **Settings › Terminal command** on the main menu chooses between `torrent-finder`, `tf`, `torrent`, `find-torrent`, or `tfind`. The canonical command remains available and `torrent` is built into pip/pipx installs; the other presets create one app-owned forwarding launcher, preserve every CLI argument, refuse unrelated command collisions, and can be removed safely from the same screen.
-- **Advanced Filtering:**
-  - Set built-in presets (resolutions, known uploaders/repackers, trusted release groups) to **Require**, **Prefer**, or **Off**.
-  - **Anime has no default resolution filter.** Older 480p/720p releases remain eligible. If 1080p is set to Require, it is a saved selection: open **Ctrl+F**, cycle it to **Prefer** or **Off**, and save with **w**. The first combined profile starts without an Anime resolution requirement; explicit later choices and copied profiles retain their settings.
-  - Cycle each search engine between **On** (every search), **Auto** (only after all On engines miss), and **Off** (skipped unless required by an active preset). Engines without a safe fallback role offer On/Off only.
-  - Add custom include/exclude keywords to quickly find the exact release you want.
-  - **Brazilian Portuguese audio (Movies & Series):** at the search prompt, press **Ctrl+F**, cycle **Dublado (PT-BR)** to **Require** with **Space**, and press **w** to save. The preset requires explicit Brazilian audio tags such as `PT-BR`, `PTBR`, `Português Brasileiro`, or `Brazilian Portuguese`; generic `dublado`, `nacional`, `Português`, uploader names, and PT-PT-only audio do not qualify. A PT-BR subtitle tag alone never qualifies the audio. **Legendado (PT subs)** is a separate preset for Portuguese subtitles; requiring both requires both kinds of tags. The presets also search with release words appended (`Toy Story` → `Toy Story pt-br`, `Toy Story dublado`; subtitles add `legendado`) and include Knaben + SolidTorrents while active, even if their saved mode is Off. The search screen shows these effective engines; clearing the preset restores the original selection. Language checks use release names rather than inspecting tracks, so genuinely Brazilian releases without a regional tag stay hidden and mistagged releases cannot be verified. "Dual Audio" alone is not Brazilian Portuguese evidence. Titles are not automatically translated: try the Portuguese release title if the English one finds nothing. SolidTorrents may report zero seeders, which puts its rows last among equally good title matches.
-  - **Shared keybinds with the episode picker:** `a` select all / set On • `i` invert • `c` clear presets • `w` save • `v` / `Shift+V` visual anchor + range toggle • `Space` cycles a preset or engine mode.
-  - **Persistent across runs:** engine modes, active filter presets, search history, usage stats, the quiet-mode flag, the chosen download folder, and the dismissed-warning state all live in `filter_state.json` in your user data folder (see [Where your data lives](#where-your-data-lives)), so configuration sticks after you close the program. Searches and counters are saved in the background about a second after they happen (a burst is one write), so closing the window doesn't lose them. Explicit actions (profile Save, filter-menu Confirm, clear history, reset stats, bookmarks, imports) save immediately, and a failure is reported instead of looking successful.
-- **Search History:** Press `H` on the provider screen (or `Tab` then `H` at the search prompt) to browse past searches. Filter by provider (`P`), date range (`D`, today/week/month), and sort order (`S`). Each entry shows the provider, relative timestamp, and the filter presets that were active at search time. Pick an entry to re-run the query; clear history with a confirmation modal. The last 2,000 distinct searches are kept (repeating a search moves it to the top). Combined searches remember their profile, stored once per distinct profile so the settings file stays small.
-- **Usage Stats:** Press `S` on the provider screen (or `Tab` then `S` at the search prompt) to open a scrollable stats page showing session count, total runtime, searches, top queries, torrents picked, method picks vs. completions (with success rate), avg seeders of picks, and preset usage counters. Reset all stats from the same screen, guarded by a confirmation modal.
-- **Confirmation Modals:** Destructive actions (clear history, reset stats) share one Y/N confirmation screen so you can't nuke state with a stray keypress.
-- **Dynamic Contextual Tips:** Random hints (`Tip ...`) sit at the bottom of the provider selector and post-download menus whenever the screen has empty rows there, so they never push choices off screen. A searchable tips browser is also available from the provider screen (`T`), the search prompt (`Tab` then `T`), and the post-download menu.
-- **Quiet Mode:** Toggle **Quiet mode** from the Download Method menu to suppress the native progress UIs of `aria2c`, `webtorrent-cli`, and `peerflix` (full-screen progress bars, peer lists, speed graphs) and replace them with a single minimal spinner. The toggle redraws in place with no flicker and persists across runs (stored as `hide_stream_output` in `filter_state.json`). Episode info, VLC hotkey hints, and `Ctrl+C` all still work.
-- **Flexible Downloading & Streaming:**
-  - **System Client:** Automatically send generated magnet links to your default system torrent client (like qBittorrent, Transmission, etc.).
-  - **Direct Terminal Download:** Use `aria2c`, `webtorrent-cli`, or `peerflix` integration to download files directly within the terminal, with native progress UIs.
-  - **File Browser / Episode Picker (Anime, Movies & Series, Manga, Books):** Open **Browse torrent files…** from the download menu to list every file in the torrent (videos, subs, artwork, .nfo, samples — or individual volumes/chapters for Manga) and pick any subset. Opening it fetches the torrent's file list over DHT via `aria2c`, which may take a minute or time out when no suitable peers are reachable; listed seed counts can be stale — press **Esc** during the load to cancel and return to the menu. If no file list is found, choosing it again retries; a list once found is reused for that torrent. Features vim-style visual range selection (`v` anchor, `Shift+V` range-toggle) and rapid hotkeys (`a`, `i`, `c`, `w`). **Selection persists across re-entries** — reopening the picker shows your existing checkboxes already ticked, so you can refine without rebuilding from scratch. Confirming with nothing checked clears the selection; `Esc` cancels and keeps the prior picks intact. Only `aria2c` honors strict file selection on download — `webtorrent` and `peerflix` ignore `--select` and pull the whole torrent (the menu warns you when a selection is active). **Streams auto-skip non-video picks** and warn about it, so you can still e.g. download the .srt + .nfo alongside the video without breaking playback. If a stream selection contains zero video files, the stream errors out instead of silently substituting another file.
-  - **Torrent Info (from origin):** In the **Torrent & files** section of the download menu, **Torrent info** fetches details straight from the source page — category, uploader, date, description, and the full file list. Supported sources: Nyaa (scraped), The Pirate Bay (Apibay JSON API) and YTS (API); other engines show "not available". It also reports **whether subtitles are embedded** in the video: a filename/metadata heuristic (e.g. an anime "English-translated" category or a `[Subbed]` tag), upgraded to a definitive answer via `ffprobe` when `ffmpeg` is installed and a copy of the video has already been downloaded — useful to tell a soft-subbed MKV apart from a raw release with no separate `.srt`.
-  - **Stream to VLC:** Stream media directly to VLC Media Player using `webtorrent-cli` (default) or `peerflix` (fallback). Both stream and download menus list **webtorrent before peerflix** to match this preference. Each stream opens its own VLC window (on Windows even when VLC is set to allow only one instance). If you close it, press `v` to reopen it without losing download/buffering progress; while it's open, `v` does nothing. Next/previous episode or Ctrl+C closes only that window, so other VLC playback is never touched. If the stream ends with an error, the app says so and shows the last lines of a small log in your temp folder instead of a success message. When an episode is selected, streams that specific file.
-  - **Subtitles for streams (auto + manual):** A `Subtitles: <mode>` row in the Download Method menu controls how VLC gets subtitles for the next stream:
-    - `auto-detect from torrent` *(default)* — scans the torrent for `.srt/.ass/.ssa/.vtt/.sub` files paired with each video (matched by basename, language tag like `.en.srt`, or a sibling `Subs/` folder with episode-numbered files like `01.ass`). Matches for the episodes being streamed are pre-downloaded via aria2c in one batch and attached to VLC via `--sub-file` before playback starts, so next/previous episode never waits for subtitles; streaming more episodes of the same torrent later fetches only the missing ones. English subs are prioritized as the primary track when available.
-    - `external file` — pick a `.srt/.ass` from a list of recent files in your chosen download folder (defaults to `downloads/`), or type a custom path. The same file is attached to every episode in the session.
-    - `off` — stream with no subtitles.
-    - After downloading subs via **Search & download subtitles** (the existing subliminal flow), the saved file is auto-promoted to external mode so your next stream just picks it up.
-  - **Auto Episode Navigation:** When streaming a torrent with ≥ 2 video files **without** pre-selecting anything, the CLI fetches metadata via `aria2c` (Esc or Ctrl+C cancels and returns to the download options without streaming), queues every video file in episode order (using filename patterns like `S01E01`, ` - 01`, `[01]`, `Episode 01`, or ` E01` when present; alphabetical fallback otherwise), and enables `n` (next) / `b` (previous) hotkeys so you can jump between episodes mid-session. Single-file movies still stream as-is — no forced picker, no extra wait.
-  - **Subtitle Download:** Search and download the best matching subtitles directly from the terminal using `subliminal`. Enter one or more languages separated by commas (e.g. `eng, por` or `pt-BR`) — accepts ISO codes (`eng`/`en`) and regional variants (`pt-BR`, `pt-PT`). Every available language is downloaded, the first in your order becomes the primary VLC track (the rest attach as switchable tracks), and any language it couldn't find is reported. If a matching video has already been downloaded, it hash-matches the real file for frame-accurate sync; otherwise it matches on the release name. Configuring OpenSubtitles.com credentials greatly improves results (see *Subtitle providers* below). For Anime searches, a dedicated **Jimaku** lookup (jimaku.cc) runs first when a `JIMAKU_API_KEY` is set, since the western-TV providers behind subliminal don't index anime fansubs well.
-  - **Configurable Download Folder:** A **Save to:** row in the Download Method menu — or the **Download folder** row on the Select Provider screen, which shows the current path — sets a persistent default download directory used by `aria2c`, `webtorrent`, `peerflix` downloads, the subtitle downloader, and Online-Fix / Madokami / Libgen / F-Droid file saves. Picker offers `Default (downloads/)`, `~/Downloads`, or a custom path (created on-the-fly if missing). If the saved folder can't be used when a download starts (e.g. a disconnected drive), the app says why before anything runs and lets you choose another folder, keeping the selected torrent and files. Streams and magnet-to-client handoff are unaffected — they use their own paths.
-  - **Unpack Page Archives:** Off by default; turn it on under **Download folder** (provider screen) or in the Download Method menu. Downloaded manga and comic archives (`.zip`, `.cbz`, `.rar`, `.cbr`, `.7z`, `.cb7`) that hold only images become a folder of pages beside them, and the archive is deleted once the pages are in place. It applies to Madokami files and to torrents downloaded in the app (aria2c, webtorrent, peerflix), not to a torrent client you hand a magnet to. Other archives (games, software, documents) are left alone. ZIP-based archives always work; RAR and 7z use the `tar` built into Windows 10/11 and macOS, 7-Zip or UnRAR, and an archive that can't be opened stays packed with a note saying why.
-  - **Clipboard Integration:** Easily copy magnet links directly to your OS clipboard (Windows/macOS/Linux).
-  - **Seamless Error Recovery:** If a terminal download fails, lacks dependencies, or is manually forcefully aborted by you (`Ctrl+C`), the CLI intercepts the exit and safely drops you back into the download method selector without losing your active search context.
-- **Network Exposure Warning:** At startup a warning screen queries `ip-api.com` and shows your public IP and location (masked until you press **R**), ISP, ASN, plus flags for `proxy` / `hosting` / `mobile`. Gives you a clear go/no-go decision before joining a public swarm.
-- **Install-Aware Update Check:** On startup the app checks for a newer version (at most once a day, fail-silent) and shows a notice tailored to how you installed it — a pip/pipx install compares against PyPI, a git clone against `origin`, a standalone binary against the latest Release. The notice is a high-visibility black-on-yellow banner; press **U** on the provider menu (an **Install update** row also appears there) or **Tab → Install update** at the search prompt to update in place (`pipx upgrade`/`pip -U`, `git pull`, or open the Releases page).
-- **Pagination & Navigation:** Navigate through large sets of search results cleanly, with the ability to safely go back to your previous search results after viewing download options.
-- **Refine Results:** Press **f** in the results table to match words, an exact media title (ignoring common release tags), or an exact full filename. Sort by Recommended order, newest upload, most seeders, name, or size. Unknown upload dates sort last. Filtering keeps only visible selections; sorting preserves the selected downloads.
-- **Search Diagnostics & Retry:** Press **n** in results, including an empty search, to inspect each provider/engine/query: returned and retained counts, which filter stage removed rows, time spent, cached rows, login failures, request errors, and timeouts. Counts are before deduplication. **r** retries only failed or unfinished requests and preserves received results and required filters. Saved credentials are configuration, not proof of a successful login; the diagnostics menu opens the existing credential verification flow. Keyword, combined, alternate-title, and creator searches use a 30-second wait limit and at most six concurrent engine calls. At the keyword search spinner, **Enter** shows partial results and **Esc** cancels; stopping a retry/page request retains earlier results.
-- **Alternate Titles:** At the search prompt, choose **Tab → A: Alternate-title search** (also available on creator-capable providers' search-mode menu). Identify a work by title, year/type and catalog ID, then use **Space** to choose up to six English, native, romanized or alternative names and **w** to search. Anime/Manga use [AniList](https://anilist.gitbook.io/anilist-apiv2-docs/docs/reference/object/media); Movies/Series use [TMDB](https://developer.themoviedb.org/reference/search-multi) with a TMDB key; Games use [IGDB](https://api-docs.igdb.com/) with Twitch/IGDB credentials; Books use [Open Library](https://openlibrary.org/dev/docs/api/search). Catalogs expose different name coverage; names can also be entered manually for any provider. Catalog browsing stops after three pages, and only the selected work's additional names are fetched. **n → Names searched** lists the chosen queries; source attempts also show preset expansions. History replays the exact saved names. Catalog identification does not establish release availability or eliminate similarly named releases; existing provider filters and the result refinement controls remain available.
-- **Load More:** Press **m** to request another page from participating **Nyaa and Knaben** engines. Nyaa continues after its first RSS page; Knaben advances by 50 source rows. New results are deduplicated, with the selected row, checkboxes, result refinement and sort retained. **n** shows exhausted queries, unsupported engines, page failures and the ten-page limit. A failed page can be retried with **r** without skipping its cursor. Each action fetches at most 24 source/query pages within the same bounded wait; Off engines and unused Auto engines stay untouched. Other integrations keep their current initial retrieval depth.
-- **Other Spellings:** When a search finds nothing matching the title, other common spellings are searched too, in every provider, and a notice says so: digits for spelled-out numbers (`Twenty First Century Boys` → `21st Century Boys`, `Mob Psycho Hundred` → `Mob Psycho 100`) and short vowels for romanized long ones (`Shingeki no Kyoujin` → `Shingeki no Kyojin`, `Mahjong Hishouden` → `Mahjong Hishoden`), since a source finds only the spelling it lists. Madokami also retries a search without punctuation such as `:`, which its site search can't handle.
-- **Anime and Manga Titles, Languages:** When an Anime, General Manga or Madokami search finds nothing matching the title, AniList's names for that work are searched too, but only when AniList lists what you typed as one of its names (long vowels and hyphens aside) or its top match's title begins with it. Those names are the romaji title as releases write it, the English title, and short names the romaji contains. For example, `Yokohama Shopping Log` finds the `Yokohama Kaidashi Kikou` releases, and `Mahjong Hishoden: Naki no Ryuu` (or just `Mahjong Hishoden`) finds `Mahjong Hishouden Naki no Ryuu` and `Naki no Ryuu`; a notice says so. In a search across providers, every selected provider searches these names. Language presets (Portuguese, Spanish, French, Italian, Raw) rank or require tagged releases and search the matching Nyaa category even when it is Off. Typing the language after the title (`Berserk português`) applies the preset to that search, also searches the title alone, and says how many results carry the language.
-- **Short Anime Titles:** Anime search ranks matching titles ahead of incidental word matches. When a short title such as **Saki** is crowded out of Nyaa's recent RSS feed, one bounded catalog lookup helps recover older releases. FitGirl and Online-Fix results must match the words in the game title, avoiding matches from post bodies or neighboring links. Those two sites are searched for the title alone (words such as `fitgirl`, `repack` or `linux` are left out), apostrophes don't matter (`Baldurs Gate 3` finds `Baldur’s Gate 3`), and when FitGirl finds nothing it tries the final number written the other way (`Civilization VI` → `Civilization 6`, `Grand Theft Auto 5` → `Grand Theft Auto V`). Both game providers share one FitGirl search when they run the same query.
-
-## Prerequisites
-
-- **Python 3.10+** — for the PyPI/pip install or running from source. *Not needed for the standalone binary.*
-- (Optional but recommended) **Node.js** & **npm** for installing `webtorrent-cli` or `peerflix`.
-- (Optional) **VLC Media Player** — required for streaming.
-- (Optional) **aria2** — required for the file browser / episode picker, the in-torrent subtitle auto-detect path, auto episode navigation on the peerflix backend, and single-process multi-file downloads. Install with `winget install aria2.aria2` (Windows), `brew install aria2` (macOS), or `apt install aria2` / `dnf install aria2` (Linux).
-- **A VT-capable terminal** — any modern terminal qualifies. On Windows 10's legacy console the interface renders garbled; the app detects this at startup and prints copy-paste fixes — the best one is installing [Windows Terminal](https://aka.ms/terminal) (`winget install -e --id Microsoft.WindowsTerminal`), the alternative enables ANSI in the current console via a `reg add` shown in the advisory.
-
-## Installation
-
-### With Python (3.10+) — from PyPI
-
-Install from PyPI; **pipx** keeps it isolated in its own environment:
+**With Python 3.10 or later**, from PyPI. pipx keeps it in its own environment:
 
 ```bash
 pipx install torrent-finder-cli      # recommended
-# or
-pip install torrent-finder-cli
+pip install torrent-finder-cli       # or this
 ```
 
-Then run either built-in command from anywhere:
+**Without Python**, download `torrent-finder-windows.exe`, `torrent-finder-macos`
+or `torrent-finder-linux` from [Releases](https://github.com/PietroFilippo/torrent-finder-cli/releases).
+On Windows, if SmartScreen warns, choose **More info → Run anyway** (the file is
+unsigned). On macOS and Linux, run `chmod +x <file>` and start it from a
+terminal; macOS may need **System Settings → Privacy & Security → Open anyway**
+the first time.
 
-```bash
-torrent-finder
-torrent          # short form
-```
-
-### Without Python — standalone binary
-
-Download a ready-to-run build for your OS from the
-[Releases page](https://github.com/PietroFilippo/torrent-finder-cli/releases):
-`torrent-finder-windows.exe`, `torrent-finder-macos`, or `torrent-finder-linux`.
-On Windows, double-click it (if SmartScreen warns, **More info → Run anyway** —
-it's just unsigned). On macOS/Linux, make it executable (`chmod +x <file>`) and
-run it from a terminal; on macOS the first run may need **System Settings →
-Privacy & Security → Open anyway**.
-
-### From source (for development)
+**From source** (see [development](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/development.md) for tests):
 
 ```bash
 git clone https://github.com/PietroFilippo/torrent-finder-cli.git
@@ -120,618 +34,217 @@ cd torrent-finder-cli
 pip install -e .
 ```
 
-Run it with `torrent-finder`, `python -m torrent_finder`, or `torrent.bat`
-(Windows). An editable install keeps pointing at your clone, so `git pull`
-updates it.
+### Optional tools
 
-To run the headless test suite:
+| Tool | Needed for | Install |
+|---|---|---|
+| [aria2](https://aria2.github.io/) | Browsing a torrent's files, picking episodes, subtitles found inside torrents, episode navigation with peerflix, fast multi-file and batch downloads | `winget install aria2.aria2`, `brew install aria2`, `apt install aria2` or `dnf install aria2` |
+| webtorrent-cli, peerflix (Node.js) | Streaming, and terminal downloads without aria2 | `npm install -g webtorrent-cli peerflix` |
+| [VLC](https://www.videolan.org/vlc/) | Streaming | |
 
-```bash
-python -m unittest discover -s tests
-```
+The interface needs a terminal that understands ANSI escape codes; any modern
+one does. On Windows 10's legacy console the app prints how to fix that, best
+by installing [Windows Terminal](https://aka.ms/terminal).
 
-APIBay can return HTTP 200 with a false "No results returned" sentinel, so its
-live behavior is tested separately from the deterministic unit suite. The
-stress harness runs known movie, book, and game queries sequentially and
-reports success rate, cache use, request amplification, and latency:
-
-```bash
-python scripts/stress_apibay.py --rounds 3
-```
-
-Add `--strict` when a nonzero exit status is useful. A result count ending in
-`*` came from the last-known-good cache. Live APIBay searches always run
-first; a successful provider/query result is saved, and a later empty or
-failed live attempt can replay it as `Apibay*`. Cache entries are bounded to
-128 queries.
-
-Where Knaben is Auto (Movies & Series, Games, Anime, Manga, Books), one
-category-scoped Knaben request runs when the On engines return zero raw rows;
-Books also runs it when no row is the requested book. Mobile searches Knaben On
-with Apibay as its Auto engine. Desktop searches Knaben On, alongside
-APIBay, by default: in the 2026-10-03 audit, APIBay averaged 5.4 s and found rows
-for 8 of 32 programs, and Knaben 0.8 s and 26. Desktop also ranks the searched
-program above longer products containing its name (Photoshop before Photoshop
-Lightroom or Elements), and a platform typed after the name (`Photoshop mac`,
-`… portable`) also searches the name alone and lists that platform first. Knaben is a meta-index with a
-[documented API](https://knaben.org/api/v2/). The client uses v2's cacheable GET
-searches, as Knaben asks. Unsafe and XXX rows stay hidden, zero-seed rows stay
-listed, a valid info hash is required, and each response is capped at 50 rows.
-The selected-row metadata shows Knaben's originating tracker. Results removed
-later by local filters do not cause fallback traffic.
-
-Engine modes are configurable under **Filters & engines**: On searches every
-time, Auto searches only after an On miss, and Off is skipped unless an active
-or typed preset requires it for that search. The
-selection persists. These layers improve availability but cannot guarantee
-results because every external source can still be unavailable.
-
-Run Knaben's live matrix separately from the unit suite:
+## Quick start
 
 ```bash
-python scripts/stress_knaben.py --rounds 1
+torrent-finder        # or the short form: torrent
 ```
 
-The default delay is deliberate: the script is a smoke/stress diagnostic, not
-a load generator. Add `--strict` when any empty query should fail the command.
+A network check first shows your public IP and whether it looks like a VPN
+(the IP stays masked until you press **R**; **Enter** continues). Then pick a
+provider on the main menu, type a title and press **Enter**. Pick a result to
+open the download menu.
 
-### Optional direct download / streaming tools
+| Where | Keys |
+|---|---|
+| Everywhere | **↑/↓** move, **Enter** choose, **Esc** back, **?** every key of the screen |
+| Main menu | **F** filters of the highlighted provider, **H** history, **S** stats, **T** tips, **Tab** quick actions, **Esc** twice to quit |
+| Search prompt | **Ctrl+F** filters and engines, **Ctrl+N** add another title, **Tab** quick actions |
+| Results | **Space** tick, **Enter** open, **i** details, **f** refine and sort, **b** bookmark, **n** diagnostics, **r** retry, **m** load more |
 
-Install these only if you want terminal-managed downloads or Stream to VLC:
+## Features
+
+### Searching
+
+- **Eleven providers**: Movies & Series, Anime, Books, and three groups:
+  **Games** (General, Online-Fix, FitGirl), **Software** (Desktop, Mobile for
+  Android, RuTracker) and **Manga** (General, Madokami). See the
+  [provider table](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/guide.md#providers-and-sources).
+- **Several engines per provider**, searched in parallel and merged without
+  duplicates. Each engine is **On**, **Auto** (only when the others find
+  nothing) or **Off**.
+- **Search across providers** with saved, named profiles, each with its own
+  providers, engines, presets, name rules and result order.
+- **Several titles at once** (**Ctrl+N**), merged with a column showing which
+  title found each result.
+- **Search by creator**: director, studio, writer, magazine, developer,
+  publisher or author, without any account (TMDB and IGDB keys make movies and
+  games richer).
+- **Alternate titles**: identify a work in AniList, TMDB, IGDB or Open Library
+  and search its English, native and romanized names together.
+- **Topic discovery**: find works by catalog genres and tags (`time travel`,
+  `co-op`), then search their releases.
+- **Other spellings**: when nothing matches, digits for spelled-out numbers,
+  short romanized vowels and AniList's names are searched too.
+
+### Results
+
+- **The title you asked for first**: films above sequels, programs above
+  add-ons, the book by its author, with a **Ranked:** line saying why.
+- **Presets** (resolution, release groups, languages, formats) cycle Off →
+  **Require** → **Prefer**: Prefer ranks matches higher without hiding the rest.
+- **Brazilian Portuguese** audio and subtitle presets that read explicit
+  release tags and search the Portuguese release words too.
+- **Literal name rules** (all words, any word, exact phrase, exclude) and a
+  refine-and-sort menu (**f**) on the fetched results.
+- **Diagnostics** (**n**) per provider, engine and query; **r** retries only
+  what failed; **m** loads more pages from Nyaa and Knaben.
+- **Bookmarks** (**b**) for results and searches to download later.
+
+### Downloading and streaming
+
+- Hand magnets to your **torrent client**, send them to **qBittorrent WebUI**
+  with real progress, or download in the terminal with **aria2c**, webtorrent or
+  peerflix.
+- **Batch**: tick several results and open, download or copy them all at once.
+- **Pick files** inside a torrent, such as single episodes or manga volumes.
+- **Direct downloads** from Libgen, Madokami and F-Droid, never overwriting a file.
+- **Stream to VLC** with next and previous episode keys, and subtitles found
+  inside the torrent, from a file, or downloaded through OpenSubtitles,
+  Addic7ed, Podnapisi, TVsubtitles and Jimaku.
+- **Unpack manga archives** into folders of pages (optional).
+
+### Appearance
+
+- Two designs: **Athanor** (the default), a framed roguelike scriptorium with
+  five colourways, and **Simple**, a quiet look with six themes including
+  **Paper** for light terminals.
+- Public-domain engravings behind the app, through a **Windows Terminal
+  profile** with pixel fonts, or as a saved image for other terminals.
+- An inspector pane in wide windows, and layouts that adapt to narrow, short
+  and tall windows.
+
+### Settings and data
+
+- Settings, history (2,000 searches), stats and bookmarks are saved within a
+  second, and several windows can be open safely.
+- Settings **backup and import** between computers, with a preview first.
+- **In-app updates** for pip, pipx and source installs, in the same window.
+- An optional short command: `tf`, `find-torrent` or `tfind`.
+
+## Command line
 
 ```bash
-npm install -g webtorrent-cli peerflix
-```
-
-`aria2c` is separate from Python/npm and is required for file browsing, strict multi-file selection, in-torrent subtitle extraction, and some auto episode metadata flows.
-
-```bash
-# Windows
-winget install aria2.aria2
-
-# macOS
-brew install aria2
-
-# Debian/Ubuntu
-sudo apt install aria2
-```
-
-### Credentials (optional)
-
-Several features improve with — or, for RuTracker and Madokami, require — an account.
-Credentials are read at runtime from environment variables (preferred) or a
-`subtitle_credentials.json` in your user data folder (see [Where your data
-lives](#where-your-data-lives)) — **never commit real values**.
-
-The easiest way to set them is in-program: on the **Select Provider** screen,
-choose **Credentials**. For each provider you can view, enter/update,
-or clear its login. Entering opens a single-screen form — edit every field in
-place (Up/Down or Tab to move, Enter to advance, **Esc** to cancel) and Save
-when done. Saved values are verified against the provider (where possible) and
-written to `subtitle_credentials.json`; the view screen masks the password / API
-key with a toggle to reveal them. Environment variables, if set, **override** the
-file (the menu flags this), and **Clear only empties the file** — unset the
-matching environment variables to remove a credential that's set there.
-
-- **OpenSubtitles.com** (movies & series): a free account dramatically improves
-  results and unlocks hash-accurate matching against a downloaded file.
-- **Addic7ed** (TV series): a free account raises rate limits and quality for
-  episodic content. Runs anonymously (limited) when no credentials are set.
-- **Jimaku** (anime): a free API key (jimaku.cc → account settings) enables a
-  dedicated anime subtitle lookup that runs before subliminal for Anime
-  searches. Without the key, Anime falls back to subliminal automatically.
-- **RuTracker** (the RuTracker provider): a free [rutracker.org](https://rutracker.org)
-  account is **required** — the provider logs in to search and returns nothing
-  without one.
-- **Madokami** (the Madokami provider, under Manga): an account on
-  [manga.madokami.al](https://manga.madokami.al) is **required** — the whole
-  site sits behind HTTP Basic auth, so the provider returns nothing without
-  one. Like RuTracker, this credential gates the whole provider.
-- **Online-Fix** (the Online-Fix provider): **optional.** Both search and
-  `.torrent` download work anonymously ([online-fix.me](https://online-fix.me)'s
-  file host is referer-gated, not login-gated). A login is supported (the site's
-  DataLife Engine `authtoken` flow) for completeness but isn't required.
-- **TMDB** (Movies & Series "by director / studio"): **optional.** That search
-  already works keyless via Wikidata; a free [TMDB](https://www.themoviedb.org)
-  v3 API key (account → Settings → API) upgrades it to richer, better-ranked
-  results.
-- **IGDB** (Games "by developer / publisher"): **optional.** That search already
-  works keyless via Wikidata; free Twitch/IGDB credentials (register an app at
-  [dev.twitch.tv](https://dev.twitch.tv) → Client ID + Client Secret) upgrade it.
-
-subliminal queries a curated set of providers — `opensubtitlescom`, `addic7ed`,
-`podnapisi`, `tvsubtitles` — chosen for broad coverage and reliability. The rest
-of subliminal's defaults (defunct legacy APIs, VIP-only variants, and
-single-language scrapers) are skipped.
-
-Set them as environment variables:
-
-```powershell
-# Windows (persists for new terminals)
-[Environment]::SetEnvironmentVariable("OPENSUBTITLES_USERNAME", "your_user", "User")
-[Environment]::SetEnvironmentVariable("OPENSUBTITLES_PASSWORD", "your_pass", "User")
-[Environment]::SetEnvironmentVariable("ADDIC7ED_USERNAME", "your_user", "User")
-[Environment]::SetEnvironmentVariable("ADDIC7ED_PASSWORD", "your_pass", "User")
-[Environment]::SetEnvironmentVariable("JIMAKU_API_KEY", "your_key", "User")
-[Environment]::SetEnvironmentVariable("RUTRACKER_USERNAME", "your_user", "User")
-[Environment]::SetEnvironmentVariable("RUTRACKER_PASSWORD", "your_pass", "User")
-[Environment]::SetEnvironmentVariable("ONLINE_FIX_USERNAME", "your_user", "User")
-[Environment]::SetEnvironmentVariable("ONLINE_FIX_PASSWORD", "your_pass", "User")
-[Environment]::SetEnvironmentVariable("MADOKAMI_USERNAME", "your_user", "User")
-[Environment]::SetEnvironmentVariable("MADOKAMI_PASSWORD", "your_pass", "User")
-[Environment]::SetEnvironmentVariable("TMDB_API_KEY", "your_key", "User")
-[Environment]::SetEnvironmentVariable("IGDB_CLIENT_ID", "your_id", "User")
-[Environment]::SetEnvironmentVariable("IGDB_CLIENT_SECRET", "your_secret", "User")
-```
-
-```bash
-# macOS / Linux (add to your shell profile)
-export OPENSUBTITLES_USERNAME="your_user"
-export OPENSUBTITLES_PASSWORD="your_pass"
-export ADDIC7ED_USERNAME="your_user"
-export ADDIC7ED_PASSWORD="your_pass"
-export JIMAKU_API_KEY="your_key"
-export RUTRACKER_USERNAME="your_user"
-export RUTRACKER_PASSWORD="your_pass"
-export ONLINE_FIX_USERNAME="your_user"
-export ONLINE_FIX_PASSWORD="your_pass"
-export MADOKAMI_USERNAME="your_user"
-export MADOKAMI_PASSWORD="your_pass"
-export TMDB_API_KEY="your_key"
-export IGDB_CLIENT_ID="your_id"
-export IGDB_CLIENT_SECRET="your_secret"
-```
-
-Or create `subtitle_credentials.json` in your user data folder (see [Where your data lives](#where-your-data-lives)):
-
-```json
-{
-  "opensubtitles_username": "your_user",
-  "opensubtitles_password": "your_pass",
-  "addic7ed_username": "your_user",
-  "addic7ed_password": "your_pass",
-  "jimaku_api_key": "your_key",
-  "rutracker_username": "your_user",
-  "rutracker_password": "your_pass",
-  "online_fix_username": "your_user",
-  "online_fix_password": "your_pass",
-  "madokami_username": "your_user",
-  "madokami_password": "your_pass",
-  "tmdb_api_key": "your_key",
-  "igdb_client_id": "your_id",
-  "igdb_client_secret": "your_secret"
-}
-```
-
-Environment variables take precedence over the file. Subtitle and creator-search
-keys are optional. Madokami and RuTracker require a login and show an explicit
-message when credentials are missing or rejected.
-
-### Where your data lives
-
-Settings, search history, usage stats, and provider choices live in a per-user,
-machine-stable `filter_state.json`:
-
-- **Windows:** `%USERPROFILE%\.torrent-finder-cli\filter_state.json`
-- **macOS:** `~/Library/Application Support/torrent-finder-cli/filter_state.json`
-- **Linux:** `$XDG_DATA_HOME/torrent-finder-cli/filter_state.json` (or `~/.local/share/torrent-finder-cli/filter_state.json`)
-
-Credentials live beside settings in `subtitle_credentials.json` (on Windows:
-`%USERPROFILE%\.torrent-finder-cli\subtitle_credentials.json`). This stable path
-prevents Python installation changes from switching to an apparently empty
-credential store. The default downloads folder still uses the platform data
-directory: `%LOCALAPPDATA%\torrent-finder-cli\` on Windows, or the app directory
-shown above on macOS/Linux.
-
-On first run after upgrading, prior state copies from the old platform-data,
-repository, package, and Store Python locations are consolidated into the
-machine-stable file. The originals are left untouched.
-
-Several Torrent Finder windows can be open at once. Each window saves only its
-own changes (a search, a bookmark, a counter) onto the current file, under a
-short lock (`filter_state.json.lock`), so one window never undoes another's
-bookmarks or settings. If the settings file can't be read at startup, the app
-says so and offers to try again or continue without saving. For damaged content,
-it can also keep a renamed copy and start fresh. It never overwrites the
-unreadable file.
-
-Credentials are also recovered from those legacy locations when the stable
-credential file does not exist. Each integration uses the newest copy containing
-its fields; username/password pairs stay together. An existing stable file,
-including an empty one after clearing credentials, is authoritative. Unreadable
-or malformed files produce a warning and block saving rather than overwriting
-other credentials. Saves replace the file atomically. Credentials saved only in
-environment variables still need to be configured in each shell or machine.
-
-Successful APIBay result sets use a separate, disposable
-`apibay_cache.json` in the same machine-stable directory. It contains at
-most 128 provider/query entries of public torrent metadata. Deleting it only
-forgets last-known-good results; it does not reset settings or history.
-
-### Updating
-
-The app checks for a newer version on startup (at most once a day, fail-silent)
-and shows a yellow banner when one is available. Update from inside the program
-with **U** on the provider menu (an **Install update** row also appears
-there) or **Tab → Install update** at the search prompt — either does the
-right thing for your install type:
-
-- **pip / pipx** — runs `pip install -U torrent-finder-cli` for the app's own Python, then `pipx upgrade torrent-finder-cli` for a pipx install so pipx's records stay right (pipx does it all when it installed the app from a file, URL or git). A failed install is reported as a failure.
-- **standalone binary** — opens the Releases page so you can download the new file.
-- **source clone** — runs `git pull`.
-
-The update runs **in the same window**: no other window or tab opens. The
-update screen shows each step (preparing, downloading, installing, finishing),
-a bar that fills with the **download percentage** and size while pip downloads
-and moves while other steps run, the elapsed time, and a clear success or
-failure result. Full installer output goes to `update.log` beside your settings.
-After a successful update, press any key and Torrent Finder restarts in the
-same window with the new version. If the update fails, the app keeps running
-the version you had.
-
-On Windows a running program's file cannot be replaced, so the app first
-renames its own launcher (`torrent-finder.exe`) out of the way and deletes the
-old copy on a later start. If another Torrent Finder window is open, the update
-stops before changing anything and asks you to close it. Ctrl+C cannot stop an
-update halfway; the screen says so and the update finishes.
-
-Preview this display now, without installing anything or changing your settings:
-
-```bash
-python -m torrent_finder --preview-update
-python -m torrent_finder --preview-update failure
-# For an installed copy:
-torrent-finder --preview-update
-```
-
-The success preview takes about seven seconds and the failure preview about six.
-Both wait for a key afterward, and neither installs an update nor restarts the
-app. For a browser replay
-with success/failure and compact-terminal controls, run
-`python -m scripts.preview_update` from the source checkout and open
-`dist/update-preview/index.html`. Both previews use the real terminal renderer.
-The installed version runs the update: updating from v0.9.0 or earlier still
-closes the app and installs in the background once (on Windows with a separate
-progress window); updates after that run in the same window.
-
-Or close the app and update manually with `pipx upgrade torrent-finder-cli`.
-If an older version reports Windows `WinError 32` while replacing
-`torrent-finder.exe`, close all running copies and rerun that command from a
-separate terminal. Its earlier “harmless” message did not guarantee completion.
-
-## Usage
-
-### Interactive Mode
-
-The easiest way to use the CLI is to run it interactively. The arrow-key driven UI will guide you through selecting a category, searching, filtering, and downloading.
-
-```bash
-# After a pip/pipx install — both commands are on your PATH
-torrent-finder
-torrent
-
-# From a source clone
-python -m torrent_finder
-torrent.bat            # Windows
-```
-
-> `torrent-finder` is canonical and `torrent` is the built-in short form. From the main menu, **Settings › Terminal command** can also install `tf`, `find-torrent`, or `tfind` as your preferred quick command.
-
-### Result details, bookmarks, and portable settings
-
-Available in v0.7.0 and later.
-
-In the result table, press **i** to expand the highlighted release. Use **[** and
-**]** to scroll its full name and metadata, then **i** to return to the same
-selection and position. Available listing metadata takes priority; filename
-hints are labelled separately and do not verify audio/subtitle tracks.
-
-Press **b** to bookmark checked results, or the highlighted result when nothing
-is checked. **Tab → Bookmarks / download later** (**B**) from the main menu,
-What's Next, or a search prompt lets you
-reopen their normal acquisition flow, compare saved results in one table,
-refresh a listing with its original search settings, or remove entries.
-**Tab → Bookmark current search** saves the typed query and its provider/profile
-settings. Bookmarks survive restarts. They retain direct-download and unresolved
-source handles; saving a bookmark does not download or resolve anything.
-The list shows when metadata was fetched. Refresh keeps the old entry if the
-same listing is not returned; saved metadata does not establish availability.
-
-Use **Tab → Settings backup / import** to transfer a local JSON file between
-computers. Normal exports contain provider choices, named profiles, download
-folder and stream-output preferences. History is optional. Credentials,
-bookmarks, usage statistics and machine-specific launcher/update state are
-excluded. Choose a new export filename; existing files are never overwritten.
-
-Import validates the file and shows a preview before **Apply import**.
-**Merge** retains other entries; incoming provider preferences win conflicts,
-profiles match by name, and the current active profile stays selected.
-**Replace** replaces portable preferences and provider choices. Both modes keep
-bookmarks, statistics and machine settings. History changes only if the backup
-includes it. Check an imported download folder exists on the destination.
-Malformed input or a failed write leaves existing settings intact.
-
-Credential transfer has separate, explicitly labelled export/import actions.
-Its plaintext file contains saved credential-file values, never environment
-variables. Environment overrides still take precedence after import.
-
-### Literal name rules and Nyaa language categories
-
-Under **Ctrl+F → Literal release-name rules**, enter **All words**, **Any word**,
-an **Exact phrase**, or **Exclude words**. Rules match returned release names
-only, with consistent case, accent and punctuation normalization. Words match
-whole tokens; a phrase requires consecutive tokens. All populated rules apply
-together, and exclusions win. For example, All `Saki`, Any `720p 1080p`, Exclude
-`sample` keeps either resolution without matching `sample` releases. Clear a
-field to disable that rule. Apply the editor, then save the outer settings menu.
-Combined profiles also have shared literal rules, alongside the existing phrase
-filters and each provider's own rules. These controls do not perform genre/topic
-discovery or send Boolean operators to external search engines.
-
-Anime's filter menu includes **Nyaa category**: English-translated (the default),
-Non-English-translated, Raw, or all Anime. This applies to Nyaa only; other
-enabled engines cannot enforce that language scope. Manga keeps separate **Nyaa
-(EN)** and **Nyaa (Raw)** switches and adds **Nyaa (Non-English)**. Raw literature
-uses Nyaa category `3_3`; `3_2` is non-English-translated literature.
-These choices persist independently in solo settings and named profiles.
-
-Anime also offers separate **PT-BR audio tags** and **PT-BR subtitle tags**
-presets. Require excludes names without the relevant explicit evidence; Prefer
-ranks matches. Generic Portuguese and PT-PT do not establish PT-BR. Pick the
-appropriate source category separately; a non-English category includes many
-languages and is not a guarantee of Brazilian Portuguese coverage.
-
-### Search across providers
-
-Available in v0.7.0 and later, including packages and standalone binaries.
-
-1. Choose **Search across providers** on the provider screen.
-2. At the search prompt, press **Ctrl+F** and open **Providers**. Press **c** to clear the selection, toggle **Anime** and **Manga · General** with Space, and press **w** to confirm. Select **Manga · Madokami** too if you want its library and have a login configured.
-3. Optionally use **All providers: include/exclude name phrases**, or open **Provider engines and presets** to configure each source. Anime's resolution presets apply only to Anime; Manga's volume/chapter presets apply only to Manga. Every provider retains its own On/Auto/Off engine choices and category restrictions.
-4. Choose **Save and return** (**w**), enter a title, and search. **Ctrl+N** adds more titles as usual. **Esc** in the combined settings menu discards all unsaved edits, including nested provider settings.
-
-The first profile starts with all providers selected and copies your individual
-engine/preset settings, except that Anime starts without a resolution restriction.
-Later edits are independent: changing this profile does not change solo searches.
-Shared includes match at least one comma-separated phrase: `batch, volume` keeps
-names containing **batch OR volume**, from any selected provider. Shared excludes
-remove a result when any phrase matches: `sample, trailer` hides names containing
-either phrase, even if an include phrase also matches. Matching ignores case and
-checks the result name, not the source label. Empty fields impose no restriction.
-These rules filter returned results; they do not append words to your query.
-For a resolution restriction on Anime alone, use its provider presets—putting
-`1080p` in the shared include field also hides manga/books without that text.
-Required provider presets and shared rules must both pass. History stores the combined
-profile with each query so choosing an entry restores that search's settings.
-
-The merged table prioritizes title relevance, then preferred preset matches,
-then preserves each provider's ordering for ties. Press **f** for exact-title/filename filtering or a different
-sort, including newest. Explicit sorts override preferences in that result view.
-The provider appears in a column on wide terminals and
-beside the title on narrower ones; the focused row shows its full provider and
-source. A duplicate torrent appears once. Its first matching provider supplies
-the download actions, while all matching providers and query titles are retained.
-Direct downloads and unresolved site entries stay separate unless they share
-the same source-specific identity.
-
-Missing/rejected credentials and other reported provider failures appear as
-search notices; successful providers still contribute results. Short windows
-show a compact notice count: press **n** to read the details and return to the
-same result.
-
-While searching, the screen shows providers finished, results ready, elapsed
-time, and which providers are still pending. **Enter** opens results received
-so far; **Esc** cancels back to the search prompt. Combined searches stop waiting
-after **30 seconds** and retain completed engine results, including those from
-providers whose other engines are still waiting. Notices identify incomplete
-providers and request timeouts. Filters can be changed at the search prompt,
-before starting another search.
-
-Providers start independently while engine calls share a concurrency limit.
-Combined mode bounds network timeouts and retry chains; ongoing requests finish
-in the background after cancellation, but no new retries start. A time-limited
-search can miss results from slow sources—search those providers individually
-to retry with their normal timeout behavior. Creator searches remain available
-through the individual providers.
-
-### Saving and switching search profiles
-
-In **Search across providers → Ctrl+F**, open the **Profile** row and choose
-**Save a copy as a new profile**. Enter a unique name, then choose providers,
-engines, presets, shared name rules, and **Result order**. A setup for one
-provider, such as PT-BR movies, uses the same menu with only that provider selected.
-**Save and return** commits all changes, including edits made before switching
-to another profile. **Esc** cancels the entire draft. Rename and delete act on
-the current profile; deletion asks for confirmation and keeps at least one profile.
-
-Existing combined settings are preserved as **Default**. Profiles remain separate
-from individual provider settings. History replay restores the historical setup
-in memory; saving it creates a separate **History search** profile that you can
-rename. CLI `--profile` and `--providers` affect only the session unless you
-explicitly save settings. Profile names are case-insensitive when selecting them.
-
-To keep lower resolutions eligible, cycle a preset to **Prefer**. **Require**
-still excludes every nonmatch, including when another preset is preferred.
-Requiring both PT-BR audio and Portuguese subtitles requires both sets of tags.
-Both Require and Prefer can invoke a preset's documented extra queries and
-engines. Preferences score returned metadata; they do not verify actual tracks.
-Choose **Result order** in settings to save a sort. Sorting with **f** in the
-results table changes that view only. A combined profile's overall order applies
-to the merged results, taking precedence over child providers' solo sort settings.
-
-### Command Line Arguments
-
-```bash
-# Direct search (defaults to Movies)
-torrent -q "The Matrix"
-
-# Search across providers using the saved combined profile (initially all)
-torrent -t all -q "Saki"
-
-# Use a named profile; -t all is implied
-torrent --profile "Anime + Manga" -q "Saki"
-
-# Override the selected providers for this session
+torrent -q "The Matrix"                      # search Movies & Series
+torrent -t game -q "Elden Ring"              # choose the provider
+torrent -t books -q "Dune" -f epub -x sample # keep or drop keywords
+torrent -t all -q "Saki"                     # search across providers
+torrent --profile "Anime + Manga" -q "Saki"  # a saved profile (implies -t all)
 torrent -t all --providers anime manga -q "Saki"
-
-# Add shared name rules; provider-specific presets still apply
-torrent -t all --providers anime manga -q "Saki" -x sample
-
-# Specify the search type (movie, game, online-fix, fitgirl, software, mobile, rutracker, anime, manga, madokami, books). `movie` covers both films and series.
-torrent -q "Elden Ring" -t game
-
-# Search Online-Fix (co-op / online game cracks from online-fix.me; no account needed)
-torrent -q "Elden Ring" -t online-fix
-
-# Search FitGirl repacks on the official fitgirl-repacks.site (no account needed)
-torrent -q "Cyberpunk" -t fitgirl
-
-# Search desktop software (The Pirate Bay Applications + Knaben)
-torrent -q "Photoshop" -t software
-
-# Search Android apps (Knaben's Android category, APIBay as Auto fallback, optional F-Droid; Android-only)
-torrent -q "Spotify" -t mobile
-
-# Search RuTracker (requires a configured rutracker.org login)
-torrent -q "Photoshop" -t rutracker
-
-# Search manga (Nyaa Literature English + Apibay Comics; Raw Nyaa available as a toggle)
-torrent -q "Berserk" -t manga
-
-# Search Madokami's manga library (requires a manga.madokami.al login; direct downloads)
-torrent -q "Berserk" -t madokami
-
-# Search books (Libgen direct downloads + TPB e-books/audiobooks; no login)
-torrent -q "Dune" -t books
-
-# Apply custom filters (include "1080p", exclude "cam")
-torrent -q "Dune" -t movie -f "1080p" -x "cam"
-
-# Search by creator: --by <role> --name "<creator>" with -t. Roles per provider:
-#   anime/movie -> director, studio   manga -> writer, magazine
-#   game -> developer, publisher      books -> author
 torrent -t anime --by director --name "Hayao Miyazaki"
-torrent -t movie --by studio   --name "A24"
-torrent -t game  --by developer --name "FromSoftware"
-torrent -t books --by author   --name "Ursula K. Le Guin"
-# Drops you into the disambiguation + title picker; keyless by default,
-# richer with a TMDB key (movies) or IGDB creds (games).
-
-# Skip the network exposure warning at startup
-torrent -y
-
-# Use another colour theme for this run (citrinitas, rubedo, albedo, viriditas,
-# nigredo; quiet, iris, lagoon, ember, mono, paper);
-# Settings › Appearance saves one, TORRENT_FINDER_THEME sets one per shell
-torrent --theme paper
-
-# Print the version and exit
+torrent --theme paper                        # a theme for this run only
+torrent -y                                   # skip the network check
 torrent --version
 ```
 
-You can also suppress the warning with the environment variable `TORRENT_SKIP_WARNING=1`, or permanently dismiss it from the warning screen itself (see below).
+- `-t`: `movie`, `game`, `online-fix`, `fitgirl`, `software`, `mobile`,
+  `rutracker`, `anime`, `manga`, `madokami`, `books` or `all`. Without `-t`, a
+  `-q` search uses Movies & Series.
+- `--by` roles: `director` and `studio` (anime, movie), `writer` and `magazine`
+  (manga), `developer` and `publisher` (game), `author` (books). The app then
+  asks which creator and which works.
+- `--theme`: `citrinitas`, `rubedo`, `albedo`, `viriditas`, `nigredo`, `quiet`,
+  `iris`, `lagoon`, `ember`, `mono`, `paper`.
+- `--profile` and `--providers` affect only that session.
+- From a source clone without installing, use `python -m torrent_finder`
+  instead of `torrent`.
 
-From a source clone with no pip install, replace `torrent` with `python -m torrent_finder` in the examples above.
+Environment variables: `TORRENT_SKIP_WARNING=1` skips the network check,
+`TORRENT_FINDER_THEME=NAME` sets a theme per shell, and `NO_COLOR` is honoured.
 
-### Network Exposure Warning
+## Credentials
 
-On launch you'll see a warning screen listing your public IP, ISP, ASN and location, with a verdict line (in a short window the Org, ASN and Location rows give way first). The IP and the location are masked (`•••.•.•••.•`) until you reveal them, so the screen is safe to share:
+Everything works without accounts except RuTracker and Madokami. Set logins in
+the app under **Credentials** on the main menu, which verifies them where
+possible, or with environment variables, which take precedence over the saved
+file. [The guide](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/guide.md#credentials) explains each one and how to set
+them.
 
-- ✓ **Proxy/VPN flagged** — detected by the IP database.
-- ✓ **Hosting/datacenter IP** — likely a VPN exit (not a residential ISP).
-- ✓ **VPN provider name detected** — keyword fallback (Mullvad, Proton, Nord, …).
-- ! **Mobile carrier IP** — your carrier and peers will see this IP.
-- ! **Residential ISP IP** — your real IP is visible to every peer and tracker.
+| Integration | Account | Environment variables |
+|---|---|---|
+| RuTracker | required for that provider | `RUTRACKER_USERNAME`, `RUTRACKER_PASSWORD` |
+| Madokami | required for that provider | `MADOKAMI_USERNAME`, `MADOKAMI_PASSWORD` |
+| Online-Fix | optional | `ONLINE_FIX_USERNAME`, `ONLINE_FIX_PASSWORD` |
+| OpenSubtitles.com | optional, much better subtitles | `OPENSUBTITLES_USERNAME`, `OPENSUBTITLES_PASSWORD`, `OPENSUBTITLES_APIKEY` (optional) |
+| Addic7ed | optional, higher limits for series | `ADDIC7ED_USERNAME`, `ADDIC7ED_PASSWORD` |
+| Jimaku | optional, anime subtitles | `JIMAKU_API_KEY` |
+| TMDB | optional, movie creator search, alternate titles and topics | `TMDB_API_KEY` |
+| IGDB (Twitch) | optional, game creator search, alternate titles and topics | `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` |
+| qBittorrent WebUI | optional, client handoff and progress | `QBITTORRENT_URL`, `QBITTORRENT_USERNAME`, `QBITTORRENT_PASSWORD` |
 
-Controls on the warning screen:
+Saved credentials are plain text in `subtitle_credentials.json`, beside your
+settings. Never commit real values.
 
-- **Enter** — acknowledge and continue.
-- **R** — reveal the public IP and location; press again to hide them.
-- **D** — don't show again (saved to `filter_state.json`).
-- **Esc** — abort the program.
+## Where your data lives
 
-Even after dismissing, you can re-open the warning at any time from the main menu: **Settings › Network exposure info**. Once the check has run in a session, the main menu's header says **VPN** or **IP visible**.
+| System | Folder |
+|---|---|
+| Windows | `%USERPROFILE%\.torrent-finder-cli\` |
+| macOS | `~/Library/Application Support/torrent-finder-cli/` |
+| Linux | `$XDG_DATA_HOME/torrent-finder-cli/` (or `~/.local/share/torrent-finder-cli/`) |
 
-### Navigating the UI
+It holds `filter_state.json` (settings, history, stats, bookmarks),
+`subtitle_credentials.json` and `update.log`. Data from older versions' locations is
+copied in on first run. Details: [Your data](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/guide.md#your-data).
 
-- **Lists & Menus**: Use `Up` and `Down` arrows to navigate; `PgUp`/`PgDn` move faster and `Home`/`End` jump to the first/last choice. Long lists show your position on the right of the header line, and the key bar adds `PgUp/PgDn`.
-- **Select**: Press `Enter` to confirm a choice or open a torrent.
-- **Toggle / cycle**: In multi-select menus, press `Enter` or `Space` to toggle a checkbox. In **Filters & engines**, those keys cycle engine **On / Auto / Off** modes or preset **Off / Require / Prefer** modes.
-- **Search prompt (multi-title)**: `Ctrl+F` jumps to filters, `Ctrl+N` commits the current title and starts another line, and `Tab` opens quick actions. `Enter` searches all entered titles at once. Below the field, **Recent** lists the provider's past searches containing what you have typed; `Up`/`Down` walk that list. `Esc` backs out progressively — clear the current line, then restore the last added title for editing, then leave.
-- **Results table (multi-select / batch)**: `Space` ticks a torrent, `a` selects all results in the current filtered view, `c` clears. Press `f` for name matching and sorting; hidden selections are cleared when applying a filter. With one or more ticked, `Enter` opens the batch menu (open all in client • download all with `aria2c` • copy all magnets); with nothing ticked, `Enter` opens that single torrent's download menu.
-- **Range Selection (Episode Picker)**: 
-  - `v`: Drop a visual anchor on the current item.
-  - `Shift + V`: Instantly mass-toggle all items between the anchor and your cursor.
-  - `a` (Select All) • `i` (Invert Selection) • `c` (Clear) • `w` (Save & Continue).
-- **Configure filters from the provider screen**: Press `F` while a provider is highlighted to jump straight into its engines + filter presets menu, then return to the provider list.
-- **Filter menu keybinds**: `a` sets engines On and presets Require; `i` toggles engines On/Off and presets Require/Off (Prefer becomes Off); `c` clears presets; `w` saves and confirms. `v` drops an anchor, `Shift+V` toggles the range, and `Space` cycles a preset or engine mode. The "Clear filters" button clears required/preferred presets only — your engine modes are preserved.
-- **History / stats / tips / filters**: On the provider screen press `H` (history), `S` (stats), `T` (tips), or `F` (filters). At the search prompt, press `Tab` for the same quick-actions menu (then `F`/`H`/`S`/`T` or arrows) — your in-progress query is preserved. The prompt itself has no single-letter shortcuts, so queries can start with any letter.
-- **Tips browser**: Use `/` to search across categories, tip text, and tags; `C` to cycle categories; `X` to clear the search/filter; and `Esc` to go back.
-- **Every key on one screen**: Press `?` on a menu or on the results to list all of its keys, including those a narrow key bar leaves out (number jump, `d`, `n`, `r`, `m`, paging).
-- **Cancel / Back**: Press `Esc` to safely cancel an action, close a menu, or go back to the previous screen.
-- **Quitting**: On the provider menu, quitting takes **two** presses of `Esc` or `Ctrl+C` (mix allowed) — the screen shows *"Press Esc or Ctrl+C again to quit"* under the key bar after the first, and any other choice, a submenu included, disarms it. Deeper in a flow, `Ctrl+C` still cancels the running operation instantly.
-- **Download Method and batch navigation**: After a download or client handoff, choose **Continue to What's Next** or **Back to download options**. `Esc` also returns to those options with the same torrent, file/subtitle choices, or batch selection. Returning does not repeat the download or handoff.
-- **What's Next shortcuts**: `R` Search Again, `P` Change Provider, `M` Main menu, `Tab` Quick actions, `H` Search History, `S` Usage Stats, `T` Tips, `C` Credentials, and `Q` Exit. Letter shortcuts also accept lowercase.
-- **Post-action exit confirmation**: On the **What's Next?** screen, choosing **Exit**, pressing `Q`, or pressing `Esc` / `Ctrl+C` opens a Y/N confirmation. Declining returns to the same menu.
+## Updating
 
+The app checks for updates once a day and shows a notice. Press **U** on the
+main menu to update in place: pip and pipx installs upgrade and restart in the
+same window, a source clone runs `git pull`, and a standalone binary opens the
+Releases page. To update by hand, close every Torrent Finder window and run
+`pipx upgrade torrent-finder-cli` in a separate terminal. More in
+[Updating](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/guide.md#updating).
 
-## Project Architecture
-
-All code lives under the `torrent_finder/` package, installed as a console script
-(`torrent-finder` and `torrent` both map to `torrent_finder.main:main`). The structure is modular and
-provider-based — the module paths below are relative to `torrent_finder/`:
-
-- `main.py`: The main entry point and CLI argument parser.
-- `launcher_alias.py`: Owns fixed quick-command presets, install-aware forwarding targets, managed shim creation/removal, collision checks, and optional Windows user-PATH updates.
-- `__main__.py`: Enables `python -m torrent_finder` and serves as the PyInstaller binary entry point.
-- `torrent.bat` *(repo root)*: Windows launcher that runs `python -m torrent_finder`.
-- `providers/`: Different search categories (Movies & Series, General games, Online-Fix, FitGirl, Desktop, Mobile, RuTracker, Anime, General manga, Madokami, Books). The display menu nests some of these under groups — **Games** (General + Online-Fix + FitGirl), **Software** (Desktop + Mobile + RuTracker), and **Manga** (General + Madokami) — via `ProviderGroup`, a display-only wrapper that changes menu shape without touching slugs. Each provider declares an immutable `slug` (used for persistence keys + CLI `-t` lookup), a display `name` (free to change), capability flags (`supports_subtitles`, `supports_episode_picker` — gate UI rows), its search engines, default filters, and toggleable presets. Nyaa-backed providers also set `nyaa_category` (the Nyaa `c` filter — e.g. `1_2` anime, `4_1` live-action, `3_1` manga). Providers may also declare a `creator_facets` list to enable search-by-creator (director/studio/writer/magazine/developer/publisher/author), set `prefer_title_matches` and implement `title_relevance` to rank the requested work first (Movies & Series, Anime, Books, Desktop, Mobile, Madokami), and override `_sort_results` to order equally good matches (Books: Libgen first; Madokami: a series folder before its contents) (Books ranks the requested work first: an exact title, with or without the author, beats titles that merely contain it, and Libgen's direct downloads lead among equally good matches. When the book's author is known, from Search by Creator, Alternate Titles or a quick Open Library lookup of the title run alongside every Books search (only a clearly dominant work counts), listings by that author rank first and Libgen entries by a clearly different author drop below; Movies ranks the requested film above sequels and remakes, and a query with release tags such as `1080p` or `pt-br` also searches the bare title and puts tagged releases first).
-- `resolvers/`: The "search by creator" metadata layer that turns a person/company name into a list of works. `types.py` (`CreatorFacet` / `Entity` / `Work`), `anilist.py` (anime director & studio + manga writer, keyless GraphQL), `jikan.py` (manga serialization magazines, keyless), `wikidata.py` (keyless SPARQL fallback for movie/series director & studio and game developer & publisher), `openlibrary.py` (book authors, keyless — works ordered by edition count), `tmdb.py` (Movies & Series, needs `TMDB_API_KEY`), `igdb.py` (Games, needs Twitch creds), and `movies.py` / `games.py` which dispatch to TMDB/IGDB when a key is configured and Wikidata otherwise. Each facet exposes `search_entities(name)` → candidates and `list_works(entity, page)` → `(works, has_more)`; `creator_search.fan_out()` then runs the normal provider search over each picked title and merges. `main._available_facets` can gate facets behind a credential when there's no keyless fallback.
-- `ui/`: Interactive terminal prompts and rendering using `rich`. `theme.py` (the look every screen shares: the designs, the palettes and their roles, header line, footer-to-key-bar parsing, main-screen log blocks), `chrome.py` (the Athanor frame, message line and status line), `appearance.py` (design, colours, painting, focus style and density, and per design the profile's font, text size and look: startup resolution and the Settings › Appearance screen, including the Windows Terminal profile), `search_progress.py` (the search-in-progress screen), `prompts.py` (menus + `confirm_prompt` modal + `subtitle_source_prompt` + `download_dir_prompt` + the per-provider "choose how to search" source screen), `creator.py` (the search-by-creator flow: name → disambiguation → paged title picker with `n`/`p` + background prefetch → fan-out), `selector.py` (reusable arrow-key selector with windowing / marquee, the inspector pane of wide windows, and in tall ones the key bar on the bottom rows with the focused row's details below the list), `inspector.py` (the details those panes show for the main menu and Settings), `table.py` (paginated result table), `history.py` (search history browser), `stats.py` (usage stats page), `streaming.py` (pinned stream header + terminal-control primitives for the streaming flow), `tips.py` (categorized tip catalog), `tips_page.py` (searchable tips browser), and `launcher.py` (terminal-command selector and PATH confirmation).
-- `acquisition.py`: The per-source acquisition seam — how a picked result becomes files on disk. Four adapter styles (magnet-direct; lazy magnet resolve for RuTracker/FitGirl; `.torrent` handoff for Online-Fix; direct download for Madokami/Libgen/F-Droid) behind one interface (`magnet` / `pick` / `batch_item`), registered by result *source* so a provider can mix styles in one results table.
-- `libgen.py`: Anonymous Library Genesis client — searches the live `.li`-family mirrors with failover (an answered-but-empty page falls through to the next mirror), resolves the keyed download link from a pick, and streams the file to disk with per-chunk cancel + progress.
-- `terminal_check.py`: Startup advisory when the terminal can't render the UI (Windows legacy console without VT processing, `TERM=dumb`) — plain-ASCII message with copy-paste fixes (`winget install` Windows Terminal, or the `VirtualTerminalLevel` registry switch).
-- `filters.py`: Presets and result predicates, including PT-BR audio through `language_tags.py`.
-- `result_view.py` / `ui/result_filters.py`: Title matching, sorting, and the results table refinement menu. Original row identities survive sorting.
-- `nyaa.py`: Bounded catalog lookup for short anime titles crowded out of the recent RSS feed.
-- `creator_search.py`: `fan_out()` for search-by-creator — runs the picked titles (up to six names per work) through the shared `SearchSession`, merged and ranked like a keyword search with each work's authors, tagging each result with the work it came from.
-- `credentials.py`: Reads optional API credentials from environment variables (preferred) or the gitignored `subtitle_credentials.json`; powers the **Credentials** menu (subtitle logins, RuTracker/Online-Fix/Madokami, and the TMDB/IGDB creator-search upgrades).
-- `torrent_session.py`: Post-torrent-pick state owner. Holds the picked magnet + user file selection + sub choice, fetches the file list explicitly (cancellable; kept once found, retried after a failure), and resolves `targets` / `stream_indexes` / `download_indexes` / `sub_paths` from it. Stream adapters consume the session directly; download adapters take `(magnet, indexes)` projections and stay session-unaware.
-- `downloader.py`: Subprocess orchestration — `aria2c` / `webtorrent-cli` / `peerflix` execution, VLC launch + sub injection with per-episode player ownership, stream error logs, quiet-mode plumbing, in-torrent sub batch fetch, and `v` / `n` / `b` hotkey handling. Stream adapters take a `TorrentSession`; download adapters keep an explicit `(magnet, indexes)` signature for reuse outside the menu loop.
-- `subtitles.py`: Logic for searching and downloading subtitles using `subliminal`. Saves into the effective download folder via `constants.get_download_dir()`.
-- `security.py`: Network exposure warning, public-IP/VPN detection via `ip-api.com`.
-- `paintings.py`: The Athanor paintings: the catalogue in `assets/paintings`, a dependency-free 1-bit PNG reader and writer, recolouring in a colourway's ink and page, and the "save as image" export. `scripts/build_paintings.py` rebuilds the assets from Wikimedia Commons.
-- `terminal_profile.py`: The Windows Terminal profile: a JSON fragment with the theme's colour scheme, the painting as background picture and the design's font at the chosen size (bundled pixel fonts for Athanor, installed for the user; Windows' own for Simple), or Athanor's plain look without them. Rewritten when the appearance changes, after which running Windows Terminals are told to reload (`refresh`); `open_tab` opens the app in a profile tab from other tabs.
-- `store.py`: Sole owner of `filter_state.json`: migration merge, in-memory view, inter-process lock and saving. Changes are operations replayed onto the current file, so concurrent windows don't overwrite each other. Best-effort changes are saved in the background shortly after they happen and at `atexit`, explicit actions immediately (raising on failure), and unreadable settings are never overwritten.
-- `unpack.py`: Unpacks downloaded page archives (images only) into folders of pages when the setting is on, with zipfile or the system's bsdtar / 7-Zip / UnRAR, and finds the files a finished torrent download wrote.
-- `direct_download.py`: Shared file writer for Madokami/Libgen/F-Droid downloads, Online-Fix `.torrent` files and Jimaku subtitles. It reduces server-provided names to one safe file name inside the download folder. It streams to a temporary `.part` file, promotes it only when complete, and saves under a numbered name instead of replacing an existing file.
-- `state.py`: Public settings and history operations over `store.py`, including engine modes, active presets, download preferences, backward-compatible migration from boolean engine toggles, and the one-shot migration from legacy display-name keys (e.g. `"Movies & Series"`) to provider slugs.
-- `stats.py`: Usage counter recorders and read helpers over the `stats` subtree owned by `store.py`, keyed by provider slug.
-- `torrent_meta.py`: Fetches a torrent's file list from a magnet via `aria2c`. Helpers for episode-number extraction, video/subtitle classification, multi-episode detection (any torrent with ≥ 2 video files), sub-to-video matching (`match_subtitles_for`), and `--select-file` range formatting.
-- `ui/update_progress.py`: The update screen (stage, download percentage or activity bar, elapsed time, result) and its safe terminal preview.
-- `updates.py`: Install-aware update check (git clone / pip-pipx / binary). Rate-limited; compares against `origin` (git) or PyPI (`__version__`), and powers the in-app **Install update** action via `check_for_update()` / `run_update()`: hidden installer commands with their output parsed for progress, the Windows launcher moved aside, and the restart in the same terminal.
-- `constants.py`: Configuration constants, trackers, UI themes, the platform user-data resolver (`user_data_dir()` / `data_path()`), the machine-stable state resolver (`machine_state_dir()` / `machine_state_path()`), legacy-location discovery, and `get_download_dir()` (returns the user's chosen `download_dir` setting or falls back to `DOWNLOADS_DIR`).
-
-## Security Notes
+## Security notes
 
 This tool does **not** make torrenting safe. Some things it cannot guarantee:
 
-- Your real IP is visible to every peer and tracker in the swarm unless you are behind a VPN.
-- Trackers in `constants.py` are plain UDP — there is no "tracker-over-HTTPS" that hides your IP, since trackers exist to exchange peer IPs.
-- Seed counts, file names, and uploader tags are not safety signals. The "Trusted Uploaders" preset is a convenience filter based on community reputation, not a guarantee of clean content.
-- The startup `ip-api.com` call travels over plain HTTP (free tier limitation). If that matters to you, use `-y` or `TORRENT_SKIP_WARNING=1`.
+- Your real IP is visible to every peer and tracker in the swarm unless you are
+  behind a VPN.
+- Trackers in `constants.py` are plain UDP. There is no "tracker over HTTPS"
+  that hides your IP, since trackers exist to exchange peer IPs.
+- Seed counts, file names and uploader tags are not safety signals. The
+  "Trusted Uploaders" preset is a convenience filter based on community
+  reputation, not a guarantee of clean content.
+- The startup `ip-api.com` check travels over plain HTTP (a free-tier
+  limitation). If that matters to you, use `-y` or `TORRENT_SKIP_WARNING=1`.
 
-Use a VPN, verify content before running installers, and treat everything in a public swarm as untrusted.
+Use a VPN, verify content before running installers, and treat everything in a
+public swarm as untrusted.
 
-## Releases
+## Documentation
 
-See the [release process](docs/releasing.md) for version tags, publishing, and verification.
+- [User guide](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/guide.md): every feature, key and setting.
+- [Provider reference](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/PROVIDER_REFERENCE.md): each provider's sources,
+  measured results and limits, from the
+  [October 2026 provider audit](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/audits/2026-10-03/README.md).
+- [Release notes](https://github.com/PietroFilippo/torrent-finder-cli/tree/main/docs/releases/) for each version.
+- [Development](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/development.md): tests and live source checks;
+  [releasing](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/releasing.md).
+- [CONTEXT.md](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/CONTEXT.md) (domain model and code map) and the
+  [architecture decision records](https://github.com/PietroFilippo/torrent-finder-cli/tree/main/docs/adr/).
 
-## License
+## License and credits
 
-Released under the [MIT License](LICENSE).
+Released under the [MIT License](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/LICENSE).
 
 The Athanor paintings are public-domain works; their sources are listed in
-[`torrent_finder/assets/paintings/CREDITS.md`](torrent_finder/assets/paintings/CREDITS.md).
-The PxPlus IBM VGA 8x16 font is from VileR's [Ultimate Oldschool PC Font Pack](https://int10h.org/oldschool-pc-fonts/),
-licensed under [CC BY-SA 4.0](torrent_finder/assets/fonts/LICENSE.TXT).
+[`torrent_finder/assets/paintings/CREDITS.md`](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/torrent_finder/assets/paintings/CREDITS.md).
+The pixel fonts (IBM VGA 8x16 and 9x16, IBM XGA-AI 12x20, Toshiba TxL1 8x16 and
+AST Premium Exec) are from VileR's
+[Ultimate Oldschool PC Font Pack](https://int10h.org/oldschool-pc-fonts/),
+licensed under [CC BY-SA 4.0](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/torrent_finder/assets/fonts/LICENSE.TXT); see
+[`torrent_finder/assets/fonts/README.md`](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/torrent_finder/assets/fonts/README.md).
