@@ -1,6 +1,8 @@
 """Per-attempt evidence, scoped to a search worker rather than global state."""
 
 from contextvars import ContextVar
+# i18n: converted
+from torrent_finder.i18n import N_, t, tn
 from dataclasses import dataclass, field
 
 import requests
@@ -42,19 +44,19 @@ def record_failure(error=None, *, message=""):
         return  # search_request already recorded the reason before unwinding
     # Never expose exception URLs, request bodies, headers, or credentials.
     if isinstance(error, requests.Timeout):
-        failure = ("timeout", "Request timed out; this does not establish source availability.")
+        failure = ("timeout", t("Request timed out; this does not establish source availability."))
     elif isinstance(error, requests.RequestException):
-        failure = ("error", "Network or HTTP request failed.")
+        failure = ("error", t("Network or HTTP request failed."))
     else:
-        failure = ("error", message or "The source returned an unreadable response.")
+        failure = ("error", message or t("The source returned an unreadable response."))
     trace.failures.append(failure)
 
 
 def record_interruption(timed_out):
     trace = _trace.get()
     if trace is not None:
-        trace.failures.append(("timeout", "Source request budget expired.") if timed_out else
-                              ("interrupted", "Stopped waiting; received rows are retained."))
+        trace.failures.append(("timeout", t("Source request budget expired.")) if timed_out else
+                              ("interrupted", t("Stopped waiting; received rows are retained.")))
 
 
 def observe_response(response):
@@ -62,7 +64,7 @@ def observe_response(response):
     if trace is not None:
         code = getattr(response, "status_code", 200)
         if isinstance(code, int) and code >= 400:
-            trace.failures.append(("error", f"Source returned HTTP {code}."))
+            trace.failures.append(("error", t("Source returned HTTP {code}.", code=code)))
 
 
 def observe_request():
@@ -73,6 +75,19 @@ def observe_request():
 
 # Access problems are shown by their own message, without a provider prefix.
 ACCESS_STATUSES = {"missing_login", "rejected_login", "login_error", "blocked"}
+
+# Mark the historical code-to-word display; status codes themselves remain identities.
+_STATUS_LABELS = {
+    "pending": N_("pending"), "searching": N_("searching"), "results": N_("results"),
+    "empty": N_("empty"), "filtered": N_("filtered"), "off": N_("off"), "auto": N_("auto"),
+    "skipped": N_("skipped"), "timeout": N_("timeout"), "interrupted": N_("interrupted"),
+    "error": N_("error"), "blocked": N_("blocked"), "missing_login": N_("missing login"),
+    "rejected_login": N_("rejected login"), "login_error": N_("login error"),
+}
+
+
+def status_label(status: str) -> str:
+    return t(_STATUS_LABELS[status]) if status in _STATUS_LABELS else status.replace("_", " ")
 
 
 @dataclass(frozen=True)
@@ -99,16 +114,19 @@ class Diagnostic:
         return self.status in {"error", "timeout", "interrupted", "missing_login", "rejected_login", "login_error"}
 
     def describe(self):
-        counts = f"{self.raw} returned, {self.kept} kept before deduplication"
-        removed = "; ".join(f"{name}: removed {count}" for name, count in self.removed)
-        page = f"page {self.page}" if self.page else "initial search"
-        requests = f"{self.requests} requests" if self.requests is not None else "request count unavailable"
+        counts = t("{raw} returned, {kept} kept before deduplication", raw=self.raw, kept=self.kept)
+        removed = "; ".join(t("{name}: removed {count}", name=t(name), count=count) for name, count in self.removed)
+        page = t("page {number}", number=self.page) if self.page else t("initial search")
+        # English retains its historical count wording; Portuguese has distinct plural forms.
+        requests = tn("{n} requests", "{n} requests", self.requests) if self.requests is not None else t("request count unavailable")
         return "\n".join(filter(None, [
-            f"{self.provider} / {self.engine} · {page} · attempt {self.attempt}",
-            f"Query: {self.query}",
-            f"{self.status.replace('_', ' ')} · {self.seconds:.1f}s · {requests}",
+            t("{provider} / {engine} · {page} · attempt {attempt}", provider=self.provider,
+              engine=self.engine, page=page, attempt=self.attempt),
+            t("Query: {query}", query=self.query),
+            t("{status} · {seconds:.1f}s · {requests}", status=status_label(self.status), seconds=self.seconds, requests=requests),
             counts, removed,
-            "Active filters: " + self.filters if self.filters else "",
-            f"{self.cached} cached rows; fetched times belong to the saved listing." if self.cached else "",
+            t("Active filters: {filters}", filters=self.filters) if self.filters else "",
+            tn("{n} cached rows; fetched times belong to the saved listing.",
+               "{n} cached rows; fetched times belong to the saved listing.", self.cached) if self.cached else "",
             self.message,
         ]))

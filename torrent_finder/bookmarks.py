@@ -5,6 +5,8 @@ bookmark added or removed in another window is never undone by this one.
 """
 
 from copy import deepcopy
+# i18n: converted
+from torrent_finder.i18n import N_, t
 from datetime import datetime, timezone
 from uuid import uuid4
 from torrent_finder import store
@@ -26,7 +28,7 @@ def _validated(data):
                 and isinstance(entry.get("search_profile"), dict)
                 and (entry["kind"] == "search" or (isinstance(entry.get("result"), dict) and "fetched_at" in entry)))
     if not isinstance(rows, list) or not all(valid(e) for e in rows) or len({e["id"] for e in rows}) != len(rows):
-        raise ValueError("Cannot read saved bookmarks; existing data was preserved.")
+        raise ValueError(t("Cannot read saved bookmarks; existing data was preserved."))
     return rows
 
 
@@ -78,7 +80,7 @@ def save_results(provider, results):
                 for key in ("listing_hash", "info_hash"):
                     existing["result"][key] = entry["result"][key]
     _change(edit)
-    return "Bookmarked. Open Bookmarks from the main menu or quick actions to review."
+    return t("Bookmarked. Open Bookmarks from the main menu or quick actions to review.")
 
 
 def save_search(provider, query):
@@ -105,7 +107,7 @@ def search_provider(entry):
     from torrent_finder.state import apply_provider_state
     original = get_provider_by_slug(entry["provider"])
     if original is None:
-        raise ValueError("This bookmark's provider is unavailable.")
+        raise ValueError(t("This bookmark's provider is unavailable."))
     if getattr(original, "is_combined", False):
         provider = CombinedProvider(original.templates)
         provider.restore_history(entry["search_profile"])
@@ -125,7 +127,7 @@ def refresh(identity, results):
             return
         entry["checked_at"] = checked
         match = next((r for r in results if result_identity(r) == result_identity(entry["result"])), None)
-        entry["refresh_status"] = "Listing found" if match is not None else "Not returned by this search; saved listing retained"
+        entry["refresh_status"] = N_("Listing found") if match is not None else N_("Not returned by this search; saved listing retained")
         if match is not None:
             refreshed = deepcopy(dict(match))
             for key in ("provider_slug", "provider_label", "listing_hash"):
@@ -139,3 +141,9 @@ def refresh(identity, results):
             entry["fetched_at"] = match.get("fetched_at") or checked
     if any(e["id"] == identity and e["kind"] == "result" for e in entries()):
         _change(edit)
+
+
+def refresh_status_label(status: str) -> str:
+    """Translate known saved status identities only; leave foreign stored text alone."""
+    known = (N_("Listing found"), N_("Not returned by this search; saved listing retained"), N_("Not refreshed"))
+    return t(status) if status in known else status

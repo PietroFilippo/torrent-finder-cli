@@ -1,47 +1,49 @@
 """Listing metadata and explicitly labelled filename hints, without network I/O."""
 
 import re
+# i18n: converted
+from torrent_finder.i18n import N_, t
 from torrent_finder.language_tags import has_brazilian_audio, has_brazilian_subtitles
 
 
 def detail_lines(row):
-    name = str(row.get("name", "Unknown"))
-    lines = ["Full name: " + name]
-    for key, label in (("provider_label", "Provider"), ("source", "Source"),
-                       ("uploader", "Uploader (listing)"), ("resolution", "Resolution (listing)"),
-                       ("audio_language", "Audio language (listing)"),
-                       ("subtitle_language", "Subtitle language (listing)"),
-                       ("language", "Language (listing; track unspecified)"),
-                       ("knaben_tracker", "Originating tracker"),
-                       ("apibay_cached_at", "Cached APIBay metadata (last-known-good)"),
-                       ("page_url", "Listing"), ("fetched_at", "Metadata fetched")):
+    name = str(row.get("name", t("Unknown")))
+    lines = [t("Full name: {name}", name=name)]
+    for key, label in (("provider_label", N_("Provider: {value}")), ("source", N_("Source: {value}")),
+                       ("uploader", N_("Uploader (listing): {value}")), ("resolution", N_("Resolution (listing): {value}")),
+                       ("audio_language", N_("Audio language (listing): {value}")),
+                       ("subtitle_language", N_("Subtitle language (listing): {value}")),
+                       ("language", N_("Language (listing; track unspecified): {value}")),
+                       ("knaben_tracker", N_("Originating tracker: {value}")),
+                       ("apibay_cached_at", N_("Cached APIBay metadata (last-known-good): {value}")),
+                       ("page_url", N_("Listing: {value}")), ("fetched_at", N_("Metadata fetched: {value}"))):
         if row.get(key):
-            lines.append(f"{label}: {row[key]}")
+            lines.append(t(label, value=row[key]))
     hints = []
     if not row.get("resolution"):
         hints.extend(dict.fromkeys(re.findall(r"\b(?:480p|720p|1080[pi]|2160p|4k)\b", name, re.I)))
     if not row.get("audio_language") and has_brazilian_audio(name):
-        hints.append("PT-BR audio tag")
+        hints.append(t("PT-BR audio tag"))
     if not row.get("subtitle_language") and has_brazilian_subtitles(name):
-        hints.append("PT-BR subtitle tag")
+        hints.append(t("PT-BR subtitle tag"))
     if re.search(r"\bpt[ ._-]*pt\b", name, re.I):
-        hints.append("PT-PT tag (track unspecified)")
+        hints.append(t("PT-PT tag (track unspecified)"))
     if re.search(r"\bdual[ ._-]+audio\b", name, re.I):
-        hints.append("Dual Audio (languages unspecified)")
+        hints.append(t("Dual Audio (languages unspecified)"))
     if not any(row.get(key) for key in ("language", "audio_language", "subtitle_language")):
-        for pattern, label in ((r"\b(?:eng|english)\b", "English"),
-                               (r"\b(?:jpn|japanese)\b", "Japanese"),
-                               (r"\b(?:spa|spanish)\b", "Spanish"),
-                               (r"\b(?:portuguese|português)\b", "Portuguese (region unspecified)")):
+        for pattern, label in ((r"\b(?:eng|english)\b", N_("English tag (track unspecified)")),
+                               (r"\b(?:jpn|japanese)\b", N_("Japanese tag (track unspecified)")),
+                               (r"\b(?:spa|spanish)\b", N_("Spanish tag (track unspecified)")),
+                               (r"\b(?:portuguese|português)\b", N_("Portuguese (region unspecified) tag (track unspecified)"))):
             if re.search(pattern, name, re.I):
-                hints.append(label + " tag (track unspecified)")
+                hints.append(t(label))
     if not row.get("uploader"):
         match = re.match(r"\[([^\]]+)\]", name)
         if match:
-            hints.append("release group: " + match[1])
+            hints.append(t("release group: {group}", group=match[1]))
     if hints:
-        lines.append("Filename hints: " + "; ".join(hints))
-    lines.append("Listing labels and filename hints do not verify media tracks or availability.")
+        lines.append(t("Filename hints: {hints}", hints="; ".join(hints)))
+    lines.append(t("Listing labels and filename hints do not verify media tracks or availability."))
     return lines
 
 
@@ -55,32 +57,32 @@ def _token(pattern: str) -> re.Pattern:
 
 
 _RESOLUTION = _token(r"2160p|4k|uhd|1080[pi]|720p|576p|480p")
-_SOURCE = _token(r"web[-. ]?dl|web[-. ]?rip|blu[-. ]?ray|bdrip|brrip|remux|hdtv|dvdrip|hdcam|hdts|telesync|cam|web")
-_EDITION = _token(r"repack|proper|extended|imax|remastered|uncut|director'?s[ .]cut")
-_HDR = _token(r"hdr10\+|hdr10|hdr|dolby[ .]?vision|dovi|dv")
-_CODEC = _token(r"x26[45]|h[ .]?26[45]|hevc|avc|av1|xvid")
+_SOURCE = _token(r"web[-. ]?dl|web[-. ]?rip|blu[-. ]?ray|bdrip|brrip|remux|hdtv|dvdrip|hdcam|hdts|telesync|cam|web")  # i18n: ignore - release tokens
+_EDITION = _token(r"repack|proper|extended|imax|remastered|uncut|director'?s[ .]cut")  # i18n: ignore - release tokens
+_HDR = _token(r"hdr10\+|hdr10|hdr|dolby[ .]?vision|dovi|dv")  # i18n: ignore - release tokens
+_CODEC = _token(r"x26[45]|h[ .]?26[45]|hevc|avc|av1|xvid")  # i18n: ignore - release tokens
 _AUDIO = re.compile(r"(?<![a-z0-9])(ddp|dd\+|e-?ac-?3|ac-?3|aac|dts-hd(?:[ .]ma)?|dts|truehd|atmos|flac|opus|lpcm)"
                     r"(?:[ .]?([257][.][01]))?(?![a-z0-9])", re.I)
 _CHANNELS = _token(r"[257][.][01]")
-_DUAL = _token(r"dual[ ._-]?audio|dual")
+_DUAL = _token(r"dual[ ._-]?audio|dual")  # i18n: ignore - release tokens
 _MULTI = _token(r"multi")
 _DUBBED = _token(r"dublado|dub")
 _TRAILING_GROUP = re.compile(r"-([A-Za-z0-9]{2,})(?:\.(?:mkv|mp4|avi|torrent))?\s*$")
 _LEADING_GROUP = re.compile(r"^\s*\[([^\]]+)\]")
 
-_SOURCE_NAMES = {"webdl": "WEB-DL", "webrip": "WEBRip", "bluray": "BluRay", "bdrip": "BDRip", "brrip": "BRRip",
-                 "remux": "Remux", "hdtv": "HDTV", "dvdrip": "DVDRip", "hdcam": "HDCAM", "hdts": "HDTS",
+_SOURCE_NAMES = {"webdl": "WEB-DL", "webrip": "WEBRip", "bluray": "BluRay", "bdrip": "BDRip", "brrip": "BRRip",  # i18n: ignore - scene names
+                 "remux": "Remux", "hdtv": "HDTV", "dvdrip": "DVDRip", "hdcam": "HDCAM", "hdts": "HDTS",  # i18n: ignore
                  "telesync": "TS", "cam": "CAM", "web": "WEB"}
-_HDR_NAMES = {"hdr10+": "HDR10+", "hdr10": "HDR10", "hdr": "HDR", "dolbyvision": "Dolby Vision",
-              "dovi": "Dolby Vision", "dv": "DV"}
+_HDR_NAMES = {"hdr10+": "HDR10+", "hdr10": "HDR10", "hdr": "HDR", "dolbyvision": "Dolby Vision",  # i18n: ignore - scene names
+              "dovi": "Dolby Vision", "dv": "DV"}  # i18n: ignore
 _CODEC_NAMES = {"x264": "x264", "x265": "x265", "h264": "H.264", "h265": "H.265", "hevc": "HEVC", "avc": "AVC",
-                "av1": "AV1", "xvid": "XviD"}
+                "av1": "AV1", "xvid": "XviD"}  # i18n: ignore - scene names
 _AUDIO_NAMES = {"ddp": "DDP", "dd+": "DDP", "eac3": "EAC3", "ac3": "AC3", "aac": "AAC", "dtshd": "DTS-HD",
-                "dtshdma": "DTS-HD MA", "dts": "DTS", "truehd": "TrueHD", "atmos": "Atmos", "flac": "FLAC",
-                "opus": "Opus", "lpcm": "LPCM"}
+                "dtshdma": "DTS-HD MA", "dts": "DTS", "truehd": "TrueHD", "atmos": "Atmos", "flac": "FLAC",  # i18n: ignore - scene names
+                "opus": "Opus", "lpcm": "LPCM"}  # i18n: ignore
 
 
-_JOINED_CHANNELS = {"DDP", "AAC", "AC3", "EAC3", "DTS", "FLAC", "LPCM", "Opus"}
+_JOINED_CHANNELS = {"DDP", "AAC", "AC3", "EAC3", "DTS", "FLAC", "LPCM", "Opus"}  # i18n: ignore - scene names
 _NOT_GROUPS = {"br", "dl", "rip", "hd", "sd", "pt"}
 
 
@@ -130,20 +132,28 @@ def release_tags(name: str) -> list[str]:
     if not with_channels:
         tags += [m.group(0) for m in _CHANNELS.finditer(area)]
     if has_brazilian_audio(name):
-        tags.append("PT-BR audio")
+        tags.append(N_("PT-BR audio"))
     elif _DUBBED.search(area):
-        tags.append("Dubbed")
+        tags.append(N_("Dubbed"))
     if has_brazilian_subtitles(name):
-        tags.append("PT-BR subs")
+        tags.append(N_("PT-BR subs"))
     if _DUAL.search(area):
-        tags.append("Dual audio")
+        tags.append(N_("Dual audio"))
     if _MULTI.search(area):
-        tags.append("Multi")
+        tags.append(N_("Multi"))
     group = _LEADING_GROUP.match(name) or _TRAILING_GROUP.search(name)
     if group and not (_compact(group.group(1)) in _NOT_GROUPS
                       or re.search(r"(?i)(?<![a-z])pt$", name[:group.start()])):  # PT-BR is not a group
-        tags.append("group " + group.group(1))
+        tags.append("group " + group.group(1))  # i18n: ignore - matched by tag_matches()
     return list(dict.fromkeys(tags))
+
+
+def tag_label(tag: str) -> str:
+    """Display a release tag after matching its unchanged English identity."""
+    if tag.startswith("group "):
+        return t("group {name}", name=tag.removeprefix("group "))
+    known = (N_("PT-BR audio"), N_("Dubbed"), N_("PT-BR subs"), N_("Dual audio"), N_("Multi"))
+    return t(tag) if tag in known else tag
 
 
 def tag_matches(tag: str, preset_names) -> bool:

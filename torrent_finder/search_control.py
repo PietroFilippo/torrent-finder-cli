@@ -5,6 +5,8 @@ request cannot be forcibly killed, but no retries start after its budget expires
 """
 
 from contextvars import ContextVar
+# i18n: converted
+from torrent_finder.i18n import t
 from dataclasses import dataclass
 import threading
 import time
@@ -101,8 +103,8 @@ class Cooldown:
             remaining = self.until - time.monotonic()
         if remaining > 0:
             from torrent_finder.search_errors import SearchError
-            raise SearchError(f"{self.name} asked the app to slow down; it is searched again in "
-                              f"{max(1, round(remaining))} s.")
+            raise SearchError(t("{name} asked the app to slow down; it is searched again in {seconds} s.",
+                                name=self.name, seconds=max(1, round(remaining))))
 
     def note(self, response) -> None:
         """Start the cooldown when *response* is a rate limit, then raise via ``check``."""

@@ -5,6 +5,8 @@ change returned rows, pagination cursors or a subsequent retry.
 """
 
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+# i18n: converted
+from torrent_finder.i18n import N_, t, tn
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -52,6 +54,29 @@ class SearchResults(list):
         super().__init__(rows)
         self.notices = tuple(notices)
         self.session = session
+
+
+@dataclass(frozen=True)
+class PageStatus:
+    """Pagination identity and numbers; UI text must never decide availability."""
+
+    provider: str
+    engine: str
+    query: str
+    status: str
+    number: int = 0
+
+    def english(self):
+        """Compatibility text for callers of SearchSession.page_status()."""
+        messages = {
+            "unavailable": "deeper retrieval unavailable",  # i18n: ignore
+            "not_needed": "Auto not needed; no pages requested",  # i18n: ignore
+            "incomplete": "page incomplete; retry failed sources first",  # i18n: ignore
+            "limit": f"page limit reached ({self.number})",  # i18n: ignore
+            "exhausted": "exhausted for this query",  # i18n: ignore
+            "next": f"next page: {self.number}",  # i18n: ignore
+        }
+        return f"{self.provider} / {self.engine} · {self.query}: {messages[self.status]}"
 
 
 @dataclass
@@ -121,25 +146,30 @@ class SearchSession:
         return list(latest.values())
 
     def page_status(self):
-        lines = []
+        """Legacy English display, retained for existing callers; UI uses page_states()."""
+        return [page.english() for page in self.page_states()]
+
+    def page_states(self):
+        pages = []
         for task in self._latest_pages():
             d = task.diagnostic
             if d.status == "off":
                 continue
+            number = 0
             if not task.engine.page_fn:
-                status = "deeper retrieval unavailable"
+                status = "unavailable"
             elif d.status in {"auto", "skipped"}:
-                status = "Auto not needed; no pages requested"
+                status = "not_needed"
             elif d.retryable:
-                status = "page incomplete; retry failed sources first"
+                status = "incomplete"
             elif task.page >= MAX_PAGE:
-                status = f"page limit reached ({MAX_PAGE})"
+                status, number = "limit", MAX_PAGE
             elif not task.has_more:
-                status = "exhausted for this query"
+                status = "exhausted"
             else:
-                status = f"next page: {task.page + 1}"
-            lines.append(f"{d.provider} / {d.engine} · {task.query}: {status}")
-        return lines
+                status, number = "next", task.page + 1
+            pages.append(PageStatus(d.provider, d.engine, task.query, status, number))
+        return tuple(pages)
 
     def _page_candidates(self):
         return [t for t in self._latest_pages() if t.engine.page_fn and t.has_more
@@ -163,10 +193,10 @@ class SearchSession:
                 authors = self.work_authors.get(self.alias_of.get(query, query), ())
                 answered = any(self._score(provider.title_relevance, row, query, authors)
                                >= provider.relevant_title_score for t in primary for row in t.rows)
-                reason = "On engines returned rows matching the title; Auto was not needed."
+                reason = t("On engines returned rows matching the title; Auto was not needed.")
             else:
                 answered = any(t.rows for t in primary)
-                reason = "On engines returned rows before local filters; Auto was not needed."
+                reason = t("On engines returned rows before local filters; Auto was not needed.")
             for task in tasks:
                 if task.diagnostic.status != "auto":
                     continue
@@ -200,10 +230,10 @@ class SearchSession:
                 if trace.failures:
                     status, message = trace.failures[-1]
                     if rows:
-                        message += " Received rows are retained; this search may be incomplete."
+                        message = t("{message} Received rows are retained; this search may be incomplete.", message=message)
             except SearchInterrupted:
                 status = "interrupted" if control.stopped() else "timeout"
-                message = "Stopped waiting; received results are retained."
+                message = t("Stopped waiting; received results are retained.")
             except SearchError as error:
                 message = str(error)
                 low = message.casefold()
@@ -211,9 +241,9 @@ class SearchSession:
                     "missing_login" if "not logged in" in low else "rejected_login" if "rejected" in low
                     else "login_error" if "login" in low or "log in" in low else "error")
             except requests.Timeout:
-                status, message = "timeout", "Source request timed out."
+                status, message = "timeout", t("Source request timed out.")
             except Exception:
-                status, message = trace.failures[-1] if trace.failures else ("error", "Source search failed; try again later.")
+                status, message = trace.failures[-1] if trace.failures else ("error", t("Source search failed; try again later."))
         try:
             kept, removed = provider.filter_with_reasons(rows, self.cli_filters, self.result_filter)
         except Exception:  # only the diagnostic counts depend on it; snapshot() filters the rows
@@ -222,17 +252,17 @@ class SearchSession:
             status = "filtered"
         hint = ""
         if not rows and status == "empty":
-            message = "No matching rows returned by this search; source coverage is not established."
+            message = t("No matching rows returned by this search; source coverage is not established.")
             try:
                 hint = task.engine.empty_hint(task.query) if task.engine.empty_hint else ""
             except Exception:
                 hint = ""  # advice is optional
         descriptions = [provider.filter_summary()]
-        for label, config in (("Defaults", provider.default_filters), ("CLI", self.cli_filters)):
+        for label, config in ((N_("Defaults"), provider.default_filters), ("CLI", self.cli_filters)):
             if config:
                 parts = [f"{name}: {value}" for name, value in vars(config).items() if value and not callable(value)]
                 if parts:
-                    descriptions.append(label + ": " + ", ".join(parts))
+                    descriptions.append(t("{label}: {filters}", label=t(label), filters=", ".join(parts)))
         if self.shared_summary:
             descriptions.append(self.shared_summary)
         diagnostic = replace(task.diagnostic, status=status, raw=len(rows), kept=len(kept),
@@ -254,7 +284,7 @@ class SearchSession:
         if previous and previous.page > task.engine.initial_page and rows and not diagnostic.retryable:
             if {(r.info_hash, r.name) for r in previous.rows} == {(r.info_hash, r.name) for r in rows}:
                 more = False
-                diagnostic = replace(diagnostic, message="Source repeated the previous page; pagination stopped.")
+                diagnostic = replace(diagnostic, message=t("Source repeated the previous page; pagination stopped."))
         # Keep earlier rows even when a repeat attempt is partial or empty.
         seen = {(r.info_hash, r.name) for r in rows}
         task.rows = rows + [r for r in task.rows if (r.info_hash, r.name) not in seen]
@@ -275,8 +305,8 @@ class SearchSession:
                 rows = provider._filter_search_results(candidates, query, self.cli_filters, self.result_filter)
             except Exception:
                 # Unfiltered rows could break the user's filters; hide only this group's.
-                self._note(f"{provider_label(provider)}: results could not be filtered (an internal error), "
-                           "so they are hidden.")
+                self._note(t("{provider}: results could not be filtered (an internal error), so they are hidden.",
+                             provider=provider_label(provider)))
                 rows = []
             for raw in rows:
                 row = SearchResult.from_mapping(dict(raw))
@@ -329,17 +359,17 @@ class SearchSession:
         elif any(typed.values()):
             ordered.sort(key=typed_hits, reverse=True)
         notices = list(dict.fromkeys(d.message if d.status in ACCESS_STATUSES
-                                    else f"{d.provider} / {d.engine}: {d.message}"
+                                    else t("{provider} / {engine}: {message}", provider=d.provider, engine=d.engine, message=d.message)
                                     for d in self.diagnostics if d.retryable or d.status in ACCESS_STATUSES))
         notices += self.notes
         for slug, presets in typed.items():
             rows = [r for r in ordered if (r.get("provider_slug") or self.providers[0].slug) == slug]
             for preset in presets if rows else ():
                 count = sum(bool(apply_filters([row], preset.config)) for row in rows)
-                notices.append(f"{count} result(s) carry a {preset.name} tag and come first among equally good "
-                               "matches; the title alone was searched too." if count else
-                               f"No result carries a {preset.name} tag; the title alone was searched too, "
-                               "so other releases are shown.")
+                notices.append(tn("{n} result(s) carry a {filter} tag and come first among equally good matches; the title alone was searched too.",
+                                  "{n} result(s) carry a {filter} tag and come first among equally good matches; the title alone was searched too.",
+                                  count, filter=t(preset.name)) if count else
+                               t("No result carries a {filter} tag; the title alone was searched too, so other releases are shown.", filter=t(preset.name)))
         if not ordered:  # source advice only when nothing at all was found
             notices += list(dict.fromkeys(d.hint for d in self.diagnostics if d.hint))
         return SearchResults(ordered, notices, session=self)
@@ -372,7 +402,7 @@ class SearchSession:
     def run(self, action="initial", *, cancel_event=None, finish_event=None,
             on_progress=None, on_results=None, timeout=30):
         if not self._busy.acquire(blocking=False):
-            raise SearchError("This search is still running.")
+            raise SearchError(t("This search is still running."))
         try:
             return self._run(action, cancel_event=cancel_event, finish_event=finish_event,
                              on_progress=on_progress, on_results=on_results, timeout=timeout)
@@ -403,7 +433,7 @@ class SearchSession:
         elif action == "initial":
             selected = [t for t in self.tasks if t.diagnostic.status == "pending"]
         else:
-            raise ValueError("Unknown search action")
+            raise ValueError("Unknown search action")  # i18n: ignore - programmer error
         for task in selected:
             task.diagnostic = replace(task.diagnostic, status="pending")
         selected += self._auto_ready()
@@ -458,11 +488,13 @@ class SearchSession:
             executor.shutdown(wait=False, cancel_futures=True)
             for task in self.tasks:
                 if task.diagnostic.status == "pending":
-                    reason = "Stopped waiting" if control.finish.is_set() or control.cancel.is_set() else "Search time limit reached"
+                    reason = (t("stopped waiting; showing results received so far.")
+                              if control.finish.is_set() or control.cancel.is_set()
+                              else t("search time limit reached; showing results received so far."))
                     task.diagnostic = replace(task.diagnostic, status="interrupted", requests=None,
                                               seconds=time.monotonic() - action_started,
                                               attempt=task.diagnostic.attempt + 1,
-                                              message=reason.lower() + "; showing results received so far.")
+                                              message=reason)
         if author_lookup is not None and not control.stopped():
             author_lookup.join(timeout=_AUTHOR_LOOKUP_WAIT)  # usually already done: it ran alongside
         publish()
@@ -478,7 +510,7 @@ class SearchSession:
         try:
             return scorer(row, query, authors)
         except Exception:
-            self._note("Some results could not be ranked (an internal error); they are listed last.")
+            self._note(t("Some results could not be ranked (an internal error); they are listed last."))
             return 0
 
     def _other_spelling_tasks(self, control):
@@ -546,10 +578,10 @@ class SearchSession:
                 group = self._add_group(provider, name)
                 added += [t for t in self.tasks if t.group == group and t.diagnostic.status == "pending"]
             catalog_names = [alias for alias in aliases if alias in names and alias not in spellings]
-            notes = [(f"Nothing matched “{query}”, so “{spelling}” was searched too.", spelling in names)
+            notes = [(t("Nothing matched “{query}”, so “{spelling}” was searched too.", query=query, spelling=spelling), spelling in names)
                      for spelling in spellings]
-            notes.append((f"Nothing matched “{query}”, so its catalog title was searched too: "
-                          + ", ".join(f"“{alias}”" for alias in catalog_names) + ".", bool(catalog_names)))
+            notes.append((t("Nothing matched “{query}”, so its catalog title was searched too: {aliases}.",
+                            query=query, aliases=", ".join(f"“{alias}”" for alias in catalog_names)), bool(catalog_names)))
             for note, shown in notes:
                 if shown and note not in self.notes:
                     self.notes.append(note)

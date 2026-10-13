@@ -1,6 +1,8 @@
 """Title matching and stable result views shared by search and the table."""
 
 import re
+# i18n: converted
+from torrent_finder.i18n import N_, t
 import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
@@ -8,12 +10,22 @@ from email.utils import parsedate_to_datetime
 
 
 SORT_ORDERS = {
-    "relevance": "Recommended",
-    "seeds": "Most seeders",
-    "newest": "Newest uploads (unknown dates last)",
-    "name": "Name A–Z",
-    "size": "Largest size",
+    "relevance": N_("Recommended"),
+    "seeds": N_("Most seeders"),
+    "newest": N_("Newest uploads (unknown dates last)"),
+    "name": N_("Name A–Z"),
+    "size": N_("Largest size"),
 }
+
+
+def sort_label(order: str) -> str:
+    """Display a saved sort identity without changing the settings vocabulary."""
+    return t(SORT_ORDERS[order]) if order in SORT_ORDERS else order
+
+
+def match_mode_label(mode: str) -> str:
+    """The table's historical capitalized labels, looked up only for display."""
+    return {"contains": t("Contains"), "title": t("Title"), "filename": t("Filename")}.get(mode, mode.capitalize())
 
 
 def words(text: str) -> tuple[str, ...]:
@@ -149,9 +161,9 @@ _RELEASE_TAGS = re.compile(
     r"\b(?:\d{3,4}p|4k|uhd|x26[45]|h\.?26[45]|hevc|av1|blu-?ray|web-?(?:dl|rip)|remux|hdtv"
     r"|bdrip|dvdrip|hdr(?:10)?|dolby vision|dual[- ]audio|multi[- ]audio|pt-?br|dublado|legendado"
     r"|dubbed|subbed|s\d{1,2}(?:e\d{1,3})?)\b", re.I)
-_NUMBER_WORDS = ("zero one two three four five six seven eight nine ten eleven twelve thirteen "
-                 "fourteen fifteen sixteen seventeen eighteen nineteen twenty").split()
-_ROMAN = ("ii iii iv vi vii viii ix xi xii xiii xiv xv xvi xvii xviii xix xx").split()
+_NUMBER_WORDS = ("zero one two three four five six seven eight nine ten eleven twelve thirteen "  # i18n: ignore - title tokens
+                 "fourteen fifteen sixteen seventeen eighteen nineteen twenty").split()  # i18n: ignore
+_ROMAN = ("ii iii iv vi vii viii ix xi xii xiii xiv xv xvi xvii xviii xix xx").split()  # i18n: ignore - title tokens
 _ROMAN_VALUES = dict(zip(_ROMAN, (2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)))
 _NUMBERS = {**{str(n): word for n, word in enumerate(_NUMBER_WORDS)},
             **{roman: _NUMBER_WORDS[value] for roman, value in _ROMAN_VALUES.items()}}
@@ -331,12 +343,12 @@ def product_title_score(name: str, query: str) -> int:
 
 
 _UNIT_WORDS = {word: n for n, word in enumerate(_NUMBER_WORDS[:20])}
-_TEN_WORDS = {word: 10 * n for n, word in enumerate("twenty thirty forty fifty sixty seventy eighty ninety".split(), 2)}
+_TEN_WORDS = {word: 10 * n for n, word in enumerate("twenty thirty forty fifty sixty seventy eighty ninety".split(), 2)}  # i18n: ignore - title tokens
 _UNIT_ORDINALS = {word: n for n, word in enumerate(
-    ("zeroth first second third fourth fifth sixth seventh eighth ninth tenth eleventh twelfth thirteenth "
-     "fourteenth fifteenth sixteenth seventeenth eighteenth nineteenth").split())}
+    ("zeroth first second third fourth fifth sixth seventh eighth ninth tenth eleventh twelfth thirteenth "  # i18n: ignore - title tokens
+     "fourteenth fifteenth sixteenth seventeenth eighteenth nineteenth").split())}  # i18n: ignore
 _TEN_ORDINALS = {word: 10 * n for n, word in enumerate(
-    "twentieth thirtieth fortieth fiftieth sixtieth seventieth eightieth ninetieth".split(), 2)}
+    "twentieth thirtieth fortieth fiftieth sixtieth seventieth eightieth ninetieth".split(), 2)}  # i18n: ignore - title tokens
 _LARGE_NUMBERS = {"thousand", "million", "billion"}
 
 
@@ -522,8 +534,8 @@ def timestamp(value) -> int:
 
 
 # What a title score means, for the "Ranked:" note under a focused result.
-TITLE_REASONS = {4: "exact title and author", 3: "exact title", 2: "title starts with the search",
-                 1: "every searched word", 0: "title differs from the search"}
+TITLE_REASONS = {4: N_("exact title and author"), 3: N_("exact title"), 2: N_("title starts with the search"),
+                 1: N_("every searched word"), 0: N_("title differs from the search")}
 
 
 def ranking_notes(provider, queries):
@@ -547,10 +559,11 @@ def ranking_notes(provider, queries):
         if queries and (combined or getattr(owner, "prefer_title_matches", False)):
             try:
                 reason = TITLE_REASONS.get(max(owner.title_relevance(row, query) for query in queries), "")
+                reason = t(reason)
             except Exception:  # a dict row (a saved bookmark) or a scorer problem: no title note
                 reason = ""
         if preferred:
-            reason = ", ".join(filter(None, (reason, "prefers " + ", ".join(preferred))))
+            reason = ", ".join(filter(None, (reason, t("prefers {filters}", filters=", ".join(t(name) for name in preferred)))))
         return reason, preferred
 
     return describe

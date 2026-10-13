@@ -12,6 +12,7 @@ from rich.text import Text
 
 import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder.search_diagnostics import Diagnostic
+from torrent_finder.search_session import PageStatus
 from torrent_finder.ui import search_diagnostics as screen, theme
 
 
@@ -23,8 +24,8 @@ def session(queries=("dune part two",)):
                                                          ("SolidTorrents", "off", 0, 0, 0))]
     return SimpleNamespace(
         can_retry=True, can_load_more=True, queries=list(queries), diagnostics=diagnostics,
-        page_status=lambda: ["Movies & Series / Apibay · dune part two: next page: 2",
-                             "Movies & Series / Knaben · dune part two: page incomplete; retry failed sources first"])
+        page_states=lambda: (PageStatus("Movies & Series", "Apibay", queries[0], "next", 2),
+                             PageStatus("Movies & Series", "Knaben", queries[0], "incomplete")))
 
 
 class DiagnosticsScreenTests(unittest.TestCase):

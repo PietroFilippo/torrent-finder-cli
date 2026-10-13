@@ -1,5 +1,7 @@
 """Actionable search failures that must not be shown as an empty result set."""
 
+# i18n: converted
+from torrent_finder.i18n import t
 
 class SearchError(Exception):
     """A failure to show instead of "no results".
@@ -17,5 +19,6 @@ def login_required(provider: str) -> SearchError:
     from torrent_finder.credentials import storage_problem
     problem = storage_problem()
     return SearchError(
-        problem or f"{provider}: not logged in. Add your username and password in Credentials on the provider screen."
+        problem or t("{provider}: not logged in. Add your username and password in Credentials on the provider screen.", provider=provider),
+        status=None if problem else "missing_login",
     )

@@ -1,6 +1,8 @@
 """Review saved listings and searches using their original acquisition path."""
 
 from rich.markup import escape
+# i18n: converted
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder import bookmarks
 from torrent_finder.providers import display_name_for
 from torrent_finder.ui.selector import SelectItem, arrow_select
@@ -9,37 +11,39 @@ from torrent_finder.utils import relative_time
 
 def _when(timestamp) -> str:
     """``2h ago``, or the saved text itself when it is not a time this app wrote."""
-    return relative_time(timestamp) or str(timestamp or "unknown")
+    return relative_time(timestamp) or str(timestamp or t("unknown"))
 
 
 def _description(entry) -> str:
-    lines = [f"{display_name_for(str(entry.get('provider', '')))} · saved {_when(entry.get('saved_at'))}"]
+    lines = [t("{provider} · saved {when}", provider=display_name_for(str(entry.get('provider', ''))),
+               when=_when(entry.get('saved_at')))]
     if entry["kind"] == "result":
-        lines.append(f"Metadata fetched {_when(entry.get('fetched_at'))} · {entry.get('refresh_status', 'Not refreshed')}")
-    lines.append("Saved metadata does not confirm current availability.")
+        lines.append(t("Metadata fetched {when} · {status}", when=_when(entry.get('fetched_at')),
+                       status=bookmarks.refresh_status_label(entry.get('refresh_status', N_("Not refreshed")))))
+    lines.append(t("Saved metadata does not confirm current availability."))
     return escape("\n".join(lines))
 
 
 def bookmark_menu():
     while True:
         saved = bookmarks.entries()
-        items = [SelectItem(e["name"], e, hint=e["kind"], description=_description(e)) for e in saved]
-        items.append(SelectItem("Back", None))
+        items = [SelectItem(e["name"], e, hint=t("result") if e["kind"] == "result" else t("search"), description=_description(e)) for e in saved]
+        items.append(SelectItem(t("Back"), None))
         if any(e["kind"] == "result" for e in saved):
-            items.insert(len(items) - 1, SelectItem("Compare saved results in one table", "compare"))
-        footer = "Enter review • Esc back" if saved else (
+            items.insert(len(items) - 1, SelectItem(t("Compare saved results in one table"), "compare"))
+        footer = t("Enter review • Esc back") if saved else t(
             "No bookmarks yet. In search results, b saves a listing; Quick actions → "
             "Bookmark current search saves a search.\nEsc back")
-        pick = arrow_select(items, title="Bookmarks / download later", status=f"{len(saved)} saved", footer=footer)
+        pick = arrow_select(items, title=t("Bookmarks / download later"), status=tn("{n} saved", "{n} saved", len(saved)), footer=footer)
         if pick is None or items[pick].value is None:
             return None
         entry = items[pick].value
         if entry == "compare":
             return "compare", [e for e in saved if e["kind"] == "result"]
-        actions = [SelectItem("Open saved result / download options" if entry["kind"] == "result" else "Run saved search", "open"),
-                   SelectItem("Refresh listing with its saved search", "refresh", enabled=entry["kind"] == "result"),
-                   SelectItem("Remove bookmark", "remove"), SelectItem("Back", "back")]
-        chosen = arrow_select(actions, title=escape(entry["name"]), footer="Enter choose • Esc back")
+        actions = [SelectItem(t("Open saved result / download options") if entry["kind"] == "result" else t("Run saved search"), "open"),
+                   SelectItem(t("Refresh listing with its saved search"), "refresh", enabled=entry["kind"] == "result"),
+                   SelectItem(t("Remove bookmark"), "remove"), SelectItem(t("Back"), "back")]
+        chosen = arrow_select(actions, title=escape(entry["name"]), footer=t("Enter choose • Esc back"))
         if chosen is None:
             continue
         action = actions[chosen].value
