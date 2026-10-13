@@ -1,0 +1,20 @@
+{
+  "Back": "Voltar",
+  "Settings": "Configurações",
+  "Press [key]any key[/key] to continue…": "Pressione [key]qualquer tecla[/key] para continuar…",
+  "↑/↓ navigate": "↑/↓ navegar",
+  "Enter select": "Enter selecionar",
+  "Enter choose": "Enter escolher",
+  "Enter confirm": "Enter confirmar",
+  "Enter search": "Enter buscar",
+  "Enter save": "Enter salvar",
+  "Esc back": "Esc voltar",
+  "Esc cancel": "Esc cancelar",
+  "key bar::keys": "teclas",
+  "engine mode::On": "Sempre",
+  "engine mode::Auto": "Auto",
+  "engine mode::Off": "Nunca",
+  "preset state::Off": "Não",
+  "preset state::Require": "Exigir",
+  "preset state::Prefer": "Preferir"
+}

@@ -9,6 +9,8 @@ so running it alone is safe.
 It also starts every test, under unittest or pytest alike, from one
 appearance: the Simple design with the default painting, the Windows
 Terminal profile out of reach, and no full-screen view left open after it.
+Every test also runs in English, whatever the machine's language or
+``TORRENT_FINDER_LANG`` say.
 """
 
 import atexit
@@ -57,10 +59,16 @@ rich.console.detect_legacy_windows = lambda: False
 # Simple design's frames, and tests that start the app apply its startup
 # appearance: every test starts and ends on this baseline. Tests of Athanor
 # or of the Windows Terminal profile opt in themselves.
-from torrent_finder import paintings, terminal_profile  # noqa: E402
+from torrent_finder import i18n, paintings, terminal_profile  # noqa: E402
 from torrent_finder.ui import appearance, display, theme  # noqa: E402
 
 BASELINE = ("quiet", "bar", "comfortable")
+# The real language probes, for the tests of the probes themselves; every test sees English ones.
+SYSTEM_PROBES = {"system_language": i18n.system_language, "system_region": i18n.system_region}
+
+
+def _english_system(environ=None, platform=None) -> str:
+    return "en-US"
 
 
 def restore_baseline() -> None:
@@ -70,6 +78,10 @@ def restore_baseline() -> None:
     appearance._session["painting"] = paintings.DEFAULT
     appearance._session["fonts"] = appearance.DEFAULT_FONTS
     appearance._session["profile"] = appearance.DEFAULT_PROFILE
+    # The suite asserts English text, also on a Portuguese machine or with the variable set.
+    os.environ.pop(i18n.ENV, None)
+    i18n.use("en")
+    i18n._session["source"] = "system"
 
 
 def _screens_closed() -> None:
@@ -87,7 +99,9 @@ def _run_from_baseline(self, result=None):
     self.addCleanup(_screens_closed)  # runs after the test's own cleanups, reported like them
     # The real Windows Terminal folder and the Store Python's cmd calls stay out of reach.
     with patch.object(terminal_profile, "supported", lambda environ=None: False), \
-         patch.object(terminal_profile, "_package_family", lambda: ""):
+         patch.object(terminal_profile, "_package_family", lambda: ""), \
+         patch.object(i18n, "system_language", _english_system), \
+         patch.object(i18n, "system_region", _english_system):
         try:
             return _run(self, result)
         finally:
