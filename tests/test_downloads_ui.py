@@ -16,7 +16,7 @@ from fake_downloads import FRIEREN, GIB, FakeManager, install, sample_jobs
 from readchar import key as K
 from rich.console import Console
 
-from torrent_finder import downloads, main, state
+from torrent_finder import downloads, i18n, main, state
 from torrent_finder.ui import chrome, downloads as downloads_ui, prompts, selector, theme
 from torrent_finder.ui.selector import SelectItem
 
@@ -384,8 +384,8 @@ class DownloadsUITests(unittest.TestCase):
         install(self, FakeManager([job for job in sample_jobs() if job.id in ("job4", "job6")]))
         watched = downloads_ui.watch()
         messages = [chrome.take_message(), chrome.take_message()]
-        self.assertIn("[good]✓[/good] [SubsPlease] Frieren - 02 (1080p) finished · 1.4 GB · D opens Downloads", messages[0])
-        self.assertIn("[bad]✗[/bad] Blue Giant 2023 1080p failed · D opens Downloads", messages[1])
+        self.assertIn("[good]✓[/good] [SubsPlease] Frieren - 02 (1080p) finished · 1.4 GB · D on the main menu opens Downloads", messages[0])
+        self.assertIn("[bad]✗[/bad] Blue Giant 2023 1080p failed · D on the main menu opens Downloads", messages[1])
         self.assertFalse(downloads_ui.poll(watched))
         self.assertEqual(chrome.take_message(), "")
 
@@ -396,11 +396,38 @@ class DownloadsUITests(unittest.TestCase):
         manager.set_state("job1", "done", done_bytes=int(1.4 * GIB), total_bytes=int(1.4 * GIB))
         self.assertTrue(downloads_ui.poll(watched))
         message = chrome.take_message()
-        self.assertIn(FRIEREN + " finished · 1.4 GB · D opens Downloads", message)
+        self.assertIn(FRIEREN + " finished · 1.4 GB · D on the main menu opens Downloads", message)
         screen = Console(file=io.StringIO(), width=137, height=36, color_system=None)
         with patch.object(selector, "console", screen):
             screen.print(selector._build_panel([SelectItem("Row", "row")], 0, "Menu", False, message=message))
         self.assertIn("✓ " + FRIEREN + " finished", screen.file.getvalue().splitlines()[0])
+
+    def test_every_terminal_notice_scopes_d_to_the_main_menu_in_both_languages(self):
+        manager = install(self, FakeManager([sample_jobs()[0]]))
+        for language, hint in (("en", "D on the main menu opens Downloads"),
+                               ("pt-BR", "D no menu principal abre Downloads")):
+            i18n.use(language)
+            for status in ("done", "failed", "interrupted"):
+                with self.subTest(language=language, status=status):
+                    chrome.clear_messages()
+                    downloads_ui._announced.clear()
+                    manager.set_state("job1", status)
+                    downloads_ui.watch()
+                    self.assertIn(hint, chrome.take_message())
+
+    def test_quick_actions_notice_does_not_claim_d_opens_downloads_here(self):
+        install(self, FakeManager([sample_jobs()[3]]))
+        messages = []
+        original = selector._build_panel
+
+        def build(*args, **kwargs):
+            messages.append(kwargs.get("message", ""))
+            return original(*args, **kwargs)
+
+        with driving(["D"]), patch.object(selector, "_build_panel", side_effect=build):
+            result = prompts.quick_actions_menu()
+        self.assertEqual(result, "discover")
+        self.assertIn("D on the main menu opens Downloads", messages[0])
 
 
 if __name__ == "__main__":

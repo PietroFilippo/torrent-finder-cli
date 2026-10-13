@@ -9,9 +9,9 @@
     "one": "[warn]A atualização espera: {n} download em andamento. Deixe terminar ou pare em Downloads (D), depois atualize.[/warn]",
     "other": "[warn]A atualização espera: {n} downloads em andamento. Deixe terminarem ou pare em Downloads (D), depois atualize.[/warn]"
   },
-  "[good]✓[/good] {title} finished · {size} · D opens Downloads": "[good]✓[/good] {title} concluído · {size} · D abre Downloads",
-  "[bad]✗[/bad] {title} failed · D opens Downloads": "[bad]✗[/bad] {title} falhou · D abre Downloads",
-  "[bad]✗[/bad] {title} interrupted · D opens Downloads": "[bad]✗[/bad] {title} interrompido · D abre Downloads",
+  "[good]✓[/good] {title} finished · {size} · D on the main menu opens Downloads": "[good]✓[/good] {title} concluído · {size} · D no menu principal abre Downloads",
+  "[bad]✗[/bad] {title} failed · D on the main menu opens Downloads": "[bad]✗[/bad] {title} falhou · D no menu principal abre Downloads",
+  "[bad]✗[/bad] {title} interrupted · D on the main menu opens Downloads": "[bad]✗[/bad] {title} interrompido · D no menu principal abre Downloads",
   "{size}/s": "{size}/s",
   "{n} new": {"one": "{n} novo", "other": "{n} novos"},
   "{n} running": {"one": "{n} em andamento", "other": "{n} em andamento"},

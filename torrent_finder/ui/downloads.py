@@ -78,12 +78,12 @@ def _announce_finished(jobs) -> None:
         _announced.add(job.id)
         title = escape(job.title)
         if job.state == "done":
-            frames.announce(t("[good]✓[/good] {title} finished · {size} · D opens Downloads",
+            frames.announce(t("[good]✓[/good] {title} finished · {size} · D on the main menu opens Downloads",
                               title=title, size=format_size(job.total_bytes or job.done_bytes)))
         elif job.state == "failed":
-            frames.announce(t("[bad]✗[/bad] {title} failed · D opens Downloads", title=title))
+            frames.announce(t("[bad]✗[/bad] {title} failed · D on the main menu opens Downloads", title=title))
         else:
-            frames.announce(t("[bad]✗[/bad] {title} interrupted · D opens Downloads", title=title))
+            frames.announce(t("[bad]✗[/bad] {title} interrupted · D on the main menu opens Downloads", title=title))
 
 
 def watch() -> dict:
