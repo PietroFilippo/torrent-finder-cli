@@ -18,6 +18,7 @@ Windows the running launcher is renamed out of the installer's way first.
 
 import json
 import os
+import queue
 import re
 import shutil
 import signal
@@ -222,6 +223,7 @@ def update_notice(force: bool = False) -> str:
 # ---- installing -------------------------------------------------------------
 
 _STEP_TIMEOUT = 900          # seconds one installer command may run
+_DRAIN_TIMEOUT = 1.0         # bounded wait for output and exit after stopping the tree
 _RAW_PROGRESS_PIP = (24, 1)  # the first pip with ``--progress-bar raw``
 _MOVED_KEY = "moved_launchers"
 _MOVED_NAME = re.compile(r"\.exe\.[0-9a-f]{8}\.old$")
@@ -500,6 +502,22 @@ class _InstallerOutput:
             self.error = line[len("ERROR: "):].strip()
 
 
+def _stop_installer(process) -> None:
+    """Stop the installer and its children, including owners of its output pipe."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)],
+                           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=5, check=True)
+        else:
+            os.killpg(process.pid, getattr(signal, "SIGKILL", 9))
+    except (OSError, subprocess.SubprocessError):
+        try:
+            process.kill()
+        except OSError:
+            pass  # already exited; the output drain still has its own deadline
+
+
 def _stream(command: list[str], log, on_line) -> int:
     """Run one installer command out of sight and wait for it; returns its exit code.
 
@@ -522,27 +540,54 @@ def _stream(command: list[str], log, on_line) -> int:
         log.write(f"{error}\n")
         on_line(f"ERROR: could not start {command[0]}: {error}")
         return -1
-    expired = threading.Event()
+    output = queue.Queue()
 
-    def expire():
-        expired.set()
-        process.kill()
+    def read():
+        try:
+            for line in process.stdout:
+                output.put(line)
+        finally:
+            process.stdout.close()
+            output.put(None)
 
-    timer = threading.Timer(_STEP_TIMEOUT, expire)
-    timer.daemon = True
-    timer.start()
-    try:
-        for line in process.stdout:
+    reader = threading.Thread(target=read, daemon=True)
+    reader.start()
+
+    def drain(deadline):
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            try:
+                line = output.get(timeout=remaining)
+            except queue.Empty:
+                return False
+            if line is None:
+                return True
             log.write(line)
             try:
                 on_line(line.rstrip("\n"))
             except Exception:
                 pass  # a display problem must never abandon a running installer
-        code = process.wait()
+
+    deadline = time.monotonic() + _STEP_TIMEOUT
+    expired = not drain(deadline)
+    try:
+        if not expired:
+            try:
+                code = process.wait(timeout=max(0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                expired = True
+        if expired:
+            _stop_installer(process)
+            drain(time.monotonic() + _DRAIN_TIMEOUT)
+            try:
+                code = process.wait(timeout=_DRAIN_TIMEOUT) or -1
+            except subprocess.TimeoutExpired:
+                code = -1
     finally:
-        timer.cancel()
-        process.stdout.close()
-    if expired.is_set():
+        reader.join(timeout=_DRAIN_TIMEOUT)  # never close a pipe another thread is blocked reading
+    if expired:
         on_line(f"ERROR: stopped after {_STEP_TIMEOUT // 60} minutes without finishing.")
     log.write(f"(exit code {code})\n")
     log.flush()

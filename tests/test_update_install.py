@@ -8,9 +8,11 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import isolation  # noqa: F401  # redirected settings and the shared test baseline
 from torrent_finder import updates
@@ -250,6 +252,67 @@ class CheckoutUpdateTests(unittest.TestCase):
 
 
 class HiddenInstallerTests(unittest.TestCase):
+    def test_timeout_stops_the_tree_that_holds_installer_output_open(self):
+        for platform in ("nt", "posix"):
+            with self.subTest(platform=platform):
+                released = threading.Event()
+                process = Mock(pid=12345)
+                process.wait.return_value = -9
+
+                def lines():
+                    yield "installer started\n"
+                    released.wait(1.5)  # a grandchild owns the pipe until the tree is killed
+
+                process.stdout = Mock()
+                process.stdout.__iter__ = Mock(side_effect=lines)
+                output = []
+                with patch.object(updates.os, "name", platform), \
+                     patch.object(updates.subprocess, "Popen", return_value=process), \
+                     patch.object(updates.subprocess, "run", side_effect=lambda *a, **k: released.set()) as taskkill, \
+                     patch.object(updates.os, "killpg", create=True,
+                                  side_effect=lambda *a: released.set()) as killpg, \
+                     patch.object(updates, "_STEP_TIMEOUT", 0.02), \
+                     patch.object(updates, "_DRAIN_TIMEOUT", 0.02):
+                    started = time.monotonic()
+                    code = updates._stream(["fixture"], io.StringIO(), output.append)
+                self.assertLess(time.monotonic() - started, 1)
+                self.assertNotEqual(code, 0)
+                self.assertIn("without finishing", output[-1])
+                if platform == "nt":
+                    self.assertEqual(taskkill.call_args.args[0], ["taskkill", "/T", "/F", "/PID", "12345"])
+                    self.assertIsNotNone(taskkill.call_args.kwargs.get("timeout"))
+                    killpg.assert_not_called()
+                else:
+                    killpg.assert_called_once_with(12345, getattr(signal, "SIGKILL", 9))
+                    taskkill.assert_not_called()
+
+    def test_timeout_does_not_wait_for_a_pipe_even_when_tree_cleanup_fails(self):
+        released = threading.Event()
+        process = Mock(pid=12345)
+        process.wait.side_effect = subprocess.TimeoutExpired("fixture", 0.02)
+
+        def lines():
+            released.wait(2)
+            return
+            yield  # empty pipe with no EOF until the escaped child exits
+
+        process.stdout = Mock()
+        process.stdout.__iter__ = Mock(side_effect=lines)
+        output = []
+        try:
+            with patch.object(updates.os, "name", "nt"), \
+                 patch.object(updates.subprocess, "Popen", return_value=process), \
+                 patch.object(updates.subprocess, "run", side_effect=OSError("cleanup failed")), \
+                 patch.object(updates, "_STEP_TIMEOUT", 0.02), \
+                 patch.object(updates, "_DRAIN_TIMEOUT", 0.02):
+                started = time.monotonic()
+                code = updates._stream(["fixture"], io.StringIO(), output.append)
+            self.assertLess(time.monotonic() - started, 1)
+            self.assertNotEqual(code, 0)
+            self.assertIn("without finishing", output[-1])
+        finally:
+            released.set()
+
     def test_installer_output_is_logged_and_passed_on_line_by_line(self):
         script = "import sys; print('Collecting torrent-finder-cli'); print('Progress 5 of 10'); sys.stdout.write('a\\rb\\n'); sys.exit(3)"
         lines, log = [], io.StringIO()
