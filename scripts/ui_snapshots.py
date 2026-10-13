@@ -41,6 +41,7 @@ import isolation  # noqa: E402,F401  # redirects persistence before anything loa
 import readchar  # noqa: E402
 
 from torrent_finder.constants import console  # noqa: E402
+from torrent_finder.i18n import t, tn  # noqa: E402
 
 SIZES = [(40, 12), (50, 16), (80, 24), (120, 40), (200, 50)]  # the last one shows the inspector pane
 OUT = Path(tempfile.gettempdir()) / "tf-ui-snapshots"
@@ -139,8 +140,8 @@ def _scenarios():
             preset = next(p for p in provider.presets if p.name == "1080p")
             provider.preferred_presets.append(preset)
             try:
-                interactive_select(results, note=note, search_summary="Prefer: 1080p",
-                                   heading="Movies & Series › dune part two",
+                interactive_select(results, note=note, search_summary=t("Prefer: {names}", names="1080p"),
+                                   heading=f"{t('Movies & Series')} › dune part two",
                                    describe=ranking_notes(provider, ["dune part two"]))
             finally:
                 provider.preferred_presets.remove(preset)
@@ -191,9 +192,10 @@ def _scenarios():
                                                               EngineProgress("Nyaa", "blocked"))),
         )
         progress = SearchProgress(2, 3, 28, ("Anime",), providers)
-        frame = progress_frame("Search across providers › dune part two",
-                               "", ["3 providers · results appear when the search finishes or after 30 seconds."],
-                               progress, 4.2, "Contacting selected providers…")
+        frame = progress_frame(f"{t('Search across providers')} › dune part two",
+                               "", [tn("{n} provider · results appear when the search finishes or after 30 seconds.",
+                                       "{n} providers · results appear when the search finishes or after 30 seconds.", 3)],
+                               progress, 4.2, t("Contacting selected providers…"))
         buffer_console(sys.stdout, console.size.width, console.size.height).print(frame)
 
     files = [TorrentFile(i, f"Show/Show - {i:02d} (1080p).mkv", 1_400_000_000) for i in range(1, 13)]

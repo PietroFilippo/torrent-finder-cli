@@ -144,7 +144,7 @@ class AppearanceLanguageTests(unittest.TestCase):
         with menu_fixture(action=choose) as menu:
             message = menu["confirm"].call_args.args[0]
             self.assertIn("Adicionar um perfil [bold]torrent-finder[/bold] ao Windows Terminal?", message)
-            self.assertIn("Satã de perfil atrás do texto", message)
+            self.assertIn("Satan in profile atrás do texto", message)
             self.assertIn("[good]Salvo[/good] torrent-finder-dore-satan-citrinitas.png", menu["footer"]())
             self.assertEqual(menu["write"].call_args.args[1], "dore-satan")
 
