@@ -13,6 +13,7 @@ Unpacking happens in a temporary folder beside the archive. The archive is
 deleted only after its pages are in place, so a failure keeps it untouched.
 """
 
+import ntpath
 import os
 import re
 import shutil
@@ -91,6 +92,8 @@ def unpack(path: str, *, expect_pages: bool = False) -> "tuple[str | None, str]"
                               if expect_pages else "")
         if not _is_pages(reader.names):
             return None, ""
+        if _colliding_names(reader.names):
+            return None, "member paths collide after Windows filename normalization"
         parent = os.path.dirname(os.path.abspath(path))
         scratch = tempfile.mkdtemp(prefix=".unpacking-", dir=parent)
         try:
@@ -109,6 +112,21 @@ def unpack(path: str, *, expect_pages: bool = False) -> "tuple[str | None, str]"
     except OSError:
         pass  # pages are in place; the archive merely stays too
     return folder, ""
+
+
+def _colliding_names(names) -> bool:
+    """Reject destinations that could overwrite one another on Windows, for every reader."""
+    seen = set()
+    for name in names:
+        path = ntpath.splitdrive(name.replace("\\", "/"))[1]
+        parts = [part for part in path.split("/") if part not in ("", ".", "..")]
+        # zipfile replaces these characters; Windows also ignores trailing dots/spaces and case.
+        parts = [re.sub(r'[:<>|"?*]', "_", part).rstrip(". ").casefold() for part in parts]
+        destination = "/".join(part for part in parts if part)
+        if destination in seen:
+            return True
+        seen.add(destination)
+    return False
 
 
 def _is_pages(names) -> bool:

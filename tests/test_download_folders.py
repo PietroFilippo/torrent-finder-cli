@@ -55,6 +55,41 @@ class FolderTestCase(unittest.TestCase):
 
 
 class UnpackTests(FolderTestCase):
+    def test_colliding_zip_page_names_stay_packed(self):
+        cases = (["page:1.png", "page?1.png"], ["001.PNG", "001.png"],
+                 ["chapter./001.png", "chapter/001.png"], ["../001.png", "001.png"])
+        for members in cases:
+            with self.subTest(members=members):
+                archive = self.make_zip("collision.cbz", members)
+                with open(archive, "rb") as stream:
+                    original = stream.read()
+                with patch.object(unpack._ZipReader, "extract", autospec=True,
+                                  side_effect=unpack._ZipReader.extract) as extract:
+                    report = unpack.unpack_all([archive])
+                self.assertEqual(report.unpacked, [])
+                self.assertIn("collide", report.kept[0][1])
+                self.assertIn("Kept collision.cbz packed", unpack.summary_lines(report)[0])
+                extract.assert_not_called()
+                with open(archive, "rb") as stream:
+                    self.assertEqual(stream.read(), original)
+                self.assertEqual(os.listdir(self.folder), ["collision.cbz"])
+
+    def test_colliding_page_names_from_every_tool_stay_packed(self):
+        for kind in ("bsdtar", "7z", "unrar"):
+            with self.subTest(kind=kind):
+                archive = self.path("collision.cbr")
+                with open(archive, "wb") as stream:
+                    stream.write(b"fixture archive")
+                listing = (b"Path = page:1.png\nPath = page?1.png\n" if kind == "7z"
+                           else b"page:1.png\npage?1.png\n")
+                with patch.object(unpack, "_tools", return_value=[(kind, kind)]), \
+                     patch.object(unpack, "_run", return_value=subprocess.CompletedProcess([], 0, listing)) as run:
+                    folder, problem = unpack.unpack(archive)
+                self.assertIsNone(folder)
+                self.assertIn("collide", problem)
+                self.assertEqual(run.call_count, 1)  # listing only; never extract or delete
+                self.assertTrue(os.path.exists(archive))
+
     def test_pages_go_to_a_folder_named_after_the_archive(self):
         archive = self.make_zip("Naki no Ryuu - v1 c2 [batoto].zip",
                                 ["001.jpg", "002.png", "ComicInfo.xml", "__MACOSX/._001.jpg"])
