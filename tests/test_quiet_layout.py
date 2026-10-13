@@ -563,7 +563,7 @@ class SecurityTinyTests(unittest.TestCase):
 class EscapedMessageTests(unittest.TestCase):
     def test_verifier_messages_with_brackets_print_literally(self):
         from torrent_finder.ui import credentials as credentials_ui
-        meta = SimpleNamespace(name="Jimaku", effective_values=lambda entered: entered,
+        meta = SimpleNamespace(name="Jimaku", display_name=lambda: "Jimaku", effective_values=lambda entered: entered,
                                missing_required=lambda values: [],
                                verify=lambda values: (None, "Gateway [/x] timed out"), save=lambda entered: None)
         out = io.StringIO()

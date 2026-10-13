@@ -10,6 +10,8 @@ to environment variables. Real values must NEVER be committed; the JSON file is
 listed in ``.gitignore``. See docs/guide.md#credentials for setup.
 """
 
+# i18n: converted
+
 import json
 import os
 import tempfile
@@ -19,6 +21,7 @@ from pathlib import Path
 
 from torrent_finder.credential_registry import credential_file_keys
 from torrent_finder.constants import legacy_data_paths, machine_state_path
+from torrent_finder.i18n import t
 
 _CRED_FILE = Path(machine_state_path("subtitle_credentials.json"))
 _LEGACY_CRED_PATHS = legacy_data_paths("subtitle_credentials.json")
@@ -37,18 +40,21 @@ def _transaction():
 _FILE_KEYS = credential_file_keys()
 
 _file_cache: dict | None = None
-_file_problem = ""
+_file_problem = ""  # the file that could not be read or migrated; "" when none
 
 
 def storage_problem() -> str:
+    """Why saved credentials cannot be used, in the interface language; "" when they can."""
     _load_file()
-    return _file_problem
+    if not _file_problem:
+        return ""
+    return t("Cannot read or migrate credentials to {path}. Existing files were preserved.", path=_file_problem)
 
 
 def _read_credentials(path: Path) -> dict:
     data = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(data, dict):
-        raise ValueError("Credential file must contain a JSON object")
+        raise ValueError(t("Credential file must contain a JSON object"))
     return data
 
 
@@ -79,7 +85,7 @@ def _migrate_legacy_file() -> None:
         except FileNotFoundError:
             continue
         except (OSError, ValueError) as error:
-            raise OSError(f"Cannot read legacy credentials at {path}; the file was preserved.") from error
+            raise OSError(t("Cannot read legacy credentials at {path}; the file was preserved.", path=path)) from error
     if copies:
         # Keep each integration's username/password from the same source.
         # The newest file containing that integration wins as a complete group.
@@ -108,7 +114,7 @@ def _load_file() -> dict:
                 _file_problem = ""
             except (OSError, ValueError):
                 # Do not cache a transient read error as an empty credential store.
-                _file_problem = f"Cannot read or migrate credentials to {_CRED_FILE}. Existing files were preserved."
+                _file_problem = str(_CRED_FILE)  # storage_problem() says it when asked
                 return {}
         return _file_cache
 
@@ -225,7 +231,7 @@ def import_file_values(values: dict, *, replace=False) -> None:
     global _file_cache, _file_problem
     if (not isinstance(values, dict) or set(values) - set(_FILE_KEYS)
             or any(not isinstance(value, str) for value in values.values())):
-        raise ValueError("Invalid credential backup")
+        raise ValueError(t("Invalid credential backup"))
     with _transaction():
         _migrate_legacy_file()
         current = _read_credentials(_CRED_FILE) if _CRED_FILE.exists() else {}

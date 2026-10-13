@@ -1,5 +1,7 @@
 """Interactive rendering and workflows for the credentials registry."""
 
+# i18n: converted
+
 import sys
 
 import readchar
@@ -10,6 +12,7 @@ from rich.text import Text
 
 from torrent_finder.constants import console
 from torrent_finder.credential_registry import CREDENTIAL_REGISTRY, CredentialField, CredentialSpec
+from torrent_finder.i18n import current, t, tn
 from torrent_finder.ui import display, theme
 from torrent_finder.ui.layout import ellipsize_cells
 from torrent_finder.ui.prompts import _make_banner_panel, confirm_prompt
@@ -25,23 +28,23 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
 
     notes = []
     if meta.limit:
-        notes.append(meta.limit)
+        notes.append(t(meta.limit))
     if any(field.env_override() for field in meta.required_fields):
-        notes.append("Env var overrides the saved file")
-    notes.append("Stored in plaintext in subtitle_credentials.json")
-    footer = "Type to edit the focused field.\n↑/↓ move  •  Tab next  •  Enter next field / choose  •  Esc cancel"
+        notes.append(t("Env var overrides the saved file"))
+    notes.append(t("Stored in plaintext in subtitle_credentials.json"))
+    footer = t("Type to edit the focused field.\n↑/↓ move  •  Tab next  •  Enter next field / choose  •  Esc cancel")
 
     def _field_text(field: CredentialField, focused: bool) -> str:
         buf = buffers.get(field.env_key, "")
         if focused:
             shown = ("*" * len(buf)) if field.secret else buf
-            text = f"{field.label}: {shown}█"
+            text = f"{field.display_label()}: {shown}█"
             room = theme.inner_width(console.size.width) - 2  # inside the cursor gutter
             if cell_len(text) <= room:
                 return text
             # Too long for one row: keep a short label and the end of the value,
             # so what is being typed and the caret stay visible.
-            prefix = ellipsize_cells(field.label, max(6, room // 3)) + ": …"
+            prefix = ellipsize_cells(field.display_label(), max(6, room // 3)) + ": …"
             tail, cells = "", 0
             for char in reversed(shown):
                 if cells + cell_len(char) > max(1, room - cell_len(prefix) - 1):
@@ -50,12 +53,12 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
             return f"{prefix}{tail}█"
         if buf:
             shown = ("*" * len(buf)) if field.secret else buf
-            return f"{field.label}: {shown}"
+            return f"{field.display_label()}: {shown}"
         current = field.value()
         if current:
             shown = ("*" * 8) if field.secret else current
-            return f"{field.label}: {shown}  (unchanged)"
-        return f"{field.label}: not set"
+            return t("{label}: {value}  (unchanged)", label=field.display_label(), value=shown)
+        return t("{label}: not set", label=field.display_label())
 
     def _row(label: str, focused: bool) -> Text:
         row = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
@@ -77,19 +80,19 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
         framed = theme.framed(width, full_height)
         compact = not theme.roomy(height, 20)
         parsed = theme.parse_footer(footer)
-        title = f"Credentials › {meta.name} › sign in"
+        title = t("Credentials › {name} › sign in", name=meta.display_name())
         top = theme.frame_header(title, "", width, full_height)
         guide: list[Text] = []
         if meta.howto:
-            guide.append(Text(theme.MARGIN + "HOW TO GET THIS", style=theme.SECTION))
+            guide.append(Text(theme.MARGIN + t("HOW TO GET THIS"), style=theme.SECTION))
             for step_no, step in enumerate(meta.howto, 1):
-                guide.extend(theme.wrap_block(Text(f"{step_no}. {step}", style=theme.MUTED), width, console))
+                guide.extend(theme.wrap_block(Text(f"{step_no}. {t(step)}", style=theme.MUTED), width, console))
             if meta.tip:
-                tip = Text("Tip  ", style=theme.ACCENT)
-                tip.append(meta.tip, style=theme.MUTED)
+                tip = Text(t("Tip  "), style=theme.ACCENT)
+                tip.append(t(meta.tip), style=theme.MUTED)
                 guide.extend(theme.wrap_block(tip, width, console))
         selectable = [_row(_field_text(field, focus == index), focus == index) for index, field in enumerate(fields)]
-        selectable += [_row("Save", focus == save_row), _row("Cancel", focus == cancel_row)]
+        selectable += [_row(t("Save"), focus == save_row), _row(t("Cancel"), focus == cancel_row)]
         prose = theme.wrap_block(Text(" · ".join(notes), style=theme.MUTED), width, console)
         for line in parsed.context:
             prose += theme.wrap_block(line, width, console)
@@ -169,56 +172,57 @@ def _inline_confirm(message: str, default: bool = False) -> bool:
         return False
     if not answer:
         return default
-    return answer in ("y", "yes")
+    return answer in ("y", "yes") or (current() == "pt-BR" and answer in ("s", "sim"))
 
 
 def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) -> bool:
     """Validate, verify, and save entered values; False reopens the form."""
     if not entered:
-        console.print("[dim]No changes entered — existing credentials kept, nothing saved.[/dim]")
-        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+        console.print(t("[dim]No changes entered — existing credentials kept, nothing saved.[/dim]"))
+        console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
         readchar.readkey()
         return True
 
     effective = meta.effective_values(entered)
     missing = meta.missing_required(effective)
     if missing:
-        labels = ", ".join(field.label for field in missing)
-        console.print(f"[warning]Required field(s) missing: {labels}.[/warning]")
-        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+        labels = ", ".join(escape(field.display_label()) for field in missing)
+        console.print(tn("[warning]Required field(s) missing: {labels}.[/warning]",
+                         "[warning]Required field(s) missing: {labels}.[/warning]", len(missing), labels=labels))
+        console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
         readchar.readkey()
         return False
 
     try:
-        with console.status("[accent]Verifying credentials…[/accent]", spinner=theme.SPINNER):
+        with console.status(t("[accent]Verifying credentials…[/accent]"), spinner=theme.SPINNER):
             ok, message = meta.verify(effective)
     except KeyboardInterrupt:
-        console.print("[warning]Verification cancelled — nothing saved.[/warning]")
+        console.print(t("[warning]Verification cancelled — nothing saved.[/warning]"))
         return False
     except Exception as error:  # a verifier bug must not end the app
-        ok, message = None, f"Couldn't verify ({type(error).__name__})"
+        ok, message = None, t("Couldn't verify ({error})", error=type(error).__name__)
     if ok is True:
-        console.print(f"[success]✓ Verified: {escape(message)}[/success]")
+        console.print(t("[success]✓ Verified: {message}[/success]", message=escape(message)))
     elif ok is None:
         console.print(f"[warning]{escape(message)}[/warning]")
     else:
-        console.print(f"[error]✗ Verification failed: {escape(message)}[/error]")
+        console.print(t("[error]✗ Verification failed: {message}[/error]", message=escape(message)))
         if not _inline_confirm(
-            "Save these credentials anyway? — Y/Yes to save, anything else cancels:"
+            t("Save these credentials anyway? — Y/Yes to save, anything else cancels:")
         ):
-            console.print("[warning]Not saved.[/warning]")
-            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+            console.print(t("[warning]Not saved.[/warning]"))
+            console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
             readchar.readkey()
             return False
 
     try:
         meta.save(entered)
     except (OSError, ValueError):
-        console.print("[error]Could not save credentials. The existing file was preserved; check its permissions and JSON format.[/error]")
+        console.print(t("[error]Could not save credentials. The existing file was preserved; check its permissions and JSON format.[/error]"))
         readchar.readkey()
         return False
-    console.print(f"[success]Saved {meta.name} credentials.[/success]")
-    console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+    console.print(t("[success]Saved {name} credentials.[/success]", name=escape(meta.display_name())))
+    console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
     readchar.readkey()
     return True
 
@@ -238,10 +242,13 @@ def _view_field_label(field: CredentialField, revealed: bool) -> str:
     """Render one stored credential row as plain text."""
     value = field.value()
     if not value:
-        return f"{field.label}: not set"
+        return t("{label}: not set", label=field.display_label())
     shown = value if (revealed or not field.secret) else "*" * 8
-    source = {"env": "from environment", "file": "from file"}.get(field.source(), "")
-    return f"{field.label}: {shown}" + (f"   [{source}]" if source else "")
+    source = field.source()
+    if source in {"env", "file"}:
+        source_label = t("from environment") if source == "env" else t("from file")
+        return t("{label}: {value}   [{source}]", label=field.display_label(), value=shown, source=source_label)
+    return f"{field.display_label()}: {shown}"
 
 
 def _view_credentials(meta: CredentialSpec) -> None:
@@ -249,7 +256,7 @@ def _view_credentials(meta: CredentialSpec) -> None:
     state = {"revealed": False}
 
     def _toggle_label() -> str:
-        return "Hide password / API key" if state["revealed"] else "Show password / API key"
+        return t("Hide password / API key") if state["revealed"] else t("Show password / API key")
 
     items = [
         SelectItem(
@@ -265,9 +272,9 @@ def _view_credentials(meta: CredentialSpec) -> None:
         label=_toggle_label(),
         value="toggle",
         is_action=True,
-        description="Reveal or hide the stored password / API key.",
+        description=t("Reveal or hide the stored password / API key."),
     ))
-    items.append(SelectItem(label="Back", value="back", is_action=True))
+    items.append(SelectItem(label=t("Back"), value="back", is_action=True))
 
     def on_action(index, menu_items):
         if menu_items[index].value != "toggle":
@@ -280,9 +287,9 @@ def _view_credentials(meta: CredentialSpec) -> None:
 
     arrow_select(
         items,
-        title=f"Credentials › {meta.name} › stored values",
+        title=t("Credentials › {name} › stored values", name=meta.display_name()),
         banner=_make_banner_panel(),
-        footer="Secrets are masked — pick Show password / API key to reveal.",
+        footer=t("Secrets are masked — pick Show password / API key to reveal."),
         on_action=on_action,
     )
 
@@ -291,18 +298,18 @@ def _manage_credentials(meta: CredentialSpec) -> None:
     """View, enter/update, or clear one registry entry."""
     while True:
         items = [
-            SelectItem(label="View credentials", value="view", is_action=True),
-            SelectItem(label="Enter / update credentials", value="edit", is_action=True),
+            SelectItem(label=t("View credentials"), value="view", is_action=True),
+            SelectItem(label=t("Enter / update credentials"), value="edit", is_action=True),
         ]
         if meta.has_any_credentials():
             items.append(SelectItem(
-                label="Clear stored credentials", value="clear", is_action=True
+                label=t("Clear stored credentials"), value="clear", is_action=True
             ))
-        items.append(SelectItem(label="Back", value="back", is_action=True))
+        items.append(SelectItem(label=t("Back"), value="back", is_action=True))
 
         index = arrow_select(
             items,
-            title=f"Credentials › {meta.name}",
+            title=t("Credentials › {name}", name=meta.display_name()),
             banner=_make_banner_panel(),
         )
         if index is None:
@@ -314,23 +321,22 @@ def _manage_credentials(meta: CredentialSpec) -> None:
             _view_credentials(meta)
         elif action == "edit":
             _edit_credentials(meta)
-        elif action == "clear" and confirm_prompt(f"Clear stored {meta.name} credentials?"):
+        elif action == "clear" and confirm_prompt(t("Clear stored {name} credentials?", name=meta.display_name())):
             try:
                 meta.clear_saved()
             except (OSError, ValueError):
-                console.print("[error]Could not clear credentials; the existing file was preserved.[/error]")
+                console.print(t("[error]Could not clear credentials; the existing file was preserved.[/error]"))
                 readchar.readkey()
                 continue
-            console.print(f"[success]Cleared {meta.name} credentials from the file.[/success]")
+            console.print(t("[success]Cleared {name} credentials from the file.[/success]", name=escape(meta.display_name())))
             overrides = meta.environment_override_keys()
             if overrides:
                 console.print(
-                    "[warning]Still set via environment (overrides the file): "
-                    + ", ".join(overrides)
-                    + ".[/warning]"
+                    t("[warning]Still set via environment (overrides the file): {variables}.[/warning]",
+                      variables=escape(", ".join(overrides)))
                 )
-                console.print("[dim]Unset those environment variables to fully remove them.[/dim]")
-            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+                console.print(t("[dim]Unset those environment variables to fully remove them.[/dim]"))
+            console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
             readchar.readkey()
 
 
@@ -345,29 +351,29 @@ def credentials_menu() -> None:
         for meta in CREDENTIAL_REGISTRY:
             if meta.category != last_category:
                 items.append(SelectItem(
-                    label=f"─── {meta.category} ───",
+                    label=f"─── {t(meta.category)} ───",
                     value="section_header",
                     enabled=False,
                     is_action=True,
                 ))
                 last_category = meta.category
             items.append(SelectItem(
-                label=meta.name,
+                label=meta.display_name(),
                 value=meta,
                 is_action=True,
-                hint=meta.status(),
-                description=meta.limit or "No notable daily limit.",
+                hint=meta.status_label(),
+                description=t(meta.limit) if meta.limit else t("No notable daily limit."),
             ))
-        items.append(SelectItem(label="Back", value="__back__", is_action=True))
+        items.append(SelectItem(label=t("Back"), value="__back__", is_action=True))
 
         index = arrow_select(
             items,
-            title="Credentials",
+            title=t("Credentials"),
             banner=_make_banner_panel(),
             footer=(
                 (escape(problem) + "\n" if problem else "")
-                + "Stored in subtitle_credentials.json (gitignored, plaintext) — "
-                "holds all of these. Env vars override the file."
+                + t("Stored in subtitle_credentials.json (gitignored, plaintext) — "
+                    "holds all of these. Env vars override the file.")
             ),
             start_index=1,
         )

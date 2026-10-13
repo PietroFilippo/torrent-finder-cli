@@ -1,16 +1,34 @@
-"""Typed registry for credentialed integrations and their verifiers."""
+"""Typed registry for credentialed integrations and their verifiers.
+
+The registry's text is English and marked with ``N_()``: a field's label, an
+integration's category, limit, how-to and tip are translated where they are
+drawn (``t(field.label)``), and ``display_name()``/``status_label()`` give the
+name and the status in the interface language. ``name`` and ``status()`` stay
+English: other screens compare them.
+"""
+
+# i18n: converted
 
 from dataclasses import dataclass
 from typing import Callable, Mapping
+
+from torrent_finder.i18n import N_, t, tn
 
 
 VerificationResult = tuple[bool | None, str]
 CredentialVerifier = Callable[[Mapping[str, str | None]], VerificationResult]
 
+# status() values, compared by other screens ("not set"), and what they read as.
+STATUS_LABELS = {
+    "not set": N_("not set", ctx="credential status"),
+    "set via environment": N_("set via environment", ctx="credential status"),
+    "saved": N_("saved", ctx="credential status"),
+}
+
 
 @dataclass(frozen=True)
 class CredentialField:
-    """One stored value in a credential entry."""
+    """One stored value in a credential entry; *label* is English, translated when drawn."""
 
     env_key: str
     label: str
@@ -20,6 +38,10 @@ class CredentialField:
     @property
     def file_key(self) -> str:
         return self.env_key.lower()
+
+    def display_label(self) -> str:
+        """The field's label in the interface language."""
+        return t(self.label)
 
     def value(self) -> str | None:
         from torrent_finder import credentials
@@ -74,19 +96,38 @@ class CredentialSpec:
             if not effective.get(field.env_key)
         )
 
+    def display_name(self) -> str:
+        """The integration's name in the interface language: proper names stay, descriptions translate.
+
+        ``name`` stays English: other screens match it against engine names.
+        """
+        if self.name in {"qBittorrent WebUI", "OpenSubtitles.com", "RuTracker", "Online-Fix"}:
+            return self.name  # proper names, including in the pseudo-locale
+        return t(self.name)
+
     def verify(self, effective: Mapping[str, str | None]) -> VerificationResult:
         missing = self.missing_required(effective)
         if missing:
-            labels = ", ".join(field.label for field in missing)
-            return False, f"missing required field(s): {labels}"
+            labels = ", ".join(field.display_label() for field in missing)
+            # English keeps its "(s)"; a translation gives a singular and a plural.
+            return False, tn("missing required field(s): {labels}", "missing required field(s): {labels}",
+                             len(missing), labels=labels)
         return self.verifier(effective)
 
     def status(self) -> str:
+        """``"not set"``, ``"set via environment"`` or ``"saved"``: English, compared by other screens.
+
+        ``status_label()`` is the same in the interface language.
+        """
         if not all(field.value() for field in self.required_fields):
-            return "not set"
+            return "not set"  # i18n: ignore
         if any(field.source() == "env" for field in self.required_fields):
-            return "set via environment"
-        return "saved"
+            return "set via environment"  # i18n: ignore
+        return "saved"  # i18n: ignore
+
+    def status_label(self) -> str:
+        """``status()`` as the interface language says it, for drawing."""
+        return t(STATUS_LABELS[self.status()])
 
     def has_any_credentials(self) -> bool:
         return any(
@@ -113,7 +154,8 @@ class CredentialSpec:
 def _required_value(values: Mapping[str, str | None], key: str) -> str:
     value = values.get(key)
     if not value:
-        raise ValueError(f"Missing required credential: {key}")
+        # Never shown: verify() checks required fields first, and the form names only the error's type.
+        raise ValueError(f"Missing required credential: {key}")  # i18n: ignore
     return value
 
 
@@ -191,137 +233,139 @@ def _verify_qbittorrent(values: Mapping[str, str | None]) -> VerificationResult:
 
 CREDENTIAL_REGISTRY: tuple[CredentialSpec, ...] = (
     CredentialSpec(
-        id="qbittorrent", category="Torrent client", icon="⬇", name="qBittorrent WebUI",
-        fields=(CredentialField("QBITTORRENT_URL", "WebUI URL (e.g. http://127.0.0.1:8080)"),
-                CredentialField("QBITTORRENT_USERNAME", "WebUI username (optional for trusted access)", required=False),
-                CredentialField("QBITTORRENT_PASSWORD", "WebUI password", secret=True, required=False)),
+        id="qbittorrent", category=N_("Torrent client"), icon="⬇",
+        name="qBittorrent WebUI",  # i18n: ignore (a name)
+        fields=(CredentialField("QBITTORRENT_URL", N_("WebUI URL (e.g. http://127.0.0.1:8080)")),
+                CredentialField("QBITTORRENT_USERNAME", N_("WebUI username (optional for trusted access)"),
+                                required=False),
+                CredentialField("QBITTORRENT_PASSWORD", N_("WebUI password"), secret=True, required=False)),
         verifier=_verify_qbittorrent,
-        howto=("Enable WebUI in qBittorrent's settings and enter its address here.",
-               "For a remote client, use its configured HTTPS endpoint. Save paths belong to that computer."),
-        tip="This app does not change WebUI exposure or authentication settings.",
+        howto=(N_("Enable WebUI in qBittorrent's settings and enter its address here."),
+               N_("For a remote client, use its configured HTTPS endpoint. Save paths belong to that computer.")),
+        tip=N_("This app does not change WebUI exposure or authentication settings."),
     ),
     CredentialSpec(
         id="opensubtitles",
-        category="Subtitles",
+        category=N_("Subtitles"),
         icon="🎬",
-        name="OpenSubtitles.com",
+        name="OpenSubtitles.com",  # i18n: ignore (a name)
         fields=(
-            CredentialField("OPENSUBTITLES_USERNAME", "Username"),
-            CredentialField("OPENSUBTITLES_PASSWORD", "Password", secret=True),
+            CredentialField("OPENSUBTITLES_USERNAME", N_("Username")),
+            CredentialField("OPENSUBTITLES_PASSWORD", N_("Password"), secret=True),
             CredentialField(
                 "OPENSUBTITLES_APIKEY",
-                "API key (optional, blank to skip)",
+                N_("API key (optional, blank to skip)"),
                 secret=True,
                 required=False,
             ),
         ),
         verifier=_verify_opensubtitles,
-        limit="Free accounts have a small daily download limit; VIP raises it.",
+        limit=N_("Free accounts have a small daily download limit; VIP raises it."),
     ),
     CredentialSpec(
         id="addic7ed",
-        category="Subtitles",
+        category=N_("Subtitles"),
         icon="📺",
-        name="Addic7ed (TV series)",
+        name=N_("Addic7ed (TV series)"),
         fields=(
-            CredentialField("ADDIC7ED_USERNAME", "Username"),
-            CredentialField("ADDIC7ED_PASSWORD", "Password", secret=True),
+            CredentialField("ADDIC7ED_USERNAME", N_("Username")),
+            CredentialField("ADDIC7ED_PASSWORD", N_("Password"), secret=True),
         ),
         verifier=_verify_addic7ed,
-        limit="Limits downloads per day (more with an account than anonymous).",
+        limit=N_("Limits downloads per day (more with an account than anonymous)."),
     ),
     CredentialSpec(
         id="jimaku",
-        category="Subtitles",
+        category=N_("Subtitles"),
         icon="🍙",
-        name="Jimaku (anime)",
-        fields=(CredentialField("JIMAKU_API_KEY", "API key", secret=True),),
+        name=N_("Jimaku (anime)"),
+        fields=(CredentialField("JIMAKU_API_KEY", N_("API key"), secret=True),),
         verifier=_verify_jimaku,
     ),
     CredentialSpec(
         id="rutracker",
-        category="Search provider logins",
+        category=N_("Search provider logins"),
         icon="🧲",
-        name="RuTracker",
+        name="RuTracker",  # i18n: ignore (a name)
         fields=(
-            CredentialField("RUTRACKER_USERNAME", "Username"),
-            CredentialField("RUTRACKER_PASSWORD", "Password", secret=True),
+            CredentialField("RUTRACKER_USERNAME", N_("Username")),
+            CredentialField("RUTRACKER_PASSWORD", N_("Password"), secret=True),
         ),
         verifier=_verify_rutracker,
-        limit=(
+        limit=N_(
             "Required — the RuTracker provider logs in to search and returns "
             "nothing without an account."
         ),
     ),
     CredentialSpec(
         id="online_fix",
-        category="Search provider logins",
+        category=N_("Search provider logins"),
         icon="🔧",
-        name="Online-Fix",
+        name="Online-Fix",  # i18n: ignore (a name)
         fields=(
-            CredentialField("ONLINE_FIX_USERNAME", "Username"),
-            CredentialField("ONLINE_FIX_PASSWORD", "Password", secret=True),
+            CredentialField("ONLINE_FIX_USERNAME", N_("Username")),
+            CredentialField("ONLINE_FIX_PASSWORD", N_("Password"), secret=True),
         ),
         verifier=_verify_online_fix,
-        limit=(
+        limit=N_(
             "Optional — Online-Fix search and download work without it; login "
             "is supported for completeness."
         ),
     ),
     CredentialSpec(
         id="madokami",
-        category="Search provider logins",
+        category=N_("Search provider logins"),
         icon="📕",
-        name="Madokami (manga)",
+        name=N_("Madokami (manga)"),
         fields=(
-            CredentialField("MADOKAMI_USERNAME", "Username"),
-            CredentialField("MADOKAMI_PASSWORD", "Password", secret=True),
+            CredentialField("MADOKAMI_USERNAME", N_("Username")),
+            CredentialField("MADOKAMI_PASSWORD", N_("Password"), secret=True),
         ),
         verifier=_verify_madokami,
-        limit=(
+        limit=N_(
             "Required — the Madokami provider authenticates every request and "
             "returns nothing without an account."
         ),
     ),
     CredentialSpec(
         id="tmdb",
-        category="Creator-search upgrades (optional)",
+        category=N_("Creator-search upgrades (optional)"),
         icon="🎬",
-        name="TMDB (Movies & Series — by director / studio)",
-        fields=(CredentialField("TMDB_API_KEY", "API key (v3)", secret=True),),
+        name=N_("TMDB (Movies & Series — by director / studio)"),
+        fields=(CredentialField("TMDB_API_KEY", N_("API key (v3)"), secret=True),),
         verifier=_verify_tmdb,
-        limit=(
+        limit=N_(
             "Optional — Movies & Series 'by director / studio' works keyless via "
             "Wikidata; a free TMDB v3 API key upgrades it to richer results."
         ),
         howto=(
-            "Create a free account at themoviedb.org",
-            "Settings → API → Request an API key (choose Developer, accept the terms)",
-            "Copy the “API Key (v3 auth)” and paste it below",
+            N_("Create a free account at themoviedb.org"),
+            N_("Settings → API → Request an API key (choose Developer, accept the terms)"),
+            N_("Copy the “API Key (v3 auth)” and paste it below"),
         ),
-        tip="The form's Application URL can be anything valid — e.g. http://localhost",
+        tip=N_("The form's Application URL can be anything valid — e.g. http://localhost"),
     ),
     CredentialSpec(
         id="igdb",
-        category="Creator-search upgrades (optional)",
+        category=N_("Creator-search upgrades (optional)"),
         icon="🎮",
-        name="IGDB (Games — by developer / publisher)",
+        name=N_("IGDB (Games — by developer / publisher)"),
         fields=(
-            CredentialField("IGDB_CLIENT_ID", "Twitch Client ID"),
-            CredentialField("IGDB_CLIENT_SECRET", "Twitch Client Secret", secret=True),
+            CredentialField("IGDB_CLIENT_ID", N_("Twitch Client ID")),
+            CredentialField("IGDB_CLIENT_SECRET", N_("Twitch Client Secret"), secret=True),
         ),
         verifier=_verify_igdb,
-        limit=(
+        limit=N_(
             "Optional — Games 'by developer / publisher' works keyless via "
             "Wikidata; free Twitch/IGDB creds (dev.twitch.tv → register an app) "
             "upgrade it to richer results."
         ),
-        howto=(
-            "dev.twitch.tv/console → Applications → Register Your Application",
-            "OAuth Redirect URL: http://localhost  •  Category: Application Integration",
-            "Copy the Client ID, click New Secret, copy the Client Secret → paste below",
+        howto=(  # Twitch's console is in English: its button and field names stay as it shows them
+            N_("dev.twitch.tv/console → Applications → Register Your Application"),
+            N_("OAuth Redirect URL: http://localhost  •  Category: Application Integration"),
+            N_("Copy the Client ID, click New Secret, copy the Client Secret → paste below"),
         ),
-        tip="The Client Secret is shown only once — copy it before leaving the page",
+        tip=N_("The Client Secret is shown only once — copy it before leaving the page"),
     ),
 )
 
@@ -329,15 +373,15 @@ CREDENTIAL_REGISTRY: tuple[CredentialSpec, ...] = (
 def _build_credential_index() -> dict[str, CredentialSpec]:
     index: dict[str, CredentialSpec] = {}
     field_owners: dict[str, str] = {}
-    for spec in CREDENTIAL_REGISTRY:
+    for spec in CREDENTIAL_REGISTRY:  # a mistake in the registry above stops the import: for developers
         if spec.id in index:
-            raise ValueError(f"Duplicate credential id: {spec.id!r}")
+            raise ValueError(f"Duplicate credential id: {spec.id!r}")  # i18n: ignore
         index[spec.id] = spec
         for field in spec.fields:
             owner = field_owners.get(field.env_key)
             if owner:
                 raise ValueError(
-                    f"Credential field {field.env_key!r} belongs to both "
+                    f"Credential field {field.env_key!r} belongs to both "  # i18n: ignore
                     f"{owner!r} and {spec.id!r}"
                 )
             field_owners[field.env_key] = spec.id

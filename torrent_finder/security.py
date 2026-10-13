@@ -1,5 +1,7 @@
 """Network exposure warning shown at startup."""
 
+# i18n: converted
+
 import os
 import re
 import sys
@@ -11,6 +13,7 @@ from rich.console import Group
 from rich.text import Text
 
 from torrent_finder.constants import console
+from torrent_finder.i18n import N_, t
 from torrent_finder.state import load_setting, save_setting
 from torrent_finder.ui import display, theme
 from torrent_finder.ui.selector import _render
@@ -31,17 +34,17 @@ def exposure_label() -> str:
     """Markup for the main menu's status: ``VPN`` in green, ``IP visible`` in yellow, or nothing."""
     state = exposure()
     if state == "vpn":
-        return "[good]VPN[/good]"
+        return t("[good]VPN[/good]")
     if state == "exposed":
-        return "[warn]IP visible[/warn]"
+        return t("[warn]IP visible[/warn]")
     return ""
 
 # Substring tokens suggesting a VPN/proxy in the ipinfo `org` field.
 VPN_ORG_HINTS = (
     "vpn", "mullvad", "proton", "nordvpn", "nord ",
-    "private internet access", "ipvanish", "expressvpn",
+    "private internet access", "ipvanish", "expressvpn",  # i18n: ignore (matched against network data)
     "surfshark", "windscribe", "airvpn", "pia ", "azire",
-    "cyberghost", "perfect privacy", "ivpn", "tunnelbear",
+    "cyberghost", "perfect privacy", "ivpn", "tunnelbear",  # i18n: ignore (matched against network data)
     "torguard", "purevpn", "hide.me", "m247", "datacamp",
 )
 
@@ -104,16 +107,16 @@ def show_security_warning(force: bool = False) -> bool:
         if load_setting(DISMISSED_KEY, False):
             return True
 
-    with console.status("[accent]Fetching network info…[/accent]", spinner=theme.SPINNER, spinner_style=theme.ACCENT):
+    with console.status(t("[accent]Fetching network info…[/accent]"), spinner=theme.SPINNER, spinner_style=theme.ACCENT):
         info = _fetch_network_info()
 
-    # (label, value) rows; rows marked optional give way first in a short window.
-    rows: list[tuple[str, str, bool]] = []
+    # (identity, English label, value, optional); masking never uses display text.
+    rows: list[tuple[str, str, str, bool]] = []
     verdict: Text | None = None
     _exposure["state"] = None  # a lookup that fails leaves no earlier verdict standing
     if info:
-        ip = info.get("query", "unknown")
-        isp = info.get("isp", "") or info.get("org", "") or "unknown"
+        ip = info.get("query", t("unknown"))
+        isp = info.get("isp", "") or info.get("org", "") or t("unknown")
         org = info.get("org", "")
         asname = info.get("asname", "") or info.get("as", "")
         country = info.get("country", "")
@@ -123,78 +126,80 @@ def show_security_warning(force: bool = False) -> bool:
         is_hosting = bool(info.get("hosting"))
         is_mobile = bool(info.get("mobile"))
 
-        rows.append(("Public IP", ip, False))
-        rows.append(("ISP", isp, False))
+        rows.append(("ip", N_("Public IP"), ip, False))
+        rows.append(("isp", N_("ISP"), isp, False))
         if org and org != isp:
-            rows.append(("Org", org, True))
+            rows.append(("org", N_("Org"), org, True))
         if asname:
-            rows.append(("ASN", asname, True))
+            rows.append(("asn", N_("ASN"), asname, True))
         if loc:
-            rows.append(("Location", loc, True))
+            rows.append(("location", N_("Location"), loc, True))
 
         # Trust API flags first, fall back to keyword heuristic.
         protected = is_proxy or is_hosting or _looks_like_vpn(f"{isp} {org} {asname}")
         _exposure["state"] = "vpn" if protected else "exposed"
         if is_proxy:
-            verdict = Text("✓ Proxy/VPN flagged by network database.", style=f"bold {theme.GOOD}")
+            verdict = Text(t("✓ Proxy/VPN flagged by network database."), style=f"bold {theme.GOOD}")
         elif is_hosting:
-            verdict = Text("✓ Hosting/datacenter IP — likely a VPN exit (not a residential ISP).",
+            verdict = Text(t("✓ Hosting/datacenter IP — likely a VPN exit (not a residential ISP)."),
                            style=f"bold {theme.GOOD}")
         elif _looks_like_vpn(f"{isp} {org} {asname}"):
-            verdict = Text("✓ VPN provider name detected in network org.", style=f"bold {theme.GOOD}")
+            verdict = Text(t("✓ VPN provider name detected in network org."), style=f"bold {theme.GOOD}")
         elif is_mobile:
-            verdict = Text("! Mobile carrier IP — no VPN. Carrier and peers see this IP.",
+            verdict = Text(t("! Mobile carrier IP — no VPN. Carrier and peers see this IP."),
                            style=f"bold {theme.BAD}")
         else:
-            verdict = Text("! Residential ISP IP — no VPN detected. Your real IP is visible.",
+            verdict = Text(t("! Residential ISP IP — no VPN detected. Your real IP is visible."),
                            style=f"bold {theme.BAD}")
     else:
-        verdict = Text("Could not fetch public IP info (offline?).", style=theme.MUTED)
+        verdict = Text(t("Could not fetch public IP info (offline?)."), style=theme.MUTED)
 
-    warning = Text(
+    warning = Text(t(
         "Any download or stream joins a public BitTorrent swarm. "
         "Every peer and tracker in that swarm sees this IP address. "
         "Seed counts and names are not safety signals — content is not verified."
-    )
-    masked_labels = ("Public IP", "Location")  # what identifies you: hidden until R
-    has_masked = any(label in masked_labels for label, _, _ in rows)
+    ))
+    masked_keys = {"ip", "location"}  # stable identities: hidden until R
+    has_masked = any(key in masked_keys for key, _, _, _ in rows)
     revealed = False
 
     def key_line() -> str:
-        parts = ["Enter continue"]
+        parts = [t("Enter continue")]
         if has_masked:
-            parts.append("R hide" if revealed else "R reveal")
+            parts.append(t("R hide") if revealed else t("R reveal"))
         if not force:
-            parts.append("D don't show again")
-        parts.append("Esc abort")
+            parts.append(t("D don't show again"))
+        parts.append(t("Esc abort"))
         return "  •  ".join(parts)
 
     def frame():
         from torrent_finder.ui import chrome as frames
         width, full_height = console.size.width, console.size.height
         height = theme.view_height(full_height, width)  # rows inside the Athanor chrome
-        top = theme.frame_header("Network exposure warning", "", width, full_height)
+        title = t("Network exposure warning")
+        top = theme.frame_header(title, "", width, full_height)
         keys_lines = theme.wrap_keys(theme.parse_footer(key_line()).keys, width)
         middle_parts = [
             theme.wrap_block(verdict, width, console),
             theme.wrap_block(warning, width, console),
         ]
-        label_width = max((len(label) for label, _, _ in rows), default=0) + 2
+        label_width = max((cell_len(t(label)) for _, label, _, _ in rows), default=0) + 2
         room = theme.inner_width(width)
         # rank 0 = always shown (Public IP), 1 = ISP, 2 = optional (Org / ASN / Location)
         detail = []
-        for index, (label, value, optional) in enumerate(rows):
+        for index, (key, label, value, optional) in enumerate(rows):
             line = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
-            line.append(label.ljust(label_width), style=theme.MUTED)
-            if label in masked_labels and not revealed:  # blurred until R reveals them
-                line.append(mask_ip(value) if label == "Public IP" else mask_text(value), style=theme.MUTED)
+            label = t(label)
+            line.append(label + " " * max(0, label_width - cell_len(label)), style=theme.MUTED)
+            if key in masked_keys and not revealed:  # blurred until R reveals them
+                line.append(mask_ip(value) if key == "ip" else mask_text(value), style=theme.MUTED)
             else:
                 line.append(value, style="bold")
             line.truncate(room + len(theme.MARGIN), overflow="ellipsis")
             detail.append((line, 2 if optional else min(index, 1)))
         spaced = theme.roomy(height, 20)
         one_line_header = [] if theme.framed(width, full_height) else [
-            theme.header("Network exposure warning", "", width)]
+            theme.header(title, "", width)]
 
         def assemble(max_rank: int, spacing: bool, header: list[Text], parts: list[list[Text]]) -> list[Text]:
             blank = [Text("")] if spacing else []
@@ -222,7 +227,7 @@ def show_security_warning(force: bool = False) -> bool:
                 last.truncate(max(1, cell_len(last.plain) - 1))
                 last.append("…")
             lines = assemble(0, False, one_line_header, [verdict_lines, warning_lines])
-        return Group(*frames.compose([line.copy() for line in lines], "Network exposure warning", "",
+        return Group(*frames.compose([line.copy() for line in lines], title, "",
                                      width, full_height))
 
     dismissed = False
@@ -250,4 +255,4 @@ def show_security_warning(force: bool = False) -> bool:
     finally:
         display.leave_screen()
         if dismissed:
-            console.print("[muted]Warning dismissed. Re-open via the provider menu.[/muted]")
+            console.print(t("[muted]Warning dismissed. Re-open via the provider menu.[/muted]"))

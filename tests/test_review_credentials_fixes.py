@@ -96,6 +96,7 @@ class CredentialScreenTests(unittest.TestCase):
     def test_a_verifier_error_is_reported_not_raised(self):
         from torrent_finder.ui import credentials as screen
         meta = Mock()
+        meta.display_name.return_value = "Madokami"
         meta.effective_values.return_value = {"MADOKAMI_USERNAME": "u", "MADOKAMI_PASSWORD": "p"}
         meta.missing_required.return_value = []
         meta.verify.side_effect = UnicodeEncodeError("latin-1", "€", 0, 1, "ordinal not in range")
