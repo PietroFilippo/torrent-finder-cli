@@ -302,6 +302,70 @@ def _scenarios():
         diagnostics_menu(session)
 
     scenarios += [("creator-works", creator_works), ("diagnostics", diagnostics)]
+
+    def with_downloads(run, state: str = "running"):
+        """*run* with the mock-ups' background downloads installed (``fake_downloads.sample_jobs``).
+
+        ``running`` is every state at once; ``done`` keeps the finished ones,
+        with one completion not seen yet, so the figure reads ``✓1 new`` and
+        the message line says it finished.
+        """
+        def scenario():
+            from fake_downloads import FakeManager, sample_jobs
+            from torrent_finder import downloads
+            from torrent_finder.ui import downloads as downloads_ui
+            jobs = sample_jobs()
+            if state == "done":
+                jobs = [job for job in jobs if job.state in downloads.FINISHED_STATES]
+            manager = FakeManager(jobs)
+            if state == "done":
+                manager._seen.update(job.id for job in jobs if job.id != "job4")
+            from torrent_finder.ui import chrome
+            chrome.clear_messages()  # the completion announces again in every theme
+            with patch.object(downloads, "_manager", manager):
+                downloads_ui._announced.clear()
+                downloads_ui._announced.update(job.id for job in jobs if state != "done" or job.id != "job4")
+                try:
+                    run()
+                finally:
+                    downloads_ui._announced.clear()
+        return scenario
+
+    def downloads_screen(focus=None):
+        def run():
+            from torrent_finder.ui.downloads import downloads_screen
+            downloads_screen(focus=focus)
+        return run
+
+    def background_started():
+        from torrent_finder.ui.downloads import background_started_prompt
+        background_started_prompt("[SubsPlease] Frieren - 01 (1080p)", r"D:\Torrents\Anime",
+                                  size_bytes=1_503_238_553, ahead=2)
+
+    def quit_with_downloads():
+        from torrent_finder.ui.downloads import quit_prompt
+        quit_prompt()
+
+    def download_method_background():
+        prompts.download_method_prompt(
+            magnet="magnet:?xt=urn:btih:" + "ab" * 20, show_subtitles=True, show_episode_picker=True,
+            selected_indexes=None, show_streaming=True, page_url="https://nyaa.si/view/1", info_source="Nyaa",
+            focus="toggle_background",
+            torrent={"name": "[SubsPlease] Frieren - 01 (1080p)", "size": 1_450_000_000, "seeders": 812,
+                     "leechers": 140, "source": "Nyaa", "uploaded_at": 1_789_000_000})
+
+    scenarios += [
+        ("download-method-background", with_downloads(download_method_background)),
+        ("downloads", with_downloads(downloads_screen())),
+        ("downloads-failed", with_downloads(downloads_screen("job6"))),
+        ("downloads-done", with_downloads(downloads_screen("job5"))),
+        ("downloads-empty", downloads_screen()),
+        ("provider-menu-downloads", with_downloads(lambda: prompts.provider_select_prompt())),
+        ("provider-menu-download-done", with_downloads(lambda: prompts.provider_select_prompt(), "done")),
+        ("whats-next-downloads", with_downloads(lambda: prompts.search_again_prompt())),
+        ("background-started", with_downloads(background_started)),
+        ("quit-with-downloads", with_downloads(quit_with_downloads)),
+    ]
     return scenarios
 
 
