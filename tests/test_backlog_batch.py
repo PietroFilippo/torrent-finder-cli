@@ -29,7 +29,7 @@ from isolation import isolate_store, restart_store
 
 class IsolatedState(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
+        temporary = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)  # Windows may hold a file a moment
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.path = isolate_store(self, path=self.root / "state.json")
