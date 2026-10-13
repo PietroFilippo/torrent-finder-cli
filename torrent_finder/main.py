@@ -65,7 +65,7 @@ from torrent_finder.ui.search_progress import REDRAW_S as SEARCH_REDRAW_S, Progr
 from torrent_finder.ui.table import interactive_select
 from torrent_finder.ui.update_progress import UpdateDisplay, preview_update
 from torrent_finder.updates import (
-    RestartRequested, check_for_update, consume_update_report, notice_line,
+    RestartRequested, UpdateCheck, check_for_update, consume_update_report, notice_line,
     relaunch, remove_moved_launchers, run_update, status_label,
 )
 from torrent_finder.utils import start_esc_listener
@@ -1101,6 +1101,7 @@ def _main_loop(args=None) -> None:
             parser.error(f"Unknown search profile {args.profile!r}. Available: " + ", ".join(p["name"] for p in library.entries))
     if args.providers and args.type != "all":
         parser.error("--providers requires -t all")
+    update_check = UpdateCheck(check_for_update)
     advise_limited_terminal()
     if not args.skip_warning:
         if not show_security_warning():
@@ -1164,12 +1165,9 @@ def _main_loop(args=None) -> None:
     if not (args.type and args.query):
         console.clear()
 
-    # One-shot, install-aware update check (git / pip-pipx / binary). Rate-limited
-    # to once a day inside check_for_update. ``update_info`` also drives the
-    # "Install update" entry in the Tab menu; ``update_msg`` is the footer line,
-    # printed once here for direct -q/-t runs that skip the menu.
-    update_info = check_for_update()
-    update_msg = notice_line(update_info)
+    # The check started before the warning gate. Collect it only when ready;
+    # the main menu also polls while idle so its update row can appear in place.
+    update_info, update_msg, update_loaded = None, "", False
     if theme_notice:
         update_msg = "\n".join(filter(None, (update_msg, f"[warning]{markup_escape(theme_notice)}[/warning]")))
     from rich.markup import escape
@@ -1178,12 +1176,22 @@ def _main_loop(args=None) -> None:
     if update_report:
         update_msg = "\n".join(filter(None, (update_msg, escape(update_report))))
     # In the Athanor design these are messages on the message line instead of a banner.
-    if update_info:
-        frames.announce(f"A raven arrives: {escape(status_label(update_info))}. U installs it.")
     if update_report:
         frames.announce(escape(update_report.splitlines()[0]))
     if theme_notice:
         frames.announce(f"[warn]{markup_escape(theme_notice)}[/warn]")
+
+    def poll_update():
+        nonlocal update_info, update_msg, update_loaded
+        if not update_loaded and update_check.done.is_set():
+            update_loaded = True
+            update_info = update_check.info
+            update_msg = "\n".join(filter(None, (notice_line(update_info), update_msg)))
+            if update_info:
+                frames.announce(f"A raven arrives: {escape(status_label(update_info))}. U installs it.")
+        return update_info, update_msg
+
+    poll_update()
     if current_provider and update_msg:
         # highlight=False: the auto-highlighter would restyle the version
         # digits (bold → bright black) on the yellow banner.
@@ -1222,6 +1230,7 @@ def _main_loop(args=None) -> None:
     quit_guard = QuitGuard()
 
     while True:
+        poll_update()
         # One-shot CLI creator search (--by/--name): jump into the by-creator
         # flow, then fall into the normal what's-next / keyword loop.
         if cli_facet is not None and pending_creator_name is not None:
@@ -1256,6 +1265,7 @@ def _main_loop(args=None) -> None:
                     open_group=pending_open_group,
                     update_available=bool(update_info),
                     update_status=status_label(update_info),
+                    refresh_update=poll_update,
                 )
             except (KeyboardInterrupt, EOFError):
                 result = None  # Ctrl+C/Ctrl+D arm the same quit guard as Esc

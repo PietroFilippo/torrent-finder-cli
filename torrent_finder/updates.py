@@ -167,6 +167,24 @@ def check_for_update(force: bool = False) -> "dict | None":
         return None
 
 
+class UpdateCheck:
+    """One fail-silent startup check; the UI polls completion without waiting."""
+
+    def __init__(self, check=None):
+        self.info: dict | None = None
+        self.done = threading.Event()
+        self.thread = threading.Thread(target=self._run, args=(check or check_for_update,), daemon=True)
+        self.thread.start()
+
+    def _run(self, check):
+        try:
+            self.info = check()
+        except Exception:
+            pass
+        finally:
+            self.done.set()
+
+
 def _banner(headline: str, action: str) -> str:
     """High-visibility notice: the theme's banner headline + bright action text.
 

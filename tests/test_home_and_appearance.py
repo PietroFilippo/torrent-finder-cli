@@ -1,6 +1,7 @@
 """The main menu's sections, hints and status; the Continue row; the Appearance picker."""
 
 import io
+import threading
 import unittest
 import warnings
 from unittest.mock import patch
@@ -34,6 +35,74 @@ class HomeTests(unittest.TestCase):
     def setUp(self):
         isolate_store(self)
         self.addCleanup(security._exposure.update, state=None)
+
+    def test_main_menu_does_not_wait_for_the_update_check(self):
+        started, release, finished = threading.Event(), threading.Event(), threading.Event()
+        info = {"kind": "git", "behind": 2}
+        calls = []
+        def check():
+            started.set()
+            release.wait(2)
+            finished.set()
+            return info
+        def menu(**kwargs):
+            if not calls:
+                self.assertTrue(started.wait(1))
+                self.assertFalse(finished.is_set(), "startup waited for the network")
+                release.set()
+                self.assertTrue(finished.wait(1))
+                calls.append(kwargs)
+            return None
+        try:
+            with patch("sys.argv", ["torrent", "-y"]), \
+                 patch.object(main, "advise_limited_terminal"), patch.object(main, "check_for_update", check), \
+                 patch.object(main, "consume_update_report", return_value=None), \
+                 patch.object(main, "remove_moved_launchers"), patch.object(main, "console"), \
+                 patch.object(main, "provider_select_prompt", side_effect=menu), \
+                 patch.object(main, "_goodbye"), patch.object(security, "_fetch_network_info") as network:
+                main._main_loop()
+            network.assert_not_called()
+        finally:
+            release.set()
+            finished.wait(1)
+
+    def test_update_check_starts_before_the_warning_gate(self):
+        started = threading.Event()
+        def warning():
+            self.assertTrue(started.wait(1))
+            return False
+        with patch("sys.argv", ["torrent"]), patch.object(main, "advise_limited_terminal"), \
+             patch.object(main, "check_for_update", side_effect=lambda: started.set()), \
+             patch.object(main, "show_security_warning", side_effect=warning), \
+             patch.object(main, "console"), patch.object(main, "provider_select_prompt") as menu:
+            main._main_loop()
+        menu.assert_not_called()
+
+    def test_idle_menu_adds_finished_update_and_enables_its_hotkey(self):
+        ready, redrawn = threading.Event(), threading.Event()
+        seen = []
+        build = selector._build_panel
+        info = {"kind": "git", "behind": 2}
+        def frame(items, cursor, *args, **kwargs):
+            seen.append((items[cursor].value, kwargs.get("status")))
+            if any(item.value == "__update__" for item in items):
+                redrawn.set()
+            return build(items, cursor, *args, **kwargs)
+        def key():
+            ready.set()
+            self.assertTrue(redrawn.wait(2), "update never appeared while idle")
+            return "u"
+        screen = Console(file=io.StringIO(), width=80, height=24, color_system=None)
+        with patch.object(selector, "console", screen), patch.object(prompts, "console", screen), \
+             patch.object(selector, "_render", return_value=True), \
+             patch.object(selector, "_build_panel", side_effect=frame), \
+             patch.object(selector.readchar, "readkey", side_effect=key):
+            result = prompts.provider_select_prompt(
+                refresh_update=lambda: (info if ready.is_set() else None, "update notice" if ready.is_set() else ""))
+        self.assertEqual(result, "__update__")
+        self.assertGreaterEqual(len(seen), 2)
+        self.assertIs(seen[0][0], seen[-1][0])
+        self.assertIn("2 commits behind", seen[-1][1])
 
     def test_sections_and_the_continue_row(self):
         items, kw = capture_home()

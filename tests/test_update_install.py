@@ -18,6 +18,16 @@ import isolation  # noqa: F401  # redirected settings and the shared test baseli
 from torrent_finder import updates
 from torrent_finder.state import load_setting, save_setting
 
+
+class BackgroundCheckTests(unittest.TestCase):
+    def test_background_failures_are_silent(self):
+        def failed():
+            raise OSError("offline")
+        check = updates.UpdateCheck(failed)
+        self.assertTrue(check.done.wait(1))
+        check.thread.join(1)
+        self.assertIsNone(check.info)
+
 PIP_OUTPUT = """\
 Requirement already satisfied: torrent-finder-cli in c:\\venv\\lib\\site-packages (0.9.0)
 Collecting torrent-finder-cli

@@ -2321,7 +2321,7 @@ def settings_menu() -> None:
 
 def provider_select_prompt(
     notice: str = "", open_group=None, update_available: bool = False,
-    quit_guard: "QuitGuard | None" = None, update_status: str = "",
+    quit_guard: "QuitGuard | None" = None, update_status: str = "", refresh_update=None,
 ) -> object | None:
     """The main menu: continue the last search, pick a provider, or open a tool.
 
@@ -2439,7 +2439,7 @@ def provider_select_prompt(
         # (that would re-roll on every keypress and make the screen jitter).
         tip_line = random_tip()
 
-        def footer(notice=notice):
+        def footer():
             # Re-evaluated on every render: resizing the open menu switches
             # between the full key bar and a compact one.
             if console.size.height < 24 or console.size.width < 60:
@@ -2448,6 +2448,27 @@ def provider_select_prompt(
             return ((notice + "\n" if notice else "")
                     + "↑/↓ navigate  •  Enter select  •  F filters  •  H history  •  "
                     "S stats  •  T tips  •  Tab actions  •  Esc quit")
+
+        hotkeys = {"H": "history", "h": "history", "S": "stats", "s": "stats",
+                   "T": "tips", "t": "tips", "\t": "actions"}
+        if update_available:
+            hotkeys.update({"U": "update", "u": "update"})
+
+        def refresh_menu():
+            nonlocal update_available, update_status, notice
+            if refresh_update is None:
+                return False
+            from torrent_finder.updates import status_label
+            info, message = refresh_update()
+            if not info or update_available:
+                return False
+            update_available, update_status = True, status_label(info)
+            notice = "" if theme.FRAMED else message
+            # Append within Tools so an idle refresh never shifts the focused row.
+            items.append(SelectItem(label="Install update", value="__update__", hint="U",
+                                    description="Install the new version now; the app reopens when it is done."))
+            hotkeys.update({"U": "update", "u": "update"})
+            return True
 
         result = arrow_select(
             items,
@@ -2459,16 +2480,8 @@ def provider_select_prompt(
             start_index=start,
             alert=quit_guard.hint if quit_guard else "",
             tip=tip_line,
-            hotkeys={
-                "H": "history",
-                "h": "history",
-                "S": "stats",
-                "s": "stats",
-                "T": "tips",
-                "t": "tips",
-                "\t": "actions",
-                **({"U": "update", "u": "update"} if update_available else {}),
-            },
+            hotkeys=hotkeys,
+            refresh=refresh_menu if refresh_update is not None else None,
             key_actions={"F": _handle_f, "f": _handle_f},
         )
 

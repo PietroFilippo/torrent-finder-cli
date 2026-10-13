@@ -755,6 +755,7 @@ def arrow_select(
     intro: "str | Text | Callable[[], str | Text]" = "",
     help: bool = True,
     tip: str = "",
+    refresh: Callable[[], bool] | None = None,
 ) -> int | list[int] | tuple | None:
     """Interactive arrow-key selector.
 
@@ -787,6 +788,8 @@ def arrow_select(
         on_action: Optional callback for action items. Called with
                    (index, items). Return True to stay in the menu,
                    False to exit and return the index.
+        refresh: Optional non-blocking poll for background content. May append
+                 items without changing existing indexes; True requests a redraw.
 
     Returns:
         - Single-select mode: index of chosen item, or None if cancelled.
@@ -823,11 +826,19 @@ def arrow_select(
     render_lock = threading.Lock()
     resize = _ResizeRedraw(console.size)
 
+    def refresh_content() -> bool:
+        nonlocal announcement
+        if refresh is not None and refresh():
+            announcement = frames.take_message() or announcement
+            return True
+        return False
+
     def draw(tick: int) -> bool:
         """Write a complete frame only when it matches the current viewport."""
         with render_lock:
             if state["paused"]:
                 return False  # another view owns the screen
+            refresh_content()
             for _ in range(3):
                 frame_size = console.size
                 panel = _build_panel(
@@ -864,6 +875,11 @@ def arrow_select(
             if state["paused"]:
                 continue
 
+            with render_lock:
+                if state["paused"]:
+                    continue
+                content_changed = refresh_content()
+
             now = time.monotonic()
             size_changed = resize.observe(console.size)
 
@@ -880,7 +896,7 @@ def arrow_select(
             if overflows and elapsed > _MARQUEE_DWELL_S:
                 new_tick = int((elapsed - _MARQUEE_DWELL_S) * _MARQUEE_RATE)
 
-            need_redraw = size_changed or (
+            need_redraw = content_changed or size_changed or (
                 overflows and new_tick != last_rendered_tick
             )
             if need_redraw:
