@@ -24,6 +24,8 @@ and a private copy left by an earlier version is removed. See
 docs/adr/0022-athanor-design.md.
 """
 
+# i18n: converted
+
 from __future__ import annotations
 
 import json
@@ -36,11 +38,13 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from torrent_finder.i18n import N_, t
+
 from torrent_finder import paintings
 
 APP = NAME = "torrent-finder"
 FONT_DIR = Path(__file__).resolve().parent / "assets" / "fonts"
-_FONTS_KEY = r"Software\Microsoft\Windows NT\CurrentVersion\Fonts"
+_FONTS_KEY = r"Software\Microsoft\Windows NT\CurrentVersion\Fonts"  # i18n: ignore -- font name, unit or Windows identity
 
 PIXEL_SCALES = (1, 1.5, 2, 3)        # a pixel font's sizes: screen pixels per font pixel at 100% scaling
 POINT_SIZES = (10, 12, 14, 16, 20)   # an outline font's sizes, in points
@@ -80,28 +84,28 @@ class Font:
         return self.cell[1] * 0.75 * size if self.pixel else float(size)
 
     def size_label(self, size: float) -> str:
-        shown = f"{round(self.points(size), 1):g} pt"
+        shown = f"{round(self.points(size), 1):g} pt"  # i18n: ignore -- font name, unit or Windows identity
         return f"×{size:g} · {shown}" if self.pixel else shown
 
 
 FONTS: dict[str, Font] = {font.key: font for font in (
-    Font("ibm-vga-8x16", "PxPlus IBM VGA 8x16", "athanor", "The IBM PC's VGA text mode: the classic letters.",
+    Font("ibm-vga-8x16", "PxPlus IBM VGA 8x16", "athanor", N_("The IBM PC's VGA text mode: the classic letters."),  # i18n: ignore -- font name, unit or Windows identity
          "PxPlus_IBM_VGA_8x16.ttf", (8, 16)),
-    Font("ibm-vga-9x16", "PxPlus IBM VGA 9x16", "athanor",
-         "VGA with its ninth column: wider letters with more space between them.",
+    Font("ibm-vga-9x16", "PxPlus IBM VGA 9x16", "athanor",  # i18n: ignore -- font name, unit or Windows identity
+         N_("VGA with its ninth column: wider letters with more space between them."),
          "PxPlus_IBM_VGA_9x16.ttf", (9, 16)),
-    Font("toshiba-txl1", "PxPlus ToshibaTxL1 8x16", "athanor", "A Toshiba laptop's: thin strokes, a lighter page.",
+    Font("toshiba-txl1", "PxPlus ToshibaTxL1 8x16", "athanor", N_("A Toshiba laptop's: thin strokes, a lighter page."),  # i18n: ignore -- font name, unit or Windows identity
          "PxPlus_ToshibaTxL1_8x16.ttf", (8, 16)),
-    Font("ast-premium-exec", "PxPlus AST PremiumExec", "athanor", "A tall cell: more air between the lines.",
+    Font("ast-premium-exec", "PxPlus AST PremiumExec", "athanor", N_("A tall cell: more air between the lines."),  # i18n: ignore -- font name, unit or Windows identity
          "PxPlus_AST_PremiumExec.ttf", (8, 19)),
-    Font("ibm-xga-12x20", "PxPlus IBM XGA-AI 12x20", "athanor",
-         "XGA's high-resolution letters: larger and finer, for big screens.",
+    Font("ibm-xga-12x20", "PxPlus IBM XGA-AI 12x20", "athanor",  # i18n: ignore -- font name, unit or Windows identity
+         N_("XGA's high-resolution letters: larger and finer, for big screens."),
          "PxPlus_IBM_XGA-AI_12x20.ttf", (12, 20)),
-    Font("cascadia-mono", "Cascadia Mono", "simple", "Windows Terminal's own font."),
-    Font("cascadia-code", "Cascadia Code", "simple",
-         "Cascadia with programming ligatures: pairs such as -> and != drawn as one sign."),
-    Font("consolas", "Consolas", "simple", "Windows' long-standing programming font."),
-    Font("lucida-console", "Lucida Console", "simple", "The classic console font: wide and plain."),
+    Font("cascadia-mono", "Cascadia Mono", "simple", N_("Windows Terminal's own font.")),  # i18n: ignore -- font name, unit or Windows identity
+    Font("cascadia-code", "Cascadia Code", "simple",  # i18n: ignore -- font name, unit or Windows identity
+         N_("Cascadia with programming ligatures: pairs such as -> and != drawn as one sign.")),
+    Font("consolas", "Consolas", "simple", N_("Windows' long-standing programming font.")),  # i18n: ignore -- font name, unit or Windows identity
+    Font("lucida-console", "Lucida Console", "simple", N_("The classic console font: wide and plain.")),  # i18n: ignore -- font name, unit or Windows identity
 )}
 DEFAULT_FONTS = {"athanor": "ibm-vga-8x16", "simple": "cascadia-mono"}
 
@@ -144,7 +148,7 @@ def supported(environ=None) -> bool:
 
 def folder(environ=None) -> Path:
     environ = os.environ if environ is None else environ
-    return Path(environ["LOCALAPPDATA"]) / "Microsoft" / "Windows Terminal" / "Fragments" / APP
+    return Path(environ["LOCALAPPDATA"]) / "Microsoft" / "Windows Terminal" / "Fragments" / APP  # i18n: ignore -- font name, unit or Windows identity
 
 
 def fragment_path(environ=None) -> Path:
@@ -189,7 +193,7 @@ def _private_copy(path: Path, environ=None) -> "Path | None":
         relative = path.relative_to(local)
     except ValueError:
         return None
-    return local / "Packages" / family / "LocalCache" / "Local" / relative
+    return local / "Packages" / family / "LocalCache" / "Local" / relative  # i18n: ignore -- font name, unit or Windows identity
 
 
 def _make_folder(target: Path) -> None:
@@ -223,8 +227,9 @@ def _check_real(path: Path, environ=None) -> None:
     """Raise when Windows kept *path* in the container's private copy, out of other programs' sight."""
     private = _private_copy(path, environ)
     if private is not None and private.exists():
-        raise OSError(f"Windows kept {path.name} in Python's private folder ({private.parent}), where "
-                      "Windows Terminal cannot see it; Python from python.org does not have this limit")
+        raise OSError(t("Windows kept {name} in Python's private folder ({folder}), where "
+                        "Windows Terminal cannot see it; Python from python.org does not have this limit",
+                        name=path.name, folder=private.parent))
 
 
 def in_profile(environ=None) -> bool:
@@ -373,12 +378,12 @@ def install_font(font: "Font | None" = None, environ=None) -> Path:
     import winreg
     font = font or default_font("athanor")
     environ = os.environ if environ is None else environ
-    target = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "Windows" / "Fonts" / font.file
+    target = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "Windows" / "Fonts" / font.file  # i18n: ignore -- font name, unit or Windows identity
     _make_folder(target.parent)
     shutil.copyfile(FONT_DIR / font.file, target)
     _check_real(target, environ)
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _FONTS_KEY) as key:
-        winreg.SetValueEx(key, f"{font.face} (TrueType)", 0, winreg.REG_SZ, str(target))
+        winreg.SetValueEx(key, f"{font.face} (TrueType)", 0, winreg.REG_SZ, str(target))  # i18n: ignore -- font name, unit or Windows identity
     try:
         ctypes.windll.gdi32.AddFontResourceW(str(target))  # usable now, without signing out
     except (AttributeError, OSError):
@@ -450,8 +455,8 @@ def settings_files(environ=None) -> list[Path]:
     """The settings.json of every Windows Terminal build on this account."""
     environ = os.environ if environ is None else environ
     local = Path(environ["LOCALAPPDATA"])
-    paths = [local / "Packages" / package / "LocalState" / "settings.json" for package in _TERMINAL_PACKAGES]
-    paths.append(local / "Microsoft" / "Windows Terminal" / "settings.json")
+    paths = [local / "Packages" / package / "LocalState" / "settings.json" for package in _TERMINAL_PACKAGES]  # i18n: ignore -- font name, unit or Windows identity
+    paths.append(local / "Microsoft" / "Windows Terminal" / "settings.json")  # i18n: ignore -- font name, unit or Windows identity
     return [path for path in paths if path.is_file()]
 
 

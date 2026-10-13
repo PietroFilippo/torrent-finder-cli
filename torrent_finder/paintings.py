@@ -8,6 +8,8 @@ colourway's ink and page colours and scaled up by whole pixels, using only
 Wikimedia Commons scans. See docs/adr/0022-athanor-design.md.
 """
 
+# i18n: converted
+
 from __future__ import annotations
 
 import json
@@ -17,6 +19,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from torrent_finder.i18n import N_, t
+
 ASSETS = Path(__file__).resolve().parent / "assets" / "paintings"
 NONE = "none"
 DEFAULT = "dore-satan"
@@ -25,7 +29,7 @@ _SIGNATURE = b"\x89PNG\r\n\x1a\n"
 # Where the terminal puts the painting: the right of the window (the plate
 # facing a page of text), the left (behind the menus), or both sides, with a
 # companion plate faded toward the page on the left.
-PLACEMENTS = {"right": "Right", "left": "Left", "facing": "Both sides"}
+PLACEMENTS = {"right": N_("Right"), "left": N_("Left"), "facing": N_("Both sides")}
 DEFAULT_PLACEMENT = "right"
 # Companion plates for "both sides": the same book or the same mood.
 _PAIRS = (("dore-satan", "dore-despair"), ("dore-charon", "dore-raven"), ("dore-quixote", "dore-mariner"),
@@ -33,6 +37,23 @@ _PAIRS = (("dore-satan", "dore-despair"), ("dore-charon", "dore-raven"), ("dore-
 FACING = {a: b for pair in _PAIRS for a, b in (pair, pair[::-1])}
 SPREAD_ASPECT = 1.9  # a maximised Windows Terminal window, tab row taken, on a 16:9 screen
 FAINT = 0.65         # how much of the ink the faded companion keeps
+
+# Mark the displayed catalogue text for extraction without changing the source
+# records, their titles, or the keys used by settings and exported file names.
+_TITLES = {title: title for title in (
+    N_("Satan in profile", ctx="painting"), N_("Satan's despair", ctx="painting"),
+    N_("The windmills", ctx="painting"), N_("The Raven", ctx="painting"),
+    N_("Charon", ctx="painting"), N_("The ice was all around", ctx="painting"),
+    N_("Melencolia I", ctx="painting"), N_("The Flammarion engraving", ctx="painting"),
+    N_("The Hermit", ctx="painting"), N_("Emblem XXI", ctx="painting"),
+)}
+_WORKS = {work: work for work in (
+    N_("Paradise Lost", ctx="painting work"), N_("Don Quixote", ctx="painting work"),
+    N_("The Raven", ctx="painting work"), N_("Inferno", ctx="painting work"),
+    N_("The Rime of the Ancient Mariner", ctx="painting work"),
+    N_("L'atmosphère", ctx="painting work"), N_("Rider–Waite tarot", ctx="painting work"),
+    N_("Atalanta Fugiens", ctx="painting work"),
+)}
 
 
 @dataclass(frozen=True)
@@ -49,6 +70,25 @@ class Painting:
     @property
     def credit(self) -> str:
         return f"{self.artist}, {self.year}" + (f" ({self.work})" if self.work else "")
+
+    def title_label(self) -> str:
+        """The title at draw time; the catalogue's English title remains intact."""
+        marked = _TITLES.get(self.title)
+        return t(marked) if marked is not None else self.title
+
+    def artist_credit_label(self) -> str:
+        artist = self.artist
+        if artist == "Unknown artist":  # i18n: ignore -- catalogue identity
+            artist = t("Unknown artist")
+        elif artist == "Matthäus Merian, for Michael Maier":  # i18n: ignore -- catalogue identity
+            artist = t("{artist}, for {author}", artist="Matthäus Merian", author="Michael Maier")  # i18n: ignore -- names
+        return f"{artist}, {self.year}"
+
+    def credit_label(self) -> str:
+        """Localised credit without changing the public English credit property."""
+        marked = _WORKS.get(self.work)
+        work = t(marked) if marked is not None else self.work
+        return self.artist_credit_label() + (f" ({work})" if work else "")
 
 
 @lru_cache(maxsize=1)
@@ -100,7 +140,7 @@ def write_png(width: int, height: int, rows: list[bytes], colours: tuple, depth:
 def read_png(blob: bytes) -> tuple[int, int, list[bytes]]:
     """Width, height and packed rows of a 1-bit PNG written with filter 0 (as ``write_png`` writes)."""
     if not blob.startswith(_SIGNATURE):
-        raise ValueError("not a PNG")
+        raise ValueError(t("not a PNG"))
     position, width, height, data = len(_SIGNATURE), 0, 0, b""
     while position < len(blob):
         length, kind = struct.unpack(">I4s", blob[position:position + 8])
@@ -108,7 +148,7 @@ def read_png(blob: bytes) -> tuple[int, int, list[bytes]]:
         if kind == b"IHDR":
             width, height, depth, _colour, _comp, _filter, interlace = struct.unpack(">IIBBBBB", body)
             if depth != 1 or interlace:
-                raise ValueError("only non-interlaced 1-bit PNGs are supported")
+                raise ValueError(t("only non-interlaced 1-bit PNGs are supported"))
         elif kind == b"IDAT":
             data += body
         position += 12 + length
@@ -118,7 +158,7 @@ def read_png(blob: bytes) -> tuple[int, int, list[bytes]]:
     for y in range(height):
         start = y * (stride + 1)
         if raw[start] != 0:
-            raise ValueError("unexpected PNG filter")
+            raise ValueError(t("unexpected PNG filter"))
         rows.append(raw[start + 1:start + 1 + stride])
     return width, height, rows
 
@@ -200,7 +240,7 @@ def spread(key: str, companion: str, ink: str, page: str, factor: int = 2, aspec
 
 def export_folder() -> Path:
     """Where saved paintings go: the Pictures folder, or the home folder without one."""
-    pictures = Path.home() / "Pictures"
+    pictures = Path.home() / "Pictures"  # i18n: ignore -- directory name
     return pictures / "torrent-finder" if pictures.is_dir() else Path.home() / "torrent-finder"
 
 

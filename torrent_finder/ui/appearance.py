@@ -11,12 +11,16 @@ The Settings › Appearance screen previews a theme in place and saves the
 choice. See docs/adr/0021-themes.md and docs/adr/0022-athanor-design.md.
 """
 
+# i18n: converted
+
 from __future__ import annotations
 
 import os
 import sys
 
 from rich.text import Text
+
+from torrent_finder.i18n import N_, t
 
 from torrent_finder import paintings, terminal_profile
 from torrent_finder.ui import theme
@@ -89,7 +93,8 @@ def env_theme(environ=None) -> tuple[str | None, str]:
     key = theme_key(raw)
     if key is None:
         names = ", ".join(theme.THEMES)
-        return None, f"{ENV}={raw.strip()} is not a theme ({names}); using the saved theme."
+        return None, t("{env}={value} is not a theme ({names}); using the saved theme.",
+                       env=ENV, value=raw.strip(), names=names)
     return key, ""
 
 
@@ -189,128 +194,152 @@ def _swatches(palette) -> Text:
     for shade in (palette.accent, palette.sky, palette.steel, palette.deep):
         hint.append(theme.BAR * 2, style=shade)
         hint.append(" ")
-    hint.append(" Heading", style=f"bold {palette.sky}")
+    hint.append(t(" Heading"), style=f"bold {palette.sky}")
     hint.append(" · ", style=palette.steel)
-    hint.append("On", style=palette.good)
+    hint.append(t("On", ctx="engine mode"), style=palette.good)
     hint.append(" ")
-    hint.append("Auto", style=palette.warn)
+    hint.append(t("Auto", ctx="engine mode"), style=palette.warn)
     hint.append(" ")
-    hint.append("Off", style=palette.steel)
+    hint.append(t("Off", ctx="engine mode"), style=palette.steel)
     return hint
 
 
 # Themes colour text, rules and the focused row; the page itself is the
 # terminal's, and an app cannot change it, so a light theme needs a light
 # terminal colour scheme.
-BACKGROUND_NOTE = "Themes colour the text; the background is your terminal's own."
+BACKGROUND_NOTE = N_("Themes colour the text; the background is your terminal's own.")
 
 
 def light_scheme_help(platform: str | None = None) -> str:
     """Where to switch the terminal to a light colour scheme, for the light theme."""
     platform = platform or sys.platform
     if platform == "win32":
-        return ("Windows Terminal: Ctrl+, › profile › Appearance › Color scheme. "
-                "Classic window: title bar › Properties › Colors.")
+        return (t("Windows Terminal: Ctrl+, › profile › Appearance › Color scheme. "
+                "Classic window: title bar › Properties › Colors."))
     if platform == "darwin":
-        return "Terminal: Settings › Profiles. iTerm2: Settings › Profiles › Colors."
-    return "Your terminal's preferences hold its colour schemes."
+        return t("Terminal: Settings › Profiles. iTerm2: Settings › Profiles › Colors.")
+    return t("Your terminal's preferences hold its colour schemes.")
 
 
 def _theme_help(palette) -> str:
     """A theme row's description: its note, and for a light theme where to make the terminal light."""
-    return f"{palette.note} {light_scheme_help()}" if palette.light else palette.note
+    note = t(_PALETTE_NOTES[palette.key])
+    return f"{note} {light_scheme_help()}" if palette.light else note
 
 
 def _focus_hint(key: str) -> str:
-    return f"{theme.CURSOR} beside the focused row" if key == "bar" else "the focused row on a tint"
+    return t("{cursor} beside the focused row", cursor=theme.CURSOR) if key == "bar" else t("the focused row on a tint")
 
 
 _FOCUS_HELP = {
-    "bar": "A mark in the gutter and bold text show the focused row.",
-    "fill": "The focused row also gets a tinted background across the screen; easier to follow in long lists.",
+    "bar": N_("A mark in the gutter and bold text show the focused row."),
+    "fill": N_("The focused row also gets a tinted background across the screen; easier to follow in long lists."),
 }
-_DENSITY_HINTS = {"comfortable": "rules and spacing when there is room", "compact": "more rows in every window"}
+_DENSITY_HINTS = {"comfortable": N_("rules and spacing when there is room"), "compact": N_("more rows in every window")}
 _DENSITY_HELP = {
-    "comfortable": "Rules, spacer lines and (in Athanor) the message and status lines whenever the window has room.",
-    "compact": "The short-window layout at every size: no rules, spacer, message or status lines, so lists show more rows.",
+    "comfortable": N_("Rules, spacer lines and (in Athanor) the message and status lines whenever the window has room."),
+    "compact": N_("The short-window layout at every size: no rules, spacer, message or status lines, so lists show more rows."),
 }
-_DESIGN_HINTS = {"athanor": "frame · message and status lines · painting", "simple": "header line · rules · no frame"}
+_DESIGN_HINTS = {"athanor": N_("frame · message and status lines · painting"), "simple": N_("header line · rules · no frame")}
+
+# Display copies: theme owns the English registry, while this screen owns its
+# descriptions. No translated value enters theme keys or Terminal fragments.
+_DESIGN_NOTES = {
+    "athanor": N_("A roguelike scriptorium: a double-line frame, a message line, a status line, "
+                  "glyphs from the IBM PC character set, and a painting behind the terminal.", ctx="appearance"),
+    "simple": N_("The quiet look: a header line, thin rules and a key bar; no frame.", ctx="appearance"),
+}
+_PALETTE_NOTES = {
+    "citrinitas": N_("Lamplight amber on parchment: the scriptorium as first seen.", ctx="appearance"),
+    "rubedo": N_("Vermilion and rust: the reddening, the work's last stage.", ctx="appearance"),
+    "albedo": N_("Bone and silver: the whitening, cool and quiet.", ctx="appearance"),
+    "viriditas": N_("Verdigris on copper: the greening of old metal.", ctx="appearance"),
+    "nigredo": N_("Ash and a single ember: the blackening.", ctx="appearance"),
+    "quiet": N_("Your terminal's bright blue with three fixed shades of blue.", ctx="appearance"),
+    "iris": N_("Violet; green, yellow and red stay free for states.", ctx="appearance"),
+    "lagoon": N_("Teal; as cool as Quiet Blue, further from the blue of links.", ctx="appearance"),
+    "ember": N_("Warm amber; Auto turns orange so it never looks like the accent.", ctx="appearance"),
+    "mono": N_("No hue: weight carries the structure, states keep their colours.", ctx="appearance"),
+    "paper": N_("For light terminals: switch your terminal to a light colour scheme first.", ctx="appearance"),
+}
+_FOCUS_LABELS = {"bar": N_("Cursor bar", ctx="appearance"), "fill": N_("Filled row", ctx="appearance")}
+_DENSITY_LABELS = {"comfortable": N_("Comfortable", ctx="appearance"), "compact": N_("Compact", ctx="appearance")}
 
 # Where a painting shows: terminals draw background pictures, apps cannot.
-PAINTING_HELP = "Set the saved image as your terminal's background picture to see it behind the app."
-PROFILE_PAINTING_HELP = "The Windows Terminal profile (at the end of this list) shows it behind the app."
-PROFILE_HELP = ("A torrent-finder profile in Windows Terminal opens the app on the theme's own page: its colours, "
+PAINTING_HELP = N_("Set the saved image as your terminal's background picture to see it behind the app.")
+PROFILE_PAINTING_HELP = N_("The Windows Terminal profile (at the end of this list) shows it behind the app.")
+PROFILE_HELP = (N_("A torrent-finder profile in Windows Terminal opens the app on the theme's own page: its colours, "
                 "the painting behind the text (Windows Terminal 1.24 or later), and the font and text size chosen "
-                "above, with the pixel fonts installed for your account. It follows what you choose here.")
-PROFILE_NOTE = "This tab is the torrent-finder profile: its page, painting and font follow what you choose here."
+                "above, with the pixel fonts installed for your account. It follows what you choose here."))
+PROFILE_NOTE = N_("This tab is the torrent-finder profile: its page, painting and font follow what you choose here.")
 # What a change does to Windows Terminal: at once when a running one could be told, else at its next start.
-FOLLOWS_NOW = "The Windows Terminal profile follows."
-FOLLOWS_LATER = "The Windows Terminal profile follows; it changes when Windows Terminal restarts."
+FOLLOWS_NOW = N_("The Windows Terminal profile follows.")
+FOLLOWS_LATER = N_("The Windows Terminal profile follows; it changes when Windows Terminal restarts.")
 # An open tab only finds fonts installed before it first drew.
-NEW_FONTS = "Installed the pixel fonts for your account: a tab opened before now shows them once you open a new one."
-FONT_SAVED = "Saved. The torrent-finder profile uses it: add it at the end of this list."
-FONT_HELP = "The torrent-finder profile in Windows Terminal draws the app in it; other terminals keep their own font."
-LOOK_HINTS = {"full": "the colourway's page, the painting, a pixel font",
-              "plain": "Windows Terminal's own page and font"}
+NEW_FONTS = N_("Installed the pixel fonts for your account: a tab opened before now shows them once you open a new one.")
+FONT_SAVED = N_("Saved. The torrent-finder profile uses it: add it at the end of this list.")
+FONT_HELP = N_("The torrent-finder profile in Windows Terminal draws the app in it; other terminals keep their own font.")
+LOOK_HINTS = {"full": N_("the colourway's page, the painting, a pixel font"),
+              "plain": N_("Windows Terminal's own page and font")}
 LOOK_HELP = {
-    "full": "The profile shows Athanor on its colourway's page, with the painting behind the text and the font "
-            "and text size chosen above.",
-    "plain": "The profile shows Athanor as any other tab does: the frame and colours on Windows Terminal's own "
-             "page and font, without the painting.",
+    "full": N_("The profile shows Athanor on its colourway's page, with the painting behind the text and the font "
+            "and text size chosen above."),
+    "plain": N_("The profile shows Athanor as any other tab does: the frame and colours on Windows Terminal's own "
+             "page and font, without the painting."),
 }
-OPEN_HELP = ("When you type the command in another Windows Terminal tab, the app opens in a torrent-finder tab of "
+OPEN_HELP = (N_("When you type the command in another Windows Terminal tab, the app opens in a torrent-finder tab of "
              "the same window, with its look, and the other tab gets its prompt back. Windows Terminal keeps "
-             "pictures and fonts in profiles, and a running program cannot change them in its own tab.")
-SIZE_HELP = ("How large the profile draws text. Larger text fills a big window with fewer, bigger rows; "
-             "whole multiples keep pixel letters sharp at 100% display scaling.")
+             "pictures and fonts in profiles, and a running program cannot change them in its own tab."))
+SIZE_HELP = (N_("How large the profile draws text. Larger text fills a big window with fewer, bigger rows; "
+             "whole multiples keep pixel letters sharp at 100% display scaling."))
 
 
 def _font_hint(option) -> str:
     if option.pixel:
-        return f"{option.cell[0]}×{option.cell[1]} pixels"
-    return "Windows Terminal's" if option.face.startswith("Cascadia") else "Windows'"
+        return t("{width}×{height} pixels", width=option.cell[0], height=option.cell[1])
+    return t("Windows Terminal's") if option.face.startswith("Cascadia") else t("Windows'")
 
 
 def _font_help(option) -> str:
-    install = " Installed for your account when chosen." if not terminal_profile.font_installed(option) else ""
-    return f"{option.note} {FONT_HELP}{install}"
+    install = t(" Installed for your account when chosen.") if not terminal_profile.font_installed(option) else ""
+    return f"{t(option.note)} {t(FONT_HELP)}{install}"
 
 
 def _size_hint(option, size) -> str:
     if option.pixel:  # half sizes draw font pixels one and two screen pixels wide by turns
-        return "sharp" if float(size).is_integer() else "uneven pixels"
-    return "Windows Terminal's default" if size == 12 else ""
+        return t("sharp") if float(size).is_integer() else t("uneven pixels")
+    return t("Windows Terminal's default") if size == 12 else ""
 
 
-PLAIN_PAINTING_HELP = "The profile's plain look leaves it out; its full look (at the end of this list) shows it."
+PLAIN_PAINTING_HELP = N_("The profile's plain look leaves it out; its full look (at the end of this list) shows it.")
 
 
 def _painting_help(plain: bool = False) -> str:
     if not terminal_profile.supported():
-        return PAINTING_HELP
-    return PLAIN_PAINTING_HELP if plain else PROFILE_PAINTING_HELP
+        return t(PAINTING_HELP)
+    return t(PLAIN_PAINTING_HELP) if plain else t(PROFILE_PAINTING_HELP)
 
 
-_PLACEMENT_HINTS = {"right": "the plate facing the page; menus stay on plain page",
-                    "left": "behind the menus", "facing": "a faded companion plate on the left"}
+_PLACEMENT_HINTS = {"right": N_("the plate facing the page; menus stay on plain page"),
+                    "left": N_("behind the menus"), "facing": N_("a faded companion plate on the left")}
 
 
 def _placement_help(key: str, painting_key: str) -> str:
     if key == "right":
-        return ("The painting fills the right of the window, like the plate facing a page of text; "
-                "menus and lists keep the plain page.")
+        return (t("The painting fills the right of the window, like the plate facing a page of text; "
+                "menus and lists keep the plain page."))
     if key == "left":
-        return ("The painting fills the left of the window, behind the menus and lists. "
-                "Its ink is dark enough to read through.")
+        return (t("The painting fills the left of the window, behind the menus and lists. "
+                "Its ink is dark enough to read through."))
     companion = paintings.catalog().get(paintings.facing(painting_key))
-    name = companion.title if companion else "another plate"
-    return (f"This painting on the right and its companion, {name}, faded on the left. The two cover the window "
-            "together, so windows of other proportions cut a little off each side.")
+    name = companion.title_label() if companion else t("another plate")
+    return t("This painting on the right and its companion, {name}, faded on the left. The two cover the window "
+             "together, so windows of other proportions cut a little off each side.", name=name)
 
 
 def _placement_rows(chosen: str, painting_key: str) -> list:
     """The Painting side section's rows: right, left, both sides."""
-    return [_choice(label, ("placement", key), key == chosen, _PLACEMENT_HINTS[key],
+    return [_choice(t(label), ("placement", key), key == chosen, t(_PLACEMENT_HINTS[key]),
                     _placement_help(key, painting_key))
             for key, label in paintings.PLACEMENTS.items()]
 
@@ -319,10 +348,11 @@ def _painting_rows(chosen: str, plain: bool = False) -> list:
     """The Painting section's rows: every engraving, then none."""
     rows = []
     for key, entry in paintings.catalog().items():
-        rows.append(_choice(entry.title, ("painting", key), key == chosen, f"{entry.artist}, {entry.year}",
-                            f"{entry.credit}; public domain. Recoloured in the colourway's ink. {_painting_help(plain)}"))
-    rows.append(_choice("None", ("painting", paintings.NONE), chosen == paintings.NONE, "a plain page",
-                        "No painting behind the app."))
+        rows.append(_choice(entry.title_label(), ("painting", key), key == chosen, entry.artist_credit_label(),
+                            t("{credit}; public domain. Recoloured in the colourway's ink. {help}",
+                              credit=entry.credit_label(), help=_painting_help(plain))))
+    rows.append(_choice(t("None"), ("painting", paintings.NONE), chosen == paintings.NONE, t("a plain page"),
+                        t("No painting behind the app.")))
     return rows
 
 
@@ -369,61 +399,62 @@ def appearance_menu() -> None:
 
     def build() -> list:
         design = design_of(state["preview"])
-        items = [_section("Design")]
+        items = [_section(t("Design"))]
         for key, option in theme.DESIGNS.items():
             items.append(_choice(option.name, ("design", key), key == design_of(chosen["theme"]),
-                                 _DESIGN_HINTS[key], option.note))
-        items.append(_section(f"{theme.DESIGNS[design].name} colours"))
+                                 t(_DESIGN_HINTS[key]), t(_DESIGN_NOTES[key])))
+        items.append(_section(t("{design} colours", design=theme.DESIGNS[design].name)))
         for option in theme.palettes(design):
             items.append(_choice(option.name, ("theme", option.key), option.key == chosen["theme"],
                                  _swatches(option), _theme_help(option)))
         if design == "athanor" and paintings.catalog():
-            items.append(_section("Painting"))
+            items.append(_section(t("Painting")))
             items += _painting_rows(chosen["painting"], plain(design))
             if chosen["painting"] != paintings.NONE:
-                items.append(SelectItem("Save the painting as an image", ("export", None), is_action=True,
-                                        hint=f"a PNG in the {theme.THEMES[state['preview']].name} colours",
-                                        description=f"Into {paintings.export_folder()}. {PAINTING_HELP}"))
-                items.append(_section("Painting side"))
+                items.append(SelectItem(t("Save the painting as an image"), ("export", None), is_action=True,
+                                        hint=t("a PNG in the {colours} colours", colours=theme.THEMES[state['preview']].name),
+                                        description=t("Into {folder}. {help}", folder=paintings.export_folder(), help=t(PAINTING_HELP))))
+                items.append(_section(t("Painting side")))
                 items += _placement_rows(chosen["placement"], chosen["painting"])
         # The app sets a font only through the Windows Terminal profile, and the plain look keeps its own.
         if terminal_profile.supported() and not plain(design):
             current, size = chosen_font(design)
-            items.append(_section("Font"))
+            items.append(_section(t("Font")))
             for option in terminal_profile.fonts(design):
                 items.append(_choice(option.face, ("font", option.key), option.key == current.key,
                                      _font_hint(option), _font_help(option)))
-            items.append(_section("Text size"))
+            items.append(_section(t("Text size")))
             for value in current.sizes:
                 items.append(_choice(current.size_label(value), ("size", value), value == size,
-                                     _size_hint(current, value), SIZE_HELP))
-        items.append(_section("Focus"))
+                                     _size_hint(current, value), t(SIZE_HELP)))
+        items.append(_section(t("Focus")))
         for key, label in theme.FOCUS_STYLES.items():
-            items.append(_choice(label, ("focus", key), key == chosen["focus"], _focus_hint(key), _FOCUS_HELP[key]))
-        items.append(_section("Density"))
+            items.append(_choice(t(_FOCUS_LABELS[key]), ("focus", key), key == chosen["focus"], _focus_hint(key), t(_FOCUS_HELP[key])))
+        items.append(_section(t("Density")))
         for key, label in theme.DENSITIES.items():
-            items.append(_choice(label, ("density", key), key == chosen["density"], _DENSITY_HINTS[key],
-                                 _DENSITY_HELP[key]))
+            items.append(_choice(t(_DENSITY_LABELS[key]), ("density", key), key == chosen["density"], t(_DENSITY_HINTS[key]),
+                                 t(_DENSITY_HELP[key])))
         if terminal_profile.supported():
-            items.append(_section("Windows Terminal"))
+            items.append(_section("Windows Terminal"))  # i18n: ignore -- product name
             if design == "athanor":
                 for key in LOOKS:
-                    items.append(_choice(f"{key.capitalize()} look", ("look", key), key == chosen["profile"]["look"],
-                                         LOOK_HINTS[key], LOOK_HELP[key]))
+                    items.append(_choice(t("Full look") if key == "full" else t("Plain look"),
+                                         ("look", key), key == chosen["profile"]["look"],
+                                         t(LOOK_HINTS[key]), t(LOOK_HELP[key])))
             if terminal_profile.installed():
                 opening = chosen["profile"]["open_from_tabs"]
-                items.append(SelectItem("Open from other tabs", ("open", not opening), is_action=True,
-                                        hint=Text("On" if opening else "Off",
+                items.append(SelectItem(t("Open from other tabs"), ("open", not opening), is_action=True,
+                                        hint=Text(t("On", ctx="appearance toggle") if opening else t("Off", ctx="appearance toggle"),
                                                   style=theme.state_style("On" if opening else "Off")),
-                                        description=OPEN_HELP))
-                items.append(SelectItem("Remove the torrent-finder profile", ("profile", "remove"), is_action=True,
-                                        hint="it follows the choices above",
-                                        description=f"{PROFILE_HELP} Removing it deletes "
-                                                    f"{terminal_profile.folder()}; the fonts stay installed."))
+                                        description=t(OPEN_HELP)))
+                items.append(SelectItem(t("Remove the torrent-finder profile"), ("profile", "remove"), is_action=True,
+                                        hint=t("it follows the choices above"),
+                                        description=t("{help} Removing it deletes {folder}; the fonts stay installed.",
+                                                      help=t(PROFILE_HELP), folder=terminal_profile.folder())))
             else:
-                items.append(SelectItem("Add a torrent-finder profile", ("profile", "add"), is_action=True,
-                                        hint="the painting behind the app", description=PROFILE_HELP))
-        items.append(SelectItem("Back", None, is_action=True))
+                items.append(SelectItem(t("Add a torrent-finder profile"), ("profile", "add"), is_action=True,
+                                        hint=t("the painting behind the app"), description=t(PROFILE_HELP)))
+        items.append(SelectItem(t("Back"), None, is_action=True))
         return items
 
     def persist(kind: str) -> None:
@@ -432,58 +463,60 @@ def appearance_menu() -> None:
                  chosen["profile"], chosen["placement"])
             state["notice"] = ""
         except (OSError, ValueError) as error:
-            state["notice"] = f"[error]Applied for this session, but not saved:[/error] {escape(str(error))}"
+            state["notice"] = t("[error]Applied for this session, but not saved:[/error] {error}", error=escape(str(error)))
             return
         if kind not in ("design", "theme", "painting", "placement", "font", "size", "look"):
             return
         if not terminal_profile.installed():
-            state["notice"] = FONT_SAVED if kind in ("font", "size") else ""
+            state["notice"] = t(FONT_SAVED) if kind in ("font", "size") else ""
             return
         try:
             installed = terminal_profile.install_fonts() if kind == "font" else []
             current, size = chosen_font(design_of(chosen["theme"]))
             terminal_profile.write(theme.THEMES[chosen["theme"]], chosen["painting"], font=current, size=size,
                                    plain=plain(design_of(chosen["theme"])), placement=chosen["placement"])
-            state["notice"] = FOLLOWS_NOW if terminal_profile.refresh() else FOLLOWS_LATER
+            state["notice"] = t(FOLLOWS_NOW) if terminal_profile.refresh() else t(FOLLOWS_LATER)
             if installed:
-                state["notice"] += " " + NEW_FONTS
+                state["notice"] += " " + t(NEW_FONTS)
         except OSError as error:
-            state["notice"] = f"[error]The Windows Terminal profile was not updated:[/error] {escape(str(error))}"
+            state["notice"] = t("[error]The Windows Terminal profile was not updated:[/error] {error}", error=escape(str(error)))
 
     def add_profile() -> None:
         from torrent_finder.ui.prompts import confirm_prompt
         palette = theme.THEMES[chosen["theme"]]
         shown = paintings.catalog().get(chosen["painting"]) if palette.design == "athanor" else None
-        parts = [f"the {palette.name} colours"] + ([f"{escape(shown.title)} behind the text"] if shown else [])
+        parts = [t("the {colours} colours", colours=palette.name)]
+        if shown:
+            parts.append(t("{painting} behind the text", painting=escape(shown.title_label())))
         current, size = chosen_font(palette.design)
-        parts.append(f"{current.face} at {current.size_label(size)}")
+        parts.append(t("{font} at {size}", font=current.face, size=current.size_label(size)))
         if plain(palette.design):
-            parts = [f"the {palette.name} colours on Windows Terminal's own page and font"]
+            parts = [t("the {colours} colours on Windows Terminal's own page and font", colours=palette.name)]
         if terminal_profile.missing_fonts():
-            parts.append("the PxPlus pixel fonts installed for your account")
-        listed = parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
-        message = ("Add a [bold]torrent-finder[/bold] profile to Windows Terminal?\n\n"
-                   f"It opens the app with {listed}, from the ▾ menu next to the tabs.")
-        if not confirm_prompt(message, title="Windows Terminal profile"):
+            parts.append(t("the PxPlus pixel fonts installed for your account"))
+        listed = parts[0] if len(parts) == 1 else t("{items} and {last}", items=', '.join(parts[:-1]), last=parts[-1])
+        message = t("Add a [bold]torrent-finder[/bold] profile to Windows Terminal?\n\n"
+                    "It opens the app with {listed}, from the ▾ menu next to the tabs.", listed=listed)
+        if not confirm_prompt(message, title=t("Windows Terminal profile")):
             return
         try:
             terminal_profile.write(palette, chosen["painting"], font=current, size=size, add_font=True,
                                    plain=plain(palette.design), placement=chosen["placement"])
             if terminal_profile.refresh():
-                state["notice"] = "[good]Added[/good] the torrent-finder profile: open it from the ▾ menu next to the tabs."
+                state["notice"] = t("[good]Added[/good] the torrent-finder profile: open it from the ▾ menu next to the tabs.")
             else:
-                state["notice"] = ("[good]Added[/good] the torrent-finder profile: restart Windows Terminal, "
-                                   "then open it from the ▾ menu next to the tabs.")
+                state["notice"] = (t("[good]Added[/good] the torrent-finder profile: restart Windows Terminal, "
+                                   "then open it from the ▾ menu next to the tabs."))
         except OSError as error:
-            state["notice"] = f"[error]The profile was not added:[/error] {escape(str(error))}"
+            state["notice"] = t("[error]The profile was not added:[/error] {error}", error=escape(str(error)))
 
     def remove_profile() -> None:
         try:
             terminal_profile.remove()
-            state["notice"] = ("Removed the torrent-finder profile." if terminal_profile.refresh() else
-                               "Removed the torrent-finder profile; Windows Terminal drops it when it restarts.")
+            state["notice"] = (t("Removed the torrent-finder profile.") if terminal_profile.refresh() else
+                               t("Removed the torrent-finder profile; Windows Terminal drops it when it restarts."))
         except OSError as error:
-            state["notice"] = f"[error]The profile was not removed:[/error] {escape(str(error))}"
+            state["notice"] = t("[error]The profile was not removed:[/error] {error}", error=escape(str(error)))
 
     def target(value) -> str:
         """The palette a design or colourway row stands for."""
@@ -533,9 +566,9 @@ def appearance_menu() -> None:
         try:
             path = paintings.export(chosen["painting"], theme.THEMES[state["preview"]], paintings.export_folder(),
                                     placement=chosen["placement"])
-            state["notice"] = f"[good]Saved[/good] {escape(path.name)} in {escape(str(path.parent))}"
+            state["notice"] = t("[good]Saved[/good] {name} in {folder}", name=escape(path.name), folder=escape(str(path.parent)))
         except (OSError, ValueError, KeyError) as error:
-            state["notice"] = f"[error]The painting was not saved:[/error] {escape(str(error))}"
+            state["notice"] = t("[error]The painting was not saved:[/error] {error}", error=escape(str(error)))
 
     def preview(index: int, items: list) -> bool:
         value = items[index].value
@@ -551,7 +584,7 @@ def appearance_menu() -> None:
     def status() -> str:
         shown = theme.THEMES[state["preview"]]
         label = f"{theme.DESIGNS[shown.design].name} · {shown.name}"
-        return f"previewing {label}" if state["preview"] != chosen["theme"] else f"using {label}"
+        return t("previewing {label}", label=label) if state["preview"] != chosen["theme"] else t("using {label}", label=label)
 
     def footer() -> str:
         lines = []
@@ -559,21 +592,21 @@ def appearance_menu() -> None:
             lines.append(state["notice"])
         source = override_source()
         if source == "env":
-            lines.append(f"{ENV} chooses the theme at startup; the saved theme applies when it is unset.")
+            lines.append(t("{env} chooses the theme at startup; the saved theme applies when it is unset.", env=ENV))
         elif source == "cli":
-            lines.append("This run uses --theme; the saved theme applies to later runs.")
+            lines.append(t("This run uses --theme; the saved theme applies to later runs."))
         if terminal_profile.in_profile():
-            lines.append(PROFILE_NOTE)
+            lines.append(t(PROFILE_NOTE))
         elif design_of(state["preview"]) != "athanor" or not terminal_profile.installed():
             # True for Simple, and for Athanor until its profile gives the page and painting.
-            lines.append(BACKGROUND_NOTE)
-        lines.append("↑/↓ navigate  •  Enter apply  •  Space preview  •  Esc back")
+            lines.append(t(BACKGROUND_NOTE))
+        lines.append(t("↑/↓ navigate  •  Enter apply  •  Space preview  •  Esc back"))
         return "\n".join(lines)
 
     items = build()
     start = next(i for i, item in enumerate(items) if item.value == ("theme", chosen["theme"]))
     try:
-        arrow_select(items, title="Settings › Appearance", status=status, footer=footer,
+        arrow_select(items, title=t("Settings › Appearance"), status=status, footer=footer,
                      start_index=start, on_action=choose, key_actions={" ": preview})
     finally:
         if state["preview"] != chosen["theme"]:
