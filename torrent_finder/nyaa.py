@@ -6,6 +6,9 @@ from html.parser import HTMLParser
 
 import requests
 
+from torrent_finder.i18n import t
+
+# i18n: converted
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
 from torrent_finder.result_view import media_title, title_score, words
@@ -75,7 +78,7 @@ class _Catalog(HTMLParser):
                 size_bytes = int(float(size[1]) * 1024 ** ("KMGT".index(size[2].upper()) + 1)) if size else 0
                 self.rows.append(SearchResult(
                     name=self.name, info_hash=self.info_hash, page_url=self.url,
-                    source="Nyaa", seeders=self.cells[5].strip(),
+                    source="Nyaa", seeders=self.cells[5].strip(),  # i18n: ignore — source identity
                     leechers=self.cells[6].strip(), size=size_bytes,
                     uploaded_at=self.uploaded_at,
                 ))
@@ -108,7 +111,7 @@ def search_page(query: str, category: str, page: int):
     parser = _Catalog()
     parser.feed(response.text)
     if not parser.is_catalog and "No results found" not in response.text:
-        raise SearchError("Nyaa returned an unrecognized catalog page.")
+        raise SearchError(t("Nyaa returned an unrecognized catalog page."))
     # The site uses a next-page anchor, including when rel=next is absent.
     from urllib.parse import parse_qs, urlparse
     links = re.findall(r'href=[\"\']([^\"\']+)[\"\']', response.text)

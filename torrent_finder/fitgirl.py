@@ -28,12 +28,14 @@ from html import unescape
 
 import requests
 
+# i18n: converted
+
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import SharedResults, search_request
 from torrent_finder.result_view import game_title_query, matches_name, number_variant, possessive_variant
 
 _BASE = "https://fitgirl-repacks.site"
-_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}  # i18n: ignore — HTTP header
 
 _session: requests.Session | None = None
 _session_lock = threading.Lock()
@@ -102,7 +104,7 @@ def _parse_page(html: str, results: list[SearchResult], seen: set[str], wanted: 
             continue
         seen.add(post_id)
         url = title_m.group(1)
-        name = _strip_tags(title_m.group(2)) or "Unknown"
+        name = _strip_tags(title_m.group(2)) or "Unknown"  # i18n: ignore — matched and persisted result name
         if not any(matches_name(name, title) for title in wanted):
             continue
         published = None
@@ -119,7 +121,7 @@ def _parse_page(html: str, results: list[SearchResult], seen: set[str], wanted: 
             seeders=0,          # the listing carries no swarm stats
             leechers=0,
             size=_parse_size(article),
-            source="FitGirl",
+            source="FitGirl",  # i18n: ignore — source identity
             page_url=url,
             handle={"fg_post_url": url},      # explicit handle for the magnet resolver
             uploaded_at=published.group(1) if published else 0,

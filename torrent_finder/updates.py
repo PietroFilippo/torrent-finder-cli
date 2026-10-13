@@ -33,8 +33,10 @@ from typing import NamedTuple
 from uuid import uuid4
 
 import torrent_finder
+from torrent_finder.i18n import t, tn
 from torrent_finder.state import load_setting, save_setting
 
+# i18n: converted
 PACKAGE = "torrent-finder-cli"
 _REPO_DIR = os.path.dirname(os.path.abspath(__file__))
 _FETCH_INTERVAL = 86400  # seconds — hit the network at most once per day
@@ -202,8 +204,8 @@ def status_label(info: "dict | None") -> str:
         return ""
     if info.get("kind") == "git":
         count = info.get("behind", 0)
-        return f"{count} commit{'s' if count != 1 else ''} behind"
-    return f"update {info.get('latest')} ready" if info.get("latest") else "update ready"
+        return tn("{n} commit behind", "{n} commits behind", count)
+    return t("update {version} ready", version=info.get("latest")) if info.get("latest") else t("update ready")
 
 
 def notice_line(info: "dict | None") -> str:
@@ -212,24 +214,23 @@ def notice_line(info: "dict | None") -> str:
         return ""
     if info["kind"] == "git":
         n = info["behind"]
-        s = "s" if n != 1 else ""
         return _banner(
-            f"UPDATE AVAILABLE — {n} commit{s} behind",
-            "Press [not dim bold]U[/not dim bold] on the menu to update, "
-            "or run [not dim bold]git pull[/not dim bold].",
+            tn("UPDATE AVAILABLE — {n} commit behind", "UPDATE AVAILABLE — {n} commits behind", n),
+            t("Press [not dim bold]U[/not dim bold] on the menu to update, "
+              "or run [not dim bold]git pull[/not dim bold]."),
         )
     latest = info.get("latest")
     if info["kind"] == "pip":
-        cmd = "pipx upgrade torrent-finder-cli" if _pipx_install() else "pip install -U torrent-finder-cli"
+        cmd = "pipx upgrade torrent-finder-cli" if _pipx_install() else "pip install -U torrent-finder-cli"  # i18n: ignore — command
         return _banner(
-            f"UPDATE AVAILABLE — v{latest}",
-            "Press [not dim bold]U[/not dim bold] on the menu to update, "
-            f"or run [not dim bold]{cmd}[/not dim bold].",
+            t("UPDATE AVAILABLE — v{version}", version=latest),
+            t("Press [not dim bold]U[/not dim bold] on the menu to update, "
+              "or run [not dim bold]{command}[/not dim bold].", command=cmd),
         )
     return _banner(
-        f"UPDATE AVAILABLE — v{latest}",
-        "Press [not dim bold]U[/not dim bold] on the menu to open "
-        f"[not dim bold]{_RELEASES_URL}[/not dim bold].",
+        t("UPDATE AVAILABLE — v{version}", version=latest),
+        t("Press [not dim bold]U[/not dim bold] on the menu to open "
+          "[not dim bold]{url}[/not dim bold].", url=_RELEASES_URL),
     )
 
 
@@ -282,12 +283,13 @@ def consume_update_report() -> str:
             return ""
         if state == "pending":
             if time.time() - float(data.get("started_at", 0)) < 1900:
-                return f"Update is still pending. Close other Torrent Finder windows and check {log}."
-            data["error"] = "The updater did not report completion."
+                return t("Update is still pending. Close other Torrent Finder windows and check {log}.", log=log)
+            data["error"] = t("The updater did not report completion.")
         status.replace(status.with_name("last-update-status.json"))
         if state == "succeeded":
-            return "Package update completed successfully."
-        return f"Update did not complete. Close all Torrent Finder windows, then retry from your terminal. Details: {log}. {data.get('error', '')}"
+            return t("Package update completed successfully.")
+        return t("Update did not complete. Close all Torrent Finder windows, then retry from your terminal. Details: {log}. {error}",
+                 log=log, error=data.get("error", ""))
     except (OSError, ValueError, TypeError):
         return ""
 
@@ -508,10 +510,10 @@ class _InstallerOutput:
                 self.report("downloading", name)
         elif match := _PIP_INSTALLING.match(line):
             self.installing = True
-            self.report("installing", f"Installing {match[1]}.")
+            self.report("installing", t("Installing {packages}.", packages=match[1]))
         elif match := _PIP_INSTALLED.match(line):
             self.version = match[1]
-            self.report("installing", f"Installed {PACKAGE} {self.version}.", latest=self.version)
+            self.report("installing", t("Installed {package} {version}.", package=PACKAGE, version=self.version), latest=self.version)
         elif match := _PIPX_UPGRADED.search(line + " "):
             self.version = match[1]  # pipx says so at the very end: the stage stays
         elif _PIP_CURRENT.match(line) or _PIPX_CURRENT.search(line):
@@ -556,7 +558,7 @@ def _stream(command: list[str], log, on_line) -> int:
         )
     except OSError as error:
         log.write(f"{error}\n")
-        on_line(f"ERROR: could not start {command[0]}: {error}")
+        on_line(f"ERROR: could not start {command[0]}: {error}")  # i18n: ignore — parsed installer protocol
         return -1
     output = queue.Queue()
 
@@ -606,8 +608,8 @@ def _stream(command: list[str], log, on_line) -> int:
     finally:
         reader.join(timeout=_DRAIN_TIMEOUT)  # never close a pipe another thread is blocked reading
     if expired:
-        on_line(f"ERROR: stopped after {_STEP_TIMEOUT // 60} minutes without finishing.")
-    log.write(f"(exit code {code})\n")
+        on_line(f"ERROR: stopped after {_STEP_TIMEOUT // 60} minutes without finishing.")  # i18n: ignore — parsed installer protocol
+    log.write(f"(exit code {code})\n")  # i18n: ignore — log file
     log.flush()
     return code
 
@@ -626,56 +628,60 @@ def _patient(on_interrupt):
 
 
 def _failed(error: str, log: Path, manual: str) -> str:
-    reason = f"The installer stopped: {error}" if error else "The installer stopped with an error."
-    return f"{reason}\nDetails: {log}\nOr close Torrent Finder and run: {manual}"
+    if error:
+        return t("The installer stopped: {error}\nDetails: {log}\nOr close Torrent Finder and run: {command}",
+                 error=error, log=log, command=manual)
+    return t("The installer stopped with an error.\nDetails: {log}\nOr close Torrent Finder and run: {command}",
+             log=log, command=manual)
 
 
 def _update_checkout(log, log_path: Path, report) -> UpdateResult:
-    report("downloading", "Downloading the latest source changes.")
+    report("downloading", t("Downloading the latest source changes."))
     current = []
     code = _stream(["git", "-C", _REPO_DIR, "pull", "--ff-only"], log,
                    lambda line: current.append(True) if line.startswith("Already up to date") else None)
     if code != 0:
-        return UpdateResult(False, f"git pull failed — resolve it manually, then restart. Log: {log_path}")
+        return UpdateResult(False, t("git pull failed — resolve it manually, then restart. Log: {log}", log=log_path))
     if current:
-        return UpdateResult(True, "This checkout is already up to date.")
-    return UpdateResult(True, "Downloaded the latest source changes.", restart=True)
+        return UpdateResult(True, t("This checkout is already up to date."))
+    return UpdateResult(True, t("Downloaded the latest source changes."), restart=True)
 
 
 def _update_package(info: dict, log, log_path: Path, report) -> UpdateResult:
-    report("preparing", "Getting ready to update.")
+    report("preparing", t("Getting ready to update."))
     pipx = _pipx_install()
-    manual = "pipx upgrade torrent-finder-cli" if pipx else "python -m pip install -U torrent-finder-cli"
+    manual = "pipx upgrade torrent-finder-cli" if pipx else "python -m pip install -U torrent-finder-cli"  # i18n: ignore — command
     # Metadata lookups reopen the launcher: make them all before moving it.
     pip = _pip_command() if not pipx or _pipx_tracks_index() else None
     installed, names = _installed_files(), _launcher_names()
     if not pip and not pipx:
-        return UpdateResult(False, f"pip is not available to this Python. Close Torrent Finder, then run: {manual}")
+        return UpdateResult(False, t("pip is not available to this Python. Close Torrent Finder, then run: {command}", command=manual))
     output = _InstallerOutput(report)
     moved = _move_running_launchers(names)
     try:
         busy = next((path for path in installed if _held_open(path)), None)
         if busy:
-            return UpdateResult(False, f"Another program has {busy.name} open, most likely another Torrent "
-                                       "Finder window. Close it, then update again. Nothing was changed.")
+            return UpdateResult(False, t("Another program has {file} open, most likely another Torrent "
+                                         "Finder window. Close it, then update again. Nothing was changed.", file=busy.name))
         note = ""
         if pip:
-            report("downloading", "Looking for the latest version on PyPI.")
+            report("downloading", t("Looking for the latest version on PyPI."))
             if _stream(pip, log, output.feed) != 0:
                 return UpdateResult(False, _failed(output.error, log_path, manual))
         if pipx and not output.current:
             if pip:  # pip installed the update; pipx refreshes its records and its copy of the command
-                report("finishing", "Updating pipx's copy of the torrent-finder command.")
+                report("finishing", t("Updating pipx's copy of the torrent-finder command."))
             else:
-                report("installing", "Upgrading with pipx. This can take a minute.")
+                report("installing", t("Upgrading with pipx. This can take a minute."))
             if _stream(["pipx", "upgrade", PACKAGE], log, output.feed) != 0:
                 if not pip:
                     return UpdateResult(False, _failed(output.error, log_path, manual))
-                note = f"\npipx could not refresh its records. Later, run: {manual}"
+                note = t("\npipx could not refresh its records. Later, run: {command}", command=manual)
         if output.current:
-            return UpdateResult(True, "Torrent Finder is already up to date.")
+            return UpdateResult(True, t("Torrent Finder is already up to date."))
         version = output.version or info.get("latest") or ""
-        return UpdateResult(True, f"Torrent Finder {version} is installed.".replace("  ", " ") + note, restart=True)
+        message = t("Torrent Finder {version} is installed.", version=version) if version else t("Torrent Finder is installed.")
+        return UpdateResult(True, message + note, restart=True)
     finally:
         _settle_launchers(moved)
 
@@ -699,18 +705,18 @@ def run_update(info: dict, *, on_progress=None, on_interrupt=None) -> UpdateResu
     if kind == "binary":
         try:
             import webbrowser
-            report("opening", "Opening the download page in your browser.")
+            report("opening", t("Opening the download page in your browser."))
             if not webbrowser.open(_RELEASES_URL):
-                return UpdateResult(False, f"Open {_RELEASES_URL} to download the new version.")
-            return UpdateResult(True, f"Opened the Releases page — download v{info.get('latest')}.")
+                return UpdateResult(False, t("Open {url} to download the new version.", url=_RELEASES_URL))
+            return UpdateResult(True, t("Opened the Releases page — download v{version}.", version=info.get("latest")))
         except Exception:
-            return UpdateResult(False, f"Open {_RELEASES_URL} to download the new version.")
+            return UpdateResult(False, t("Open {url} to download the new version.", url=_RELEASES_URL))
 
     _, log_path = _update_files()
     try:
         log = log_path.open("w", encoding="utf-8")
     except OSError as error:
-        return UpdateResult(False, f"Could not write the update log {log_path}: {error}")
+        return UpdateResult(False, t("Could not write the update log {log}: {error}", log=log_path, error=error))
     with log, _patient(on_interrupt):
         if kind == "git":
             return _update_checkout(log, log_path, report)

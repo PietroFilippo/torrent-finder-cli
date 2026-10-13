@@ -17,6 +17,9 @@ from urllib.parse import urlencode
 
 import requests
 
+from torrent_finder.i18n import t
+
+# i18n: converted
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
 
@@ -66,7 +69,7 @@ def search(query: str, categories: Iterable[int], *, page: int = 1) -> list[Sear
     hits = payload.get("hits") if isinstance(payload, dict) else None
     if not isinstance(hits, list):
         from torrent_finder.search_diagnostics import record_failure
-        record_failure(message="The source response did not contain a results list.")
+        record_failure(message=t("The source response did not contain a results list."))
         return []
 
     results: list[SearchResult] = []
@@ -84,7 +87,7 @@ def search(query: str, categories: Iterable[int], *, page: int = 1) -> list[Sear
         title = (
             unescape(raw_title)
             if isinstance(raw_title, str) and raw_title
-            else "Unknown"
+            else "Unknown"  # i18n: ignore — persisted result name
         )
         result = SearchResult(
             name=title,
@@ -92,7 +95,7 @@ def search(query: str, categories: Iterable[int], *, page: int = 1) -> list[Sear
             seeders=row.get("seeders", 0),
             leechers=row.get("peers", 0),
             size=row.get("bytes", 0),
-            source="Knaben",
+            source="Knaben",  # i18n: ignore — source identity
             page_url=(
                 row.get("details")
                 if (

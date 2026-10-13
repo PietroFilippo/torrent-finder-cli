@@ -24,6 +24,9 @@ from urllib.parse import urlsplit
 
 import requests
 
+from torrent_finder.i18n import t
+
+# i18n: converted
 from torrent_finder.direct_download import Cancelled, save_response
 from torrent_finder.search_control import search_request
 from torrent_finder.search_result import SearchResult
@@ -49,7 +52,7 @@ def search(query: str) -> list[SearchResult]:
     apps = response.json().get("apps")
     if not isinstance(apps, list):
         from torrent_finder.search_diagnostics import record_failure
-        record_failure(message="F-Droid's response did not contain an app list.")
+        record_failure(message=t("F-Droid's response did not contain an app list."))
         return []
     rows = []
     for app in apps[:_MAX_ROWS]:

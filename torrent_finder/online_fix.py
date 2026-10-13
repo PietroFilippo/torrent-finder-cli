@@ -35,13 +35,15 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 import requests
 
+from torrent_finder.i18n import t, tn
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import SearchInterrupted, search_request, search_stopped, search_wait
 from torrent_finder.result_view import game_title_query, matches_name
 
 _BASE = "https://online-fix.me"
-_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}  # i18n: ignore — HTTP header
+# i18n: converted
 # The uploads host gates files by HTTP referer (hotlink protection), not login —
 # sending the site's own referer is enough to list a directory or fetch a .torrent.
 _REFERER = {"Referer": _BASE + "/"}
@@ -103,8 +105,8 @@ def _deslug(path: str) -> str:
     """
     m = re.search(r"/\d+-([^/]+)\.html$", path)
     if not m:
-        return "Unknown"
-    return unescape(m.group(1).replace("-", " ")).strip().title() or "Unknown"
+        return "Unknown"  # i18n: ignore — persisted result name
+    return unescape(m.group(1).replace("-", " ")).strip().title() or "Unknown"  # i18n: ignore — persisted result name
 
 
 def _logged_in(session: requests.Session) -> bool:
@@ -197,8 +199,8 @@ def empty_search_hint(query: str) -> str:
     literally, so punctuation or extra words can hide a game it has."""
     if len(query.split()) < 2:
         return ""
-    return ("Online-Fix matches title text literally: try one distinctive word "
-            "(e.g. Starve for Don't Starve Together).")
+    return t("Online-Fix matches title text literally: try one distinctive word "
+             "(e.g. Starve for Don't Starve Together).")
 
 
 @contextmanager
@@ -227,8 +229,10 @@ def _search_page(query: str) -> str | None:
     wait = _SEARCH_INTERVAL - (time.monotonic() - _last_search)
     for _attempt in range(2):
         if wait > 0 and not search_wait(wait):
-            raise SearchError(f"Online-Fix allows one search every {_SEARCH_INTERVAL:.0f} seconds and "
-                              "this one ran out of time waiting. Press r to retry.")
+            raise SearchError(tn("Online-Fix allows one search every {n:.0f} second and "
+                                 "this one ran out of time waiting. Press r to retry.",
+                                 "Online-Fix allows one search every {n:.0f} seconds and "
+                                 "this one ran out of time waiting. Press r to retry.", _SEARCH_INTERVAL))
         # The site's search form is a GET to /index.php with do/subaction/story.
         session = _anon_http()
         try:
@@ -243,15 +247,15 @@ def _search_page(query: str) -> str | None:
         finally:
             _last_search = time.monotonic()
         if r.status_code != 200:
-            raise SearchError(f"Online-Fix returned HTTP {r.status_code}. Press r to retry.")
+            raise SearchError(t("Online-Fix returned HTTP {status}. Press r to retry.", status=r.status_code))
         cooldown = _cooldown_seconds(r.text)
         if cooldown is None:
             if not _RESULT_BLOCK_RE.search(r.text) and _SEARCH_FORM not in r.text:
-                raise SearchError("Online-Fix returned an unrecognized page (site layout or "
-                                  "protection may have changed). Press r to retry.")
+                raise SearchError(t("Online-Fix returned an unrecognized page (site layout or "
+                                    "protection may have changed). Press r to retry."))
             return r.text
         wait = cooldown + 0.5
-    raise SearchError("Online-Fix is still asking to wait between searches. Press r to retry in a few seconds.")
+    raise SearchError(t("Online-Fix is still asking to wait between searches. Press r to retry in a few seconds."))
 
 
 def _result_blocks(html: str):
@@ -387,7 +391,7 @@ def test_credentials(username: str, password: str) -> tuple[bool | None, str]:
         s.headers.update(_UA)
         _do_login(s, username, password)
     except requests.RequestException as e:
-        return None, f"Couldn't reach online-fix.me ({type(e).__name__})"
+        return None, t("Couldn't reach online-fix.me ({error})", error=type(e).__name__)
     if _logged_in(s):
-        return True, "Login successful"
-    return False, "Login failed — check username/password"
+        return True, t("Login successful")
+    return False, t("Login failed — check username/password")

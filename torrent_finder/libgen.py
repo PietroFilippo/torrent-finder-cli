@@ -25,12 +25,14 @@ from urllib.parse import unquote
 
 import requests
 
+# i18n: converted
+
 from torrent_finder.direct_download import Cancelled, save_response
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
 
 _MIRRORS = ("https://libgen.li", "https://libgen.vg", "https://libgen.la")
-_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}  # i18n: ignore — HTTP header
 
 _ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S)
 _CELL_RE = re.compile(r"<td[^>]*>(.*?)</td>", re.S)
@@ -103,7 +105,7 @@ def _parse_rows(html: str, mirror: str) -> list[SearchResult]:
             seeders=0,                  # no swarm — direct downloads
             leechers=0,
             size=size_bytes,
-            source="Libgen",
+            source="Libgen",  # i18n: ignore — source identity
             page_url=f"{mirror}/ads.php?md5={md5}",
             handle={"lg_md5": md5},
             extra={"lg_ext": extension, "lg_author": author},

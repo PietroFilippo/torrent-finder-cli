@@ -34,6 +34,7 @@ from urllib.parse import unquote, urlsplit
 
 import requests
 
+from torrent_finder.i18n import N_, t
 from torrent_finder.direct_download import Cancelled, safe_filename, save_response
 from torrent_finder.result_view import title_score
 from torrent_finder.search_result import SearchResult
@@ -42,7 +43,8 @@ from torrent_finder.search_control import search_request
 from torrent_finder.credentials import madokami_config
 
 _BASE = "https://manga.madokami.al"
-_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}  # i18n: ignore — HTTP header
+# i18n: converted
 
 _session: requests.Session | None = None
 _session_lock = threading.Lock()
@@ -135,9 +137,21 @@ def display_name(path: str) -> str:
     """A result name that says what a pick opens:
     "One Piece [series folder]", "One Piece › One Piece [Viz] [folder]",
     "Berserk › Berserk v01.cbz [file]", "One Piece x Toriko [Oneshots · series folder]"."""
+    # Result names are persisted in bookmarks/history; keep this API English.
+    return _display_name(path, localized=False)
+
+
+def localized_display_name(path: str) -> str:
+    """A translated label for a library path, for drawing only (never a saved name)."""
+    return _display_name(path, localized=True)
+
+
+def _display_name(path: str, *, localized: bool) -> str:
     chain, area = describe(path)
     shown = chain if len(chain) <= 3 else (chain[0], "…", chain[-2], chain[-1])
-    kind = "file" if is_file_path(path) else "series folder" if len(chain) == 1 else "folder"
+    kind = N_("file") if is_file_path(path) else N_("series folder") if len(chain) == 1 else N_("folder")
+    if localized:
+        kind = t(kind)
     return f"{' › '.join(shown)} [{' · '.join(filter(None, (area, kind)))}]"
 
 
@@ -208,7 +222,7 @@ def search(query: str) -> list[SearchResult]:
     session = _get_session()
     if session is None:
         from torrent_finder.search_errors import login_required
-        raise login_required("Madokami")
+        raise login_required("Madokami")  # i18n: ignore — provider identity; shared helper owns the message
     paths = _search_paths(session, query)
     # The site's search misses names typed with punctuation: "Mahjong Hishoden:
     # Naki no Ryuu" finds nothing, the same name without ":" finds the series.
@@ -223,7 +237,7 @@ def search(query: str) -> list[SearchResult]:
             seeders=0,                   # no swarm - direct downloads
             leechers=0,
             size=0,                      # listing carries no reliable size
-            source="Madokami",
+            source="Madokami",  # i18n: ignore — source identity
             page_url=_BASE + path,
             handle={"mdk_path": path},                 # handle for listing/downloading
         ))
@@ -236,7 +250,9 @@ def _search_paths(session, query: str) -> list[str]:
         r = search_request(session.get, f"{_BASE}/search", params={"q": query}, timeout=30)
         if r.status_code in (401, 403):
             from torrent_finder.search_errors import SearchError
-            raise SearchError("Madokami rejected the login. Check your saved credentials in Credentials.")
+            # search_session classifies access failures by status, never translated prose.
+            raise SearchError(t("Madokami rejected the login. Check your saved credentials in Credentials."),
+                              status="rejected_login")
         if r.status_code != 200:
             return []
     except requests.RequestException:
@@ -297,7 +313,7 @@ def save_folder(file_path: str, download_dir: str) -> str:
     library folders holding it: "Naki no Ryuu", "One Piece/One Piece [Viz]".
     Areas outside the main index are named too: "Naki no Ryuu [Raws]"."""
     chain, area = describe(file_path.rsplit("/", 1)[0])
-    parts = [safe_filename(part, "Madokami") for part in chain]
+    parts = [safe_filename(part, "Madokami") for part in chain]  # i18n: ignore — filename
     if area and parts:
         parts[0] = safe_filename(area if parts[0].lstrip("_") == area else f"{parts[0]} [{area}]")
     return os.path.join(download_dir, *parts)
@@ -350,9 +366,9 @@ def test_credentials(username: str, password: str) -> tuple[bool | None, str]:
             _BASE + "/", auth=_basic_auth(username, password), headers=_UA, timeout=25
         )
     except requests.RequestException as e:
-        return None, f"Couldn't reach Madokami ({type(e).__name__})"
+        return None, t("Couldn't reach Madokami ({error})", error=type(e).__name__)
     if r.status_code in (401, 403):
-        return False, "Login failed — check username/password"
+        return False, t("Login failed — check username/password")
     if r.status_code == 200:
-        return True, "Login successful"
-    return None, f"Unexpected response from Madokami (HTTP {r.status_code})"
+        return True, t("Login successful")
+    return None, t("Unexpected response from Madokami (HTTP {status})", status=r.status_code)

@@ -23,6 +23,7 @@ from html import unescape
 
 import requests
 
+from torrent_finder.i18n import N_, t
 from torrent_finder.search_errors import SearchError, login_required
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
@@ -30,7 +31,8 @@ from torrent_finder.search_control import search_request
 from torrent_finder.credentials import rutracker_config
 
 _BASE = "https://rutracker.org/forum"
-_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}  # i18n: ignore — HTTP header
+# i18n: converted
 
 _session: requests.Session | None = None
 _session_credentials: tuple[str, str] | None = None
@@ -43,21 +45,21 @@ _blocked_reason = "blocked"
 _failed_login: str = ""  # "rejected" for _session_credentials, until they change
 
 _LOGIN_ERRORS = {
-    "blocked": ("RuTracker's Cloudflare browser check blocked the app (this is not a password problem; "
+    "blocked": (N_("RuTracker's Cloudflare browser check blocked the app (this is not a password problem; "
                 "your credentials weren't checked). The app can't pass that check, so it won't try again "
-                "for a few minutes.", "blocked"),
-    "captcha": ("RuTracker asks for a captcha after failed logins. Log in once at rutracker.org in your "
-                "browser; the app tries again in a few minutes.", "login_error"),
-    "rejected": ("RuTracker rejected the login. Check your saved credentials in Credentials.", "rejected_login"),
-    "unreachable": ("RuTracker could not be reached. Try again later.", "error"),
-    "unexpected": ("RuTracker returned an unexpected login page. Try again later.", "error"),
+                "for a few minutes."), "blocked"),
+    "captcha": (N_("RuTracker asks for a captcha after failed logins. Log in once at rutracker.org in your "
+                "browser; the app tries again in a few minutes."), "login_error"),
+    "rejected": (N_("RuTracker rejected the login. Check your saved credentials in Credentials."), "rejected_login"),
+    "unreachable": (N_("RuTracker could not be reached. Try again later."), "error"),
+    "unexpected": (N_("RuTracker returned an unexpected login page. Try again later."), "error"),
 }
 
 
 def _login_error(reason: str) -> SearchError:
     """A new error for *reason*: a shared instance would collect every raise's traceback."""
     message, status = _LOGIN_ERRORS[reason]
-    return SearchError(message, status=status)
+    return SearchError(t(message), status=status)
 
 _ROW_RE = re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
 
@@ -126,7 +128,7 @@ def _get_session() -> requests.Session:
         if _session is not None:
             return _session
         if not auth:
-            raise login_required("RuTracker")
+            raise login_required("RuTracker")  # i18n: ignore — provider identity; shared helper owns the message
         if _failed_login:
             raise _login_error(_failed_login)
         session, reason = _login(*auth)
@@ -157,7 +159,7 @@ def search(query: str) -> list[SearchResult]:
     if r.status_code in (401, 403) or "login.php" in r.url:
         with _session_lock:
             _session = None  # log in again on the next search
-        raise SearchError("RuTracker ended the login session. Press r to log in again.", status="login_error")
+        raise SearchError(t("RuTracker ended the login session. Press r to log in again."), status="login_error")
     r.encoding = "cp1251"
     html = r.text
 
@@ -176,7 +178,7 @@ def search(query: str) -> list[SearchResult]:
             seeders=seeders.group(1) if seeders else 0,
             leechers=leechers.group(1) if leechers else 0,
             size=size.group(1),      # bytes
-            source="RuTracker",
+            source="RuTracker",  # i18n: ignore — source identity
             page_url=f"{_BASE}/viewtopic.php?t={tid.group(1)}",
             handle={"rt_topic_id": tid.group(1)},
         ))
@@ -215,10 +217,10 @@ def test_credentials(username: str, password: str) -> tuple[bool | None, str]:
     False rejected, None couldn't reach RuTracker."""
     session, reason = _login(username, password)
     return {
-        "ok": (True, "Login successful"),
-        "rejected": (False, "Login failed — check username/password"),
-        "captcha": (False, "RuTracker wants a captcha after failed logins — log in once in your browser"),
-        "blocked": (None, "RuTracker's Cloudflare browser check blocked the app — credentials not tested"),
-        "unreachable": (None, "Couldn't reach RuTracker"),
-        "unexpected": (None, "RuTracker returned an unexpected page"),
+        "ok": (True, t("Login successful")),
+        "rejected": (False, t("Login failed — check username/password")),
+        "captcha": (False, t("RuTracker wants a captcha after failed logins — log in once in your browser")),
+        "blocked": (None, t("RuTracker's Cloudflare browser check blocked the app — credentials not tested")),
+        "unreachable": (None, t("Couldn't reach RuTracker")),
+        "unexpected": (None, t("RuTracker returned an unexpected page")),
     }[reason]

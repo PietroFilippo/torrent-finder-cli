@@ -6,8 +6,10 @@ import time
 from urllib.parse import quote
 
 from torrent_finder.constants import TRACKERS
+from torrent_finder.i18n import t, tn
 from torrent_finder.ui import theme
 
+# i18n: converted
 
 def start_esc_listener(cancel_event: "threading.Event", *, finish_event=None) -> "threading.Event":
     """Watch for Esc on a daemon thread and set ``cancel_event`` when pressed.
@@ -87,17 +89,17 @@ def relative_time(iso_ts: object, now=None) -> str:
         return ""
     seconds = int(((now or datetime.now(timezone.utc)) - moment).total_seconds())
     if seconds < 60:
-        return "just now"
+        return t("just now")
     minutes = seconds // 60
     if minutes < 60:
-        return f"{minutes}m ago"
+        return tn("{n}m ago", "{n}m ago", minutes)
     hours = minutes // 60
     if hours < 24:
-        return f"{hours}h ago"
+        return tn("{n}h ago", "{n}h ago", hours)
     days = hours // 24
     if days < 30:
-        return f"{days}d ago"
-    return f"{days // 30}mo ago"
+        return tn("{n}d ago", "{n}d ago", days)
+    return tn("{n}mo ago", "{n}mo ago", days // 30)
 
 
 def format_size(size_bytes: int) -> str:
