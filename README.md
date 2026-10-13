@@ -133,6 +133,8 @@ open the download menu.
 - Settings **backup and import** between computers, with a preview first.
 - **In-app updates** for pip, pipx and source installs, in the same window.
 - An optional short command: `tf`, `find-torrent` or `tfind`.
+- The interface in **English or Brazilian Portuguese** (Settings › Language),
+  following the system's display language unless you choose.
 
 ## Command line
 
@@ -145,6 +147,7 @@ torrent --profile "Anime + Manga" -q "Saki"  # a saved profile (implies -t all)
 torrent -t all --providers anime manga -q "Saki"
 torrent -t anime --by director --name "Hayao Miyazaki"
 torrent --theme paper                        # a theme for this run only
+torrent --lang pt-BR                         # the interface in Portuguese for this run
 torrent -y                                   # skip the network check
 torrent --version
 ```
@@ -157,12 +160,14 @@ torrent --version
   asks which creator and which works.
 - `--theme`: `citrinitas`, `rubedo`, `albedo`, `viriditas`, `nigredo`, `quiet`,
   `iris`, `lagoon`, `ember`, `mono`, `paper`.
+- `--lang`: `auto`, `en` or `pt-BR`.
 - `--profile` and `--providers` affect only that session.
 - From a source clone without installing, use `python -m torrent_finder`
   instead of `torrent`.
 
 Environment variables: `TORRENT_SKIP_WARNING=1` skips the network check,
-`TORRENT_FINDER_THEME=NAME` sets a theme per shell, and `NO_COLOR` is honoured.
+`TORRENT_FINDER_THEME=NAME` sets a theme and `TORRENT_FINDER_LANG=CODE` a
+language per shell, and `NO_COLOR` is honoured.
 
 ## Credentials
 

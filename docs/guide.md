@@ -566,8 +566,9 @@ skipping. Other engines return what their first request gives.
 
 ## Downloading
 
-Picking a result opens the download menu. **Back to results** returns to the
-same list; **Cancel** goes to What's Next.
+Picking a result opens the download menu. **Back to results** (or **Esc**)
+returns to the same list, with its filter, order and ticks; **Done with this
+torrent** goes to What's Next.
 
 | Section | Rows |
 |---|---|
@@ -605,6 +606,11 @@ creator search) and press **Enter**:
 
 Online-Fix, Madokami, Libgen and F-Droid entries have no magnet and are skipped
 by aria2c and copying.
+
+When some items fail, the menu adds **Retry the N that failed**, which runs only
+those again (or **Continue with the N left** when you stopped partway); the
+other rows still act on the whole selection, and **Done with this selection**
+goes to What's Next.
 
 ### Choosing files
 
@@ -749,7 +755,9 @@ the presets active then; filter by provider (**P**), date (**D**: today, week,
 month) or kind (**T**: keyword or by-creator) and change the sort (**S**).
 Picking one runs it again; a search across providers brings back its profile's
 settings. The last 2,000 distinct searches are kept, and repeating a search
-moves it to the top. Clearing history asks first.
+moves it to the top. **/** finds searches by text, **X** (or **Delete**)
+removes the focused one and **U** puts the last removed one back. Clearing all
+history asks first.
 
 ### Usage stats
 
@@ -805,7 +813,8 @@ its own colours; **Space** previews on the whole screen and **Enter** saves.
   and the version). Colourways: **Citrinitas** (default, lamplight amber),
   **Rubedo**, **Albedo**, **Viriditas**, **Nigredo**.
 - **Simple** is the quiet look: one header line naming the screen with what it
-  is about on the right, thin rules, no boxes or emoji. Themes: **Quiet Blue**
+  is about on the right, thin rules, no boxes or emoji; what just happened shows
+  on a notice line above the keys. Themes: **Quiet Blue**
   (your terminal's bright blue), **Iris**, **Lagoon**, **Ember**, **Mono**,
   **Paper** (for light terminals).
 - **Focus** is a cursor bar or a tinted row; **Density** **Compact** drops rules
@@ -856,10 +865,26 @@ apps, so:
   same place on every screen.
 - **Narrow or short windows** wrap hints without changing row height, drop
   spacer lines, continue long screen names on a second header line, and scroll
-  long names when focused. Very small windows (about 20×8) crop the results
-  table's last keys.
+  long names when focused. Windows smaller than 30×8 show one *Enlarge the
+  window* line and redraw when the window grows.
 
 ## Settings and startup checks
+
+### Language
+
+**Settings › Language** (in Portuguese, *Idioma · Language*) chooses the
+interface language: **Automatic** (the system's display language when the app
+has it, English otherwise), **English** or **Português (Brasil)**. The choice
+applies at once and is saved. `--lang CODE` (`auto`, `en`, `pt-BR`) and
+`TORRENT_FINDER_LANG` choose it for one run or one shell and win over the saved
+choice.
+
+- Keys are the same in every language; yes/no questions also take **S** or
+  **sim** in Portuguese.
+- Names of sources, release tags, search words and file names are never
+  translated, and searches send what you type.
+- Windows in English with the region set to Brazil starts in English and says
+  once, in Portuguese, where to switch.
 
 ### Terminal command
 
