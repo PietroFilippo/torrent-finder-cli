@@ -2,10 +2,11 @@
 
 from datetime import datetime, timedelta, timezone
 
+import readchar
 from rich.markup import escape
 
 from torrent_finder.providers import PROVIDERS, display_name_for
-from torrent_finder.state import clear_history, load_history
+from torrent_finder.state import clear_history, load_history, remove_history_entry, restore_history_entry
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.ui.prompts import _make_banner_panel, confirm_prompt
 from torrent_finder.utils import parse_timestamp, relative_time
@@ -75,6 +76,20 @@ def _filter_by_date(entries: list[dict], date_range: str) -> list[dict]:
     return result
 
 
+def _filter_by_text(entries: list[dict], text: str) -> list[dict]:
+    """Entries whose search text, saved names, creator name or provider contain *text* (case-folded)."""
+    needle = text.casefold().strip()
+    if not needle:
+        return entries
+
+    def matches(entry: dict) -> bool:
+        parts = [str(entry.get("query", "")), str(entry.get("name", "") or ""),
+                 display_name_for(str(entry.get("provider", "")))]
+        parts += [str(alias) for alias in entry.get("queries", []) or []]
+        return any(needle in part.casefold() for part in parts)
+    return [e for e in entries if matches(e)]
+
+
 def _sort_entries(entries: list[dict], order: str) -> list[dict]:
     reverse = order == "Newest first"
     return sorted(
@@ -100,10 +115,12 @@ def history_select_prompt() -> dict | None:
         "date_idx": 0,   # index into _DATE_OPTIONS
         "sort_idx": 0,   # index into _SORT_OPTIONS
         "type_idx": 0,   # index into _TYPE_OPTIONS
+        "search": "",    # text the entries must contain (/ asks for it)
     }
 
     history = load_history()
     notice = ""  # shown above the footer, e.g. a failed Clear history
+    removed: "tuple[dict, int] | None" = None  # the last entry removed with x, and where it was: u puts it back
 
     # --- helpers to build / rebuild the items list in place ---
 
@@ -122,6 +139,7 @@ def history_select_prompt() -> dict | None:
         filtered = _filter_by_provider(history, prov_filter)
         filtered = _filter_by_type(filtered, type_filter)
         filtered = _filter_by_date(filtered, date_filter)
+        filtered = _filter_by_text(filtered, fstate["search"])
         filtered = _sort_entries(filtered, sort_order)
 
         items.clear()
@@ -135,7 +153,8 @@ def history_select_prompt() -> dict | None:
             ))
         elif not filtered:
             items.append(SelectItem(
-                label="No results match the current filters",
+                label=(f"No searches contain “{fstate['search']}” — / changes the text; empty clears it"
+                       if fstate["search"] else "No results match the current filters"),
                 value="empty_placeholder",
                 enabled=False,
                 is_action=True,
@@ -175,13 +194,18 @@ def history_select_prompt() -> dict | None:
             tags.append(date_filter)
         if sort_order != "Newest first":
             tags.append(sort_order)
+        if fstate["search"]:
+            tags.append(f'"{escape(fstate["search"])}"')
         return " › ".join(["Search History", " · ".join(tags)] if tags else ["Search History"])
 
     def _footer():
         prov_filter, date_filter, sort_order, type_filter = _current_filters()
+        search = f"Search: {escape(fstate['search'])}\n" if fstate["search"] else ""  # the key bar says / search
+        undo = "  •  U undo" if removed else ""
         return (
             (notice + "\n" if notice else "")
-            + "↑/↓ navigate  •  Enter re-run  •  Esc back\n"
+            + search
+            + f"↑/↓ navigate  •  Enter re-run  •  / search  •  X remove{undo}  •  Esc back\n"
             f"P provider: {escape(_option_label(prov_filter))}  •  T type: {type_filter}  •  "
             f"D date: {date_filter}  •  S sort: {sort_order}"
         )
@@ -200,10 +224,63 @@ def history_select_prompt() -> dict | None:
             return True
         return handler
 
+    def _jump_to(items_list, index: int):
+        """Keep the cursor on a selectable row near *index* after the list changed."""
+        enabled = [i for i, it in enumerate(items_list) if it.enabled]
+        if not enabled:
+            return True
+        return ("jump", min(enabled, key=lambda i: (abs(i - index), i)))
+
+    def _search(cursor, items_list):
+        """/ asks for text the entries must contain; empty text clears the search."""
+        from torrent_finder.ui.prompts import PROMPT, get_query_with_shortcut, input_screen
+        typed = get_query_with_shortcut(PROMPT, initial=fstate["search"], screen_renderer=input_screen(
+            "Search history", "Matches the search text, saved names, creator names and providers; "
+                              "empty clears the search."))
+        if not isinstance(typed, str) or typed == "GO_BACK":
+            return True
+        fstate["search"] = typed.strip()
+        _rebuild(items_list)
+        return _jump_to(items_list, 0)
+
+    def _remove(cursor, items_list):
+        """x removes the focused search; u puts it back."""
+        nonlocal notice, removed
+        entry = items_list[cursor].value
+        if not isinstance(entry, dict):
+            return True
+        try:
+            remove_history_entry(entry)
+        except (OSError, ValueError) as error:
+            notice = f"[error]The search was not removed:[/error] {escape(str(error))}"
+            return True
+        removed = (entry, history.index(entry))
+        history.remove(entry)
+        notice = f"Removed “{escape(str(entry.get('query', '')))}” · [key]U[/key] puts it back"
+        _rebuild(items_list)
+        return _jump_to(items_list, cursor)
+
+    def _undo(cursor, items_list):
+        nonlocal notice, removed
+        if removed is None:
+            return True
+        entry, index = removed
+        try:
+            restore_history_entry(entry, index)
+        except (OSError, ValueError) as error:
+            notice = f"[error]The search was not restored:[/error] {escape(str(error))}"
+            return True
+        history.insert(min(index, len(history)), entry)
+        removed = None
+        notice = f"Put back “{escape(str(entry.get('query', '')))}”"
+        _rebuild(items_list)
+        back = next((i for i, it in enumerate(items_list) if it.value is entry), cursor)
+        return _jump_to(items_list, back)
+
     # --- on_action for Clear History ---
 
     def on_action(idx, items_list):
-        nonlocal history, notice
+        nonlocal history, notice, removed
         if items_list[idx].value == "clear":
             if not confirm_prompt(
                 "[error]Clear all search history?[/error]\n\n"
@@ -218,6 +295,7 @@ def history_select_prompt() -> dict | None:
                 return True  # stay; the saved history is unchanged
             notice = ""
             history = []
+            removed = None
             _rebuild(items_list)
             return True
         return False
@@ -242,6 +320,12 @@ def history_select_prompt() -> dict | None:
             "s": _cycle("sort_idx", len(_SORT_OPTIONS)),
             "T": _cycle("type_idx", len(_TYPE_OPTIONS)),
             "t": _cycle("type_idx", len(_TYPE_OPTIONS)),
+            "/": _search,
+            "X": _remove,
+            "x": _remove,
+            readchar.key.DELETE: _remove,
+            "U": _undo,
+            "u": _undo,
         },
     )
 

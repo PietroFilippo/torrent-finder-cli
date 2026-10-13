@@ -374,3 +374,38 @@ def clear_history() -> None:
         data["history"] = []
         data.pop(_HISTORY_PROFILES, None)
     store.commit(change)
+
+
+_IDENTITY_KEYS = ("query", "provider", "timestamp", "kind", "facet", "name", "queries")
+
+
+def same_history_entry(a: dict, b: dict) -> bool:
+    """Whether two entries are the same search: the saved form and the expanded one compare equal."""
+    return all(a.get(key) == b.get(key) for key in _IDENTITY_KEYS)
+
+
+def remove_history_entry(entry: dict) -> None:
+    """Remove one search from the history.
+
+    Saved immediately, as an operation on the saved list, so another window's
+    newer searches stay; raises ``ValueError`` / ``store.SaveError`` when
+    saving fails, leaving the history in place.
+    """
+    def change(data):
+        history = data.get("history")
+        if isinstance(history, list):
+            data["history"] = [e for e in history if not (isinstance(e, dict) and same_history_entry(e, entry))]
+            compact_history(data)
+    store.commit(change)
+
+
+def restore_history_entry(entry: dict, index: int) -> None:
+    """Put a removed search back at *index* (the undo of ``remove_history_entry``); saved immediately."""
+    def change(data):
+        history = data.get("history")
+        history = [e for e in history if not (isinstance(e, dict) and same_history_entry(e, entry))] \
+            if isinstance(history, list) else []
+        history.insert(max(0, min(index, len(history))), deepcopy(entry))
+        data["history"] = history[:store.HISTORY_LIMIT]
+        compact_history(data)
+    store.commit(change)
