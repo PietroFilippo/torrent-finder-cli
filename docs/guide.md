@@ -58,7 +58,7 @@ options** first: keyword search, [alternate-title search](#alternate-titles),
 | Enter | Choose |
 | Space | Tick a checkbox, or cycle a mode in Filters & engines |
 | Esc | Back or cancel |
-| ? | List every key of this screen, including those a narrow key bar leaves out |
+| ? | List every key of a menu or the results, including those a narrow key bar leaves out (in a text field, ? is typed) |
 | Ctrl+C | Cancel the running operation |
 
 Long lists show your position at the right of the header line.

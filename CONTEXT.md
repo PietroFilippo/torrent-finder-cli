@@ -453,8 +453,8 @@ help shows an **inspector pane** for the focused row (its help, then
 `SelectItem.inspect` lines; the main menu's come from `ui/inspector.py`), beside
 a list column laid out at that narrower width. See
 [ADR-0023](docs/adr/0023-inspector-pane.md). In roomy windows a selector's
-footer (row help, notices, rule, key bar) sits on the bottom rows above the
-tip while the list stays on top, and when the pane does not fit beside the
+row help and details follow the list, while notices, the rule and the key bar
+sit on the bottom rows above the tip; when the pane does not fit beside the
 list the focused row's `inspect` lines fill rows the list leaves empty, above
 the keys, never costing list rows. See [ADR-0025](docs/adr/0025-tall-windows.md). The main menu groups CONTINUE (the newest
 search; a plain keyword search reopens the field with its query), SEARCH and

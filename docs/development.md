@@ -12,8 +12,9 @@ the code, and [the ADRs](adr/) for decisions with history.
 
 ## Tests
 
-The suite is headless and never touches the network or your real settings
-(`tests/isolation.py` redirects saved data to a temporary folder):
+The suite is headless and never touches public network services or your real
+settings (`tests/isolation.py` redirects saved data to a temporary folder; when
+aria2c is installed, one test downloads from a local HTTP server):
 
 ```bash
 python -m unittest discover -s tests

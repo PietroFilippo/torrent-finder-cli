@@ -128,8 +128,9 @@ package so the app never loads it. Provider is *categoria*, engine
 *mecanismo*, source *fonte*, preset *filtro*, search *buscar*/*busca*,
 bookmark *favorito*, settings *Configurações*; engine modes *Sempre / Auto /
 Nunca*, preset states *Não / Exigir / Preferir*. Key names and hotkey
-letters stay as they are; theme, colourway, font and painting names, and
-Athanor, are never translated.
+letters stay as they are; theme, colourway and font names, and Athanor, are
+never translated. Painting titles stay in English unless Portuguese has an
+established title (see [the pt-BR notes](../i18n/pt-BR.md)).
 
 ## Rejected
 

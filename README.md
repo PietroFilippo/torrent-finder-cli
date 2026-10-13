@@ -59,7 +59,7 @@ open the download menu.
 
 | Where | Keys |
 |---|---|
-| Everywhere | **↑/↓** move, **Enter** choose, **Esc** back, **?** every key of the screen |
+| Everywhere | **↑/↓** move, **Enter** choose, **Esc** back; in menus and results **?** lists every key |
 | Main menu | **F** filters of the highlighted provider, **H** history, **S** stats, **T** tips, **D** Downloads after a background download starts, **Tab** quick actions, **Esc** twice to quit |
 | Search prompt | **Ctrl+F** filters and engines, **Ctrl+N** add another title, **Tab** quick actions |
 | Results | **Space** tick, **Enter** open, **i** details, **f** refine and sort, **b** bookmark, **n** diagnostics, **r** retry, **m** load more |
