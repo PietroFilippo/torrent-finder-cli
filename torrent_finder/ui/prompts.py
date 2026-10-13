@@ -335,6 +335,8 @@ def _render_query_frame(
     same character-folded rows that are drawn.
     """
     width, height = max(1, width), max(1, height)
+    if frames.too_small(width, height):
+        return "\n".join(_ansi(line, width) for line in frames.enlarge_notice(width, height)), height, 1
     # A renderer that names its screen gets the Athanor frame: it lays out for
     # the rows inside it, and the frame and its lines are added at the end.
     title = getattr(screen_renderer, "title", None)
@@ -1528,6 +1530,8 @@ def confirm_prompt(message: str, title: str = "Confirm") -> bool:
         body[-1].truncate(max(1, width - 1))
         body[-1].append("…")
     lines = head + body + extra + rule + keys
+    if frames.too_small(width, height):
+        lines = frames.enlarge_notice(width, height)
     display.enter_screen()
     try:
         _render(None, Group(*frames.compose(lines, title, "", width, height)), width=width)

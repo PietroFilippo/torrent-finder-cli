@@ -130,6 +130,45 @@ def message_line(message: "str | Text", width: int) -> Text:
     return line
 
 
+# The smallest window any screen lays out for; below it every view shows enlarge_notice instead.
+MIN_WIDTH, MIN_HEIGHT = 30, 8
+
+
+def too_small(width: int, height: int) -> bool:
+    """True when a window is too small for a frame, a menu or the results table."""
+    return width < MIN_WIDTH or height < MIN_HEIGHT
+
+
+def enlarge_notice(width: int, height: int) -> list[Text]:
+    """What a window too small for any screen shows: one centred line, and the size it needs when there is room.
+
+    Exactly *height* lines of at most *width* cells, so it replaces a frame
+    without scrolling; the view draws it again as the window grows.
+    """
+    width, height = max(1, width), max(1, height)
+    asked = (f"the scriptorium needs {MIN_WIDTH} columns by {MIN_HEIGHT} rows" if theme.FRAMED
+             else f"at least {MIN_WIDTH} columns by {MIN_HEIGHT} rows")
+    lines: list[Text] = []
+    for text, style in (("Enlarge the window", f"bold {theme.TEXT}" if theme.TEXT else "bold"), (asked, theme.MUTED)):
+        if lines and height < 4:
+            break
+        row = ""
+        for word in text.split():
+            if row and cell_len(row) + 1 + cell_len(word) > width:
+                lines.append(Text(row, style=style, justify="center"))
+                row = word
+            else:
+                row = f"{row} {word}".strip()
+        lines.append(Text(row, style=style, justify="center"))
+    lines = lines[:height]
+    for line in lines:
+        line.no_wrap, line.overflow = True, "ellipsis"
+        line.truncate(width, overflow="ellipsis")
+        line.pad_left((width - cell_len(line.plain)) // 2)
+    top = (height - len(lines)) // 2
+    return [Text("")] * top + lines + [Text("")] * (height - top - len(lines))
+
+
 def shows_message(width: int, height: int) -> bool:
     """True when a screen this size has a place for an announcement.
 

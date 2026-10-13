@@ -387,6 +387,8 @@ def _build_panel(
     """
     screen_width = console.size.width
     full_height = console.size.height
+    if frames.too_small(screen_width, full_height):
+        return Group(*frames.enlarge_notice(screen_width, full_height))
     pane_width = theme.inspector_width(screen_width) if any(_has_details(item) for item in items) else 0
     width = screen_width - pane_width - _PANE_GAP if pane_width else screen_width  # the list column
     _layout.width = width if pane_width else None

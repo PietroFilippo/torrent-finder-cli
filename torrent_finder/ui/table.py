@@ -659,6 +659,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         status = results_status(current if expanded else scroll_offset, 1 if expanded else visible_count,
                                 total, current_page, total_pages, frozenset(picked))
         width, full_height = console.size.width, console.size.height
+        if frames.too_small(width, full_height):
+            return Group(*frames.enlarge_notice(width, full_height))
         title = heading or "Results"
         if theme.framed(width, full_height):
             parts: list[object] = []  # the frame's top edge names the screen

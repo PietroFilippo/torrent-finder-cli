@@ -115,8 +115,9 @@ class SmallWindowTests(unittest.TestCase):
         self.assertIn("A raven arrives.", lines[keys + 1])
 
     def test_a_tiny_window_never_scrolls_the_menu(self):
+        # 30x8 is the smallest window that still draws a menu (see test_tiny_windows for smaller ones).
         items = [SelectItem(f"Row {i}", description="Some help for this row.") for i in range(5)]
-        lines = self.frame(20, 8, lambda: selector._build_panel(
+        lines = self.frame(30, 8, lambda: selector._build_panel(
             items, 0, "Menu", False, "Enter select • Esc back", alert="Press Esc again to quit"))
         self.assertLessEqual(len(lines), 8)
         self.assertIn("Row 0", "\n".join(lines))
