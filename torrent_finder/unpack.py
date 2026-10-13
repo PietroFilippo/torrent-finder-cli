@@ -214,7 +214,8 @@ def _tools() -> list:
 
 
 def _run(command) -> "subprocess.CompletedProcess":
-    return subprocess.run(command, capture_output=True, timeout=_TOOL_TIMEOUT, stdin=subprocess.DEVNULL)
+    kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+    return subprocess.run(command, capture_output=True, timeout=_TOOL_TIMEOUT, stdin=subprocess.DEVNULL, **kwargs)
 
 
 class _ToolReader:
