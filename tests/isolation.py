@@ -122,7 +122,9 @@ def isolate_store(case, data=None, path=None) -> Path:
     *path* places that file in a directory the test already owns.
     """
     if path is None:
-        directory = tempfile.TemporaryDirectory()
+        # A virus scanner may still hold the settings file just written: Windows then
+        # keeps it until the scan ends, so the folder can't go yet. Leave it to the OS.
+        directory = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         case.addCleanup(directory.cleanup)
         path = Path(directory.name) / "filter_state.json"
     if data is not None:

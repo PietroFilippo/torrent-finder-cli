@@ -46,7 +46,9 @@ class CommandLineLanguageTests(unittest.TestCase):
         errors = io.StringIO()
         with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
             main._build_parser().parse_args(["-t", "nowhere"])
-        self.assertIn("erro: argumento -t/--type: opção inválida", errors.getvalue())
+        # Python 3.10's argparse doesn't pass "argument …" through gettext; 3.11+ does.
+        self.assertIn("erro: argument", errors.getvalue())
+        self.assertIn("opção inválida: 'nowhere'", errors.getvalue())
 
     def test_a_bad_lang_is_left_for_the_parser_to_report(self):
         main._early_language(["--lang", "klingon"])
