@@ -351,7 +351,7 @@ def _painting_rows(chosen: str, plain: bool = False) -> list:
         rows.append(_choice(entry.title_label(), ("painting", key), key == chosen, entry.artist_credit_label(),
                             t("{credit}; public domain. Recoloured in the colourway's ink. {help}",
                               credit=entry.credit_label(), help=_painting_help(plain))))
-    rows.append(_choice(t("None"), ("painting", paintings.NONE), chosen == paintings.NONE, t("a plain page"),
+    rows.append(_choice(t("None", ctx="painting"), ("painting", paintings.NONE), chosen == paintings.NONE, t("a plain page"),
                         t("No painting behind the app.")))
     return rows
 

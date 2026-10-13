@@ -41,7 +41,7 @@
   "The painting fills the right of the window, like the plate facing a page of text; menus and lists keep the plain page.": "A pintura ocupa a direita da janela, como uma gravura diante de uma página de texto; menus e listas ficam no fundo liso.",
   "The painting fills the left of the window, behind the menus and lists. Its ink is dark enough to read through.": "A pintura ocupa a esquerda da janela, atrás dos menus e listas. A tinta é escura o bastante para permitir a leitura.",
   "another plate": "outra gravura",
-  "None": "Nenhuma",
+  "painting::None": "Nenhuma",
   "a plain page": "a página lisa",
   "No painting behind the app.": "Sem pintura atrás do aplicativo.",
   "Design": "Design",
