@@ -1557,25 +1557,21 @@ def clear_screen() -> None:
     print_banner()
 
 
-def torrent_info_screen(result: dict) -> None:
-    """Fetch and display origin details for a torrent in a scrollable view."""
+def _wrap_info_paragraph(paragraph: str, width: int) -> list[str]:
+    """Keep legacy single-cell word breaks; fold wide text at whole cell boundaries."""
     import textwrap
-    from torrent_finder.torrent_info import description_label, fetch_torrent_info, info_label
 
-    try:
-        with console.status(t("[accent]Fetching torrent info…[/accent]"), spinner=theme.SPINNER):
-            info, err = fetch_torrent_info(result)
-    except KeyboardInterrupt:
-        console.print(t("[warning]Torrent info fetch cancelled.[/warning]"))
-        return
+    if paragraph.isascii() or cell_len(paragraph) == len(paragraph):
+        return textwrap.wrap(paragraph, width) or [""]
+    return [line.plain.rstrip() for line in Text(paragraph).wrap(console, width, overflow="fold")] or [""]
 
-    if info is None:
-        console.print(f"[warning]{escape(info_label(str(err)))}[/warning]")
-        console.print(t("[muted]Press [key]any key[/key] to continue…[/muted]"))
-        readchar.readkey()
-        return
 
-    width = max(8, console.size.width - 12)
+def _torrent_info_rows(info, screen_width: int) -> list[SelectItem]:
+    """Derive physical rows from source paragraphs using the current viewport."""
+    from torrent_finder.torrent_info import description_label, info_label
+
+    # Preserve the old description measure and the selector's margins/gutter.
+    width = max(8, screen_width - 12)
     rows: list[SelectItem] = []
 
     def add(text: str = "") -> None:
@@ -1583,7 +1579,7 @@ def torrent_info_screen(result: dict) -> None:
 
     def add_wrapped(text: str, indent: str = "    ") -> None:
         for para in text.splitlines() or [""]:
-            for line in (textwrap.wrap(para, width) or [""]):
+            for line in _wrap_info_paragraph(para, width):
                 add(indent + line)
 
     def field(lbl: str, val: str) -> None:
@@ -1607,14 +1603,63 @@ def torrent_info_screen(result: dict) -> None:
     if info.files:
         add(); rows.append(SelectItem(t('Files ({count})', count=len(info.files)), value="section_header", enabled=False))
         for name, size in info.files:
-            add(f"    {name}  ({size})" if size else f"    {name}")
+            add_wrapped(f"{name}  ({size})" if size else name)
 
-    items = rows + [SelectItem(label=t("Back"), value="back", is_action=True)]
+    return rows
+
+
+class _TorrentInfoItems(list[SelectItem]):
+    """Keep an old cursor on Back until the selector clamps it after a resize."""
+
+    def __getitem__(self, index):
+        # Rewrapping may remove the focused physical row between key presses.
+        # The selector clamps during drawing/navigation, but Enter reads first.
+        if isinstance(index, int) and index >= len(self):
+            index = len(self) - 1
+        return super().__getitem__(index)
+
+
+def torrent_info_screen(result: dict) -> None:
+    """Fetch and display origin details for a torrent in a scrollable view."""
+    from torrent_finder.torrent_info import fetch_torrent_info, info_label
+
+    try:
+        with console.status(t("[accent]Fetching torrent info…[/accent]"), spinner=theme.SPINNER):
+            info, err = fetch_torrent_info(result)
+    except KeyboardInterrupt:
+        console.print(t("[warning]Torrent info fetch cancelled.[/warning]"))
+        return
+
+    if info is None:
+        console.print(f"[warning]{escape(info_label(str(err)))}[/warning]")
+        console.print(t("[muted]Press [key]any key[/key] to continue…[/muted]"))
+        readchar.readkey()
+        return
+
+    width = console.size.width
+    back = SelectItem(label=t("Back"), value="back", is_action=True)
+    items = _TorrentInfoItems(_torrent_info_rows(info, width) + [back])
+
+    def refresh() -> bool:
+        nonlocal width
+        current_width = console.size.width
+        if current_width == width:
+            return False
+        items[:] = _torrent_info_rows(info, current_width) + [back]
+        width = current_width
+        return True
+
+    def title() -> str:
+        # A resize can also discard a frame and retry within the same draw.
+        refresh()
+        return t('Torrent info › {source}', source=info.source)
+
     arrow_select(
         items,
-        title=t('Torrent info › {source}', source=info.source),
+        title=title,
         banner=_make_banner_panel(),
         footer=t("↑/↓ scroll  •  Esc back"),
+        refresh=refresh,
     )
 
 
