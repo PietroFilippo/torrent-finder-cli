@@ -36,7 +36,8 @@ without drawing into the terminal or sharing its Ctrl+C delivery.
   process-tree kill and reaping. An unpack already executing is allowed to
   return; cancellation prevents more archives or completion statistics.
   `--stop-with-process` covers parent crashes. `downloads.busy()` supplies the
-  future update/quit guard, including queued, paused and unpacking jobs.
+  future update/quit guard, including queued, paused and unpacking jobs and a
+  stopped finisher that has not returned yet.
 - State identities remain English; labels and diagnostics use `t()` and the
   Brazilian Portuguese catalogue. Notifications reach the later UI through
   `on_change`, rather than calling chrome from the engine.

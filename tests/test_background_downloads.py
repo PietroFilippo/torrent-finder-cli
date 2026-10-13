@@ -166,6 +166,16 @@ class BackgroundDownloadsTests(unittest.TestCase):
         self.assertFalse(any(c[0] == "remove" for c in self.rpc.calls))
         self.stats.assert_not_called()
 
+    def test_update_guard_stays_busy_until_a_stopped_finisher_returns(self):
+        job = self.poll(self.enqueue(), status="complete")
+        with patch.object(downloads, "_manager", self.manager):
+            self.manager.stop(job.id)
+            self.assertEqual(self.manager.active(), ())
+            self.assertTrue(downloads.busy())
+            self.finish_pending()
+            self.assertFalse(downloads.busy())
+        self.stats.assert_not_called()
+
     def test_batch_records_once_after_every_member_succeeds(self):
         with self.manager.batch():
             first = self.enqueue(group="batch")

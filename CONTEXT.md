@@ -192,7 +192,8 @@ batch enrollment. Failed/stopped members keep the group from counting even
 if their rows are removed. Snapshots are copies, summaries are immutable,
 and `on_change` signals redraws without workers writing to the console.
 Stop preserves partial data; shutdown stops jobs, reaps aria2 and joins
-workers. The current unpack may finish, but no further archives or stats run
+workers. `busy()` stays true until a stopped finisher returns as well.
+The current unpack may finish, but no further archives or stats run
 after cancellation. UI integration and persistence belong to later phases.
 See [ADR-0029](docs/adr/0029-background-downloads.md).
 

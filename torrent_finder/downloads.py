@@ -551,7 +551,10 @@ def manager() -> JobManager:
 
 
 def busy() -> bool:
-    """Update/quit guard. Includes queued, paused and unpacking jobs."""
+    """Update/quit guard, including a finisher still returning after stop."""
     with _manager_lock:
         current = _manager
-    return current is not None and bool(current.active())
+    if current is None:
+        return False
+    with current._lock:
+        return bool(current._finishing) or any(j.state in ACTIVE_STATES for j in current._jobs.values())
