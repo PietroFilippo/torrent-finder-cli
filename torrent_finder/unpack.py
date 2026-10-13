@@ -13,6 +13,9 @@ Unpacking happens in a temporary folder beside the archive. The archive is
 deleted only after its pages are in place, so a failure keeps it untouched.
 """
 
+# i18n: converted
+from torrent_finder.i18n import N_, t, tn
+
 import ntpath
 import os
 import re
@@ -61,7 +64,7 @@ def unpack_all(paths, *, expect_pages: bool = False, status=None) -> Report:
     archives = [path for path in paths if is_archive(path)]
     for number, path in enumerate(archives, 1):
         if status:
-            status(f"Unpacking ({number}/{len(archives)}) {os.path.basename(path)}")
+            status(t("Unpacking ({number}/{count}) {value}", number=number, count=len(archives), value=os.path.basename(path)))
         folder, problem = unpack(path, expect_pages=expect_pages)
         if folder:
             report.unpacked.append(folder)
@@ -86,27 +89,27 @@ def unpack(path: str, *, expect_pages: bool = False) -> "tuple[str | None, str]"
             reader = _tool_reader(path)
             if reader is None:
                 if not _tools():
-                    return None, (f"no program here opens {extension} files; install 7-Zip or UnRAR"
+                    return None, (f"no program here opens {extension} files; install 7-Zip or UnRAR"  # i18n: ignore — stable identity, source/tool data or public English value
                                   if expect_pages else "")
-                return None, ("couldn't be read (damaged, or a format this computer can't open)"
+                return None, (N_("couldn't be read (damaged, or a format this computer can't open)")
                               if expect_pages else "")
         if not _is_pages(reader.names):
             return None, ""
         if _colliding_names(reader.names):
-            return None, "member paths collide after Windows filename normalization"
+            return None, N_("member paths collide after Windows filename normalization")
         parent = os.path.dirname(os.path.abspath(path))
         scratch = tempfile.mkdtemp(prefix=".unpacking-", dir=parent)
         try:
             reader.extract(scratch)
             root = _content_root(scratch)
             if root is None:
-                return None, "its contents weren't only pages after all"
+                return None, N_("its contents weren't only pages after all")
             stem = os.path.splitext(os.path.abspath(path))[0].rstrip(". ")
             folder = _move_to_free_name(root, stem if os.path.basename(stem) else os.path.abspath(path) + " pages")
         finally:
             shutil.rmtree(scratch, ignore_errors=True)
     except Exception as error:  # damaged data, an unsupported method, a full disk: keep the archive
-        return None, f"couldn't be unpacked ({error})"
+        return None, f"couldn't be unpacked ({error})"  # i18n: ignore — stable identity, source/tool data or public English value
     try:
         os.remove(path)
     except OSError:
@@ -175,7 +178,7 @@ def _move_to_free_name(source: str, target: str) -> str:
             continue
         os.rename(source, candidate)
         return candidate
-    raise OSError(f"No free folder name for {target}")
+    raise OSError(f"No free folder name for {target}")  # i18n: ignore — stable identity, source/tool data or public English value
 
 
 class _ZipReader:
@@ -225,7 +228,7 @@ class _ToolReader:
             "unrar": [self.executable, "x", "-y", "-idq", self.path, destination + os.sep],
         }[self.kind]
         if _run(command).returncode != 0:
-            raise RuntimeError(f"{os.path.basename(self.executable)} failed")
+            raise RuntimeError(f"{os.path.basename(self.executable)} failed")  # i18n: ignore — stable identity, source/tool data or public English value
 
 
 def _tool_reader(path: str) -> "_ToolReader | None":
@@ -293,9 +296,30 @@ def summary_lines(report: Report) -> list:
 
     lines = []
     if report.unpacked:
-        lines.append(f"[success]✓ Unpacked {len(report.unpacked)} archive(s) into folders of pages.[/success]")
+        lines.append(tn("[success]✓ Unpacked {n} archive(s) into folders of pages.[/success]", "[success]✓ Unpacked {n} archive(s) into folders of pages.[/success]", len(report.unpacked)))
     for path, problem in report.kept[:4]:
-        lines.append(f"[warning]Kept {escape(os.path.basename(path))} packed:[/warning] {escape(problem)}")
+        lines.append(t("[warning]Kept {value} packed:[/warning] {problem}", value=escape(os.path.basename(path)), problem=escape(reason_label(problem))))
     if len(report.kept) > 4:
-        lines.append(f"[dim]… and {len(report.kept) - 4} more kept packed.[/dim]")
+        lines.append(tn("[dim]… and {n} more kept packed.[/dim]", "[dim]… and {n} more kept packed.[/dim]", len(report.kept) - 4))
     return lines
+
+
+def reason_label(reason: str) -> str:
+    """Display a kept-packed reason without changing Report.kept or unpack's return."""
+    match = re.fullmatch(r"no program here opens (.+) files; install 7-Zip or UnRAR", reason)  # i18n: ignore — stable reason
+    if match:
+        return t("no program here opens {extension} files; install 7-Zip or UnRAR", extension=match[1])
+    match = re.fullmatch(r"couldn't be unpacked \((.*)\)", reason, re.S)  # i18n: ignore — stable reason
+    if match:
+        return t("couldn't be unpacked ({error})", error=_error_label(match[1]))
+    return t(reason)
+
+
+def _error_label(error: str) -> str:
+    match = re.fullmatch(r"No free folder name for (.*)", error, re.S)  # i18n: ignore — exception identity
+    if match:
+        return t("No free folder name for {target}", target=match[1])
+    match = re.fullmatch(r"(.+) failed", error)  # i18n: ignore — external tool name
+    if match:
+        return t("{tool} failed", tool=match[1])
+    return error

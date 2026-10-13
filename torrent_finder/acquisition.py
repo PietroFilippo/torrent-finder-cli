@@ -22,6 +22,9 @@ Interface:
   ``BatchItemOutcome`` the batch loop aggregates into its summary panel.
 """
 
+# i18n: converted
+from torrent_finder.i18n import N_, t, tn
+
 import os
 import threading
 
@@ -71,7 +74,7 @@ class BatchItemOutcome:
     the summary (a downloaded archive that stayed packed).
     """
 
-    __slots__ = ("ok", "saved_direct", "manual_url", "password", "note")
+    __slots__ = ("ok", "saved_direct", "manual_url", "password", "note", "_kept")
 
     def __init__(self, ok: bool, saved_direct: bool = False,
                  manual_url: str = "", password: str = "", note: str = "") -> None:
@@ -80,6 +83,14 @@ class BatchItemOutcome:
         self.manual_url = manual_url
         self.password = password
         self.note = note
+        self._kept = []
+
+    def note_label(self) -> str:
+        """The batch summary's display text; note keeps its English public value."""
+        if self._kept:
+            return "; ".join(t("Kept {name} packed: {reason}", name=os.path.basename(path),
+                               reason=unpack.reason_label(reason)) for path, reason in self._kept)
+        return self.note
 
 
 class MagnetDirect:
@@ -96,7 +107,7 @@ class MagnetDirect:
         from torrent_finder.qbittorrent import magnet_payload, ClientError
         magnet = self.magnet(result)
         if not magnet:
-            raise ClientError("The source could not resolve a magnet for this result.")
+            raise ClientError(t("The source could not resolve a magnet for this result."))
         return magnet_payload(magnet)
 
     def pick(self, result) -> PickOutcome:
@@ -142,7 +153,7 @@ def _wait_with_esc(message: str, work, *args):
     worker = threading.Thread(target=run, daemon=True)
     stop_listener = start_esc_listener(cancel)
     try:
-        with console.status(f"[accent]{message}[/accent] [dim]Esc to cancel[/dim]", spinner=theme.SPINNER):
+        with console.status(t("[accent]{message}[/accent] [dim]Esc to cancel[/dim]", message=message), spinner=theme.SPINNER):
             worker.start()
             while worker.is_alive() and not cancel.is_set():
                 worker.join(0.1)
@@ -185,12 +196,12 @@ class MagnetLazyResolve(MagnetDirect):
         return build_magnet(real_hash, result.get("name", "Unknown")) if real_hash else None
 
     def pick(self, result) -> PickOutcome:
-        real_hash, cancelled = _wait_with_esc(f"Fetching magnet from {self.label}…", self._resolve, result)
+        real_hash, cancelled = _wait_with_esc(t("Fetching magnet from {label}…", label=self.label), self._resolve, result)
         if cancelled:
             return PickOutcome("back")
         if not real_hash:
-            console.print(f"[error] {self.error_text}[/error]")
-            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+            console.print(f"[error] {t(self.error_text)}[/error]")
+            console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
             readchar.readkey()
             return PickOutcome("back")
         # Persist the real hash so everything downstream of the pick (session,
@@ -203,8 +214,8 @@ class MagnetLazyResolve(MagnetDirect):
 
 
 class RuTrackerAcquisition(MagnetLazyResolve):
-    label = "RuTracker"
-    error_text = "Couldn't get the magnet from RuTracker (login expired or topic unavailable)."
+    label = "RuTracker"  # i18n: ignore — stable identity, source/tool data or public English value
+    error_text = N_("Couldn't get the magnet from RuTracker (login expired or topic unavailable).")
 
     def _resolve(self, result) -> str | None:
         from torrent_finder import rutracker
@@ -212,8 +223,8 @@ class RuTrackerAcquisition(MagnetLazyResolve):
 
 
 class FitGirlAcquisition(MagnetLazyResolve):
-    label = "FitGirl"
-    error_text = "Couldn't get the magnet from FitGirl (post layout changed or site unreachable)."
+    label = "FitGirl"  # i18n: ignore — stable identity, source/tool data or public English value
+    error_text = N_("Couldn't get the magnet from FitGirl (post layout changed or site unreachable).")
 
     def _resolve(self, result) -> str | None:
         from torrent_finder import fitgirl
@@ -243,7 +254,7 @@ class OnlineFixAcquisition:
         with tempfile.TemporaryDirectory(prefix="torrent-finder-") as directory:
             path = online_fix.fetch_torrent_for(result.get("page_url") or result.get("of_post_url") or "", directory)
             if not path or Path(path).stat().st_size > 8 * 1024 * 1024:
-                raise ClientError("Could not obtain Online-Fix torrent metadata. Open its listing manually.")
+                raise ClientError(t("Could not obtain Online-Fix torrent metadata. Open its listing manually."))
             return torrent_payload(Path(path).read_bytes())
 
     def pick(self, result) -> PickOutcome:
@@ -257,29 +268,21 @@ class OnlineFixAcquisition:
 
         name = result.get("name", "Unknown")
         page_url = result.get("page_url") or result.get("of_post_url") or ""
-        path, cancelled = _wait_with_esc("Fetching .torrent from online-fix.me…",
+        path, cancelled = _wait_with_esc(t("Fetching .torrent from online-fix.me…"),
                                          online_fix.fetch_torrent_for, page_url, get_download_dir())
         if cancelled:
             return PickOutcome("back")
         if not path:
-            console.print(theme.report("Online-Fix", f"[bold]{escape(name)}[/bold]\n\n"
-                "[warning]Couldn't fetch the .torrent automatically[/warning] "
-                "(post layout changed or host blocked).\n"
-                f"[muted]Open the page and grab it manually:[/muted]\n{escape(page_url)}", tone=theme.WARN))
-            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+            console.print(theme.report("Online-Fix", t("[bold]{name}[/bold]\n\n[warning]Couldn't fetch the .torrent automatically[/warning] (post layout changed or host blocked).\n[muted]Open the page and grab it manually:[/muted]\n{page_url}", name=escape(name), page_url=escape(page_url)), tone=theme.WARN))
+            console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
             readchar.readkey()
             return PickOutcome("back")
 
         opened = open_torrent_file(path)
-        handoff = ("[success]✓ opened in your torrent client[/success]" if opened
-                   else "[warning]saved, but couldn't auto-open — add it to your client manually[/warning]")
-        console.print(theme.report("Online-Fix", f"[bold]{escape(name)}[/bold]\n\n"
-            f"[muted].torrent saved:[/muted]   {escape(path)}\n"
-            f"[muted]Handed to client:[/muted] {handoff}\n"
-            f"[muted]Archive password:[/muted] {online_fix.ARCHIVE_PASSWORD}\n\n"
-            "[dim]Your client downloads the game from online-fix's tracker; unpack the "
-            "archives with the password above.[/dim]"))
-        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+        handoff = (t("[success]✓ opened in your torrent client[/success]") if opened
+                   else t("[warning]saved, but couldn't auto-open — add it to your client manually[/warning]"))
+        console.print(theme.report("Online-Fix", t("[bold]{name}[/bold]\n\n[muted].torrent saved:[/muted]   {path}\n[muted]Handed to client:[/muted] {handoff}\n[muted]Archive password:[/muted] {ARCHIVE_PASSWORD}\n\n[dim]Your client downloads the game from online-fix's tracker; unpack the archives with the password above.[/dim]", name=escape(name), path=escape(path), handoff=handoff, ARCHIVE_PASSWORD=online_fix.ARCHIVE_PASSWORD)))
+        console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
         readchar.readkey()
         return PickOutcome("next")
 
@@ -322,10 +325,8 @@ class MadokamiAcquisition:
         page_url = result.get("page_url", "")
 
         if madokami_config() is None:
-            console.print(theme.report("Madokami", "[warning]Madokami needs a login[/warning] — add your account under "
-                "Credentials on the provider screen (or set MADOKAMI_USERNAME / "
-                "MADOKAMI_PASSWORD).", tone=theme.WARN))
-            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+            console.print(theme.report("Madokami", t("[warning]Madokami needs a login[/warning] — add your account under Credentials on the provider screen (or set MADOKAMI_USERNAME / MADOKAMI_PASSWORD)."), tone=theme.WARN))  # i18n: ignore — stable identity, source/tool data or public English value
+            console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
             readchar.readkey()
             return PickOutcome("back")
 
@@ -367,7 +368,7 @@ class MadokamiAcquisition:
             console=console,
         )
         console.print(
-            f"[info]Downloading {len(dl_paths)} file(s) from Madokami — press Esc to stop.[/info]"
+            tn("[info]Downloading {n} file(s) from Madokami — press Esc to stop.[/info]", "[info]Downloading {n} file(s) from Madokami — press Esc to stop.[/info]", len(dl_paths))
         )
         try:
             with progress:
@@ -399,23 +400,24 @@ class MadokamiAcquisition:
         unpacked = _unpack_saved(saved)
         lines = []
         if cancel_event.is_set():
-            lines.append(f"[warning] Stopped after {len(saved)} of {len(dl_paths)}.[/warning]")
+            lines.append(t("[warning] Stopped after {count} of {count2}.[/warning]", count=len(saved), count2=len(dl_paths)))
         elif saved:
             where = {os.path.dirname(s) for s in saved}
             shown = where.pop() if len(where) == 1 else get_download_dir()
-            lines.append(f"[success]✓ {len(saved)} file(s) saved to {escape(shown)}[/success]")
+            lines.append(tn("[success]✓ {n} file(s) saved to {shown}[/success]", "[success]✓ {n} file(s) saved to {shown}[/success]", len(saved), shown=escape(shown)))
         for s in saved[:6]:
             lines.append(f"[dim]{escape(os.path.basename(s))}[/dim]")
         if len(saved) > 6:
-            lines.append(f"[dim]… +{len(saved) - 6} more[/dim]")
+            lines.append(tn("[dim]… +{n} more[/dim]", "[dim]… +{n} more[/dim]", len(saved) - 6))
         lines += unpacked
         if failed:
-            lines.append(f"[warning] Couldn't download {len(failed)}:[/warning] " + escape(", ".join(failed[:4])))
-            lines.append(f"[dim]Grab manually: {escape(page_url)}[/dim]")
+            lines.append(t("[warning] Couldn't download {count}:[/warning] {files}",
+                           count=len(failed), files=escape(", ".join(failed[:4]))))
+            lines.append(t("[dim]Grab manually: {page_url}[/dim]", page_url=escape(page_url)))
         if not lines:
-            lines.append("[warning] Nothing downloaded.[/warning]")
-        console.print(theme.report("Madokami", f"[bold]{escape(name)}[/bold]\n\n" + "\n".join(lines)))
-        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+            lines.append(t("[warning] Nothing downloaded.[/warning]"))
+        console.print(theme.report("Madokami", f"[bold]{escape(name)}[/bold]\n\n" + "\n".join(lines)))  # i18n: ignore — stable identity, source/tool data or public English value
+        console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
         readchar.readkey()
         return PickOutcome("next" if saved else "back")
 
@@ -435,7 +437,7 @@ class MadokamiAcquisition:
         current = path
         while True:
             if current not in listings:
-                listing, cancelled = _wait_with_esc("Listing the Madokami folder…", madokami.list_directory, current)
+                listing, cancelled = _wait_with_esc(t("Listing the Madokami folder…"), madokami.list_directory, current)
                 if cancelled:  # Esc: up one level, or back to the results
                     if not trail:
                         return []
@@ -449,10 +451,9 @@ class MadokamiAcquisition:
             if children is None or not folders:
                 if children is None:
                     del listings[current]  # visiting it again asks again
-                    self._notice(here, "[warning]Couldn't list the folder[/warning] (login rejected or "
-                                       "site layout changed).", current)
+                    self._notice(here, t("[warning]Couldn't list the folder[/warning] (login rejected or site layout changed)."), current)
                 elif not files:
-                    self._notice(here, "[warning]This folder is empty.[/warning]", current)
+                    self._notice(here, t("[warning]This folder is empty.[/warning]"), current)
                 else:
                     picked = self._pick_files(files)
                     if picked:
@@ -463,13 +464,13 @@ class MadokamiAcquisition:
                 continue
             items = []
             if files:
-                items.append(SelectItem(f"Choose from the {len(files)} file(s) here", "files",
-                                        description="Volumes or chapters stored directly in this folder."))
-            items += [SelectItem(f"{folder['name']}/", folder["path"], description="Open this folder.")
+                items.append(SelectItem(tn("Choose from the {n} file(s) here", "Choose from the {n} file(s) here", len(files)), "files",
+                                        description=t("Volumes or chapters stored directly in this folder.")))
+            items += [SelectItem(f"{folder['name']}/", folder["path"], description=t("Open this folder."))
                       for folder in folders]
-            items.append(SelectItem("Back", "back", is_action=True))
-            choice = arrow_select(items, title=f"Madokami › {escape(here)}", start_index=cursors.get(current, 0),
-                                  footer="Enter open • Esc back")
+            items.append(SelectItem(t("Back"), "back", is_action=True))
+            choice = arrow_select(items, title=f"Madokami › {escape(here)}", start_index=cursors.get(current, 0),  # i18n: ignore — stable identity, source/tool data or public English value
+                                  footer=t("Enter open • Esc back"))
             if choice is None or items[choice].value == "back":
                 if not trail:
                     return []
@@ -499,9 +500,8 @@ class MadokamiAcquisition:
     def _notice(here, message, path):
         from torrent_finder import madokami
 
-        console.print(theme.report("Madokami", f"[bold]{escape(here)}[/bold]\n\n{message}\n"
-            f"[muted]Open it in your browser instead:[/muted]\n{escape(madokami._BASE + path)}", tone=theme.WARN))
-        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+        console.print(theme.report("Madokami", t("[bold]{here}[/bold]\n\n{message}\n[muted]Open it in your browser instead:[/muted]\n{value}", here=escape(here), message=message, value=escape(madokami._BASE + path)), tone=theme.WARN))  # i18n: ignore — stable identity, source/tool data or public English value
+        console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
         readchar.readkey()
 
     def batch_item(self, result, *, download_dir, cancel_event, set_status) -> BatchItemOutcome:
@@ -517,8 +517,8 @@ class MadokamiAcquisition:
         # these can run to hundreds of MB. The callback keeps a MB counter on
         # the batch status line while the archive streams.
         def _on_progress(done, total):
-            size = (f"{done / 1048576:.1f}/{total / 1048576:.1f} MB"
-                    if total else f"{done / 1048576:.1f} MB")
+            size = (f"{done / 1048576:.1f}/{total / 1048576:.1f} MB"  # i18n: ignore — stable identity, source/tool data or public English value
+                    if total else f"{done / 1048576:.1f} MB")  # i18n: ignore — stable identity, source/tool data or public English value
             set_status(size)
 
         dest = madokami.download_file(
@@ -527,11 +527,14 @@ class MadokamiAcquisition:
         )
         if dest:
             note = ""
+            kept = []
             if unpack.enabled():
-                set_status("unpacking")
+                set_status(t("unpacking"))
                 kept = unpack.unpack_all([dest], expect_pages=True).kept
                 note = "; ".join(f"Kept {os.path.basename(path)} packed: {problem}" for path, problem in kept)
-            return BatchItemOutcome(ok=True, saved_direct=True, note=note)
+            outcome = BatchItemOutcome(ok=True, saved_direct=True, note=note)
+            outcome._kept = kept
+            return outcome
         return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
 
 
@@ -568,15 +571,12 @@ class LibgenAcquisition:
         if not download_dir_ready():
             return PickOutcome("back")
 
-        url, cancelled = _wait_with_esc("Resolving the download link from Libgen…", libgen.resolve_download_url, md5)
+        url, cancelled = _wait_with_esc(t("Resolving the download link from Libgen…"), libgen.resolve_download_url, md5)
         if cancelled:
             return PickOutcome("back")
         if not url:
-            console.print(theme.report("Libgen", f"[bold]{escape(name)}[/bold]\n\n"
-                "[warning]Couldn't resolve the download link[/warning] "
-                "(mirrors unreachable or page layout changed).\n"
-                f"[muted]Open the page and grab it manually:[/muted]\n{escape(page_url)}", tone=theme.WARN))
-            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+            console.print(theme.report("Libgen", t("[bold]{name}[/bold]\n\n[warning]Couldn't resolve the download link[/warning] (mirrors unreachable or page layout changed).\n[muted]Open the page and grab it manually:[/muted]\n{page_url}", name=escape(name), page_url=escape(page_url)), tone=theme.WARN))  # i18n: ignore — stable identity, source/tool data or public English value
+            console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
             readchar.readkey()
             return PickOutcome("back")
 
@@ -592,7 +592,7 @@ class LibgenAcquisition:
             TimeRemainingColumn(),
             console=console,
         )
-        console.print("[info]Downloading from Libgen — press Esc to stop.[/info]")
+        console.print(t("[info]Downloading from Libgen — press Esc to stop.[/info]"))
         ext = result.get("lg_ext") or "bin"
         fallback = f"libgen-{md5[:8]}.{ext}"
         try:
@@ -611,15 +611,13 @@ class LibgenAcquisition:
             stop_listener.set()
 
         if dest:
-            body = (f"[success]✓ Saved to {escape(get_download_dir())}[/success]\n"
-                    f"[dim]{escape(os.path.basename(dest))}[/dim]")
+            body = (t("[success]✓ Saved to {value}[/success]\n[dim]{value2}[/dim]", value=escape(get_download_dir()), value2=escape(os.path.basename(dest))))
         elif cancel_event.is_set():
-            body = "[warning] Download cancelled.[/warning]"
+            body = t("[warning] Download cancelled.[/warning]")
         else:
-            body = ("[warning]Download failed.[/warning]\n"
-                    f"[muted]Grab it manually:[/muted]\n{escape(page_url)}")
-        console.print(theme.report("Libgen", f"[bold]{escape(name)}[/bold]\n\n{body}"))
-        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+            body = (t("[warning]Download failed.[/warning]\n[muted]Grab it manually:[/muted]\n{page_url}", page_url=escape(page_url)))
+        console.print(theme.report("Libgen", f"[bold]{escape(name)}[/bold]\n\n{body}"))  # i18n: ignore — stable identity, source/tool data or public English value
+        console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
         readchar.readkey()
         return PickOutcome("next" if dest else "back")
 
@@ -633,8 +631,8 @@ class LibgenAcquisition:
             return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
 
         def _on_progress(done, total):
-            size = (f"{done / 1048576:.1f}/{total / 1048576:.1f} MB"
-                    if total else f"{done / 1048576:.1f} MB")
+            size = (f"{done / 1048576:.1f}/{total / 1048576:.1f} MB"  # i18n: ignore — stable identity, source/tool data or public English value
+                    if total else f"{done / 1048576:.1f} MB")  # i18n: ignore — stable identity, source/tool data or public English value
             set_status(size)
 
         ext = result.get("lg_ext") or "bin"
@@ -678,15 +676,12 @@ class FDroidAcquisition:
         if not download_dir_ready():
             return PickOutcome("back")
 
-        apk, cancelled = _wait_with_esc("Finding the current version on F-Droid…", fdroid.suggested_apk, package)
+        apk, cancelled = _wait_with_esc(t("Finding the current version on F-Droid…"), fdroid.suggested_apk, package)
         if cancelled:
             return PickOutcome("back")
         if not apk:
-            console.print(theme.report("F-Droid", f"[bold]{escape(name)}[/bold]\n\n"
-                "[warning]Couldn't find a version to download[/warning] (F-Droid unreachable or no "
-                "suggested version).\n"
-                f"[muted]Open the package page instead:[/muted]\n{escape(page_url)}", tone=theme.WARN))
-            console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+            console.print(theme.report("F-Droid", t("[bold]{name}[/bold]\n\n[warning]Couldn't find a version to download[/warning] (F-Droid unreachable or no suggested version).\n[muted]Open the package page instead:[/muted]\n{page_url}", name=escape(name), page_url=escape(page_url)), tone=theme.WARN))
+            console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
             readchar.readkey()
             return PickOutcome("back")
         url, version, builds = apk
@@ -701,7 +696,7 @@ class FDroidAcquisition:
             TimeRemainingColumn(),
             console=console,
         )
-        console.print("[info]Downloading from F-Droid — press Esc to stop.[/info]")
+        console.print(t("[info]Downloading from F-Droid — press Esc to stop.[/info]"))
         try:
             with progress:
                 task = progress.add_task(url.rsplit("/", 1)[-1], total=None)
@@ -715,22 +710,16 @@ class FDroidAcquisition:
             stop_listener.set()
 
         if dest:
-            body = (f"[success]✓ Saved to {escape(get_download_dir())}[/success]\n"
-                    f"[dim]{escape(os.path.basename(dest))}[/dim]\n\n"
-                    f"Package {escape(package)}, version {escape(version or '?')}, from f-droid.org.\n"
-                    + (f"[warning]This version has {builds} builds, usually one per CPU type; this is the one "
-                       "F-Droid suggests (most phones). For another device type, use the F-Droid app or "
-                       f"the package page: {escape(page_url)}[/warning]\n" if builds > 1 else "")
+            body = (t("[success]✓ Saved to {value}[/success]\n[dim]{value2}[/dim]\n\nPackage {package}, version {value3}, from f-droid.org.\n", value=escape(get_download_dir()), value2=escape(os.path.basename(dest)), package=escape(package), value3=escape(version or '?'))
+                    + (t("[warning]This version has {builds} builds, usually one per CPU type; this is the one F-Droid suggests (most phones). For another device type, use the F-Droid app or the package page: {page_url}[/warning]\n", builds=builds, page_url=escape(page_url)) if builds > 1 else "")
                     +
-                    "[dim]Android checks the APK's signature when you install it. "
-                    f"F-Droid's PGP signature: {escape(url)}.asc[/dim]")
+                    t("[dim]Android checks the APK's signature when you install it. F-Droid's PGP signature: {url}.asc[/dim]", url=escape(url)))
         elif cancel_event.is_set():
-            body = "[warning] Download cancelled.[/warning]"
+            body = t("[warning] Download cancelled.[/warning]")
         else:
-            body = ("[warning]Download failed.[/warning]\n"
-                    f"[muted]Get it from the package page:[/muted]\n{escape(page_url)}")
+            body = (t("[warning]Download failed.[/warning]\n[muted]Get it from the package page:[/muted]\n{page_url}", page_url=escape(page_url)))
         console.print(theme.report("F-Droid", f"[bold]{escape(name)}[/bold]\n\n{body}"))
-        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+        console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
         readchar.readkey()
         return PickOutcome("next" if dest else "back")
 
@@ -742,8 +731,8 @@ class FDroidAcquisition:
             return BatchItemOutcome(ok=False, manual_url=result.get("page_url") or "")
 
         def _on_progress(done, total):
-            size = (f"{done / 1048576:.1f}/{total / 1048576:.1f} MB"
-                    if total else f"{done / 1048576:.1f} MB")
+            size = (f"{done / 1048576:.1f}/{total / 1048576:.1f} MB"  # i18n: ignore — stable identity, source/tool data or public English value
+                    if total else f"{done / 1048576:.1f} MB")  # i18n: ignore — stable identity, source/tool data or public English value
             set_status(size)
 
         if fdroid.download_apk(apk[0], download_dir, cancel_event=cancel_event, progress_cb=_on_progress):

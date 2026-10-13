@@ -12,6 +12,9 @@ Names come from servers, so ``safe_filename`` reduces each to one ordinary
 file name inside the download folder before anything is written.
 """
 
+# i18n: converted
+from torrent_finder.i18n import t
+
 import os
 import re
 import tempfile
@@ -61,7 +64,7 @@ def save_response(resp, dest_dir: str, filename: str, cancel_event=None, progres
     filename = safe_filename(filename)
     dest = os.path.join(dest_dir, filename)
     if os.path.dirname(os.path.abspath(dest)) != os.path.abspath(dest_dir):
-        raise OSError(f"Refusing to save outside the download folder: {filename}")
+        raise OSError(t("Refusing to save outside the download folder: {filename}", filename=filename))
     try:
         total = int(resp.headers.get("Content-Length", "")) or None
     except ValueError:
@@ -103,7 +106,7 @@ def _promote(temporary: str, dest: str, cancel_event=None) -> str:
         except FileExistsError:
             continue
         return candidate
-    raise FileExistsError(f"No free filename for {dest}")
+    raise FileExistsError(t("No free filename for {dest}", dest=dest))
 
 
 def _rename_new(source: str, target: str, cancel_event=None) -> None:

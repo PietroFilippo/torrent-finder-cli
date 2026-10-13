@@ -1,5 +1,8 @@
 """Download methods: torrent client (magnet) and webtorrent direct download."""
 
+# i18n: converted
+from torrent_finder.i18n import N_, t, tn
+
 import os
 import platform
 import re
@@ -54,7 +57,7 @@ def _quiet_streams(quiet: bool) -> tuple[int | None, int | None]:
 def _resolve_vlc_path() -> str | None:
     vlc_path = shutil.which("vlc")
     if not vlc_path and platform.system() == "Windows":
-        for p in [r"C:\Program Files\VideoLAN\VLC\vlc.exe", r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe"]:
+        for p in [r"C:\Program Files\VideoLAN\VLC\vlc.exe", r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe"]:  # i18n: ignore — stable identity, source/tool data or public English value
             if os.path.exists(p):
                 return p
     return vlc_path
@@ -333,14 +336,14 @@ def _log_tail(path: str, lines: int = 8) -> str:
 def _report_stream_end(returncode: int, log_path: str) -> str:
     """Say how streaming ended; a nonzero exit is a failure, shown with its log."""
     if not returncode:
-        console.print("\n[success] Streaming session(s) ended![/success]")
+        console.print(t("\n[success] Streaming session(s) ended![/success]"))
         return "ended"
-    console.print(f"\n[error] Streaming stopped with an error (exit code {returncode}).[/error]")
+    console.print(t("\n[error] Streaming stopped with an error (exit code {returncode}).[/error]", returncode=returncode))
     tail = _log_tail(log_path) if log_path else ""
     if tail:
         console.print(escape(tail), style="dim")
     if log_path:
-        console.print(f"[dim]Full log: {escape(log_path)}[/dim]")
+        console.print(t("[dim]Full log: {log_path}[/dim]", log_path=escape(log_path)))
     return "failed"
 
 
@@ -353,13 +356,13 @@ def detect_torrent_client() -> str:
     KNOWN_CLIENTS = {
         "qbittorrent": "qBittorrent",
         "utorrent": "uTorrent",
-        "bittorrent": "BitTorrent",
-        "deluge": "Deluge",
-        "transmission-qt": "Transmission",
-        "transmission-gtk": "Transmission",
-        "vuze": "Vuze",
-        "tixati": "Tixati",
-        "biglybt": "BiglyBT",
+        "bittorrent": "BitTorrent",  # i18n: ignore — stable identity, source/tool data or public English value
+        "deluge": "Deluge",  # i18n: ignore — stable identity, source/tool data or public English value
+        "transmission-qt": "Transmission",  # i18n: ignore — stable identity, source/tool data or public English value
+        "transmission-gtk": "Transmission",  # i18n: ignore — stable identity, source/tool data or public English value
+        "vuze": "Vuze",  # i18n: ignore — stable identity, source/tool data or public English value
+        "tixati": "Tixati",  # i18n: ignore — stable identity, source/tool data or public English value
+        "biglybt": "BiglyBT",  # i18n: ignore — stable identity, source/tool data or public English value
     }
 
     # 1. Windows: scan common install directories
@@ -402,7 +405,14 @@ def detect_torrent_client() -> str:
         except (OSError, ImportError):
             pass
 
-    return "default torrent client"
+    return "default torrent client"  # i18n: ignore — stable identity, source/tool data or public English value
+
+
+def torrent_client_label(client: str) -> str:
+    """Display the fallback client name without translating executable identities."""
+    if client == "default torrent client":  # i18n: ignore — public fallback identity
+        return t("default torrent client")
+    return client
 
 
 def open_magnet(magnet_link: str) -> None:
@@ -455,8 +465,8 @@ def has_aria2() -> bool:
 
 # Shown when a Node CLI is missing.
 _NODE_CLI_INSTALL = {
-    "webtorrent": "webtorrent-cli not found. Install with: npm install -g webtorrent-cli",
-    "peerflix": "peerflix not found. Install with: npm install -g peerflix",
+    "webtorrent": N_("webtorrent-cli not found. Install with: npm install -g webtorrent-cli"),
+    "peerflix": N_("peerflix not found. Install with: npm install -g peerflix"),
 }
 _SHIM_TARGET = re.compile(r'"%~?dp0%?\\([^"%]+?\.(?:[cm]?js|cmd|bat))"', re.IGNORECASE)
 
@@ -473,14 +483,13 @@ def _cli_command(name: str) -> list[str] | None:
     """
     path = shutil.which(name)
     if not path:
-        console.print(f"[error] {_NODE_CLI_INSTALL[name]}[/error]\n")
+        console.print(f"[error] {t(_NODE_CLI_INSTALL[name])}[/error]\n")
         return None
     if os.name != "nt" or not path.lower().endswith((".cmd", ".bat")):
         return [path]
     command = _unwrap_npm_shim(path)
     if command is None:
-        console.print(f"[error] Can't start {name} safely: {escape(path)} isn't a recognised npm "
-                      f"launcher. Reinstall it ({_NODE_CLI_INSTALL[name].split(': ', 1)[-1]}).[/error]\n")
+        console.print(t("[error] Can't start {name} safely: {path} isn't a recognised npm launcher. Reinstall it ({value}).[/error]\n", name=name, path=escape(path), value=_NODE_CLI_INSTALL[name].split(': ', 1)[-1]))
     return command
 
 
@@ -544,9 +553,8 @@ def _download_dir_or_explain() -> str | None:
     try:
         return prepare_download_dir()
     except OSError as error:
-        console.print(f"[error] Can't save to {escape(get_download_dir())}: "
-                      f"{escape(error.strerror or str(error))}[/error]")
-        console.print("[info]Nothing was downloaded. Choose another download folder and try again.[/info]\n")
+        console.print(t("[error] Can't save to {value}: {value2}[/error]", value=escape(get_download_dir()), value2=escape(error.strerror or str(error))))
+        console.print(t("[info]Nothing was downloaded. Choose another download folder and try again.[/info]\n"))
         return None
 
 
@@ -588,9 +596,9 @@ def _run_download(cmd: list[str], quiet: bool, status_msg: str, done_marker: str
 def _touch_command(path: str) -> str:
     """A shell command that creates *path*: what peerflix runs (through the shell) when it has every piece."""
     if platform.system() == "Windows":
-        return f'type nul > "{path}"'
+        return f'type nul > "{path}"'  # i18n: ignore — stable identity, source/tool data or public English value
     import shlex
-    return f"touch {shlex.quote(path)}"
+    return f"touch {shlex.quote(path)}"  # i18n: ignore — stable identity, source/tool data or public English value
 
 
 def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = None) -> bool:
@@ -603,16 +611,18 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
     """
     aria_path = shutil.which("aria2c")
     if not aria_path:
-        console.print("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n")
+        console.print(t("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n"))
         return False
 
     dl_dir = _download_dir_or_explain()
     if dl_dir is None:
         return False
-    console.print(f"[info]Downloading to:[/info] [highlight]{escape(dl_dir)}[/highlight]")
+    console.print(t("[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]", dl_dir=escape(dl_dir)))
     if select_indexes:
-        console.print(f"[info]Selected files:[/info] [highlight]{compact_ranges(select_indexes)}[/highlight] ({len(select_indexes)} file(s))")
-    console.print("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n")
+        console.print(tn("[info]Selected files:[/info] [highlight]{files}[/highlight] ({n} file(s))",
+                         "[info]Selected files:[/info] [highlight]{files}[/highlight] ({n} file(s))",
+                         len(select_indexes), files=compact_ranges(select_indexes)))
+    console.print(t("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n"))
 
     cmd = [
         aria_path,
@@ -632,22 +642,22 @@ def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = Non
     quiet = is_quiet_mode()
 
     try:
-        rc = _run_download(cmd, quiet, "[accent]Downloading…[/accent]  Ctrl+C cancel")
+        rc = _run_download(cmd, quiet, t("[accent]Downloading…[/accent]  Ctrl+C cancel"))
         if rc is None:
-            console.print("\n[warning] Download cancelled.[/warning]\n")
+            console.print(t("\n[warning] Download cancelled.[/warning]\n"))
             return False
         console.print()
         if rc == 0:
-            console.print("[success] Download complete![/success]")
-            console.print(f"[info]Files saved to:[/info] [highlight]{escape(dl_dir)}[/highlight]\n")
+            console.print(t("[success] Download complete![/success]"))
+            console.print(t("[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n", dl_dir=escape(dl_dir)))
             return True
-        console.print(f"[error] Download failed (exit code {rc}).[/error]\n")
+        console.print(t("[error] Download failed (exit code {rc}).[/error]\n", rc=rc))
         return False
     except KeyboardInterrupt:
-        console.print("\n[warning] Download cancelled.[/warning]\n")
+        console.print(t("\n[warning] Download cancelled.[/warning]\n"))
         return False
     except FileNotFoundError:
-        console.print("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n")
+        console.print(t("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n"))
         return False
 
 
@@ -660,7 +670,7 @@ def download_many_with_aria2(magnets: list[str]) -> bool:
     """
     aria_path = shutil.which("aria2c")
     if not aria_path:
-        console.print("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n")
+        console.print(t("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n"))
         return False
     if not magnets:
         return False
@@ -668,9 +678,9 @@ def download_many_with_aria2(magnets: list[str]) -> bool:
     dl_dir = _download_dir_or_explain()
     if dl_dir is None:
         return False
-    console.print(f"[info]Downloading to:[/info] [highlight]{escape(dl_dir)}[/highlight]")
-    console.print(f"[info]Torrents:[/info] [highlight]{len(magnets)}[/highlight] (downloaded in parallel)")
-    console.print("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n")
+    console.print(t("[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]", dl_dir=escape(dl_dir)))
+    console.print(t("[info]Torrents:[/info] [highlight]{count}[/highlight] (downloaded in parallel)", count=len(magnets)))
+    console.print(t("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n"))
 
     cmd = [
         aria_path,
@@ -683,23 +693,23 @@ def download_many_with_aria2(magnets: list[str]) -> bool:
     try:
         rc = _run_download(
             cmd, quiet,
-            f"[accent]Downloading {len(magnets)} torrent(s)…[/accent]  Ctrl+C cancel",
+            tn("[accent]Downloading {n} torrent(s)…[/accent]  Ctrl+C cancel", "[accent]Downloading {n} torrent(s)…[/accent]  Ctrl+C cancel", len(magnets)),
         )
         if rc is None:
-            console.print("\n[warning] Downloads cancelled.[/warning]\n")
+            console.print(t("\n[warning] Downloads cancelled.[/warning]\n"))
             return False
         console.print()
         if rc == 0:
-            console.print("[success] Downloads complete![/success]")
-            console.print(f"[info]Files saved to:[/info] [highlight]{escape(dl_dir)}[/highlight]\n")
+            console.print(t("[success] Downloads complete![/success]"))
+            console.print(t("[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n", dl_dir=escape(dl_dir)))
             return True
-        console.print(f"[error] Some downloads failed (exit code {rc}).[/error]\n")
+        console.print(t("[error] Some downloads failed (exit code {rc}).[/error]\n", rc=rc))
         return False
     except KeyboardInterrupt:
-        console.print("\n[warning] Downloads cancelled.[/warning]\n")
+        console.print(t("\n[warning] Downloads cancelled.[/warning]\n"))
         return False
     except FileNotFoundError:
-        console.print("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n")
+        console.print(t("[error] aria2c not found. Install from https://aria2.github.io/[/error]\n"))
         return False
 
 
@@ -719,19 +729,16 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
     dl_dir = _download_dir_or_explain()
     if dl_dir is None:
         return False
-    console.print(f"[info]Downloading to:[/info] [highlight]{escape(dl_dir)}[/highlight]")
+    console.print(t("[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]", dl_dir=escape(dl_dir)))
     if select_indexes:
         console.print(
-            "[warning] webtorrent-cli's --select does NOT always limit download to the picked "
-            "file(s) — it can still pull the whole torrent. "
-            "Use [bold]aria2c[/bold] for strict file selection.[/warning]"
+            t("[warning] webtorrent-cli's --select does NOT always limit download to the picked file(s) — it can still pull the whole torrent. Use [bold]aria2c[/bold] for strict file selection.[/warning]")
         )
         if len(select_indexes) > 1:
             console.print(
-                f"[warning] Running {len(select_indexes)} sequential sessions "
-                "(webtorrent-cli downloads one file per run).[/warning]"
+                t("[warning] Running {count} sequential sessions (webtorrent-cli downloads one file per run).[/warning]", count=len(select_indexes))
             )
-    console.print("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n")
+    console.print(t("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n"))
 
     targets: list[int | None] = [i for i in (select_indexes or [])] or [None]
     quiet = is_quiet_mode()
@@ -739,33 +746,33 @@ def download_with_webtorrent(magnet_link: str, select_indexes: list[int] | None 
     try:
         for n, idx in enumerate(targets, 1):
             if len(targets) > 1:
-                console.print(f"[info]Session {n}/{len(targets)} — file index {idx}[/info]")
+                console.print(t("[info]Session {n}/{count} — file index {idx}[/info]", n=n, count=len(targets), idx=idx))
             cmd = [*wt_cmd, "download", magnet_link, "--out", dl_dir]
             if idx is not None:
                 cmd.extend(["--select", str(idx - 1)])  # webtorrent is 0-based
             rc = _run_download(
                 cmd, quiet,
-                f"[accent]Downloading…[/accent]  "
-                f"{'session ' + str(n) + '/' + str(len(targets)) + '  •  ' if len(targets) > 1 else ''}"
-                "Ctrl+C cancel",
+                (t("[accent]Downloading…[/accent]  session {session}/{total}  •  Ctrl+C cancel",
+                   session=n, total=len(targets)) if len(targets) > 1
+                 else t("[accent]Downloading…[/accent]  Ctrl+C cancel")),
             )
             if rc is None:
-                console.print("\n[warning] Download cancelled.[/warning]\n")
+                console.print(t("\n[warning] Download cancelled.[/warning]\n"))
                 return False
             if rc != 0:
-                console.print(f"\n[error] Session {n} failed (exit code {rc}).[/error]\n")
+                console.print(t("\n[error] Session {n} failed (exit code {rc}).[/error]\n", n=n, rc=rc))
                 return False
 
         console.print()
-        console.print("[success] Download complete![/success]")
-        console.print(f"[info]Files saved to:[/info] [highlight]{escape(dl_dir)}[/highlight]\n")
+        console.print(t("[success] Download complete![/success]"))
+        console.print(t("[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n", dl_dir=escape(dl_dir)))
         return True
 
     except KeyboardInterrupt:
-        console.print("\n[warning] Download cancelled.[/warning]\n")
+        console.print(t("\n[warning] Download cancelled.[/warning]\n"))
         return False
     except FileNotFoundError:
-        console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
+        console.print(t("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n"))
         return False
 
 
@@ -784,19 +791,16 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
     dl_dir = _download_dir_or_explain()
     if dl_dir is None:
         return False
-    console.print(f"[info]Downloading to:[/info] [highlight]{escape(dl_dir)}[/highlight]")
+    console.print(t("[info]Downloading to:[/info] [highlight]{dl_dir}[/highlight]", dl_dir=escape(dl_dir)))
     if select_indexes:
         console.print(
-            "[warning] peerflix is a streaming tool — its -i flag only picks which file is "
-            "served at the root, NOT which pieces are downloaded. The whole torrent will "
-            "still be pulled to disk. Use [bold]aria2c[/bold] for strict file selection.[/warning]"
+            t("[warning] peerflix is a streaming tool — its -i flag only picks which file is served at the root, NOT which pieces are downloaded. The whole torrent will still be pulled to disk. Use [bold]aria2c[/bold] for strict file selection.[/warning]")
         )
         if len(select_indexes) > 1:
             console.print(
-                f"[warning] Running {len(select_indexes)} sequential sessions "
-                "(peerflix handles one file per run).[/warning]"
+                t("[warning] Running {count} sequential sessions (peerflix handles one file per run).[/warning]", count=len(select_indexes))
             )
-    console.print("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n")
+    console.print(t("[muted]To cancel, press [key]Ctrl+C[/key] at any time.[/muted]\n"))
 
     targets: list[int | None] = [i for i in (select_indexes or [])] or [None]
     quiet = is_quiet_mode()
@@ -807,35 +811,35 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
     try:
         for n, idx in enumerate(targets, 1):
             if len(targets) > 1:
-                console.print(f"[info]Session {n}/{len(targets)} — file index {idx}[/info]")
+                console.print(t("[info]Session {n}/{count} — file index {idx}[/info]", n=n, count=len(targets), idx=idx))
             marker = os.path.join(markers, f"done-{n}")
             cmd = [*pf_cmd, magnet_link, "--path", dl_dir, "--on-downloaded", _touch_command(marker)]
             if idx is not None:
                 cmd.extend(["-i", str(idx - 1)])  # peerflix is 0-based
             rc = _run_download(
                 cmd, quiet,
-                f"[accent]Downloading…[/accent]  "
-                f"{'session ' + str(n) + '/' + str(len(targets)) + '  •  ' if len(targets) > 1 else ''}"
-                "Ctrl+C cancel",
+                (t("[accent]Downloading…[/accent]  session {session}/{total}  •  Ctrl+C cancel",
+                   session=n, total=len(targets)) if len(targets) > 1
+                 else t("[accent]Downloading…[/accent]  Ctrl+C cancel")),
                 done_marker=marker,
             )
             if rc is None:
-                console.print("\n[warning] Download cancelled.[/warning]\n")
+                console.print(t("\n[warning] Download cancelled.[/warning]\n"))
                 return False
             if rc != 0:
-                console.print(f"\n[error] Session {n} failed (exit code {rc}).[/error]\n")
+                console.print(t("\n[error] Session {n} failed (exit code {rc}).[/error]\n", n=n, rc=rc))
                 return False
 
         console.print()
-        console.print("[success] Download complete![/success]")
-        console.print(f"[info]Files saved to:[/info] [highlight]{escape(dl_dir)}[/highlight]\n")
+        console.print(t("[success] Download complete![/success]"))
+        console.print(t("[info]Files saved to:[/info] [highlight]{dl_dir}[/highlight]\n", dl_dir=escape(dl_dir)))
         return True
 
     except KeyboardInterrupt:
-        console.print("\n[warning] Download cancelled.[/warning]\n")
+        console.print(t("\n[warning] Download cancelled.[/warning]\n"))
         return False
     except FileNotFoundError:
-        console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
+        console.print(t("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n"))
         return False
     finally:
         shutil.rmtree(markers, ignore_errors=True)
@@ -961,12 +965,12 @@ def _run_stream(
 
         try:
             if quiet:
-                hints = ["Ctrl+C cancel"]
+                hints = [t("Ctrl+C cancel")]
                 if vlc_url:
-                    hints.append("v reopen VLC")
+                    hints.append(t("v reopen VLC"))
                 if allow_navigate:
-                    hints.append("n/b next/prev")
-                msg = "[accent]Streaming…[/accent]  " + "  •  ".join(hints)
+                    hints.append(t("n/b next/prev"))
+                msg = t("[accent]Streaming…[/accent]  {hints}", hints="  •  ".join(hints))
                 with console.status(msg, spinner=theme.SPINNER):
                     nav_action = _poll_loop()
             else:
@@ -1084,7 +1088,7 @@ def _resolve_subs_for_session(
         abs_paths = [os.path.abspath(p) for p in raw_paths if p and os.path.exists(p)]
         if not abs_paths:
             console.print(
-                "[warning] External subtitle path missing or not found — streaming without subs.[/warning]"
+                t("[warning] External subtitle path missing or not found — streaming without subs.[/warning]")
             )
             return {}
         if file_list:
@@ -1112,9 +1116,9 @@ def _resolve_subs_for_session(
     missing = sorted(i for i in needed if not os.path.exists(local.get(i, "")))
     if missing:
         console.print(
-            f"[info]Found {len(missing)} subtitle file(s) inside torrent — fetching via aria2c…[/info]"
+            tn("[info]Found {n} subtitle file(s) inside torrent — fetching via aria2c…[/info]", "[info]Found {n} subtitle file(s) inside torrent — fetching via aria2c…[/info]", len(missing))
         )
-        with console.status("[accent]Downloading subtitles…[/accent]", spinner=theme.SPINNER):
+        with console.status(t("[accent]Downloading subtitles…[/accent]"), spinner=theme.SPINNER):
             local.update(_fetch_torrent_subs(magnet_link, files_meta, missing))
 
     result: dict[int, list[str]] = {}
@@ -1124,7 +1128,7 @@ def _resolve_subs_for_session(
             result[vid_idx] = paths
     if not result:
         console.print(
-            "[warning] Could not fetch in-torrent subtitles — streaming without subs.[/warning]"
+            t("[warning] Could not fetch in-torrent subtitles — streaming without subs.[/warning]")
         )
     return result
 
@@ -1153,12 +1157,11 @@ def stream_with_webtorrent(session: "TorrentSession") -> str:
         n_skipped = len(session.selected_files) - len(session.stream_indexes)
         if n_skipped and session.stream_indexes:
             console.print(
-                f"[warning] Skipping {n_skipped} non-video file(s) — streamable files only.[/warning]"
+                tn("[warning] Skipping {n} non-video file(s) — streamable files only.[/warning]", "[warning] Skipping {n} non-video file(s) — streamable files only.[/warning]", n_skipped)
             )
         if not session.stream_indexes and session.file_list:
             console.print(
-                "[error] Selection contains no streamable video files. "
-                "Pick a video file or use a download method instead.[/error]\n"
+                t("[error] Selection contains no streamable video files. Pick a video file or use a download method instead.[/error]\n")
             )
             return "unavailable"
 
@@ -1237,11 +1240,11 @@ def stream_with_webtorrent(session: "TorrentSession") -> str:
         _reset_terminal_title()
         time.sleep(0.5)
         _clear_terminal()
-        console.print("\n[warning] Streaming cancelled.[/warning]\n")
+        console.print(t("\n[warning] Streaming cancelled.[/warning]\n"))
         return "cancelled"
     except FileNotFoundError:
         _reset_terminal_title()
-        console.print("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n")
+        console.print(t("[error] webtorrent-cli not found. Install with: npm install -g webtorrent-cli[/error]\n"))
         return "unavailable"
 
 
@@ -1263,12 +1266,11 @@ def stream_with_peerflix(session: "TorrentSession") -> str:
         n_skipped = len(session.selected_files) - len(session.stream_indexes)
         if n_skipped and session.stream_indexes:
             console.print(
-                f"[warning] Skipping {n_skipped} non-video file(s) — streamable files only.[/warning]"
+                tn("[warning] Skipping {n} non-video file(s) — streamable files only.[/warning]", "[warning] Skipping {n} non-video file(s) — streamable files only.[/warning]", n_skipped)
             )
         if not session.stream_indexes and session.file_list:
             console.print(
-                "[error] Selection contains no streamable video files. "
-                "Pick a video file or use a download method instead.[/error]\n"
+                t("[error] Selection contains no streamable video files. Pick a video file or use a download method instead.[/error]\n")
             )
             return "unavailable"
 
@@ -1336,11 +1338,11 @@ def stream_with_peerflix(session: "TorrentSession") -> str:
         _reset_terminal_title()
         time.sleep(0.5)
         _clear_terminal()
-        console.print("\n[warning] Streaming cancelled.[/warning]\n")
+        console.print(t("\n[warning] Streaming cancelled.[/warning]\n"))
         return "cancelled"
     except FileNotFoundError:
         _reset_scroll_region()
         _reset_terminal_title()
-        console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
+        console.print(t("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n"))
         return "unavailable"
 

@@ -11,6 +11,9 @@ heuristic always, plus a definitive ffprobe check when ffmpeg is installed and a
 copy of the video has already been downloaded.
 """
 
+# i18n: converted
+from torrent_finder.i18n import N_, t, tn
+
 import json
 import os
 import re
@@ -77,24 +80,24 @@ def _nyaa_field(html: str, label: str) -> str:
 def _fetch_nyaa(result: dict):
     url = result.get("page_url")
     if not url:
-        return None, "No Nyaa page link for this result."
+        return None, N_("No Nyaa page link for this result.")
     try:
         html = requests.get(url, headers=_UA, timeout=20).text
     except Exception as e:
-        return None, f"Couldn't reach Nyaa ({type(e).__name__})."
+        return None, f"Couldn't reach Nyaa ({type(e).__name__})."  # i18n: ignore — stable identity, source/tool data or public English value
 
     title_m = re.search(r"<h3 class=\"panel-title\">(.*?)</h3>", html, re.S)
     info = TorrentInfo(
-        source="Nyaa",
+        source="Nyaa",  # i18n: ignore — stable identity, source/tool data or public English value
         title=_strip_tags(title_m.group(1)) if title_m else result.get("name", ""),
         page_url=url,
-        category=_nyaa_field(html, "Category"),
-        uploader=_nyaa_field(html, "Submitter"),
-        date=_nyaa_field(html, "Date"),
-        seeders=_nyaa_field(html, "Seeders"),
-        leechers=_nyaa_field(html, "Leechers"),
-        size=_nyaa_field(html, "File size"),
-        info_hash=_nyaa_field(html, "Info hash") or result.get("info_hash", ""),
+        category=_nyaa_field(html, "Category"),  # i18n: ignore — stable identity, source/tool data or public English value
+        uploader=_nyaa_field(html, "Submitter"),  # i18n: ignore — stable identity, source/tool data or public English value
+        date=_nyaa_field(html, "Date"),  # i18n: ignore — stable identity, source/tool data or public English value
+        seeders=_nyaa_field(html, "Seeders"),  # i18n: ignore — stable identity, source/tool data or public English value
+        leechers=_nyaa_field(html, "Leechers"),  # i18n: ignore — stable identity, source/tool data or public English value
+        size=_nyaa_field(html, "File size"),  # i18n: ignore — stable identity, source/tool data or public English value
+        info_hash=_nyaa_field(html, "Info hash") or result.get("info_hash", ""),  # i18n: ignore — stable identity, source/tool data or public English value
     )
 
     desc_m = re.search(r'id="torrent-description">(.*?)</div>', html, re.S)
@@ -121,16 +124,16 @@ def _fetch_apibay(result: dict):
     if m:
         tid = m.group(1)
     if not tid:
-        return None, "No PirateBay id for this result."
+        return None, N_("No PirateBay id for this result.")
     try:
         # apibay.org is slow (~20s behind Cloudflare) — use a generous timeout.
         d = requests.get("https://apibay.org/t.php", params={"id": tid}, timeout=25, headers=_UA).json()
         files = requests.get("https://apibay.org/f.php", params={"id": tid}, timeout=25, headers=_UA).json()
     except Exception as e:
-        return None, f"Couldn't reach PirateBay API ({type(e).__name__})."
+        return None, f"Couldn't reach PirateBay API ({type(e).__name__})."  # i18n: ignore — stable identity, source/tool data or public English value
 
     info = TorrentInfo(
-        source="Apibay",
+        source="Apibay",  # i18n: ignore — stable identity, source/tool data or public English value
         title=d.get("name", result.get("name", "")),
         page_url=result.get("page_url", ""),
         category=str(d.get("category", "")),
@@ -171,9 +174,9 @@ def _fetch_yts(result: dict):
         ).json()
         movies = r.get("data", {}).get("movies", []) or []
     except Exception as e:
-        return None, f"Couldn't reach YTS ({type(e).__name__})."
+        return None, f"Couldn't reach YTS ({type(e).__name__})."  # i18n: ignore — stable identity, source/tool data or public English value
     if not movies:
-        return None, "YTS returned no details for this title."
+        return None, N_("YTS returned no details for this title.")
     mv = movies[0]
     info = TorrentInfo(
         source="YTS",
@@ -185,7 +188,7 @@ def _fetch_yts(result: dict):
     )
     rating = mv.get("rating")
     if rating:
-        info.description = f"IMDb rating: {rating}/10\n\n" + info.description
+        info.description = f"IMDb rating: {rating}/10\n\n" + info.description  # i18n: ignore — stable identity, source/tool data or public English value
     return info, ""
 
 
@@ -197,7 +200,7 @@ def _human_size(n) -> str:
         n = float(n)
     except (TypeError, ValueError):
         return ""
-    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):  # i18n: ignore — stable identity, source/tool data or public English value
         if n < 1024 or unit == "TiB":
             return f"{n:.1f} {unit}"
         n /= 1024
@@ -254,26 +257,26 @@ def assess_embedded_subs(result: dict, files: list) -> str:
         tracks = _ffprobe_subtitle_tracks(local)
         if tracks is not None:
             if tracks:
-                return f"yes — {len(tracks)} embedded track(s): {', '.join(tracks[:6])} (ffprobe)"
+                return f"yes — {len(tracks)} embedded track(s): {', '.join(tracks[:6])} (ffprobe)"  # i18n: ignore — stable identity, source/tool data or public English value
             elif has_separate:
-                return "no embedded tracks, but separate subtitle file(s) present (ffprobe)"
+                return N_("no embedded tracks, but separate subtitle file(s) present (ffprobe)")
             else:
-                return "no — no embedded tracks and no separate subs (ffprobe)"
+                return N_("no — no embedded tracks and no separate subs (ffprobe)")
 
     # Heuristic fallback.
     if has_separate:
-        return "separate subtitle file(s) present in the torrent"
+        return N_("separate subtitle file(s) present in the torrent")
     tags = result.get("name", "").lower()
     cat = (result.get("category", "") or "").lower()
     sub_signal = any(t in tags for t in (
-        "subbed", "softsub", "eng sub", "engsub", "multi-sub", "multisub",
-        "dual audio", "dual-audio", "english", "vostfr", "10bit",
+        "subbed", "softsub", "eng sub", "engsub", "multi-sub", "multisub",  # i18n: ignore — stable identity, source/tool data or public English value
+        "dual audio", "dual-audio", "english", "vostfr", "10bit",  # i18n: ignore — stable identity, source/tool data or public English value
     )) or "english-translated" in cat
     if has_mkv and sub_signal:
-        return "likely embedded — MKV with subtitle/translation tags (heuristic)"
+        return N_("likely embedded — MKV with subtitle/translation tags (heuristic)")
     if has_mkv:
-        return "uncertain — MKV without separate subs; may be soft-subbed or raw (heuristic)"
-    return "no subtitle indications found (heuristic)"
+        return N_("uncertain — MKV without separate subs; may be soft-subbed or raw (heuristic)")
+    return N_("no subtitle indications found (heuristic)")
 
 
 # --------------------------------------------------------------------------- #
@@ -289,7 +292,36 @@ def fetch_torrent_info(result: dict):
     elif source == "YTS":
         info, err = _fetch_yts(result)
     else:
-        return None, f"Origin info isn't available for {source or 'this source'}."
+        return None, f"Origin info isn't available for {source or 'this source'}."  # i18n: ignore — stable identity, source/tool data or public English value
     if info is not None:
         info.embedded_subs = assess_embedded_subs(result, info.files)
     return info, err
+
+
+def info_label(message: str) -> str:
+    """Display an origin error or embedded-subtitle verdict; core values stay English."""
+    match = re.fullmatch(r"Couldn't reach (Nyaa|PirateBay API|YTS) \((.*)\)\.", message, re.S)  # i18n: ignore — public error
+    if match:
+        templates = {
+            "Nyaa": N_("Couldn't reach Nyaa ({error})."),
+            "PirateBay API": N_("Couldn't reach PirateBay API ({error})."),
+            "YTS": N_("Couldn't reach YTS ({error})."),
+        }
+        return t(templates[match[1]], error=match[2])
+    match = re.fullmatch(r"Origin info isn't available for (.*)\.", message, re.S)  # i18n: ignore — public error
+    if match:
+        source = t("this source") if match[1] == "this source" else match[1]  # i18n: ignore — fallback identity
+        return t("Origin info isn't available for {source}.", source=source)
+    match = re.fullmatch(r"yes — (\d+) embedded track\(s\): (.*) \(ffprobe\)", message, re.S)  # i18n: ignore — verdict identity
+    if match:
+        return tn("yes — {n} embedded track(s): {tracks} (ffprobe)",
+                  "yes — {n} embedded track(s): {tracks} (ffprobe)", int(match[1]), tracks=match[2])
+    return t(message)
+
+
+def description_label(description: str) -> str:
+    """Translate the generated rating prefix, preserving the origin's description."""
+    match = re.match(r"IMDb rating: (.*?)\/10\n\n", description)  # i18n: ignore — generated prefix
+    if match:
+        return t("IMDb rating: {rating}/10\n\n", rating=match[1]) + description[match.end():]
+    return description

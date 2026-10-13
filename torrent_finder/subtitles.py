@@ -1,5 +1,8 @@
 """Subtitle downloading module using subliminal."""
 
+# i18n: converted
+from torrent_finder.i18n import N_, t
+
 import os
 import re
 import warnings
@@ -110,28 +113,27 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
     video has already been downloaded, hash-match the real file for accurate
     sync instead of guessing from the release name.
     """
-    console.print(f"\n[info]Subtitle Search for:[/info] [highlight]{escape(torrent_name)}[/highlight]")
+    console.print(t("\n[info]Subtitle Search for:[/info] [highlight]{torrent_name}[/highlight]", torrent_name=escape(torrent_name)))
     console.print(
-        "[dim]Tip: enter one or more languages separated by commas (e.g. eng, por "
-        "or pt-BR). The first found becomes the primary track.[/dim]"
+        t("[dim]Tip: enter one or more languages separated by commas (e.g. eng, por or pt-BR). The first found becomes the primary track.[/dim]")
     )
 
     # Prompt for one or more languages.
     while True:
-        raw = console.input("[accent]›[/accent] Language code(s) [muted]\\[default: eng][/muted]: ").strip()
+        raw = console.input(t("[accent]›[/accent] Language code(s) [muted]\\[default: eng][/muted]: ")).strip()
         if not raw:
             languages, unknown = [Language("eng")], []
             break
         languages, unknown = _parse_languages(raw)
         if languages:
             break
-        console.print("[warning]No valid language codes recognised. Try e.g. eng, por, pt-BR.[/warning]")
+        console.print(t("[warning]No valid language codes recognised. Try e.g. eng, por, pt-BR.[/warning]"))
 
     if unknown:
-        console.print(f"[warning]Ignored unrecognised code(s): {escape(', '.join(unknown))}[/warning]")
+        console.print(t("[warning]Ignored unrecognised code(s): {value}[/warning]", value=escape(', '.join(unknown))))
 
     label_list = ", ".join(_lang_label(l) for l in languages)
-    console.print(f"[info]Searching subtitles for:[/info] [highlight]{escape(label_list)}[/highlight]")
+    console.print(t("[info]Searching subtitles for:[/info] [highlight]{label_list}[/highlight]", label_list=escape(label_list)))
 
     # Per-provider credentials (if configured) unlock the best sources; without
     # them those providers still run anonymously with tighter limits.
@@ -144,8 +146,7 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
         provider_configs["addic7ed"] = add_cfg
     if not os_cfg:
         console.print(
-            "[dim]Tip: set OpenSubtitles.com credentials (main menu › Credentials) "
-            "for far better matches.[/dim]"
+            t("[dim]Tip: set OpenSubtitles.com credentials (main menu › Credentials) for far better matches.[/dim]")
         )
 
     try:
@@ -158,9 +159,7 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
                 video = scan_video(video_path)
                 hash_matched = True
                 console.print(
-                    f"[dim]Matching against downloaded file "
-                    f"[/dim][highlight]{escape(os.path.basename(video_path))}[/highlight] "
-                    f"[dim]for accurate sync.[/dim]"
+                    t("[dim]Matching against downloaded file [/dim][highlight]{value}[/highlight] [dim]for accurate sync.[/dim]", value=escape(os.path.basename(video_path)))
                 )
             except Exception:
                 video = None
@@ -169,7 +168,7 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
             # subliminal treat the string as a standard video filename.
             video = Video.fromname(f"{torrent_name}.mkv")
 
-        with console.status(f"[accent]Downloading subtitles for '[highlight]{escape(torrent_name)}[/highlight]'...[/accent]", spinner=theme.SPINNER):
+        with console.status(t("[accent]Downloading subtitles for '[highlight]{torrent_name}[/highlight]'...[/accent]", torrent_name=escape(torrent_name)), spinner=theme.SPINNER):
             # subliminal downloads the best subtitle per requested language.
             best_subtitles = download_best_subtitles(
                 [video], set(languages),
@@ -209,25 +208,23 @@ def download_subtitles(torrent_name: str, video_path: Optional[str] = None) -> l
                     ordered_paths.append(match)
                 console.print(f"[success]✓ {escape(_lang_label(lang))} — {escape(os.path.basename(match))}[/success]")
             else:
-                console.print(f"[warning]✗ {escape(_lang_label(lang))} — no subtitle found.[/warning]")
+                console.print(t("[warning]✗ {value} — no subtitle found.[/warning]", value=escape(_lang_label(lang))))
 
         if not ordered_paths:
-            console.print("[warning]No subtitles found matching that release.[/warning]")
+            console.print(t("[warning]No subtitles found matching that release.[/warning]"))
             # Only meaningful when we matched by name — with a hashed file there's
             # nothing better to fall back to.
             if not hash_matched:
                 console.print(
-                    "[dim]Tip: searched by release name. If you've downloaded the "
-                    "video, search again to match by file hash — more reliable, "
-                    "especially for non-English titles.[/dim]"
+                    t("[dim]Tip: searched by release name. If you've downloaded the video, search again to match by file hash — more reliable, especially for non-English titles.[/dim]")
                 )
             return []
 
-        console.print(f"\n[success]Saved to {escape(dl_dir)}.[/success]")
+        console.print(t("\n[success]Saved to {dl_dir}.[/success]", dl_dir=escape(dl_dir)))
         return ordered_paths
 
     except Exception as e:
-        console.print(f"\n[error]Subtitle download failed: {escape(str(e))}[/error]")
+        console.print(t("\n[error]Subtitle download failed: {value}[/error]", value=escape(str(e))))
         return []
 
 
@@ -247,15 +244,15 @@ def test_opensubtitles(username: str, password: str, apikey: str | None = None):
     try:
         provider.initialize()
         provider.login()  # actually authenticate; raises on bad credentials
-        return True, "Login successful"
+        return True, N_("Login successful")
     except Exception as e:
         msg = str(e) or type(e).__name__
         low = msg.lower()
         if any(t in low for t in ("401", "unauthor", "invalid", "403", "forbidden")):
-            return False, "Invalid username or password"
-        if any(t in low for t in ("429", "too many", "rate")):
-            return None, "Rate limited by OpenSubtitles — try again shortly"
-        return None, f"Couldn't verify ({msg[:120]})"
+            return False, N_("Invalid username or password")
+        if any(t in low for t in ("429", "too many", "rate")):  # i18n: ignore — stable identity, source/tool data or public English value
+            return None, N_("Rate limited by OpenSubtitles — try again shortly")
+        return None, f"Couldn't verify ({msg[:120]})"  # i18n: ignore — stable identity, source/tool data or public English value
     finally:
         try:
             provider.terminate()
@@ -271,4 +268,12 @@ def test_addic7ed(username: str, password: str):
     look identical to a right one. Return None ("couldn't verify") rather than a
     misleading success.
     """
-    return None, "Addic7ed can't be verified automatically; it'll be used on the next search."
+    return None, N_("Addic7ed can't be verified automatically; it'll be used on the next search.")
+
+
+def verification_label(message: str) -> str:
+    """Translate a verification result only when displayed by the credential UI."""
+    match = re.fullmatch(r"Couldn't verify \((.*)\)", message, re.S)  # i18n: ignore — public return value
+    if match:
+        return t("Couldn't verify ({error})", error=match[1])
+    return t(message)

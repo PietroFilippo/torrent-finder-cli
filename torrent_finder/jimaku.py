@@ -7,6 +7,9 @@ free API key (Jimaku account → settings), read from ``JIMAKU_API_KEY`` — see
 caller transparently falls back to subliminal.
 """
 
+# i18n: converted
+from torrent_finder.i18n import N_, t
+
 import os
 import re
 from typing import Optional
@@ -51,7 +54,7 @@ def _search_entries(query: str, key: str) -> list[dict]:
             timeout=15,
         )
         if resp.status_code == 401:
-            console.print("[warning]Jimaku rejected the API key (401).[/warning]")
+            console.print(t("[warning]Jimaku rejected the API key (401).[/warning]"))
             return []
         resp.raise_for_status()
         data = resp.json()
@@ -85,7 +88,7 @@ def _download(url: str, name: str, key: str) -> Optional[str]:
             resp.raise_for_status()
             return save_response(resp, dl_dir, name or "subtitle.srt")
     except Exception as e:
-        console.print(f"[error]Jimaku download failed: {escape(str(e))}[/error]")
+        console.print(t("[error]Jimaku download failed: {value}[/error]", value=escape(str(e))))
         return None
 
 
@@ -94,7 +97,7 @@ def _entry_label(entry: dict) -> str:
         entry.get("english_name")
         or entry.get("name")
         or entry.get("japanese_name")
-        or f"entry {entry.get('id', '?')}"
+        or t("entry {value}", value=entry.get('id', '?'))
     )
 
 
@@ -111,17 +114,15 @@ def search_and_download(torrent_name: str) -> Optional[str]:
     from torrent_finder.ui.selector import SelectItem, arrow_select  # local: avoid UI coupling at import
 
     console.print(
-        "[dim]Note: Jimaku lists community anime fansubs by series (mostly "
-        "Japanese/English) — you pick the file/episode manually, and the "
-        "comma-separated language option doesn't apply here.[/dim]"
+        t("[dim]Note: Jimaku lists community anime fansubs by series (mostly Japanese/English) — you pick the file/episode manually, and the comma-separated language option doesn't apply here.[/dim]")
     )
     query = _clean_title(torrent_name)
-    console.print(f"[info]Searching Jimaku for:[/info] [highlight]{escape(query)}[/highlight]")
+    console.print(t("[info]Searching Jimaku for:[/info] [highlight]{query}[/highlight]", query=escape(query)))
 
-    with console.status("[accent]Querying Jimaku...[/accent]", spinner=theme.SPINNER):
+    with console.status(t("[accent]Querying Jimaku...[/accent]"), spinner=theme.SPINNER):
         entries = _search_entries(query, key)
     if not entries:
-        console.print("[warning]No Jimaku series matched — trying subliminal instead.[/warning]")
+        console.print(t("[warning]No Jimaku series matched — trying subliminal instead.[/warning]"))
         return None
 
     # Pick the series (auto when there's only one match).
@@ -129,35 +130,35 @@ def search_and_download(torrent_name: str) -> Optional[str]:
         entry = entries[0]
     else:
         items = [SelectItem(label=_entry_label(e), value=e, is_action=True) for e in entries[:25]]
-        items.append(SelectItem(label="Cancel", value=None, is_action=True))
-        idx = arrow_select(items, title="Jimaku series")
+        items.append(SelectItem(label=t("Cancel"), value=None, is_action=True))
+        idx = arrow_select(items, title=t("Jimaku series"))
         if idx is None or items[idx].value is None:
             return None
         entry = items[idx].value
 
-    with console.status("[accent]Loading subtitle files...[/accent]", spinner=theme.SPINNER):
+    with console.status(t("[accent]Loading subtitle files...[/accent]"), spinner=theme.SPINNER):
         files = _list_files(entry.get("id"), key)
     files = [f for f in files if isinstance(f.get("name"), str) and f.get("url")]
     if not files:
-        console.print("[warning]That series has no downloadable files — trying subliminal instead.[/warning]")
+        console.print(t("[warning]That series has no downloadable files — trying subliminal instead.[/warning]"))
         return None
 
     # Pick a file.
     file_items = []
     for f in files:
         size = f.get("size")
-        hint = f"{int(size)/1024:.0f} KiB" if isinstance(size, (int, float)) and size else ""
+        hint = f"{int(size)/1024:.0f} KiB" if isinstance(size, (int, float)) and size else ""  # i18n: ignore — stable identity, source/tool data or public English value
         file_items.append(SelectItem(label=f["name"], value=f, is_action=True, hint=hint))
-    file_items.append(SelectItem(label="Cancel", value=None, is_action=True))
-    idx = arrow_select(file_items, title=f"Jimaku › {escape(_entry_label(entry))}")
+    file_items.append(SelectItem(label=t("Cancel"), value=None, is_action=True))
+    idx = arrow_select(file_items, title=f"Jimaku › {escape(_entry_label(entry))}")  # i18n: ignore — stable identity, source/tool data or public English value
     if idx is None or file_items[idx].value is None:
         return None
     chosen = file_items[idx].value
 
-    with console.status(f"[accent]Downloading {escape(chosen['name'])}...[/accent]", spinner=theme.SPINNER):
+    with console.status(t("[accent]Downloading {value}...[/accent]", value=escape(chosen['name'])), spinner=theme.SPINNER):
         saved = _download(chosen["url"], chosen["name"], key)
     if saved:
-        console.print(f"\n[success]Saved Jimaku subtitle to {escape(get_download_dir())}![/success]")
+        console.print(t("\n[success]Saved Jimaku subtitle to {value}![/success]", value=escape(get_download_dir())))
     return saved
 
 
@@ -180,8 +181,16 @@ def validate_key(key: str):
             timeout=15,
         )
         if resp.status_code == 401:
-            return False, "Invalid API key (401)"
+            return False, N_("Invalid API key (401)")
         resp.raise_for_status()
-        return True, "API key accepted"
+        return True, N_("API key accepted")
     except Exception as e:
-        return None, f"Couldn't verify ({str(e)[:120] or type(e).__name__})"
+        return None, f"Couldn't verify ({str(e)[:120] or type(e).__name__})"  # i18n: ignore — stable identity, source/tool data or public English value
+
+
+def verification_label(message: str) -> str:
+    """Display a verification message; validate_key keeps its public English result."""
+    match = re.fullmatch(r"Couldn't verify \((.*)\)", message, re.S)  # i18n: ignore — public return value
+    if match:
+        return t("Couldn't verify ({error})", error=match[1])
+    return t(message)

@@ -1,5 +1,7 @@
 """Fetch torrent file list from a magnet link using aria2c."""
 
+# i18n: converted
+
 import base64
 import os
 import re

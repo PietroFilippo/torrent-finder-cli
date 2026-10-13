@@ -7,6 +7,9 @@ header knows about episode index, VLC URL, and attached sub paths — not a
 generic terminal toolkit.
 """
 
+# i18n: converted
+from torrent_finder.i18n import t, tn
+
 import os
 import sys
 
@@ -76,49 +79,52 @@ def _print_stream_header(
 
     # Terminal title — persists in OS title bar regardless of screen content
     if multi:
-        _set_terminal_title(f"Episode {n}/{total} — file {file_idx} | n: next  b: back  v: VLC  Ctrl+C: cancel")
+        _set_terminal_title(t("Episode {n}/{total} — file {file_idx} | n: next  b: back  v: VLC  Ctrl+C: cancel", n=n, total=total, file_idx=file_idx))
     elif file_idx is not None:
-        _set_terminal_title(f"Streaming file {file_idx} | v: VLC  Ctrl+C: cancel")
+        _set_terminal_title(t("Streaming file {file_idx} | v: VLC  Ctrl+C: cancel", file_idx=file_idx))
 
     # Column 0, like the tools' own output below it.
     inner_width = max(8, console.size.width - 2)
 
     # Escape user-supplied strings — torrent filenames often contain bracketed
     # tags like ``[x265]`` that Rich's markup parser would interpret as styles.
-    file_display = escape(_truncate(filename or "(unknown file)", inner_width))
+    file_display = escape(_truncate(filename or t("(unknown file)"), inner_width))
 
-    size_str = format_size(filesize_bytes) if filesize_bytes else "size unknown"
-    backend_str = f" · via {escape(backend)}" if backend else ""
-    idx_str = f" · file index {file_idx}" if file_idx is not None else ""
+    size_str = format_size(filesize_bytes) if filesize_bytes else t("size unknown")
+    backend_str = t(" · via {backend}", backend=escape(backend)) if backend else ""
+    idx_str = t(" · file index {file_idx}", file_idx=file_idx) if file_idx is not None else ""
 
     if sub_paths:
         primary = escape(
             _truncate(os.path.basename(sub_paths[0]), max(4, inner_width - 20))
         )
-        extras = f"  (+{len(sub_paths) - 1} more)" if len(sub_paths) > 1 else ""
-        sub_line = f"[success]Subtitles:[/success] [highlight]{primary}[/highlight]{extras}"
+        if len(sub_paths) > 1:
+            sub_line = tn("[success]Subtitles:[/success] [highlight]{primary}[/highlight]  (+{n} more)",
+                          "[success]Subtitles:[/success] [highlight]{primary}[/highlight]  (+{n} more)",
+                          len(sub_paths) - 1, primary=primary)
+        else:
+            sub_line = t("[success]Subtitles:[/success] [highlight]{primary}[/highlight]", primary=primary)
     else:
-        sub_line = "[muted]No subtitles attached[/muted]"
+        sub_line = t("[muted]No subtitles attached[/muted]")
 
-    binds: list[str] = ["Ctrl+C cancel"]
+    binds: list[str] = [t("Ctrl+C cancel")]
     if vlc_url:
-        binds.append("v reopen VLC")
+        binds.append(t("v reopen VLC"))
     if multi:
-        binds.append("n next")
+        binds.append(t("n next"))
         if ep_idx > 0:
-            binds.append("b previous")
+            binds.append(t("b previous"))
 
     # Persistent warning row — surfaces the VLC "cannot open MRL" race that
     # can hit multi-file webtorrent streams (the HTTP server may need a moment
     # to register the file route after the TCP port comes up). Always shown
     # so the user knows the recovery key without having to remember it.
     warning_line = (
-        '[muted]If VLC errors with "cannot open MRL": press [/muted][key]v[/key] '
-        '[muted]to retry (stream route may still be warming up)[/muted]'
+        t("[muted]If VLC errors with \"cannot open MRL\": press [/muted][key]v[/key] [muted]to retry (stream route may still be warming up)[/muted]")
     )
 
     width = console.size.width
-    title_text = f"Streaming — Episode {n}/{total}" if multi else "Streaming"
+    title_text = t("Streaming — Episode {n}/{total}", n=n, total=total) if multi else t("Streaming")
     lines: list[Text] = [theme.log_header(title_text, width)]
     for markup in (f"[highlight]{file_display}[/highlight]",
                    f"[muted]{size_str}{backend_str}{idx_str}[/muted]",

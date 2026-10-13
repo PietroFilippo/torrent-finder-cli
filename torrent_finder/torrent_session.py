@@ -6,6 +6,8 @@ adapters take ``session.magnet`` + ``session.download_indexes`` projections
 and stay session-unaware (see CONTEXT.md).
 """
 
+# i18n: converted
+
 from torrent_finder.torrent_meta import (
     TorrentFile,
     TorrentMetadata,
