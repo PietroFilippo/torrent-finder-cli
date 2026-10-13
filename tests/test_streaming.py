@@ -317,6 +317,37 @@ class DownloadCancelTests(unittest.TestCase):
         self.assertLess(time.monotonic() - started, 8)
 
 
+class PeerflixCompletionTests(unittest.TestCase):
+    """peerflix keeps running once a download is complete; its marker ends the wait as a success."""
+
+    def test_the_done_marker_stops_a_child_that_never_exits(self):
+        marker = os.path.join(tempfile.mkdtemp(), "done")
+        self.addCleanup(shutil.rmtree, os.path.dirname(marker), True)
+        child = [sys.executable, "-c", "import time; time.sleep(30)"]
+        threading.Timer(0.4, lambda: open(marker, "w").close()).start()
+        started = time.monotonic()
+        self.assertEqual(downloader._run_download(child, quiet=False, status_msg="x", done_marker=marker), 0)
+        self.assertLess(time.monotonic() - started, 15)
+
+    def test_peerflix_is_told_to_leave_the_marker_and_the_download_counts_as_complete(self):
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder, True)
+        seen = []
+
+        def peerflix_finishes(cmd, quiet, status_msg, done_marker=None):
+            hook = cmd[cmd.index("--on-downloaded") + 1]
+            subprocess.run(hook, shell=True, check=True)  # what peerflix does with every piece in
+            seen.append(os.path.exists(done_marker))
+            return 0
+
+        with patch.object(downloader, "_cli_command", return_value=["peerflix"]), \
+             patch.object(downloader, "_download_dir_or_explain", return_value=folder), \
+             patch.object(downloader, "_run_download", side_effect=peerflix_finishes), \
+             patch.object(downloader, "console", Console(file=io.StringIO())):
+            self.assertTrue(downloader.download_with_peerflix(MAGNET, [1, 2]))
+        self.assertEqual(seen, [True, True])
+
+
 class StreamPreparationTests(unittest.TestCase):
     """A08: cancelling the file-list fetch for a stream starts nothing."""
 

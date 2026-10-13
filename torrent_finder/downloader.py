@@ -550,21 +550,27 @@ def _download_dir_or_explain() -> str | None:
         return None
 
 
-def _wait_interruptibly(proc: subprocess.Popen) -> int:
+def _wait_interruptibly(proc: subprocess.Popen, done_marker: str | None = None) -> int:
     """Wait for *proc* while letting Ctrl+C through.
 
     On Windows a plain ``proc.wait()`` holds Ctrl+C back until the child exits,
     and a detached child never sees Ctrl+C itself, so a download looked frozen.
     Short timed waits let the KeyboardInterrupt land within a moment.
+
+    A child that keeps running after its work is done (peerflix) creates
+    *done_marker* instead; it is then stopped and counts as a clean exit.
     """
     while True:
         try:
             return proc.wait(timeout=0.25)
         except subprocess.TimeoutExpired:
-            pass
+            if done_marker and os.path.exists(done_marker):
+                _kill_process_tree(proc)
+                proc.wait()
+                return 0
 
 
-def _run_download(cmd: list[str], quiet: bool, status_msg: str) -> int | None:
+def _run_download(cmd: list[str], quiet: bool, status_msg: str, done_marker: str | None = None) -> int | None:
     """Run one download subprocess to completion. Returns its exit code, or
     None when the user cancelled with Ctrl+C. In quiet mode the child's native
     UI is suppressed and a spinner renders instead."""
@@ -572,11 +578,19 @@ def _run_download(cmd: list[str], quiet: bool, status_msg: str) -> int | None:
     try:
         if quiet:
             with console.status(status_msg, spinner=theme.SPINNER):
-                return _wait_interruptibly(proc)
-        return _wait_interruptibly(proc)
+                return _wait_interruptibly(proc, done_marker)
+        return _wait_interruptibly(proc, done_marker)
     except KeyboardInterrupt:
         _cancel_download_proc(proc)
         return None
+
+
+def _touch_command(path: str) -> str:
+    """A shell command that creates *path*: what peerflix runs (through the shell) when it has every piece."""
+    if platform.system() == "Windows":
+        return f'type nul > "{path}"'
+    import shlex
+    return f"touch {shlex.quote(path)}"
 
 
 def download_with_aria2(magnet_link: str, select_indexes: list[int] | None = None) -> bool:
@@ -786,12 +800,16 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
 
     targets: list[int | None] = [i for i in (select_indexes or [])] or [None]
     quiet = is_quiet_mode()
+    # peerflix never exits by itself: with every piece in, it pauses and waits for a
+    # player. --on-downloaded runs a command at that moment; it leaves a marker here.
+    markers = tempfile.mkdtemp(prefix="torrent-finder-peerflix-")
 
     try:
         for n, idx in enumerate(targets, 1):
             if len(targets) > 1:
                 console.print(f"[info]Session {n}/{len(targets)} — file index {idx}[/info]")
-            cmd = [*pf_cmd, magnet_link, "--path", dl_dir]
+            marker = os.path.join(markers, f"done-{n}")
+            cmd = [*pf_cmd, magnet_link, "--path", dl_dir, "--on-downloaded", _touch_command(marker)]
             if idx is not None:
                 cmd.extend(["-i", str(idx - 1)])  # peerflix is 0-based
             rc = _run_download(
@@ -799,6 +817,7 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
                 f"[accent]Downloading…[/accent]  "
                 f"{'session ' + str(n) + '/' + str(len(targets)) + '  •  ' if len(targets) > 1 else ''}"
                 "Ctrl+C cancel",
+                done_marker=marker,
             )
             if rc is None:
                 console.print("\n[warning] Download cancelled.[/warning]\n")
@@ -818,6 +837,8 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
     except FileNotFoundError:
         console.print("[error] peerflix not found. Install with: npm install -g peerflix[/error]\n")
         return False
+    finally:
+        shutil.rmtree(markers, ignore_errors=True)
 
 
 def _kill_process_tree(proc: subprocess.Popen) -> None:
