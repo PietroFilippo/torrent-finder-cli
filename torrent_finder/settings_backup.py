@@ -63,6 +63,31 @@ def validate_profile(data):
         _strings(values)
 
 
+def _validate_appearance(value):
+    from torrent_finder import terminal_profile
+    from torrent_finder.ui import appearance, theme
+
+    _object(value, {"theme", "focus", "density", "painting", "fonts", "profile"})
+    for key in ("theme", "focus", "density", "painting"):
+        if key in value and not isinstance(value[key], str):
+            raise ValueError("Invalid appearance settings")
+    fonts = value.get("fonts", {})
+    _object(fonts, theme.DESIGNS)
+    for design, choice in fonts.items():
+        _object(choice, {"font", "size"})
+        if not isinstance(choice.get("font"), str):
+            raise ValueError("Invalid appearance font")
+        font = terminal_profile.FONTS.get(choice["font"])
+        if (font is None or font.design != design or type(choice.get("size")) not in (int, float)
+                or choice["size"] not in font.sizes):
+            raise ValueError("Invalid appearance font or size")
+    profile = value.get("profile", {})
+    _object(profile, {"look", "open_from_tabs"})
+    if ("look" in profile and profile["look"] not in appearance.LOOKS
+            or "open_from_tabs" in profile and type(profile["open_from_tabs"]) is not bool):
+        raise ValueError("Invalid terminal profile settings")
+
+
 def validate_payload(data):
     _object(data, {"providers", "settings", "history"})
     providers, settings = data.get("providers", {}), data.get("settings", {})
@@ -76,9 +101,7 @@ def validate_payload(data):
         if key == "hide_stream_output" and type(value) is not bool:
             raise ValueError("Invalid stream preference")
         if key == "appearance":
-            _object(value, {"theme", "focus", "density", "painting"})
-            if any(not isinstance(item, str) for item in value.values()):
-                raise ValueError("Invalid appearance settings")
+            _validate_appearance(value)
         if key == "combined_search":
             validate_profile(value)
         if key == "search_profiles":
@@ -125,6 +148,9 @@ def export_settings(path, *, history=False):
             "settings": {k: deepcopy(v) for k, v in current.get("settings", {}).items() if k in PREFERENCES}}
     if history:
         data["history"] = load_history()  # full form: backups stay self-contained
+    appearance = data["settings"].get("appearance")
+    if isinstance(appearance, dict):
+        appearance.pop("profile", None)  # this machine's Windows Terminal behavior stays local
     validate_payload(data)
     _export(path, {"format": "torrent-finder-settings", "version": 1, "data": data})
 
@@ -196,6 +222,9 @@ def _apply_import(result, data, mode):
     """Apply *data* to the settings document *result* in place; return the preview lines."""
     incoming = deepcopy(data)
     previous = store.section(result, "settings")
+    appearance = previous.get("appearance", {})
+    local_profile = ({"profile": deepcopy(appearance["profile"])}
+                     if isinstance(appearance, dict) and "profile" in appearance else {})
     changes = ["Merge: imported provider/preferences win; other settings stay." if mode == "merge"
                else "Replace: replace portable provider/preferences; keep machine settings, stats and bookmarks."]
     if mode == "replace":
@@ -205,6 +234,11 @@ def _apply_import(result, data, mode):
     else:
         store.section(result, "providers").update(incoming.get("providers", {}))
     settings = incoming.get("settings", {})
+    appearance = settings.get("appearance")
+    if isinstance(appearance, dict) and "profile" in appearance:
+        appearance.pop("profile")
+        if not appearance:
+            settings.pop("appearance")
     if "combined_search" in settings and "search_profiles" not in settings:
         settings["search_profiles"] = {"version": 1, "active": "default", "profiles": [
             {"id": "default", "name": "Default", "settings": deepcopy(settings["combined_search"])}]}
@@ -225,6 +259,8 @@ def _apply_import(result, data, mode):
                 changes.append("Add profile: " + entry["name"])
         settings["search_profiles"] = library.data
     previous.update(settings)
+    if local_profile:
+        previous.setdefault("appearance", {}).update(local_profile)
     if "search_profiles" in settings:
         for entry in settings["search_profiles"]["profiles"]:
             config = entry["settings"]

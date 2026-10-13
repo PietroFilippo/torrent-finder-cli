@@ -23,7 +23,7 @@ from torrent_finder.search_profiles import ProfileLibrary
 from torrent_finder.state import provider_snapshot, apply_provider_state
 from torrent_finder.result_details import detail_lines
 from torrent_finder.language_tags import has_brazilian_subtitles
-from torrent_finder.ui import table, prompts, theme, backup as backup_ui
+from torrent_finder.ui import appearance, table, prompts, theme, backup as backup_ui
 from isolation import isolate_store, restart_store
 
 
@@ -41,6 +41,51 @@ class IsolatedState(unittest.TestCase):
 
 
 class BackupTests(IsolatedState):
+    def test_saved_appearance_exports_and_imports_fonts_without_machine_profile(self):
+        fonts = {"athanor": {"font": "ibm-vga-9x16", "size": 1.5},
+                 "simple": {"font": "consolas", "size": 16}}
+        local = {"look": "plain", "open_from_tabs": True}
+        appearance.save("rubedo", "bar", "compact", fonts=fonts, profile=local)
+        target = self.root / "appearance.json"
+        backup.export_settings(target)
+        data = backup.read_backup(target)
+        exported = data["settings"]["appearance"]
+        self.assertEqual(exported["fonts"], fonts)
+        self.assertNotIn("profile", exported)
+        for mode in ("merge", "replace"):
+            with self.subTest(mode=mode):
+                incoming = deepcopy(data)
+                incoming["settings"]["appearance"]["profile"] = {"look": "full", "open_from_tabs": False}
+                candidate, _ = backup.prepare_import(incoming, mode)
+                self.assertEqual(candidate["settings"]["appearance"]["profile"], local)
+                self.assertEqual(candidate["settings"]["appearance"]["fonts"], fonts)
+                store.commit(backup.import_change(incoming, mode))
+                self.assertEqual(store.read()["settings"]["appearance"]["profile"], local)
+
+    def test_replace_without_appearance_keeps_local_terminal_profile(self):
+        local = {"look": "plain", "open_from_tabs": True}
+        appearance.save("rubedo", "bar", "compact", profile=local)
+        candidate, _ = backup.prepare_import({"settings": {}}, "replace")
+        self.assertEqual(candidate["settings"]["appearance"], {"profile": local})
+        candidate, _ = backup.prepare_import({"settings": {"appearance": {"profile": {
+            "look": "full", "open_from_tabs": False}}}}, "merge")
+        self.assertEqual(candidate["settings"]["appearance"], store.read()["settings"]["appearance"])
+
+    def test_backup_rejects_invalid_nested_font_and_profile_settings(self):
+        choices = ["consolas", {"unknown": {"font": "consolas", "size": 12}},
+                   {"athanor": {"font": "consolas", "size": 12}},
+                   {"simple": {"font": "missing", "size": 12}},
+                   {"simple": {"font": "consolas", "size": 13}},
+                   {"athanor": {"font": "ibm-vga-8x16", "size": True}},
+                   {"simple": {"font": "consolas", "size": "12"}},
+                   {"simple": {"font": "consolas", "size": 12, "extra": 1}}]
+        values = [{"fonts": fonts} for fonts in choices] + [
+            {"profile": "plain"}, {"profile": {"look": "unknown"}},
+            {"profile": {"open_from_tabs": 1}}, {"profile": {"extra": True}}]
+        for value in values:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                backup.validate_payload({"settings": {"appearance": value}})
+
     def initial(self):
         profile = CombinedProvider([AnimeProvider()])
         profile.restore({"selected": ["anime"]})

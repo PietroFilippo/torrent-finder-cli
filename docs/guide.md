@@ -775,8 +775,9 @@ keeps the old entry; saved details don't prove the torrent is still available.
 **Tab → Settings backup / import** moves settings between computers as a JSON
 file. A normal export holds provider choices, profiles, the download folder and
 stream preferences; history is optional. Credentials, bookmarks, stats and
-machine-specific launcher and update state are left out. Exports always use a
-new file name, never overwriting one.
+machine-specific launcher and update state are left out. Appearance and font
+choices travel; the Windows Terminal profile's look and "open from other tabs"
+stay with each computer. Exports always use a new file name, never overwriting one.
 
 Import checks the file and previews it before **Apply import**:
 
