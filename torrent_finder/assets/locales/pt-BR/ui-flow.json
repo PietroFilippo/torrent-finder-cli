@@ -1,0 +1,138 @@
+{
+  "[info]Goodbye![/info]": "[info]Até logo![/info]",
+  "Saved data could not be updated": "Não foi possível atualizar os dados salvos",
+  "Enter / Esc back": "Enter / Esc voltar",
+  "[accent]Opening torrents…  (Esc to stop)[/accent]": "[accent]Abrindo torrents…  (Esc para parar)[/accent]",
+  "[accent]({index}/{total}) {name}  (Esc to stop)[/accent]": "[accent]({index}/{total}) {name}  (Esc para parar)[/accent]",
+  "[accent]({index}/{total}) {name} — {status}  (Esc to stop)[/accent]": "[accent]({index}/{total}) {name} — {status}  (Esc para parar)[/accent]",
+  "[warning] Stopped after {sent} of {total}.[/warning]": "[warning] Parou após {sent} de {total}.[/warning]",
+  "[success]✓ {sent} of {total} saved to your download folder.[/success]": {
+    "one": "[success]✓ {sent} de {total} salvo na sua pasta de downloads.[/success]",
+    "other": "[success]✓ {sent} de {total} salvos na sua pasta de downloads.[/success]"
+  },
+  "[success]✓ {sent} of {total} done — {handed} handed to your torrent client, {saved} saved directly.[/success]": "[success]✓ {sent} de {total} concluídos — no cliente de torrent: {handed}; salvos diretamente: {saved}.[/success]",
+  "[success]✓ {sent} of {total} handed to your torrent client.[/success]": {
+    "one": "[success]✓ {sent} de {total} enviado ao seu cliente de torrent.[/success]",
+    "other": "[success]✓ {sent} de {total} enviados ao seu cliente de torrent.[/success]"
+  },
+  "[muted]Online-Fix archive password:[/muted] {password}": "[muted]Senha do arquivo Online-Fix:[/muted] {password}",
+  "[warning] Couldn't open {count}:[/warning] {names}": "[warning] Não foi possível abrir {count}:[/warning] {names}",
+  "[dim]Grab manually: {url}[/dim]": "[dim]Baixe manualmente: {url}[/dim]",
+  "Retry the {count} that failed": {
+    "one": "Tentar novamente o {count} que falhou",
+    "other": "Tentar novamente os {count} que falharam"
+  },
+  "Continue with the {count} left": {
+    "one": "Continuar com o {count} restante",
+    "other": "Continuar com os {count} restantes"
+  },
+  "Batch handoff finished": "Envio em lote concluído",
+  "[accent]Collecting magnet links…[/accent]": "[accent]Reunindo links magnet…[/accent]",
+  "[warning] No magnet links in this selection (e.g. all Online-Fix / Madokami).[/warning]": "[warning] Nenhum link magnet nesta seleção (ex.: só Online-Fix / Madokami).[/warning]",
+  "[success]✓ Copied {n} magnet link(s) to the clipboard.[/success]": {
+    "one": "[success]✓ {n} link magnet copiado para a área de transferência.[/success]",
+    "other": "[success]✓ {n} links magnet copiados para a área de transferência.[/success]"
+  },
+  "[warning] Couldn't access the clipboard — {n} link(s) below:[/warning]\n": {
+    "one": "[warning] Não foi possível acessar a área de transferência — {n} link abaixo:[/warning]\n",
+    "other": "[warning] Não foi possível acessar a área de transferência — {n} links abaixo:[/warning]\n"
+  },
+  "[dim]{count} skipped (no magnet link).[/dim]": {
+    "one": "[dim]{count} ignorado (sem link magnet).[/dim]",
+    "other": "[dim]{count} ignorados (sem link magnet).[/dim]"
+  },
+  "[warning] Nothing to download via aria2c — no magnet links (e.g. all Online-Fix / Madokami).[/warning]": "[warning] Nada para baixar via aria2c — nenhum link magnet (ex.: só Online-Fix / Madokami).[/warning]",
+  "[dim]{n} item(s) skipped — no magnet (e.g. Online-Fix / Madokami). Use “Open all in client” for those.[/dim]": {
+    "one": "[dim]{n} item ignorado — sem link magnet (ex.: Online-Fix / Madokami). Use “Abrir todos no cliente” para ele.[/dim]",
+    "other": "[dim]{n} itens ignorados — sem link magnet (ex.: Online-Fix / Madokami). Use “Abrir todos no cliente” para eles.[/dim]"
+  },
+  "[muted]Press [key]any key[/key] to return to download options…[/muted]": "[muted]Pressione [key]qualquer tecla[/key] para voltar às opções de download…[/muted]",
+  "{n} torrent(s) downloaded; {skipped} skipped (no magnet).": {
+    "one": "{n} torrent baixado; sem link magnet: {skipped}.",
+    "other": "{n} torrents baixados; sem link magnet: {skipped}."
+  },
+  "Batch download finished": "Download em lote concluído",
+  "qBittorrent handoff finished": "Envio ao qBittorrent concluído",
+  "Open {n} torrents in your client at once?": {
+    "one": "Abrir {n} torrent no seu cliente de uma vez?",
+    "other": "Abrir {n} torrents no seu cliente de uma vez?"
+  },
+  "Batch download": "Download em lote",
+  "[accent]Unpacking…[/accent]": "[accent]Extraindo…[/accent]",
+  "[info]Looking for online peers that can share the torrent's file list…[/info]": "[info]Buscando peers online que possam compartilhar a lista de arquivos do torrent…[/info]",
+  "[dim]This may take a minute or time out. Listed seed counts can be stale; even a torrent showing seeders may have no reachable metadata peers right now.[/dim]": "[dim]Isso pode levar um minuto ou esgotar o tempo. A contagem de seeds pode estar desatualizada; mesmo um torrent com seeds pode não ter peers de metadados acessíveis agora.[/dim]",
+  "[dim]Press Esc or Ctrl+C to cancel and go back.[/dim]\n": "[dim]Pressione Esc ou Ctrl+C para cancelar e voltar.[/dim]\n",
+  "[accent]Fetching file list...[/accent]": "[accent]Obtendo lista de arquivos...[/accent]",
+  "Results": "Resultados",
+  "Send to qBittorrent WebUI": "Enviar ao qBittorrent WebUI",
+  "Open with default client": "Abrir com o cliente padrão",
+  "Enter select • Esc back": "Enter selecionar • Esc voltar",
+  "[error]aria2c required to list files. Install from https://aria2.github.io/[/error]\n": "[error]aria2c é necessário para listar arquivos. Instale em https://aria2.github.io/[/error]\n",
+  "[error] Could not fetch file list (timeout or no metadata peers).[/error]": "[error] Não foi possível obter a lista de arquivos (tempo esgotado ou nenhum peer de metadados).[/error]",
+  "[dim]Choose Browse torrent files again to retry.[/dim]\n": "[dim]Escolha Explorar arquivos do torrent de novo para tentar novamente.[/dim]\n",
+  "[info]Opening magnet link with default torrent client...[/info]": "[info]Abrindo link magnet com o cliente de torrent padrão...[/info]",
+  "[warning] External torrent clients cannot be pre-filtered from here.[/warning]\n[dim]When the client's 'Add new torrent' dialog appears, uncheck the files you don't want.[/dim]\n[dim]If your client skipped the dialog, pause the torrent and deselect unwanted files in its Content/Files tab.[/dim]": "[warning] Não é possível pré-filtrar clientes de torrent externos por aqui.[/warning]\n[dim]Quando a janela 'Adicionar novo torrent' do cliente aparecer, desmarque os arquivos que não quiser.[/dim]\n[dim]Se o cliente pulou essa janela, pause o torrent e desmarque os arquivos na aba Conteúdo/Arquivos.[/dim]",
+  "[error] Couldn't open the magnet link: {error}[/error]": "[error] Não foi possível abrir o link magnet: {error}[/error]",
+  "[dim]Is a torrent client set to open magnet links? You can also use Copy magnet link and add it in your client.[/dim]\n": "[dim]Há um cliente de torrent configurado para abrir links magnet? Você também pode usar Copiar link magnet e adicioná-lo no cliente.[/dim]\n",
+  "[success] Magnet link handed to your torrent client.[/success]\n": "[success] Link magnet enviado ao seu cliente de torrent.[/success]\n",
+  "[warning]File selection must be set in your torrent client.[/warning]\nUncheck unwanted files in its Add torrent dialog or Content/Files tab.": "[warning]Selecione os arquivos no seu cliente de torrent.[/warning]\nDesmarque os arquivos indesejados na janela Adicionar torrent ou na aba Conteúdo/Arquivos.",
+  "Magnet link handed to torrent client": "Link magnet enviado ao cliente de torrent",
+  "[warning] File list unavailable — streaming the backend's default file.[/warning]": "[warning] Lista de arquivos indisponível — transmitindo o arquivo padrão da ferramenta.[/warning]",
+  "\n[muted]Press [key]any key[/key] to continue…[/muted]": "\n[muted]Pressione [key]qualquer tecla[/key] para continuar…[/muted]",
+  "\n[muted]Press [key]any key[/key] to return to download options…[/muted]": "\n[muted]Pressione [key]qualquer tecla[/key] para voltar às opções de download…[/muted]",
+  "Download finished": "Download concluído",
+  "[success]Saved. Next stream will use[/success] [highlight]{name}[/highlight] [success]as primary, plus {n} more track(s).[/success]": {
+    "one": "[success]Salvo. A próxima transmissão usará[/success] [highlight]{name}[/highlight] [success]como principal, mais {n} faixa.[/success]",
+    "other": "[success]Salvo. A próxima transmissão usará[/success] [highlight]{name}[/highlight] [success]como principal, mais {n} faixas.[/success]"
+  },
+  "[success]Saved. Next stream will use[/success] [highlight]{name}[/highlight] [success]as the subtitle source.[/success]": "[success]Salvo. A próxima transmissão usará[/success] [highlight]{name}[/highlight] [success]como fonte de legendas.[/success]",
+  "[success]Saved[/success] [highlight]{name}[/highlight][success].[/success]": "[success]Salvo[/success] [highlight]{name}[/highlight][success].[/success]",
+  "Saved listing; current availability is unverified. i: metadata details": "Lista salva; disponibilidade atual não verificada. i: detalhes dos metadados",
+  "Searching saved names…": "Buscando nomes salvos…",
+  "Saved search failed. Try again later.": "A busca salva falhou. Tente mais tarde.",
+  "Alternate titles": "Títulos alternativos",
+  "Topic discovery": "Descobrir por tema",
+  "Save search": "Salvar busca",
+  "Bookmark current search": "Favoritar busca atual",
+  "Saves this query with the provider's current settings.": "Salva esta busca com as configurações atuais da categoria.",
+  "Enter save  •  Esc cancel": "Enter salvar  •  Esc cancelar",
+  "Search bookmarked.": "Busca favoritada.",
+  "Quit torrent-finder?": "Sair do torrent-finder?",
+  "Quit": "Sair",
+  "\n[warning]Update cancelled.[/warning]": "\n[warning]Atualização cancelada.[/warning]",
+  "restart Torrent Finder": "reiniciar o Torrent Finder",
+  "--profile requires -t all (or omit -t)": "--profile requer -t all (ou omita -t)",
+  "--providers requires -t all": "--providers requer -t all",
+  "[info]Aborted.[/info]": "[info]Cancelado.[/info]",
+  "You feel watched: every peer can see your real IP.": "Você se sente observado: todo peer vê seu IP real.",
+  "A cloak of VPN hides your address from the swarm.": "Um manto de VPN oculta seu endereço do swarm.",
+  "[warning] Unknown provider type '{provider}'. Falling back to Movies.[/warning]": "[warning] Categoria desconhecida: '{provider}'. Usando Filmes.[/warning]",
+  "[warning] {provider} has no '--by {facet}' option (available: {available}).[/warning]": "[warning] {provider} não tem a opção '--by {facet}' (disponíveis: {available}).[/warning]",
+  "[warning] --by requires --name \"<creator>\".[/warning]": "[warning] --by requer --name \"<criador>\".[/warning]",
+  "A raven arrives: {version}. U installs it.": "Um corvo chega: {version}. U o instala.",
+  "None": "Nenhum",
+  "Providers": "Categorias",
+  "Engines": "Mecanismos",
+  "[warning] Please enter a search term.[/warning]": "[warning] Digite um termo de busca.[/warning]",
+  "30 s search limit; Enter shows the results received so far.": "Limite de 30 s; Enter mostra os resultados recebidos até agora.",
+  "Search could not be completed. Please try again.": "Não foi possível concluir a busca. Tente novamente.",
+  "Contacting selected providers…": "Consultando categorias selecionadas…",
+  "Searching {provider}…": "Buscando {provider}…",
+  "[warning] Search cancelled — returning to the prompt.[/warning]\n": "[warning] Busca cancelada — voltando ao campo de busca.[/warning]\n",
+  "No results found.": "Nenhum resultado encontrado.",
+  " +{count} more": " +{count} mais",
+  "[muted]Restarting Torrent Finder…[/muted]": "[muted]Reiniciando o Torrent Finder…[/muted]",
+  "[warning]Open Torrent Finder again to use the new version.[/warning]": "[warning]Abra o Torrent Finder de novo para usar a nova versão.[/warning]",
+  "No torrents for {missing} of {total} titles: {titles}{more}": "Nenhum torrent para {missing} de {total} títulos: {titles}{more}",
+  "Saved bookmarks; metadata may be stale": "Favoritos salvos; os metadados podem estar desatualizados",
+  "Unknown search profile {profile!r}. Available: {profiles}": "Perfil de busca desconhecido: {profile!r}. Disponíveis: {profiles}",
+  "You find {n} result for {queries}.": {
+    "one": "Você encontra {n} resultado para {queries}.",
+    "other": "Você encontra {n} resultados para {queries}."
+  },
+  "continue": "continuar",
+  "{n} provider · results appear when the search finishes or after 30 seconds.": {
+    "one": "{n} categoria · os resultados aparecem ao fim da busca ou após 30 segundos.",
+    "other": "{n} categorias · os resultados aparecem ao fim da busca ou após 30 segundos."
+  }
+}

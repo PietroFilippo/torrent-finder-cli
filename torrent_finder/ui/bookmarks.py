@@ -27,7 +27,7 @@ def _description(entry) -> str:
 def bookmark_menu():
     while True:
         saved = bookmarks.entries()
-        items = [SelectItem(e["name"], e, hint=t("result") if e["kind"] == "result" else t("search"), description=_description(e)) for e in saved]
+        items = [SelectItem(_display_name(e), e, hint=t("result") if e["kind"] == "result" else t("search"), description=_description(e)) for e in saved]
         items.append(SelectItem(t("Back"), None))
         if any(e["kind"] == "result" for e in saved):
             items.insert(len(items) - 1, SelectItem(t("Compare saved results in one table"), "compare"))
@@ -43,7 +43,7 @@ def bookmark_menu():
         actions = [SelectItem(t("Open saved result / download options") if entry["kind"] == "result" else t("Run saved search"), "open"),
                    SelectItem(t("Refresh listing with its saved search"), "refresh", enabled=entry["kind"] == "result"),
                    SelectItem(t("Remove bookmark"), "remove"), SelectItem(t("Back"), "back")]
-        chosen = arrow_select(actions, title=escape(entry["name"]), footer=t("Enter choose • Esc back"))
+        chosen = arrow_select(actions, title=escape(_display_name(entry)), footer=t("Enter choose • Esc back"))
         if chosen is None:
             continue
         action = actions[chosen].value
@@ -51,3 +51,12 @@ def bookmark_menu():
             bookmarks.remove(entry["id"])
         elif action != "back":
             return action, entry
+
+
+def _display_name(entry) -> str:
+    """Localize library handles for display, retaining the saved bookmark name."""
+    path = entry.get("result", {}).get("mdk_path") if entry["kind"] == "result" else None
+    if path:
+        from torrent_finder.madokami import localized_display_name
+        return localized_display_name(path)
+    return entry["name"]

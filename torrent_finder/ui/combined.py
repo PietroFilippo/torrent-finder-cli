@@ -7,7 +7,7 @@ from torrent_finder.i18n import N_, t, tn
 from torrent_finder.search_profiles import profile_label
 from torrent_finder.providers.combined_provider import CombinedProvider, provider_display_label
 from torrent_finder.ui.selector import SelectItem, arrow_select
-from torrent_finder.result_view import SORT_ORDERS
+from torrent_finder.result_view import sort_label
 from torrent_finder.ui.result_filters import choose_result_sort
 
 
@@ -172,7 +172,7 @@ def combined_filter_menu(provider):
             SelectItem(t("All providers: literal name rules…"), "rules",
                        hint=draft.name_rules.summary_label() or t("off", ctx="name rule"),
                        description=t("All words / any word / exact phrase / exclusions. Applies together with existing phrase rules.")),
-            SelectItem(t("Result order: {order}", order=t(SORT_ORDERS[draft.result_sort])), "sort",
+            SelectItem(t("Result order: {order}", order=sort_label(draft.result_sort)), "sort",
                        description=t("Saved in this profile. Recommended uses title relevance, then preferences. Other sorts override ranking; required filters still apply.")),
             SelectItem(t("Save and return"), "save", enabled=bool(draft.selected_slugs), hint="w",
                        description=t("Select at least one provider to save.") if not draft.selected_slugs else ""),

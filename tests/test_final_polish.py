@@ -24,7 +24,8 @@ class ClientHandoffTests(unittest.TestCase):
 
     def test_failed_handoff_keeps_the_download_options(self):
         isolate_store(self)
-        provider = SimpleNamespace(slug="anime", result_sort="relevance", filter_summary=lambda: "No filters")
+        provider = SimpleNamespace(slug="anime", result_sort="relevance", filter_summary=lambda: "No filters",
+                                   filter_summary_label=lambda: "No filters")
         result = {"name": "Example", "source": "Nyaa", "info_hash": "a" * 40}
         adapter = Mock()
         adapter.pick.return_value = acquisition.PickOutcome("menu", MAGNET)

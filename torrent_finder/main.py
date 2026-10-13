@@ -6,6 +6,7 @@ Usage:
     python main.py              # Interactive prompt
     python main.py -q "query"   # Direct search
 """
+# i18n: converted
 import argparse
 import sys
 import threading
@@ -25,6 +26,7 @@ from torrent_finder.constants import console
 import readchar
 from torrent_finder.downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, stream_with_peerflix, stream_with_webtorrent
 from torrent_finder.filters import FilterConfig
+from torrent_finder.i18n import t, tn
 from torrent_finder.providers import (
     PROVIDERS,
     creator_facet_choices,
@@ -92,7 +94,7 @@ def _goodbye() -> None:
     """
     import os
     os.system('cls' if os.name == 'nt' else 'clear')
-    console.print("[info]Goodbye![/info]")
+    console.print(t('[info]Goodbye![/info]'))
 
 
 def _saved_data_action(action):
@@ -102,8 +104,8 @@ def _saved_data_action(action):
     except (OSError, ValueError) as error:
         from rich.markup import escape
         from torrent_finder.ui.selector import SelectItem, arrow_select
-        arrow_select([SelectItem("Back", description=escape(str(error)))],
-                     title="Saved data could not be updated", footer="Enter / Esc back")
+        arrow_select([SelectItem(t('Back'), description=escape(str(error)))],
+                     title=t('Saved data could not be updated'), footer=t('Enter / Esc back'))
         return None
 
 
@@ -208,7 +210,7 @@ def _batch_handoff_run(provider, results: list, idxs: list[int]) -> tuple[str, l
     # The status line names the item being handled ("(3/8) Title…") — and for a
     # Madokami file, a live MB counter — so a multi-minute batch isn't a blind
     # spinner. Titles are markup-escaped (manga names carry brackets).
-    status = console.status("[accent]Opening torrents…  (Esc to stop)[/accent]", spinner=theme.SPINNER)
+    status = console.status(t('[accent]Opening torrents…  (Esc to stop)[/accent]'), spinner=theme.SPINNER)
     selection = [results[gi] for gi in idxs if 0 <= gi < len(results)]
     notes: list[str] = []
     try:
@@ -220,12 +222,12 @@ def _batch_handoff_run(provider, results: list, idxs: list[int]) -> tuple[str, l
                 if not (0 <= gi < len(results)):
                     continue
                 r = results[gi]
-                name = r.get("name", "Unknown")
+                name = r.get("name", t("Unknown"))
                 shown = escape(name[:40] + ("…" if len(name) > 40 else ""))
-                status.update(f"[accent]({k}/{n}) {shown}  (Esc to stop)[/accent]")
+                status.update(t('[accent]({index}/{total}) {name}  (Esc to stop)[/accent]', index=k, total=n, name=shown))
                 def _set_status(suffix, _k=k, _shown=shown):
                     status.update(
-                        f"[accent]({_k}/{n}) {_shown} — {suffix}  (Esc to stop)[/accent]"
+                        t('[accent]({index}/{total}) {name} — {status}  (Esc to stop)[/accent]', index=_k, total=n, name=_shown, status=suffix)
                     )
 
                 outcome = None
@@ -243,7 +245,7 @@ def _batch_handoff_run(provider, results: list, idxs: list[int]) -> tuple[str, l
                     if outcome.password:
                         ofix_pw = outcome.password
                     if outcome.note:
-                        notes.append(outcome.note)
+                        notes.append(outcome.note_label())
                     record_torrent_picked(provider_for_result(r, provider).slug, int(r.get("seeders", 0) or 0))
                     if not outcome.saved_direct:  # a saved file isn't a magnet dispatch
                         record_magnet_dispatch()
@@ -261,28 +263,45 @@ def _batch_handoff_run(provider, results: list, idxs: list[int]) -> tuple[str, l
     remaining = failed_idxs + [gi for gi in left if gi not in failed_idxs]
 
     if cancel_event.is_set():
-        lines = [f"[warning] Stopped after {sent} of {n}.[/warning]"]
+        lines = [t('[warning] Stopped after {sent} of {total}.[/warning]', sent=sent, total=n)]
     elif saved_direct and saved_direct == sent:
-        lines = [f"[success]✓ {sent} of {n} saved to your download folder.[/success]"]
+        lines = [tn('[success]✓ {sent} of {total} saved to your download folder.[/success]',
+            '[success]✓ {sent} of {total} saved to your download folder.[/success]',
+            sent,
+            sent=sent,
+            total=n)]
     elif saved_direct:
-        lines = [f"[success]✓ {sent} of {n} done — {sent - saved_direct} handed to your torrent client, "
-                 f"{saved_direct} saved directly.[/success]"]
+        lines = [t('[success]✓ {sent} of {total} done — {handed} handed to your torrent client, {saved} saved directly.[/success]',
+            sent=sent,
+            total=n,
+            handed=sent - saved_direct,
+            saved=saved_direct)]
     else:
-        lines = [f"[success]✓ {sent} of {n} handed to your torrent client.[/success]"]
+        lines = [tn('[success]✓ {sent} of {total} handed to your torrent client.[/success]',
+            '[success]✓ {sent} of {total} handed to your torrent client.[/success]',
+            sent,
+            sent=sent,
+            total=n)]
     if ofix_pw:
-        lines.append(f"[muted]Online-Fix archive password:[/muted] {escape(ofix_pw)}")
+        lines.append(t('[muted]Online-Fix archive password:[/muted] {password}', password=escape(ofix_pw)))
     lines += [f"[warning]{escape(note)}[/warning]" for note in notes[:4]]
     if failed:
         shown = ", ".join(failed[:6]) + (" …" if len(failed) > 6 else "")
-        lines.append(f"[warning] Couldn't open {len(failed)}:[/warning] {escape(shown)}")
+        lines.append(t("[warning] Couldn't open {count}:[/warning] {names}", count=len(failed), names=escape(shown)))
         for u in manual_urls[:6]:
-            lines.append(f"[dim]Grab manually: {escape(u)}[/dim]")
+            lines.append(t('[dim]Grab manually: {url}[/dim]', url=escape(u)))
     # A partial failure or a stop offers the rest again, and only the rest.
     retry = ""
     if remaining and sent:
-        retry = (f"Retry the {len(remaining)} that failed" if not left
-                 else f"Continue with the {len(remaining)} left")
-    return download_complete_prompt("Batch handoff finished", summary="\n".join(lines), retry=retry), remaining
+        retry = (tn('Retry the {count} that failed',
+            'Retry the {count} that failed',
+            len(remaining),
+            count=len(remaining)) if not left
+                 else tn('Continue with the {count} left',
+                     'Continue with the {count} left',
+                     len(remaining),
+                     count=len(remaining)))
+    return download_complete_prompt(t('Batch handoff finished'), summary="\n".join(lines), retry=retry), remaining
 
 
 def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
@@ -293,7 +312,7 @@ def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
     """
     magnets: list[str] = []
     skipped = 0
-    with console.status("[accent]Collecting magnet links…[/accent]", spinner=theme.SPINNER):
+    with console.status(t('[accent]Collecting magnet links…[/accent]'), spinner=theme.SPINNER):
         for gi in idxs:
             if not (0 <= gi < len(results)):
                 continue
@@ -304,22 +323,29 @@ def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
                 skipped += 1
 
     if not magnets:
-        console.print("[warning] No magnet links in this selection (e.g. all Online-Fix / Madokami).[/warning]")
-        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+        console.print(t('[warning] No magnet links in this selection (e.g. all Online-Fix / Madokami).[/warning]'))
+        console.print(t('[muted]Press [key]any key[/key] to continue…[/muted]'))
         readchar.readkey()
         clear_screen()
         return
 
     if _copy_to_clipboard("\n".join(magnets)):
-        console.print(f"[success]✓ Copied {len(magnets)} magnet link(s) to the clipboard.[/success]")
+        console.print(tn('[success]✓ Copied {n} magnet link(s) to the clipboard.[/success]',
+            '[success]✓ Copied {n} magnet link(s) to the clipboard.[/success]',
+            len(magnets)))
     else:
         console.print(
-            f"[warning] Couldn't access the clipboard — {len(magnets)} link(s) below:[/warning]\n"
+            tn("[warning] Couldn't access the clipboard — {n} link(s) below:[/warning]\n",
+                "[warning] Couldn't access the clipboard — {n} link(s) below:[/warning]\n",
+                len(magnets))
             + "\n".join(magnets)
         )
     if skipped:
-        console.print(f"[dim]{skipped} skipped (no magnet link).[/dim]")
-    console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+        console.print(tn('[dim]{count} skipped (no magnet link).[/dim]',
+            '[dim]{count} skipped (no magnet link).[/dim]',
+            skipped,
+            count=skipped))
+    console.print(t('[muted]Press [key]any key[/key] to continue…[/muted]'))
     readchar.readkey()
     clear_screen()
 
@@ -340,7 +366,7 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
     magnets: list[str] = []
     picked: list[dict] = []
     skipped = 0
-    with console.status("[accent]Collecting magnet links…[/accent]", spinner=theme.SPINNER):
+    with console.status(t('[accent]Collecting magnet links…[/accent]'), spinner=theme.SPINNER):
         for gi in idxs:
             if not (0 <= gi < len(results)):
                 continue
@@ -352,16 +378,17 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
                 skipped += 1
 
     if not magnets:
-        console.print("[warning] Nothing to download via aria2c — no magnet links (e.g. all Online-Fix / Madokami).[/warning]")
-        console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+        console.print(t('[warning] Nothing to download via aria2c — no magnet links (e.g. all Online-Fix / Madokami).[/warning]'))
+        console.print(t('[muted]Press [key]any key[/key] to continue…[/muted]'))
         readchar.readkey()
         clear_screen()
         return "back"
 
     if skipped:
         console.print(
-            f"[dim]{skipped} item(s) skipped — no magnet (e.g. Online-Fix / Madokami). "
-            "Use “Open all in client” for those.[/dim]"
+            tn('[dim]{n} item(s) skipped — no magnet (e.g. Online-Fix / Madokami). Use “Open all in client” for those.[/dim]',
+                '[dim]{n} item(s) skipped — no magnet (e.g. Online-Fix / Madokami). Use “Open all in client” for those.[/dim]',
+                skipped)
         )
 
     ok = download_many_with_aria2(magnets)
@@ -370,16 +397,19 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
         for r in picked:
             record_torrent_picked(provider_for_result(r, provider).slug, int(r.get("seeders", 0) or 0))
     if not ok:
-        console.print("[muted]Press [key]any key[/key] to return to download options…[/muted]")
+        console.print(t('[muted]Press [key]any key[/key] to return to download options…[/muted]'))
         readchar.readkey()
         return "back"
     from torrent_finder import unpack
     from torrent_finder.constants import get_download_dir
-    summary = f"{len(picked)} torrent(s) downloaded; {skipped} skipped (no magnet)."
+    summary = tn('{n} torrent(s) downloaded; {skipped} skipped (no magnet).',
+        '{n} torrent(s) downloaded; {skipped} skipped (no magnet).',
+        len(picked),
+        skipped=skipped)
     if unpack.enabled():
         paths = [path for magnet in magnets for path in unpack.torrent_files(get_download_dir(), magnet=magnet)]
         summary = "\n".join(filter(None, (summary, _unpack_downloaded(paths))))
-    return download_complete_prompt("Batch download finished", summary=summary)
+    return download_complete_prompt(t('Batch download finished'), summary=summary)
 
 
 def _batch_flow(provider, results: list, idxs: list[int]) -> str:
@@ -401,7 +431,7 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
         if action == "qbittorrent":
             from torrent_finder.ui.qbittorrent import send_results
             if (send_results([results[i] for i in idxs if 0 <= i < len(results)])
-                    and download_complete_prompt("qBittorrent handoff finished") == "next"):
+                    and download_complete_prompt(t('qBittorrent handoff finished')) == "next"):
                 return "next"
             continue
         if action == "open":
@@ -410,8 +440,8 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
             if len(idxs) > 8:
                 from torrent_finder.ui.prompts import confirm_prompt
                 if not confirm_prompt(
-                    f"Open {len(idxs)} torrents in your client at once?",
-                    title="Batch download",
+                    tn('Open {n} torrents in your client at once?', 'Open {n} torrents in your client at once?', len(idxs)),
+                    title=t('Batch download'),
                 ):
                     clear_screen()
                     continue
@@ -441,7 +471,7 @@ def _unpack_downloaded(paths) -> str:
 
     if not any(unpack.is_archive(path) for path in paths):
         return ""
-    with console.status("[accent]Unpacking…[/accent]", spinner=theme.SPINNER) as status:
+    with console.status(t('[accent]Unpacking…[/accent]'), spinner=theme.SPINNER) as status:
         report = unpack.unpack_all(paths, status=lambda text: status.update(f"[accent]{escape(text)}[/accent]"))
     return "\n".join(unpack.summary_lines(report))
 
@@ -463,14 +493,14 @@ def _fetch_session_files(session) -> tuple[bool, object]:
     Returns ``(cancelled, metadata)``; metadata is None when cancelled or when
     no file list could be found (timeout, no metadata peers).
     """
-    console.print("[info]Looking for online peers that can share the torrent's file list…[/info]")
-    console.print("[dim]This may take a minute or time out. Listed seed counts can be stale; even a torrent showing seeders may have no reachable metadata peers right now.[/dim]")
-    console.print("[dim]Press Esc or Ctrl+C to cancel and go back.[/dim]\n")
+    console.print(t("[info]Looking for online peers that can share the torrent's file list…[/info]"))
+    console.print(t('[dim]This may take a minute or time out. Listed seed counts can be stale; even a torrent showing seeders may have no reachable metadata peers right now.[/dim]'))
+    console.print(t('[dim]Press Esc or Ctrl+C to cancel and go back.[/dim]\n'))
     cancel_event = threading.Event()
     stop_listener = start_esc_listener(cancel_event)
     try:
         try:
-            with console.status("[accent]Fetching file list...[/accent]", spinner=theme.SPINNER):
+            with console.status(t('[accent]Fetching file list...[/accent]'), spinner=theme.SPINNER):
                 metadata = session.fetch_files_meta(cancel_event=cancel_event)
         except KeyboardInterrupt:
             # Deeper flows cancel locally. Only the idle provider /
@@ -514,10 +544,13 @@ def _browse_results(provider, results, note: str = "") -> str:
         queries = getattr(getattr(results, "session", None), "queries", None) or []
         from rich.markup import escape
         # Headers are Rich markup; queries are user text and may hold brackets.
-        crumbs = [escape(getattr(provider, "name", "") or "Results"), escape(", ".join(queries))]
+        provider_name = getattr(provider, "name", "")
+        crumbs = [escape(t(provider_name) or t('Results')), escape(", ".join(queries))]
         from torrent_finder.result_view import ranking_notes
+        summary = provider.filter_summary()
         choice = interactive_select(results, note=note, initial_order=provider.result_sort,
-                                    search_summary=provider.filter_summary(),
+                                    search_summary=(summary if summary == "No presets"  # i18n: ignore — table sentinel
+                                                    else provider.filter_summary_label()),
                                     on_bookmark=lambda rows: save_results(provider, rows),
                                     heading=" › ".join(part for part in crumbs if part),
                                     describe=ranking_notes(provider, queries), view_state=view_state)
@@ -548,15 +581,15 @@ def _browse_results(provider, results, note: str = "") -> str:
         from torrent_finder.qbittorrent import configured
         if configured() and acquisition.for_result(selected).style == "torrent-file-handoff":
             from torrent_finder.ui.selector import SelectItem, arrow_select
-            options = [SelectItem("Send to qBittorrent WebUI", "qbittorrent"),
-                       SelectItem("Open with default client", "default"), SelectItem("Back", None)]
+            options = [SelectItem(t('Send to qBittorrent WebUI'), "qbittorrent"),
+                       SelectItem(t('Open with default client'), "default"), SelectItem(t('Back'), None)]
             while True:
-                picked = arrow_select(options, title="Torrent client", footer="Enter select • Esc back")
+                picked = arrow_select(options, title=t('Torrent client'), footer=t('Enter select • Esc back'))
                 if picked is None or options[picked].value != "qbittorrent":
                     break
                 from torrent_finder.ui.qbittorrent import send_results
                 if (send_results([selected])
-                        and download_complete_prompt("qBittorrent handoff finished") == "next"):
+                        and download_complete_prompt(t('qBittorrent handoff finished')) == "next"):
                     return "next"
             if picked is None or options[picked].value is None:
                 continue
@@ -608,7 +641,7 @@ def _browse_results(provider, results, note: str = "") -> str:
             if method == "qbittorrent":
                 from torrent_finder.ui.qbittorrent import send_results
                 if (send_results([selected], magnet=session.magnet)
-                        and download_complete_prompt("qBittorrent handoff finished") == "next"):
+                        and download_complete_prompt(t('qBittorrent handoff finished')) == "next"):
                     return "next"
                 continue
 
@@ -634,8 +667,8 @@ def _browse_results(provider, results, note: str = "") -> str:
             if method == "pick_episodes":
                 clear_screen()
                 if not has_aria2():
-                    console.print("[error]aria2c required to list files. Install from https://aria2.github.io/[/error]\n")
-                    console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+                    console.print(t('[error]aria2c required to list files. Install from https://aria2.github.io/[/error]\n'))
+                    console.print(t('[muted]Press [key]any key[/key] to continue…[/muted]'))
                     readchar.readkey()
                     continue
                 cancelled, metadata = _fetch_session_files(session)
@@ -643,9 +676,9 @@ def _browse_results(provider, results, note: str = "") -> str:
                     clear_screen()
                     continue
                 if not metadata or not metadata.files:
-                    console.print("[error] Could not fetch file list (timeout or no metadata peers).[/error]")
-                    console.print("[dim]Choose Browse torrent files again to retry.[/dim]\n")
-                    console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+                    console.print(t('[error] Could not fetch file list (timeout or no metadata peers).[/error]'))
+                    console.print(t('[dim]Choose Browse torrent files again to retry.[/dim]\n'))
+                    console.print(t('[muted]Press [key]any key[/key] to continue…[/muted]'))
                     readchar.readkey()
                     continue
                 picked = episode_select_prompt(metadata.files, preselected=session.selected_files)
@@ -662,30 +695,26 @@ def _browse_results(provider, results, note: str = "") -> str:
 
             if method == "t":
                 clear_screen()
-                console.print("[info]Opening magnet link with default torrent client...[/info]")
+                console.print(t('[info]Opening magnet link with default torrent client...[/info]'))
                 if session.selected_files:
                     console.print(
-                        "[warning] External torrent clients cannot be pre-filtered from here.[/warning]\n"
-                        "[dim]When the client's 'Add new torrent' dialog appears, uncheck the files you don't want.[/dim]\n"
-                        "[dim]If your client skipped the dialog, pause the torrent and deselect unwanted files in its Content/Files tab.[/dim]"
+                        t("[warning] External torrent clients cannot be pre-filtered from here.[/warning]\n[dim]When the client's 'Add new torrent' dialog appears, uncheck the files you don't want.[/dim]\n[dim]If your client skipped the dialog, pause the torrent and deselect unwanted files in its Content/Files tab.[/dim]")
                     )
                 try:
                     open_magnet(session.magnet)
                 except OSError as error:
                     from rich.markup import escape
-                    console.print(f"[error] Couldn't open the magnet link: {escape(error.strerror or str(error))}[/error]")
-                    console.print("[dim]Is a torrent client set to open magnet links? You can also use "
-                                  "Copy magnet link and add it in your client.[/dim]\n")
-                    console.print("[muted]Press [key]any key[/key] to return to download options…[/muted]")
+                    console.print(t("[error] Couldn't open the magnet link: {error}[/error]", error=escape(error.strerror or str(error))))
+                    console.print(t('[dim]Is a torrent client set to open magnet links? You can also use Copy magnet link and add it in your client.[/dim]\n'))
+                    console.print(t('[muted]Press [key]any key[/key] to return to download options…[/muted]'))
                     readchar.readkey()
                     continue
                 record_magnet_dispatch()
-                console.print("[success] Magnet link handed to your torrent client.[/success]\n")
+                console.print(t('[success] Magnet link handed to your torrent client.[/success]\n'))
                 summary = (
-                    "[warning]File selection must be set in your torrent client.[/warning]\n"
-                    "Uncheck unwanted files in its Add torrent dialog or Content/Files tab."
+                    t('[warning]File selection must be set in your torrent client.[/warning]\nUncheck unwanted files in its Add torrent dialog or Content/Files tab.')
                 ) if session.selected_files else ""
-                if download_complete_prompt("Magnet link handed to torrent client", summary=summary) == "next":
+                if download_complete_prompt(t('Magnet link handed to torrent client'), summary=summary) == "next":
                     return "next"
                 continue
             elif method in ("stream_p", "stream_w"):
@@ -699,10 +728,10 @@ def _browse_results(provider, results, note: str = "") -> str:
                         clear_screen()
                         continue
                     if metadata is None:
-                        console.print("[warning] File list unavailable — streaming the backend's default file.[/warning]")
+                        console.print(t("[warning] File list unavailable — streaming the backend's default file.[/warning]"))
                 stream = stream_with_peerflix if method == "stream_p" else stream_with_webtorrent
                 stream(session)
-                console.print("\n[muted]Press [key]any key[/key] to continue…[/muted]")
+                console.print(t('\n[muted]Press [key]any key[/key] to continue…[/muted]'))
                 readchar.readkey()
                 continue
             elif method == "aria":
@@ -711,10 +740,10 @@ def _browse_results(provider, results, note: str = "") -> str:
                 if ok:
                     record_method_complete("aria")
                 if not ok:
-                    console.print("\n[muted]Press [key]any key[/key] to return to download options…[/muted]")
+                    console.print(t('\n[muted]Press [key]any key[/key] to return to download options…[/muted]'))
                     readchar.readkey()
                     continue
-                if download_complete_prompt("Download finished", summary=_unpack_torrent(session)) == "next":
+                if download_complete_prompt(t('Download finished'), summary=_unpack_torrent(session)) == "next":
                     return "next"
                 continue
             elif method == "p":
@@ -723,10 +752,10 @@ def _browse_results(provider, results, note: str = "") -> str:
                 if ok:
                     record_method_complete("peerflix_download")
                 if not ok:
-                    console.print("\n[muted]Press [key]any key[/key] to return to download options…[/muted]")
+                    console.print(t('\n[muted]Press [key]any key[/key] to return to download options…[/muted]'))
                     readchar.readkey()
                     continue
-                if download_complete_prompt("Download finished", summary=_unpack_torrent(session)) == "next":
+                if download_complete_prompt(t('Download finished'), summary=_unpack_torrent(session)) == "next":
                     return "next"
                 continue
             elif method == "d":
@@ -735,10 +764,10 @@ def _browse_results(provider, results, note: str = "") -> str:
                 if ok:
                     record_method_complete("webtorrent_download")
                 if not ok:
-                    console.print("\n[muted]Press [key]any key[/key] to return to download options…[/muted]")
+                    console.print(t('\n[muted]Press [key]any key[/key] to return to download options…[/muted]'))
                     readchar.readkey()
                     continue
-                if download_complete_prompt("Download finished", summary=_unpack_torrent(session)) == "next":
+                if download_complete_prompt(t('Download finished'), summary=_unpack_torrent(session)) == "next":
                     return "next"
                 continue
             elif method == "s":
@@ -769,23 +798,21 @@ def _browse_results(provider, results, note: str = "") -> str:
                     extra = len(attachable) - 1
                     if extra > 0:
                         console.print(
-                            f"[success]Saved. Next stream will use[/success] "
-                            f"[highlight]{escape(primary)}[/highlight] "
-                            f"[success]as primary, plus {extra} more track(s).[/success]"
+                            tn('[success]Saved. Next stream will use[/success] [highlight]{name}[/highlight] [success]as primary, plus {n} more track(s).[/success]',
+                                '[success]Saved. Next stream will use[/success] [highlight]{name}[/highlight] [success]as primary, plus {n} more track(s).[/success]',
+                                extra,
+                                name=escape(primary))
                         )
                     else:
                         console.print(
-                            f"[success]Saved. Next stream will use[/success] "
-                            f"[highlight]{escape(primary)}[/highlight] "
-                            f"[success]as the subtitle source.[/success]"
+                            t('[success]Saved. Next stream will use[/success] [highlight]{name}[/highlight] [success]as the subtitle source.[/success]',
+                                name=escape(primary))
                         )
                 elif sub_paths:
                     console.print(
-                        f"[success]Saved[/success] "
-                        f"[highlight]{escape(_os.path.basename(sub_paths[0]))}[/highlight]"
-                        f"[success].[/success]"
+                        t('[success]Saved[/success] [highlight]{name}[/highlight][success].[/success]', name=escape(_os.path.basename(sub_paths[0])))
                     )
-                console.print("\n[muted]Press [key]any key[/key] to continue…[/muted]")
+                console.print(t('\n[muted]Press [key]any key[/key] to continue…[/muted]'))
                 readchar.readkey()
                 continue
             elif method == "cancel":  # "Done with this torrent" → what's next
@@ -891,7 +918,8 @@ def _bookmarks_flow(cli_filters=None):
         if operation == "compare":
             from torrent_finder.providers.combined_provider import CombinedProvider
             provider = CombinedProvider(get_provider("all").templates)
-            provider.filter_summary = lambda: "Saved bookmarks; metadata may be stale"
+            provider.filter_summary = lambda: "Saved bookmarks; metadata may be stale"  # i18n: ignore — identity
+            provider.filter_summary_label = lambda: t("Saved bookmarks; metadata may be stale")
             browse_results(provider, [dict(e["result"], fetched_at=e["fetched_at"]) for e in entry])
             continue
         provider = _saved_data_action(lambda: bookmarks.search_provider(entry))
@@ -899,16 +927,16 @@ def _bookmarks_flow(cli_filters=None):
             continue
         if operation == "open" and entry["kind"] == "result":
             browse_results(provider, [dict(entry["result"], fetched_at=entry["fetched_at"])],
-                           note="Saved listing; current availability is unverified. i: metadata details")
+                           note=t('Saved listing; current availability is unverified. i: metadata details'))
             continue
         cancel = threading.Event()
         cancelled, results = _run_cancellable(
             lambda: search_many(provider, entry["queries"], cli_filters, cancel_event=cancel),
-            "Searching saved names…", cancel=cancel)
+            t('Searching saved names…'), cancel=cancel)
         if cancelled:
             continue
         if results is None or isinstance(results, SearchError):
-            _notice("Saved search failed. Try again later.")
+            _notice(t('Saved search failed. Try again later.'))
             continue
         provider.last_queries = entry["queries"]
         if operation == "refresh":
@@ -929,8 +957,8 @@ def _quick_actions_flow(provider=None, cli_filters=None, typed="", on_update=Non
         action = quick_actions_menu(update_available=bool(on_update), provider=provider)
         scope = provider
         if action in {"filter", "titles", "discover", "save_search"} and scope is None:
-            scope = action_provider_prompt({"filter": "Filters", "titles": "Alternate titles",
-                                           "discover": "Topic discovery", "save_search": "Save search"}[action])
+            scope = action_provider_prompt({"filter": t('Filters'), "titles": t('Alternate titles'),
+                                           "discover": t('Topic discovery'), "save_search": t('Save search')}[action])
             if scope is None:
                 continue
         if action == "update" and on_update:
@@ -952,11 +980,11 @@ def _quick_actions_flow(provider=None, cli_filters=None, typed="", on_update=Non
             from torrent_finder.ui.creator import _notice
             value = typed.strip() or get_query_with_shortcut(
                 PROMPT, screen_renderer=input_screen(
-                    "Bookmark current search", "Saves this query with the provider's current settings.",
-                    keys="Enter save  •  Esc cancel"))
+                    t('Bookmark current search'), t("Saves this query with the provider's current settings."),
+                    keys=t('Enter save  •  Esc cancel')))
             if isinstance(value, str) and value and value != "GO_BACK":
                 if _saved_data_action(lambda: save_search(scope, value)):
-                    _notice("Search bookmarked.")
+                    _notice(t('Search bookmarked.'))
         elif action == "bookmarks":
             _bookmarks_flow(cli_filters)
         elif action == "qbittorrent":
@@ -1005,7 +1033,7 @@ def _handle_whats_next(current_provider, cli_filters=None, on_update=None):
     while True:
         choice = search_again_prompt()
         if choice in (None, "exit"):
-            if confirm_prompt("Quit torrent-finder?", title="Quit"):
+            if confirm_prompt(t('Quit torrent-finder?'), title=t('Quit')):
                 return "EXIT"
             clear_screen()
             continue
@@ -1043,10 +1071,10 @@ def _run_update_flow(info: dict) -> None:
                 stage = "opened" if info.get("kind") == "binary" else "succeeded"
             display.update(stage, result.message)
     except KeyboardInterrupt:
-        console.print("\n[warning]Update cancelled.[/warning]")
+        console.print(t('\n[warning]Update cancelled.[/warning]'))
         clear_screen()
         return
-    console.print("\n" + theme.any_key("restart Torrent Finder" if result.restart else "continue"))
+    console.print("\n" + theme.any_key(t('restart Torrent Finder') if result.restart else t("continue")))
     try:
         readchar.readkey()
     except KeyboardInterrupt:
@@ -1065,32 +1093,33 @@ def _restart_args(args) -> list[str]:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Search and download torrents.")
+    # Language is applied after parsing in this checkout; CLI help stays English.
+    parser = argparse.ArgumentParser(description="Search and download torrents.")  # i18n: ignore — before language resolution
     parser.add_argument("--version", action="version", version=f"%(prog)s {torrent_finder.__version__}")
     parser.add_argument("--preview-update", nargs="?", const="success", choices=("success", "failure"),
-                        help="Preview the update display without installing anything")
+                        help="Preview the update display without installing anything")  # i18n: ignore — before language resolution
     parser.add_argument("--providers", nargs="+", metavar="PROVIDER", choices=[p for p in provider_cli_choices() if p != "all"],
-                        help="Providers for -t all (for example: --providers anime manga)")
-    parser.add_argument("--profile", metavar="NAME", help="Use a named search profile (implies -t all)")
-    parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")
+                        help="Providers for -t all (for example: --providers anime manga)")  # i18n: ignore — before language resolution
+    parser.add_argument("--profile", metavar="NAME", help="Use a named search profile (implies -t all)")  # i18n: ignore — before language resolution
+    parser.add_argument("-q", "--query", type=str, help="Search query (skip prompt)")  # i18n: ignore — before language resolution
     parser.add_argument(
         "-t", "--type", type=str, choices=provider_cli_choices(),
-        help="Search provider (default: movie if used with -q)",
+        help="Search provider (default: movie if used with -q)",  # i18n: ignore — before language resolution
     )
-    parser.add_argument("-f", "--filter", action="append", help="Include keyword in results")
-    parser.add_argument("-x", "--exclude", action="append", help="Exclude keyword from results")
-    parser.add_argument("-y", "--skip-warning", action="store_true", help="Skip network exposure warning")
+    parser.add_argument("-f", "--filter", action="append", help="Include keyword in results")  # i18n: ignore — before language resolution
+    parser.add_argument("-x", "--exclude", action="append", help="Exclude keyword from results")  # i18n: ignore — before language resolution
+    parser.add_argument("-y", "--skip-warning", action="store_true", help="Skip network exposure warning")  # i18n: ignore — before language resolution
     parser.add_argument(
         "--by", choices=creator_facet_choices(),
-        help="Search by creator role (use with --name and -t), e.g. --by director",
+        help="Search by creator role (use with --name and -t), e.g. --by director",  # i18n: ignore — before language resolution
     )
-    parser.add_argument("--name", type=str, help='Creator name for --by, e.g. --name "Hayao Miyazaki"')
+    parser.add_argument("--name", type=str, help='Creator name for --by, e.g. --name "Hayao Miyazaki"')  # i18n: ignore — before language resolution
     from torrent_finder.ui.theme import THEMES
     parser.add_argument("--theme", choices=tuple(THEMES), type=str.lower,
-                        help="Colour theme for this run (saved choice: Settings › Appearance)")
+                        help="Colour theme for this run (saved choice: Settings › Appearance)")  # i18n: ignore — before language resolution
     from torrent_finder import i18n
     parser.add_argument("--lang", type=_language_arg, metavar="{" + ",".join((i18n.AUTO, *i18n.languages())) + "}",
-                        help="Interface language for this run (auto: the system's display language)")
+                        help="Interface language for this run (auto: the system's display language)")  # i18n: ignore — before language resolution
     return parser
 
 
@@ -1101,7 +1130,7 @@ def _language_arg(value: str) -> str:
     code = i18n.AUTO if value.strip().casefold() == i18n.AUTO else i18n.normalise(value)
     if code is None:
         choices = ", ".join((i18n.AUTO, *i18n.languages()))
-        raise argparse.ArgumentTypeError(f"invalid choice: {value!r} (choose from {choices})")
+        raise argparse.ArgumentTypeError(f"invalid choice: {value!r} (choose from {choices})")  # i18n: ignore — before language resolution
     return code
 
 
@@ -1144,7 +1173,7 @@ def _main_loop(args=None) -> None:
     load_state(PROVIDERS)
     if args.profile:
         if args.type not in (None, "all"):
-            parser.error("--profile requires -t all (or omit -t)")
+            parser.error(t('--profile requires -t all (or omit -t)'))
         args.type = "all"
         from torrent_finder.search_profiles import ProfileLibrary
         try:
@@ -1153,21 +1182,23 @@ def _main_loop(args=None) -> None:
             parser.error(str(error))
         profile_entry = library.find(args.profile)
         if profile_entry is None:
-            parser.error(f"Unknown search profile {args.profile!r}. Available: " + ", ".join(p["name"] for p in library.entries))
+            parser.error(t('Unknown search profile {profile!r}. Available: {profiles}',
+                profile=args.profile,
+                profiles=', '.join((p['name'] for p in library.entries))))
     if args.providers and args.type != "all":
-        parser.error("--providers requires -t all")
+        parser.error(t('--providers requires -t all'))
     update_check = UpdateCheck(check_for_update)
     advise_limited_terminal()
     if not args.skip_warning:
         if not show_security_warning():
-            console.print("[info]Aborted.[/info]")
+            console.print(t('[info]Aborted.[/info]'))
             return
     from torrent_finder.security import exposure
     from torrent_finder.ui import chrome as frames
     if exposure() == "exposed":
-        frames.announce("You feel watched: every peer can see your real IP.")
+        frames.announce(t('You feel watched: every peer can see your real IP.'))
     elif exposure() == "vpn":
-        frames.announce("A cloak of VPN hides your address from the swarm.")
+        frames.announce(t('A cloak of VPN hides your address from the swarm.'))
 
     query = args.query
     initial_provider = None
@@ -1175,7 +1206,7 @@ def _main_loop(args=None) -> None:
     if args.type:
         initial_provider = get_provider(args.type)
         if not initial_provider:
-            console.print(f"[warning] Unknown provider type '{markup_escape(args.type)}'. Falling back to Movies.[/warning]")
+            console.print(t("[warning] Unknown provider type '{provider}'. Falling back to Movies.[/warning]", provider=markup_escape(args.type)))
             initial_provider = PROVIDERS[0]
     elif query or args.by:
         # If -q or --by is passed without -t, default to Movies.
@@ -1207,11 +1238,13 @@ def _main_loop(args=None) -> None:
             None,
         )
         if cli_facet is None:
-            avail = ", ".join(f.key for f in getattr(current_provider, "creator_facets", [])) or "none"
-            console.print(f"[warning] {markup_escape(current_provider.name)} has no '--by {markup_escape(args.by)}' "
-                          f"option (available: {markup_escape(avail)}).[/warning]")
+            avail = ", ".join(f.key for f in getattr(current_provider, "creator_facets", [])) or t("none")
+            console.print(t("[warning] {provider} has no '--by {facet}' option (available: {available}).[/warning]",
+                provider=markup_escape(t(current_provider.name)),
+                facet=markup_escape(args.by),
+                available=markup_escape(avail)))
         elif not args.name:
-            console.print('[warning] --by requires --name "<creator>".[/warning]')
+            console.print(t('[warning] --by requires --name "<creator>".[/warning]'))
             cli_facet = None
         else:
             pending_creator_name = args.name
@@ -1243,7 +1276,7 @@ def _main_loop(args=None) -> None:
             update_info = update_check.info
             update_msg = "\n".join(filter(None, (notice_line(update_info), update_msg)))
             if update_info:
-                frames.announce(f"A raven arrives: {escape(status_label(update_info))}. U installs it.")
+                frames.announce(t('A raven arrives: {version}. U installs it.', version=escape(status_label(update_info))))
         return update_info, update_msg
 
     poll_update()
@@ -1401,18 +1434,18 @@ def _main_loop(args=None) -> None:
         if not query:
             # Build status line showing active engines and filters
             engine_names = [e.name for e in provider.effective_engines]
-            engine_str = ", ".join(engine_names) if engine_names else "None"
-            active_name = provider.filter_summary()
+            engine_str = ", ".join(engine_names) if engine_names else t('None')
+            active_name = provider.filter_summary_label()
             if getattr(provider, "is_combined", False):
-                engine_str, active_name = provider.summary()
+                engine_str, active_name = provider.summary_label()
             prov_history = history_queries(provider.slug)
             screen_renderer = make_search_screen_renderer(
                 engine_str,
                 active_name,
                 has_history=bool(prov_history),
                 notice=notice_msg or "",
-                scope_label="Providers" if getattr(provider, "is_combined", False) else "Engines",
-                title=provider.name,
+                scope_label=t('Providers') if getattr(provider, "is_combined", False) else t('Engines'),
+                title=t(provider.name),
                 provider=provider,
                 recent_hints=history_notes(provider.slug),
             )
@@ -1488,7 +1521,7 @@ def _main_loop(args=None) -> None:
             queries = [query.strip()] if isinstance(query, str) and query.strip() else []
 
         if not queries:
-            notice_msg = "[warning] Please enter a search term.[/warning]"
+            notice_msg = t('[warning] Please enter a search term.[/warning]')
             clear_screen()
             query = None
             continue
@@ -1504,12 +1537,13 @@ def _main_loop(args=None) -> None:
             # CLI -q can reach this screen before the lazy profile is loaded.
             count = sum(p.slug in provider.selected_slugs for p in provider.children)
             intro = ""
-            notes = [f"{count} provider{'s' if count != 1 else ''} · "
-                     "results appear when the search finishes or after 30 seconds."]
+            notes = [tn('{n} provider · results appear when the search finishes or after 30 seconds.',
+                '{n} providers · results appear when the search finishes or after 30 seconds.',
+                count)]
         else:
             intro = ""
-            notes = [escape(provider.search_note)] if getattr(provider, "search_note", "") else []
-            notes.append("30 s search limit; Enter shows the results received so far.")
+            notes = [escape(t(provider.search_note))] if getattr(provider, "search_note", "") else []
+            notes.append(t('30 s search limit; Enter shows the results received so far.'))
 
         # Run the search on a worker thread so Esc can abort the wait instead of
         # forcing the user to sit through the engine timeouts (or Ctrl+C).
@@ -1535,7 +1569,7 @@ def _main_loop(args=None) -> None:
                 if isinstance(error, SearchError):
                     search_result["error"] = str(error)
                 else:
-                    search_result["error"] = "Search could not be completed. Please try again."
+                    search_result["error"] = t('Search could not be completed. Please try again.')
             finally:
                 search_result["done"] = True
 
@@ -1543,8 +1577,8 @@ def _main_loop(args=None) -> None:
         worker.start()
         stop_listener = start_esc_listener(cancel_event, finish_event=finish_event)
         started = time.monotonic()
-        waiting_label = "Contacting selected providers…" if combined else f"Searching {provider.name}…"
-        title = f"{escape(provider.name)} › {escape(shown)}"
+        waiting_label = t('Contacting selected providers…') if combined else t('Searching {provider}…', provider=t(provider.name))
+        title = f"{escape(t(provider.name))} › {escape(shown)}"
         try:
             with ProgressScreen() as screen:
                 drawn_at = 0.0
@@ -1563,7 +1597,7 @@ def _main_loop(args=None) -> None:
             stop_listener.set()
 
         if cancel_event.is_set():
-            notice_msg = "[warning] Search cancelled — returning to the prompt.[/warning]\n"
+            notice_msg = t('[warning] Search cancelled — returning to the prompt.[/warning]\n')
             clear_screen()
             query = None
             continue
@@ -1574,7 +1608,7 @@ def _main_loop(args=None) -> None:
         provider.last_queries = queries
         if not results and getattr(results, "session", None) is None:
             from rich.markup import escape
-            message = search_result.get("error") or "\n".join(["No results found.", *notices])
+            message = search_result.get("error") or "\n".join([t('No results found.'), *notices])
             notice_msg = f"[warning] {escape(message)}[/warning]\n"
             clear_screen()
             query = None
@@ -1598,9 +1632,12 @@ def _main_loop(args=None) -> None:
             missing = [q for q in queries if q not in found]
             if missing:
                 cap = 4
-                more = f" +{len(missing) - cap} more" if len(missing) > cap else ""
-                note = (f"No torrents for {len(missing)} of {len(queries)} titles: "
-                        + ", ".join(missing[:cap]) + more)
+                more = t(' +{count} more', count=len(missing) - cap) if len(missing) > cap else ""
+                note = t('No torrents for {missing} of {total} titles: {titles}{more}',
+                    missing=len(missing),
+                    total=len(queries),
+                    titles=', '.join(missing[:cap]),
+                    more=more)
         if notices:
             note = "\n".join(filter(None, [note, *notices]))
 
@@ -1608,8 +1645,10 @@ def _main_loop(args=None) -> None:
         # results table steps back to the keyword prompt; a completed download
         # proceeds to "what's next?".
         frames.clear_messages()
-        frames.announce(f"You find {len(results)} result{'s' if len(results) != 1 else ''} "
-                        f"for {escape(', '.join(queries))}.")
+        frames.announce(tn('You find {n} result for {queries}.',
+            'You find {n} results for {queries}.',
+            len(results),
+            queries=escape(', '.join(queries))))
         if browse_results(provider, results, note=note) == "back":
             query = None
             clear_screen()
@@ -1639,7 +1678,7 @@ def _opened_in_profile_tab() -> bool:
         return False
     if not terminal_profile.open_tab(sys.argv[1:]):
         return False
-    console.print("[muted]Opened in a torrent-finder tab.[/muted]")
+    console.print("[muted]Opened in a torrent-finder tab.[/muted]")  # i18n: ignore — before language resolution
     return True
 
 
@@ -1679,11 +1718,11 @@ def main() -> None:
         # This process still runs the old code: save its last changes now, so
         # nothing it holds is written over the new version's after it starts.
         store.flush()
-        console.print("[muted]Restarting Torrent Finder…[/muted]")
+        console.print(t('[muted]Restarting Torrent Finder…[/muted]'))
         try:
             code = relaunch(_restart_args(args))
         except OSError:
-            console.print("[warning]Open Torrent Finder again to use the new version.[/warning]")
+            console.print(t('[warning]Open Torrent Finder again to use the new version.[/warning]'))
             code = 0
         raise SystemExit(code)
 

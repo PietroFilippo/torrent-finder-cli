@@ -196,6 +196,12 @@ def _finalize_credentials_save(meta: CredentialSpec, entered: dict[str, str]) ->
     try:
         with console.status(t("[accent]Verifying credentials…[/accent]"), spinner=theme.SPINNER):
             ok, message = meta.verify(effective)
+            if meta.id in {"opensubtitles", "addic7ed"}:
+                from torrent_finder.subtitles import verification_label
+                message = verification_label(message)
+            elif meta.id == "jimaku":
+                from torrent_finder.jimaku import verification_label
+                message = verification_label(message)
     except KeyboardInterrupt:
         console.print(t("[warning]Verification cancelled — nothing saved.[/warning]"))
         return False

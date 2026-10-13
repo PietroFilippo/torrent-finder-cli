@@ -8,7 +8,11 @@ from torrent_finder.language_tags import has_brazilian_audio, has_brazilian_subt
 
 def detail_lines(row):
     name = str(row.get("name", t("Unknown")))
-    lines = [t("Full name: {name}", name=name)]
+    shown_name = name
+    if row.get("mdk_path"):
+        from torrent_finder.madokami import localized_display_name
+        shown_name = localized_display_name(row["mdk_path"])
+    lines = [t("Full name: {name}", name=shown_name)]
     for key, label in (("provider_label", N_("Provider: {value}")), ("source", N_("Source: {value}")),
                        ("uploader", N_("Uploader (listing): {value}")), ("resolution", N_("Resolution (listing): {value}")),
                        ("audio_language", N_("Audio language (listing): {value}")),

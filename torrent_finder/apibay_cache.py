@@ -7,6 +7,8 @@ metadata while preserving source="Apibay" for acquisition routing.
 
 from __future__ import annotations
 
+# i18n: converted
+
 import json
 import os
 import threading
@@ -93,7 +95,7 @@ def _serialized_rows(
                 "seeders": result.seeders,
                 "leechers": result.leechers,
                 "size": result.size,
-                "source": "Apibay",
+                "source": "Apibay",  # i18n: ignore — persisted acquisition identity
                 "page_url": result.page_url,
             }
         )
@@ -154,7 +156,7 @@ def load(provider_slug: str, query: str) -> list[SearchResult]:
             result = normalize_result(raw_row)
             if not result.info_hash:
                 continue
-            result.source = "Apibay"
+            result.source = "Apibay"  # i18n: ignore — acquisition identity
             result.extra["apibay_cached_at"] = saved_at
             results.append(result)
         return results

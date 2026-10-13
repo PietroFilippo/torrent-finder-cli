@@ -1,5 +1,7 @@
 """Run chosen catalog works through the shared bounded search session."""
 
+# i18n: converted
+
 from torrent_finder.resolvers.titles import MAX_ALIASES, distinct_names
 from torrent_finder.search_session import SearchSession
 

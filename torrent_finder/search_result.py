@@ -9,6 +9,8 @@ their legacy keys during the migration.
 
 from __future__ import annotations
 
+# i18n: converted
+
 from collections.abc import Iterator, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -37,7 +39,7 @@ _FIELD_KEYS = {
 }
 
 _FIELD_DEFAULTS = {
-    "name": "Unknown",
+    "name": "Unknown",  # i18n: ignore — persisted metadata default
     "info_hash": "",
     "seeders": 0,
     "leechers": 0,
@@ -65,7 +67,7 @@ def _as_str(value: Any, default: str = "") -> str:
 
 @dataclass
 class SearchResult(MutableMapping[str, Any]):
-    name: str = "Unknown"
+    name: str = "Unknown"  # i18n: ignore — persisted metadata default
     info_hash: str = ""
     seeders: int = 0
     leechers: int = 0
@@ -78,7 +80,7 @@ class SearchResult(MutableMapping[str, Any]):
     uploaded_at: int = 0
 
     def __post_init__(self) -> None:
-        self.name = _as_str(self.name, "Unknown")
+        self.name = _as_str(self.name, "Unknown")  # i18n: ignore — persisted metadata default
         self.info_hash = _as_str(self.info_hash)
         self.seeders = _as_int(self.seeders)
         self.leechers = _as_int(self.leechers)
@@ -140,7 +142,7 @@ class SearchResult(MutableMapping[str, Any]):
             elif key in ("seeders", "leechers", "size"):
                 value = _as_int(value)
             elif key == "name":
-                value = _as_str(value, "Unknown")
+                value = _as_str(value, "Unknown")  # i18n: ignore — persisted metadata default
             else:
                 value = _as_str(value)
             setattr(self, _FIELD_KEYS[key], value)

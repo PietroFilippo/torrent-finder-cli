@@ -163,7 +163,8 @@ class DownloadFolderTests(unittest.TestCase):
         session.set_selected_files([1, 3])
         adapter = Mock(style="magnet-direct")
         adapter.pick.return_value = acquisition.PickOutcome("menu", self.MAGNET)
-        provider = SimpleNamespace(slug="anime", result_sort="relevance", filter_summary=lambda: "No filters")
+        provider = SimpleNamespace(slug="anime", result_sort="relevance", filter_summary=lambda: "No filters",
+                                   filter_summary_label=lambda: "No filters")
         quiet = [patch.object(main, name) for name in ("clear_screen", "record_torrent_picked",
                                                        "record_method_pick", "record_method_complete")]
         for patcher in quiet:

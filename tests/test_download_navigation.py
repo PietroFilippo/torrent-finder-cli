@@ -17,7 +17,7 @@ class DownloadNavigationTests(unittest.TestCase):
     def setUp(self):
         isolate_store(self)
         self.provider = SimpleNamespace(slug="anime", result_sort="relevance",
-                                        filter_summary=lambda: "No filters")
+                                        filter_summary=lambda: "No filters", filter_summary_label=lambda: "No filters")
         self.result = {"name": "Example", "source": "Nyaa", "info_hash": "a" * 40}
         self.magnet = "magnet:?xt=urn:btih:" + "a" * 40
         self.session = TorrentSession(self.result, self.magnet)
