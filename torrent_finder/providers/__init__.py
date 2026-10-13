@@ -1,5 +1,9 @@
 """Provider registry - import and expose all available providers."""
 
+from torrent_finder.i18n import N_, t
+
+# i18n: converted
+
 from dataclasses import dataclass, field
 
 from torrent_finder.providers.base import BaseProvider
@@ -14,7 +18,7 @@ from torrent_finder.providers.movie_provider import MovieProvider
 from torrent_finder.providers.online_fix_provider import OnlineFixProvider
 from torrent_finder.providers.rutracker_provider import RuTrackerProvider
 from torrent_finder.providers.software_provider import SoftwareProvider
-from torrent_finder.providers.combined_provider import CombinedProvider, provider_label
+from torrent_finder.providers.combined_provider import CombinedProvider, provider_label, provider_display_label
 
 # Singleton provider instances. Named so the display menu can nest some of them
 # under a group without changing the flat registry below.
@@ -64,7 +68,7 @@ def _build_provider_name_index() -> dict[str, BaseProvider]:
                 other = index[name]
                 raise ValueError(
                     f"Duplicate provider CLI name {raw_name!r}: "
-                    f"{other.slug!r} and {provider.slug!r}"
+                    f"{other.slug!r} and {provider.slug!r}"  # i18n: ignore — developer registry invariant, raised during import
                 )
             index[name] = provider
     return index
@@ -107,33 +111,33 @@ class ProviderGroup:
     @property
     def label(self) -> str:
         """Menu label. Icons stay as data (``icon``) but menus show names only."""
-        return self.name
+        return t(self.name)
 
 
 # The "Games" umbrella collects the game sources. Picking it drills into General
 # (public-tracker search) / Online-Fix (co-op cracks) / FitGirl (official repacks).
 GAMES_GROUP = ProviderGroup(
-    name="Games",
+    name=N_("Games"),
     icon="🎮",
-    search_note="Games — General (public trackers), Online-Fix (co-op / online cracks), or FitGirl (official repacks).",
+    search_note=N_("Games — General (public trackers), Online-Fix (co-op / online cracks), or FitGirl (official repacks)."),
     children=[_game, _online_fix, _fitgirl],
 )
 
 # The "Software" umbrella collects the three app sources so they don't crowd the
 # top-level list. Picking it drills into Desktop / Mobile / RuTracker.
 SOFTWARE_GROUP = ProviderGroup(
-    name="Software",
+    name=N_("Software"),
     icon="💿",
-    search_note="Apps & programs — Desktop, Mobile (Android), or RuTracker.",
+    search_note=N_("Apps & programs — Desktop, Mobile (Android), or RuTracker."),
     children=[_desktop, _mobile, _rutracker],
 )
 
 # The "Manga" umbrella collects the manga sources. Picking it drills into
 # General (public trackers) / Madokami (private library, direct downloads).
 MANGA_GROUP = ProviderGroup(
-    name="Manga",
+    name=N_("Manga"),
     icon="📚",
-    search_note="Manga — General (public trackers) or Madokami (private library, login needed).",
+    search_note=N_("Manga — General (public trackers) or Madokami (private library, login needed)."),
     children=[_manga, _madokami],
 )
 
@@ -181,7 +185,7 @@ def display_name_for(slug: str) -> str:
     General" vs "Manga · General"), or the slug itself when unknown (orphaned
     history rows, removed providers)."""
     p = get_provider_by_slug(slug)
-    return provider_label(p) if p else slug
+    return provider_display_label(p) if p else slug
 
 
 def icon_for(slug: str) -> str:

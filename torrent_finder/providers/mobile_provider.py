@@ -7,6 +7,10 @@ sideloading is impractical — so this provider advertises that it covers Androi
 official repository of free and open-source apps, downloaded directly.
 """
 
+from torrent_finder.i18n import N_
+
+# i18n: converted
+
 import re
 
 from torrent_finder import fdroid
@@ -17,13 +21,13 @@ from torrent_finder.search_result import SearchResult
 
 
 class MobileProvider(BaseProvider):
-    name = "Mobile"
+    name = N_("Mobile")
     slug = "mobile"
     icon = "📱"
     categories = [306]  # The Pirate Bay "Android" (iOS 305 left out on purpose)
     knaben_categories = (8_001_000,)  # Mobile / Android
-    solidtorrents_category = "Apps"
-    search_note = "Mobile is Android-only (APK / MOD / OBB); iOS/IPA isn't covered."
+    solidtorrents_category = "Apps"  # i18n: ignore — service/engine identity, including external category values
+    search_note = N_("Mobile is Android-only (APK / MOD / OBB); iOS/IPA isn't covered.")
 
     # Apps aren't video/audio — no streaming or subtitle features.
     supports_subtitles = False
@@ -38,15 +42,15 @@ class MobileProvider(BaseProvider):
                                    or bool(re.search(r"\b(?:android|apk)\b", name, re.I)))
 
     presets = [
-        FilterPreset("MOD / Patched", FilterConfig(include_keywords=[
+        FilterPreset(N_("MOD / Patched"), FilterConfig(include_keywords=[
             "mod", "modded", "patched", "premium", "unlocked", "pro",
         ])),
-        FilterPreset("APK only", FilterConfig(include_keywords=["apk"]), description=(
-            "Names that say APK. Android-category listings are apps either way and many never say "
-            "APK (none of the audit's Stardew Valley rows did), so Prefer is usually better than Require.")),
-        FilterPreset("With OBB / Data", FilterConfig(include_keywords=["obb", "data"])),
-        FilterPreset("Games", FilterConfig(include_keywords=["game"])),
-        FilterPreset("Ad-Free", FilterConfig(include_keywords=["ad-free", "adfree", "no ads", "no-ads"])),
+        FilterPreset(N_("APK only"), FilterConfig(include_keywords=["apk"]), description=(
+            N_("Names that say APK. Android-category listings are apps either way and many never say "
+            "APK (none of the audit's Stardew Valley rows did), so Prefer is usually better than Require."))),
+        FilterPreset(N_("With OBB / Data"), FilterConfig(include_keywords=["obb", "data"])),
+        FilterPreset(N_("Games"), FilterConfig(include_keywords=["game"])),
+        FilterPreset(N_("Ad-Free"), FilterConfig(include_keywords=["ad-free", "adfree", "no ads", "no-ads"])),  # i18n: ignore — literal service or release-name match data
     ]
 
     # The searched app before others containing its name; F-Droid rows are
@@ -76,20 +80,20 @@ class MobileProvider(BaseProvider):
         """
         return [
             SearchEngine(
-                "Knaben", "🧭", self._search_knaben,
+                "Knaben", "🧭", self._search_knaben,  # i18n: ignore — service/engine identity, including external category values
                 enabled=True, emergency_fallback=True,
             ),
             SearchEngine(
-                "Apibay", "🏴‍☠️", self._search_apibay,
+                "Apibay", "🏴‍☠️", self._search_apibay,  # i18n: ignore — service/engine identity, including external category values
                 enabled=False, emergency_fallback=True,
             ),
             SearchEngine(
-                "SolidTorrents", "🔗", self._search_solidtorrents,
+                "SolidTorrents", "🔗", self._search_solidtorrents,  # i18n: ignore — service/engine identity, including external category values
                 enabled=False,
             ),
             SearchEngine("F-Droid", "🤖", self._search_fdroid, enabled=False, description=(
-                "F-Droid's official repository: free and open-source apps only (no commercial games). "
-                "A pick downloads the current APK from f-droid.org; Android checks its signature on install.")),
+                N_("F-Droid's official repository: free and open-source apps only (no commercial games). "
+                "A pick downloads the current APK from f-droid.org; Android checks its signature on install."))),
         ]
 
     def _search_fdroid(self, query: str) -> list[SearchResult]:

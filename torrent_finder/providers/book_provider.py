@@ -6,6 +6,10 @@ releases; SolidTorrents' eBook category is available opt-in. Every default
 engine works without credentials.
 """
 
+from torrent_finder.i18n import N_
+
+# i18n: converted
+
 from torrent_finder import libgen
 from torrent_finder.filters import FilterConfig, FilterPreset
 from torrent_finder.providers.base import BaseProvider, SearchEngine
@@ -15,11 +19,11 @@ from torrent_finder.search_result import SearchResult
 
 
 class BookProvider(BaseProvider):
-    name = "Books"
+    name = N_("Books")
     slug = "books"
     cli_aliases = ("book",)
     icon = "📖"
-    search_note = "Books — Libgen (direct download, no login) + public torrent trackers."
+    search_note = N_("Books — Libgen (direct download, no login) + public torrent trackers.")
     categories = [601, 102]  # TPB E-books + Audio books
     # Apibay's cat=0 search falsely returns the no-results sentinel for many
     # book titles ("Metamorphosis") that the category-scoped search finds —
@@ -43,35 +47,35 @@ class BookProvider(BaseProvider):
     supports_streaming = False
 
     presets = [
-        FilterPreset("EPUB", FilterConfig(include_keywords=["epub"])),
-        FilterPreset("PDF", FilterConfig(include_keywords=["pdf"])),
-        FilterPreset("Kindle (MOBI/AZW3)", FilterConfig(include_keywords=["mobi", "azw3", "azw"])),
-        FilterPreset("Audiobook", FilterConfig(include_keywords=["audiobook", "m4b", "mp3"])),
-        FilterPreset("English", FilterConfig(include_keywords=["english"])),
+        FilterPreset(N_("EPUB"), FilterConfig(include_keywords=["epub"])),
+        FilterPreset(N_("PDF"), FilterConfig(include_keywords=["pdf"])),
+        FilterPreset(N_("Kindle (MOBI/AZW3)"), FilterConfig(include_keywords=["mobi", "azw3", "azw"])),
+        FilterPreset(N_("Audiobook"), FilterConfig(include_keywords=["audiobook", "m4b", "mp3"])),
+        FilterPreset(N_("English"), FilterConfig(include_keywords=["english"])),
     ]
 
     # Search by creator. OpenLibrary is keyless; works come back ordered by
     # edition count so an author's known books surface first in the picker.
     creator_facets = [
         CreatorFacet(
-            key="author", label="Author", icon="📝",
+            key="author", label=N_("Author"), icon="📝",
             search_entities=openlibrary.author_search,
             list_works=openlibrary.author_works,
-            note="Find an author's books via OpenLibrary, then search each title.",
+            note=N_("Find an author's books via OpenLibrary, then search each title."),
         ),
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
         """Libgen + APIBay on, category-scoped Knaben auto, Solid manually off."""
         return [
-            SearchEngine("Libgen", "📖", self._search_libgen, enabled=True),
-            SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
+            SearchEngine("Libgen", "📖", self._search_libgen, enabled=True),  # i18n: ignore — service/engine identity, including external category values
+            SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine(
-                "Knaben", "🧭", self._search_knaben,
+                "Knaben", "🧭", self._search_knaben,  # i18n: ignore — service/engine identity, including external category values
                 enabled=False, emergency_fallback=True,
             ),
             SearchEngine(
-                "SolidTorrents", "🔗", self._search_solidtorrents,
+                "SolidTorrents", "🔗", self._search_solidtorrents,  # i18n: ignore — service/engine identity, including external category values
                 enabled=False,
             ),
         ]

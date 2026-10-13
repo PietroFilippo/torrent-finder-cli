@@ -14,12 +14,14 @@ import requests
 from torrent_finder import apibay_cache, knaben
 from torrent_finder.constants import API_URL, console
 from torrent_finder.filters import FilterConfig, FilterPreset, apply_filters, strip_accents
+from torrent_finder.i18n import N_, t
 from torrent_finder.search_result import SearchResult, normalize_result
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_control import Cooldown, search_request
 from torrent_finder.search_diagnostics import ACCESS_STATUSES, record_failure
 from torrent_finder.result_view import split_release_tags, title_score
 
+# i18n: converted
 
 _APIBAY_NUMBER_WORDS = {
     "zero": "0",
@@ -37,8 +39,17 @@ _APIBAY_NUMBER_WORDS = {
 # One search already costs engines x retries; query expansion multiplies that.
 # Keep both bounded so a preset stack stays polite to the indexers.
 _MAX_QUERY_EXPANSIONS = 4
+
+_FILTER_REASONS = {
+    "Name rules": N_("Name rules"),
+    "Provider defaults": N_("Provider defaults"),
+    "CLI filters": N_("CLI filters"),
+    "Shared rules / CLI filters": N_("Shared rules / CLI filters"),
+}
+
+
 # Every provider that searches SolidTorrents shares its rate-limit pause.
-_SOLIDTORRENTS_COOLDOWN = Cooldown("SolidTorrents")
+_SOLIDTORRENTS_COOLDOWN = Cooldown("SolidTorrents")  # i18n: ignore — service/engine identity, including external category values
 
 _APIBAY_FALLBACK_IGNORED = {
     "a",
@@ -56,6 +67,14 @@ _APIBAY_FALLBACK_IGNORED = {
     "the",
     "to",
 }
+
+
+def filter_reason_label(reason: str) -> str:
+    """Display an existing diagnostic reason without changing its stored value."""
+    if reason.startswith("Require "):
+        name = reason[len("Require "):]
+        return t("Require {name}", name=t(name))
+    return t(_FILTER_REASONS[reason]) if reason in _FILTER_REASONS else reason
 
 
 def _apibay_title_case(query: str) -> str:
@@ -125,7 +144,7 @@ class SearchEngine:
         normalized = str(mode).casefold()
         if normalized not in self.available_modes:
             raise ValueError(
-                f"Unsupported mode {mode!r} for engine {self.name!r}"
+                t("Unsupported mode {mode!r} for engine {engine!r}", mode=mode, engine=self.name)
             )
         self.enabled = normalized == "on"
         self.explicitly_disabled = normalized == "off"
@@ -219,14 +238,14 @@ class BaseProvider(ABC):
     def _init_engines(self) -> list[SearchEngine]:
         """Define available search engines. Override in subclasses to customize."""
         return [
-            SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
-            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=True),
+            SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),  # i18n: ignore — service/engine identity, including external category values
+            SearchEngine("SolidTorrents", "🔗", self._search_solidtorrents, enabled=True),  # i18n: ignore — service/engine identity, including external category values
         ]
 
     @property
     def label(self) -> str:
         """Menu label. Icons stay as data (``icon``) but menus show names only."""
-        return self.name
+        return t(self.name)
 
     def _apibay_retry_queries(self, query: str) -> Iterator[str]:
         # APIBay's query cache is case-sensitive. Preserve the user's spelling
@@ -311,7 +330,7 @@ class BaseProvider(ABC):
                     continue
                 tried.add(params)
                 if not isinstance(data, list):
-                    record_failure(message="APIBay returned an invalid results list.")
+                    record_failure(message=t("APIBay returned an invalid results list."))
                     continue
                 answered = True
                 rows = [item for item in data if isinstance(item, dict)]
@@ -334,7 +353,7 @@ class BaseProvider(ABC):
                 name = (
                     raw_name
                     if isinstance(raw_name, str) and raw_name
-                    else "Unknown"
+                    else "Unknown"  # i18n: ignore — fallback name is also a search query / saved result
                 )
                 results.append(SearchResult(
                     # Apibay HTML-escapes quotes in names (&quot;) to keep its
@@ -344,7 +363,7 @@ class BaseProvider(ABC):
                     seeders=item.get("seeders", 0),
                     leechers=item.get("leechers", 0),
                     size=item.get("size", 0),
-                    source="Apibay",
+                    source="Apibay",  # i18n: ignore — service/engine identity, including external category values
                     page_url=(
                         f"https://thepiratebay.org/description.php?id={tid}"
                         if tid
@@ -417,7 +436,7 @@ class BaseProvider(ABC):
                     seeders=r.get("swarm", {}).get("seeders", 0),
                     leechers=r.get("swarm", {}).get("leechers", 0),
                     size=r.get("size", 0),
-                    source="SolidTorrents",
+                    source="SolidTorrents",  # i18n: ignore — service/engine identity, including external category values
                     page_url=f"https://solidtorrents.to/torrents/t/{rid}" if rid else "",
                 ))
         except SearchError:
@@ -472,7 +491,7 @@ class BaseProvider(ABC):
 
             root = ET.fromstring(response.text)
             if root.tag != "rss":
-                record_failure(message="Nyaa returned an unrecognized RSS response.")
+                record_failure(message=t("Nyaa returned an unrecognized RSS response."))
             nyaa_ns = "{https://nyaa.si/xmlns/nyaa}"
 
             for item in root.findall(".//item"):
@@ -494,7 +513,7 @@ class BaseProvider(ABC):
                         seeders=seeders.text if seeders is not None else 0,
                         leechers=leechers.text if leechers is not None else 0,
                         size=size_bytes,
-                        source="Nyaa",
+                        source="Nyaa",  # i18n: ignore — service/engine identity, including external category values
                         page_url=guid.text if guid is not None and guid.text else "",
                         uploaded_at=item.findtext("pubDate", ""),
                     ))
@@ -563,15 +582,15 @@ class BaseProvider(ABC):
 
     def filter_with_reasons(self, rows, cli_filters=None, result_filter=None):
         """Apply ordered filtering stages; counts describe first exclusion only."""
-        stages = [("Name rules", lambda values: [r for r in values if self.name_rules.matches(r.name)])]
+        stages = [("Name rules", lambda values: [r for r in values if self.name_rules.matches(r.name)])]  # i18n: ignore — stable diagnostic value; translate with the display helper
         if self.default_filters:
-            stages.append(("Provider defaults", lambda values: apply_filters(values, self.default_filters)))
+            stages.append(("Provider defaults", lambda values: apply_filters(values, self.default_filters)))  # i18n: ignore — stable diagnostic value; translate with the display helper
         for preset in self.active_presets:
-            stages.append(("Require " + preset.name, lambda values, p=preset: apply_filters(values, p.config)))
+            stages.append(("Require " + preset.name, lambda values, p=preset: apply_filters(values, p.config)))  # i18n: ignore — stable diagnostic value; translate with the display helper
         if cli_filters:
-            stages.append(("CLI filters", lambda values: apply_filters(values, cli_filters)))
+            stages.append(("CLI filters", lambda values: apply_filters(values, cli_filters)))  # i18n: ignore — stable diagnostic value; translate with the display helper
         if result_filter:
-            stages.append(("Shared rules / CLI filters", lambda values: [r for r in values if result_filter(r)]))
+            stages.append(("Shared rules / CLI filters", lambda values: [r for r in values if result_filter(r)]))  # i18n: ignore — stable diagnostic value; translate with the display helper
         removed = []
         for name, apply in stages:
             kept = apply(rows)
@@ -663,14 +682,27 @@ class BaseProvider(ABC):
     def filter_summary(self) -> str:
         parts = []
         if self.name_rules.summary():
-            parts.append("Names: " + self.name_rules.summary())
+            parts.append("Names: " + self.name_rules.summary())  # i18n: ignore — stable diagnostic value; translate with the display helper
         if getattr(self, "nyaa_categories", None):
-            parts.append("Nyaa: " + self.nyaa_categories[self.nyaa_category])
+            parts.append("Nyaa: " + self.nyaa_categories[self.nyaa_category])  # i18n: ignore — stable diagnostic value; translate with the display helper
         if self.active_presets:
-            parts.append("Require: " + ", ".join(p.name for p in self.active_presets))
+            parts.append("Require: " + ", ".join(p.name for p in self.active_presets))  # i18n: ignore — stable diagnostic value; translate with the display helper
         if self.preferred_presets:
-            parts.append("Prefer: " + ", ".join(p.name for p in self.preferred_presets))
-        return "; ".join(parts) or "No presets"
+            parts.append("Prefer: " + ", ".join(p.name for p in self.preferred_presets))  # i18n: ignore — stable diagnostic value; translate with the display helper
+        return "; ".join(parts) or "No presets"  # i18n: ignore — stable diagnostic value; translate with the display helper
+
+    def filter_summary_label(self) -> str:
+        """Display summary; filter_summary() retains its English sentinel and contract."""
+        parts = []
+        if self.name_rules.summary():
+            parts.append(t("Names: {rules}", rules=self.name_rules.summary_label()))
+        if getattr(self, "nyaa_categories", None):
+            parts.append(t("Nyaa: {category}", category=t(self.nyaa_categories[self.nyaa_category])))
+        if self.active_presets:
+            parts.append(t("Require: {names}", names=", ".join(p.label for p in self.active_presets)))
+        if self.preferred_presets:
+            parts.append(t("Prefer: {names}", names=", ".join(p.label for p in self.preferred_presets)))
+        return "; ".join(parts) or t("No presets")
 
     def _sort_results(self, results: list[SearchResult]) -> list[SearchResult]:
         """Order merged results for display. Default: seeders descending.

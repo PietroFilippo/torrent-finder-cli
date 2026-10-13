@@ -9,6 +9,10 @@ Director = eager (TMDB returns a person's whole filmography in one call).
 Studio  = network-paged (TMDB discover is 20/page with a total_pages count).
 """
 
+from torrent_finder.i18n import t, tn
+
+# i18n: converted
+
 import concurrent.futures
 
 import requests
@@ -45,9 +49,9 @@ def _credit_to_work(item: dict) -> Work:
         date, kind = item.get("first_air_date") or "", "TV"
     else:
         title, orig = item.get("title"), item.get("original_title")
-        date, kind = item.get("release_date") or "", "Movie"
+        date, kind = item.get("release_date") or "", t("Movie")
 
-    primary = title or orig or "Unknown"
+    primary = title or orig or "Unknown"  # i18n: ignore — fallback name is also a search query / saved result
     alts: list[str] = []
     for cand in (orig, title):
         if cand and cand != primary and cand not in alts:
@@ -79,17 +83,17 @@ def person_search(name: str) -> "list[Entity] | None":
         dept = p.get("known_for_department") or ""
         known: list[str] = []
         for kf in p.get("known_for") or []:
-            t = kf.get("title") or kf.get("name")
-            if t and t not in known:
-                known.append(t)
+            title = kf.get("title") or kf.get("name")
+            if title and title not in known:
+                known.append(title)
             if len(known) >= 3:
                 break
         bits = []
         if dept:
             bits.append(dept)
         if known:
-            bits.append("known for " + ", ".join(known))
-        out.append(Entity(id=str(pid), name=p.get("name") or "Unknown", detail=" · ".join(bits)))
+            bits.append(t("known for {works}", works=", ".join(known)))
+        out.append(Entity(id=str(pid), name=p.get("name") or "Unknown", detail=" · ".join(bits)))  # i18n: ignore — fallback name is also a search query / saved result
     return out
 
 
@@ -142,8 +146,8 @@ def company_search(name: str) -> "list[Entity] | None":
     ranked = sorted(((c, n) for c, n in zip(candidates, counts) if n > 0),
                     key=lambda t: t[1], reverse=True)
     return [
-        Entity(id=str(co["id"]), name=co.get("name") or "Unknown",
-               detail=f"{n} film{'s' if n != 1 else ''}")
+        Entity(id=str(co["id"]), name=co.get("name") or "Unknown",  # i18n: ignore — fallback name is also a search query / saved result
+               detail=tn("{n} film", "{n} films", n))
         for co, n in ranked
     ]
 
@@ -169,14 +173,14 @@ def test_api_key(key: str) -> "tuple[bool | None, str]":
     try:
         resp = requests.get(f"{_API}/authentication", params={"api_key": key}, timeout=10)
     except requests.RequestException as exc:
-        return None, f"couldn't reach TMDB ({exc})"
+        return None, t("couldn't reach TMDB ({error})", error=exc)
     if resp.status_code == 200:
         try:
             if (resp.json() or {}).get("success"):
-                return True, "key valid"
+                return True, t("key valid")
         except ValueError:
             pass
-        return None, "unexpected response"
+        return None, t("unexpected response")
     if resp.status_code == 401:
-        return False, "invalid API key"
-    return None, f"unexpected response ({resp.status_code})"
+        return False, t("invalid API key")
+    return None, t("unexpected response ({status})", status=resp.status_code)

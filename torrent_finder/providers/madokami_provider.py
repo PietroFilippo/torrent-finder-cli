@@ -8,17 +8,21 @@ archive(s) directly (a folder opens in place to browse and pick files) instead o
 entering the magnet pipeline (see main.py's Madokami branch).
 """
 
+from torrent_finder.i18n import N_
+
+# i18n: converted
+
 from torrent_finder import madokami
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
 
 
 class MadokamiProvider(BaseProvider):
-    name = "Madokami"
+    name = N_("Madokami")
     slug = "madokami"
     icon = "📕"
     categories = []  # not Apibay-based; the engine talks to manga.madokami.al directly
-    search_note = "Needs a Madokami login (Credentials menu). Picks download directly — no torrent client involved."
+    search_note = N_("Needs a Madokami login (Credentials menu). Picks download directly — no torrent client involved.")
 
     # Direct-download archives behind Basic auth — no swarm, no video, so none
     # of the magnet/streaming features apply.
@@ -34,7 +38,7 @@ class MadokamiProvider(BaseProvider):
     alias_catalog = "manga"
 
     def _init_engines(self) -> list[SearchEngine]:
-        return [SearchEngine("Madokami", "📕", self._search_madokami, enabled=True)]
+        return [SearchEngine("Madokami", "📕", self._search_madokami, enabled=True)]  # i18n: ignore — service/engine identity, including external category values
 
     def _search_madokami(self, query: str) -> list[SearchResult]:
         return madokami.search(query)

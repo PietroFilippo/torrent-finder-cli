@@ -5,6 +5,10 @@ Windows / macOS / Linux programs. Android apps have their own provider
 mobile listings out unless they name a desktop platform.
 """
 
+from torrent_finder.i18n import N_
+
+# i18n: converted
+
 import re
 
 from torrent_finder.filters import FilterConfig, FilterPreset
@@ -15,19 +19,19 @@ from torrent_finder.result_view import product_title_score
 class SoftwareProvider(BaseProvider):
     # Shown as "Desktop" under the Software group; slug stays "software" so the
     # -t flag and existing history/stats keys keep working.
-    name = "Desktop"
+    name = N_("Desktop")
     slug = "software"
     # 💻 (laptop) is width-2 like the sibling icons; 🖥️ (desktop) is a
     # variation-selector emoji that Rich miscounts as width-1, so its menu row
     # overflows by a cell and wraps. Stick to clean width-2 emoji here.
     icon = "💻"
-    search_note = "Desktop programs for Windows, macOS & Linux."
+    search_note = N_("Desktop programs for Windows, macOS & Linux.")
     # The Pirate Bay "Applications" categories: 300 Applications, 301 Windows,
     # 302 Mac, 303 UNIX/Linux, 399 Other OS. (Mobile parked: 305 iOS, 306 Android.)
     categories = [300, 301, 302, 303, 399]
     # Knaben PC subcategories: Software, Mac, Unix.
     knaben_categories = (4_002_000, 4_003_000, 4_004_000)
-    solidtorrents_category = "Apps"
+    solidtorrents_category = "Apps"  # i18n: ignore — service/engine identity, including external category values
 
     # Software isn't video/audio — no streaming or subtitle features. Use the
     # Torrent info option to inspect a torrent's file list before downloading.
@@ -46,14 +50,14 @@ class SoftwareProvider(BaseProvider):
                           r"|sdk|device manager|for pc)\b", name, re.I)))
 
     presets = [
-        FilterPreset("Pre-activated / Cracked", FilterConfig(include_keywords=[
+        FilterPreset(N_("Pre-activated / Cracked"), FilterConfig(include_keywords=[
             "pre-activated", "preactivated", "activated", "cracked", "crack", "repack",
         ])),
-        FilterPreset("Portable", FilterConfig(include_keywords=["portable"])),
-        FilterPreset("Windows", FilterConfig(include_keywords=["windows", "win64", "win32", "x64", "x86"])),
-        FilterPreset("macOS", FilterConfig(include_keywords=["macos", "mac os", "osx", "dmg"],
+        FilterPreset(N_("Portable"), FilterConfig(include_keywords=["portable"])),
+        FilterPreset(N_("Windows"), FilterConfig(include_keywords=["windows", "win64", "win32", "x64", "x86"])),
+        FilterPreset(N_("macOS"), FilterConfig(include_keywords=["macos", "mac os", "osx", "dmg"],  # i18n: ignore — literal service or release-name match data
                                           include_regex=r"\bmac\b")),  # "for Mac", "(MAC)"
-        FilterPreset("Linux", FilterConfig(include_keywords=["linux", "ubuntu", "debian", "appimage"])),
+        FilterPreset(N_("Linux"), FilterConfig(include_keywords=["linux", "ubuntu", "debian", "appimage"])),
     ]
 
     # The searched program before longer products containing its name
@@ -79,13 +83,13 @@ class SoftwareProvider(BaseProvider):
         APIBay; APIBay stays on because its rows were mostly not in Knaben's.
         """
         return [
-            SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
+            SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine(
-                "Knaben", "🧭", self._search_knaben,
+                "Knaben", "🧭", self._search_knaben,  # i18n: ignore — service/engine identity, including external category values
                 enabled=True, emergency_fallback=True,
             ),
             SearchEngine(
-                "SolidTorrents", "🔗", self._search_solidtorrents,
+                "SolidTorrents", "🔗", self._search_solidtorrents,  # i18n: ignore — service/engine identity, including external category values
                 enabled=False,
             ),
         ]

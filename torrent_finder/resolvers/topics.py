@@ -1,5 +1,9 @@
 """Catalog topics identify works; release-name keywords do not establish topics."""
 
+from torrent_finder.i18n import N_, t, tn
+
+# i18n: converted
+
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -27,12 +31,23 @@ class Topic:
     detail: str = ""
 
 
+_KINDS = {
+    "genre": N_("genre"), "tag": N_("tag"), "keyword": N_("keyword"),
+    "genres": N_("genres"), "themes": N_("themes"),
+    "game_modes": N_("game modes"), "keywords": N_("keywords"), "subject": N_("subject"),
+}
+
+
+def kind_label(kind):
+    return t(_KINDS[kind]) if kind in _KINDS else kind
+
+
 def discovery_catalogs(provider):
     out = []
     for catalog in catalogs_for(provider):
         if catalog.key == "movies":
             out.extend(replace(catalog, key=key, label=label) for key, label in
-                       (("movie", "Movies · TMDB"), ("tv", "Series · TMDB")))
+                       (("movie", N_("Movies · TMDB")), ("tv", N_("Series · TMDB"))))
         else:
             out.append(catalog)
     return out
@@ -51,26 +66,26 @@ def scope_for(provider, catalog):
 
 def scope_label(provider):
     if not getattr(provider, "is_combined", False):
-        return provider.name
-    from torrent_finder.providers.combined_provider import provider_label
-    return ", ".join(provider_label(p) for p in provider.children if p.slug in provider.selected_slugs)
+        return t(provider.name)
+    from torrent_finder.providers.combined_provider import provider_display_label
+    return ", ".join(provider_display_label(p) for p in provider.children if p.slug in provider.selected_slugs)
 
 
 def _check(catalog):
     missing = catalog.missing_credentials()
     if missing:
-        raise SearchError("Configure " + ", ".join(missing) + " in Credentials to use this catalog.")
+        raise SearchError(t("Configure {credentials} in Credentials to use this catalog.", credentials=", ".join(missing)))
 
 
 def _require(value, label):
     if value is None:
-        raise SearchError(f"{label} could not be reached or rejected the request. Try again or check Credentials.")
+        raise SearchError(t("{service} could not be reached or rejected the request. Try again or check Credentials.", service=label))
     return value
 
 
 def _rows(data, field, label):
     if not isinstance(data, dict) or not isinstance(data.get(field), list):
-        raise SearchError(f"{label} returned an incomplete catalog response.")
+        raise SearchError(t("{service} returned an incomplete catalog response.", service=label))
     return data[field]
 
 
@@ -81,9 +96,9 @@ def _normal(text):
 
 @lru_cache(maxsize=1)
 def _anilist_topics():
-    data = _require(anilist._post("{ GenreCollection MediaTagCollection { id name description isAdult } }", {}), "AniList")
+    data = _require(anilist._post("{ GenreCollection MediaTagCollection { id name description isAdult } }", {}), "AniList")  # i18n: ignore — service query/protocol, never interface text
     if not isinstance(data.get("GenreCollection"), list) or not isinstance(data.get("MediaTagCollection"), list):
-        raise SearchError("AniList did not return its topic vocabulary.")
+        raise SearchError(t("AniList did not return its topic vocabulary."))
     return tuple([Topic("genre", name, name) for name in data["GenreCollection"]] +
                  [Topic("tag", str(row["id"]), row["name"], row.get("description") or "")
                   for row in data["MediaTagCollection"] if row.get("id") and row.get("name") and not row.get("isAdult")])
@@ -115,19 +130,19 @@ def find_topics(catalog, text):
                          for kind in kinds)
         data = _require(igdb._post("multiquery", body), "IGDB")
         if {group.get("name") for group in data} != set(kinds) or any(not isinstance(g.get("result"), list) for g in data):
-            raise SearchError("IGDB did not return all requested topic vocabularies.")
+            raise SearchError(t("IGDB did not return all requested topic vocabularies."))
         return [Topic(group["name"], str(r["id"]), r["name"]) for group in data for r in group["result"]
                 if r.get("id") and r.get("name")]
     if key == "books":
         slug = quote(text.casefold().replace(" ", "_"), safe="")
-        data = _require(openlibrary._get(f"/subjects/{slug}.json", {"limit": 0}), "Open Library")
+        data = _require(openlibrary._get(f"/subjects/{slug}.json", {"limit": 0}), "Open Library")  # i18n: ignore — service/engine identity, including external category values
         if not isinstance(data.get("work_count"), int):
-            raise SearchError("Open Library returned an incomplete subject response.")
+            raise SearchError(t("Open Library returned an incomplete subject response."))
         if not data.get("work_count"):
             return []
         name = data.get("name") or text
-        return [Topic("subject", slug, name, f"{data['work_count']} catalog works; one subject per search.")]
-    raise SearchError("Topic discovery is unavailable for this category.")
+        return [Topic("subject", slug, name, tn("{n} catalog work; one subject per search.", "{n} catalog works; one subject per search.", data["work_count"]))]
+    raise SearchError(t("Topic discovery is unavailable for this category."))
 
 
 _DISCOVER = """
@@ -140,27 +155,27 @@ query ($type: MediaType, $genres: [String], $tags: [String], $page: Int) {
     }
   }
 }
-"""
+"""  # i18n: ignore — service query/protocol, never interface text
 
 
 def discover(catalog, topics, page=1):
     _check(catalog)
     if not 1 <= page <= MAX_PAGES or not 1 <= len(topics) <= (1 if catalog.key == "books" else MAX_TOPICS):
-        raise ValueError("Discovery exceeds the topic/page limit")
+        raise ValueError(t("Discovery exceeds the topic/page limit"))
     key = catalog.key
     allowed = ({"genre", "tag"} if key in {"anime", "manga"} else {"genre", "keyword"}
                if key in {"movie", "tv"} else {"genres", "themes", "game_modes", "keywords"}
                if key == "games" else {"subject"})
     if any(t.kind not in allowed for t in topics):
-        raise ValueError("Topic does not belong to this catalog")
-    evidence = "Catalog criteria (all): " + ", ".join(t.name for t in topics)
+        raise ValueError(t("Topic does not belong to this catalog"))
+    evidence = t("Catalog criteria (all): {criteria}", criteria=", ".join(topic.name for topic in topics))
     if key in {"anime", "manga"}:
         data = _require(anilist._post(_DISCOVER, {"type": key.upper(), "page": page,
             "genres": [t.name for t in topics if t.kind == "genre"] or None,
-            "tags": [t.name for t in topics if t.kind == "tag"] or None}), "AniList")
+            "tags": [t.name for t in topics if t.kind == "tag"] or None}), "AniList")  # i18n: ignore — service/engine identity, including external category values
         if not isinstance(data.get("Page"), dict):
-            raise SearchError("AniList returned an incomplete discovery response.")
-        rows = _rows(data["Page"], "media", "AniList")
+            raise SearchError(t("AniList returned an incomplete discovery response."))
+        rows = _rows(data["Page"], "media", "AniList")  # i18n: ignore — service/engine identity, including external category values
         matches = []
         for row in rows:
             tag_ranks = {t.get("name"): t.get("rank", 0) for t in row.get("tags", [])}
@@ -171,7 +186,7 @@ def discover(catalog, topics, page=1):
             work = _with_names(anilist._node_to_work(row), [names.get("native"), *(row.get("synonyms") or [])])
             tags = ", ".join(f"{t['name']} ({t.get('rank', 0)}%)" for t in row.get("tags", [])
                              if t.get("name") in {x.name for x in topics})
-            matches.append(TitleMatch(key, str(row["id"]), work, evidence + ("\nTag relevance: " + tags if tags else "")))
+            matches.append(TitleMatch(key, str(row["id"]), work, evidence + (t("\nTag relevance: {tags}", tags=tags) if tags else "")))
         more = bool((data["Page"].get("pageInfo") or {}).get("hasNextPage"))
     elif key in {"movie", "tv"}:
         params = {"page": page, "include_adult": "false", "sort_by": "popularity.desc"}
@@ -185,9 +200,9 @@ def discover(catalog, topics, page=1):
         more = page < data.get("total_pages", 1)
     elif key == "games":
         clauses = [f"{t.kind} = [{int(t.id)}]" for t in topics]
-        data = _require(igdb._post("games", "fields name,first_release_date,alternative_names.name,platforms.name; "
-            + "where " + " & ".join(clauses) + "; sort total_rating_count desc; "
-            + f"limit {PAGE_SIZE}; offset {(page - 1) * PAGE_SIZE};"), "IGDB")
+        data = _require(igdb._post("games", "fields name,first_release_date,alternative_names.name,platforms.name; "  # i18n: ignore — service query/protocol, never interface text
+            + "where " + " & ".join(clauses) + "; sort total_rating_count desc; "  # i18n: ignore — service query/protocol, never interface text
+            + f"limit {PAGE_SIZE}; offset {(page - 1) * PAGE_SIZE};"), "IGDB")  # i18n: ignore — service query/protocol, never interface text
         matches = []
         for row in data:
             year = datetime.fromtimestamp(row["first_release_date"], timezone.utc).year if row.get("first_release_date") else None
@@ -198,24 +213,24 @@ def discover(catalog, topics, page=1):
     elif key == "books":
         # ID is a percent-encoded subject path component, never a raw endpoint.
         if not re.fullmatch(r"[\w%\-.~]+", topics[0].id):
-            raise ValueError("Invalid subject identifier")
+            raise ValueError(t("Invalid subject identifier"))
         data = _require(openlibrary._get(f"/subjects/{topics[0].id}.json",
-            {"limit": PAGE_SIZE, "offset": (page - 1) * PAGE_SIZE}), "Open Library")
+            {"limit": PAGE_SIZE, "offset": (page - 1) * PAGE_SIZE}), "Open Library")  # i18n: ignore — service/engine identity, including external category values
         matches = []
-        for row in _rows(data, "works", "Open Library"):
+        for row in _rows(data, "works", "Open Library"):  # i18n: ignore — service/engine identity, including external category values
             year = row.get("first_publish_year")
             authors = ", ".join(a.get("name", "") for a in row.get("authors", [])[:3])
             work = Work(row["title"], year=year, subtitle=" · ".join(filter(None, [str(year or ""), authors])))
             matches.append(TitleMatch(key, row["key"], work, evidence))
         more = page * PAGE_SIZE < data.get("work_count", 0)
     else:
-        raise SearchError("This category has no topic catalog.")
+        raise SearchError(t("This category has no topic catalog."))
     return matches, more and page < MAX_PAGES
 
 
 def query_plan(matches):
     if not 1 <= len(matches) <= MAX_WORKS:
-        raise ValueError(f"Choose 1–{MAX_WORKS} works")
+        raise ValueError(t("Choose 1–{limit} works", limit=MAX_WORKS))
     queries, origins = [], {}
     for match in matches:
         for name in distinct_names([match.work.title, *match.work.alt_titles])[:2]:

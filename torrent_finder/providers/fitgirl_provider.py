@@ -8,17 +8,21 @@ when a result is selected (see fitgirl.resolve_info_hash), same shape as the
 RuTracker lazy resolve.
 """
 
+from torrent_finder.i18n import N_
+
+# i18n: converted
+
 from torrent_finder import fitgirl
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
 
 
 class FitGirlProvider(BaseProvider):
-    name = "FitGirl"
+    name = N_("FitGirl")
     slug = "fitgirl"
     icon = "🧚"
     categories = []  # not Apibay-based; the engine talks to fitgirl-repacks.site directly
-    search_note = "Repacks from the official fitgirl-repacks.site — no account needed; the magnet resolves from the post when you pick one."
+    search_note = N_("Repacks from the official fitgirl-repacks.site — no account needed; the magnet resolves from the post when you pick one.")
 
     # Game installers — none of the video-centric features apply.
     supports_subtitles = False
@@ -26,7 +30,7 @@ class FitGirlProvider(BaseProvider):
     supports_episode_picker = False
 
     def _init_engines(self) -> list[SearchEngine]:
-        return [SearchEngine("FitGirl", "🧚", self._search_fitgirl, enabled=True)]
+        return [SearchEngine("FitGirl", "🧚", self._search_fitgirl, enabled=True)]  # i18n: ignore — service/engine identity, including external category values
 
     def _search_fitgirl(self, query: str) -> list[SearchResult]:
         return fitgirl.search(query)

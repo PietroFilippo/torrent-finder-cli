@@ -10,6 +10,10 @@ caps the page count — magazines like Shōnen Jump have hundreds of entries, an
 top-by-popularity slice is plenty for a picker.
 """
 
+from torrent_finder.i18n import t, tn
+
+# i18n: converted
+
 import time
 
 import requests
@@ -62,8 +66,8 @@ def magazine_search(name: str) -> "list[Entity] | None":
         if mid is None:
             continue
         count = mag.get("count")
-        detail = f"{count} manga" if count else "Serialization magazine"
-        out.append(Entity(id=str(mid), name=mag.get("name") or "Unknown", detail=detail))
+        detail = tn("{n} manga", "{n} manga", count) if count else t("Serialization magazine")
+        out.append(Entity(id=str(mid), name=mag.get("name") or "Unknown", detail=detail))  # i18n: ignore — fallback name is also a search query / saved result
     return out
 
 
@@ -71,7 +75,7 @@ def _manga_to_work(manga: dict) -> Work:
     """Build a Work from a Jikan manga entry, English title as primary."""
     title = manga.get("title")
     english = manga.get("title_english")
-    primary = english or title or "Unknown"
+    primary = english or title or "Unknown"  # i18n: ignore — fallback name is also a search query / saved result
 
     alts: list[str] = []
     for cand in (title, english):

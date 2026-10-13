@@ -8,6 +8,10 @@ source screen). The shared torrent-results + download UI is supplied by the
 caller as ``browse_fn`` so this flow reuses the same path as keyword search.
 """
 
+from torrent_finder.i18n import t, tn
+
+# i18n: converted
+
 import re
 import threading
 import time
@@ -63,7 +67,7 @@ def _run_cancellable(fn, message: str, cancel: "threading.Event | None" = None):
 
 def _notice(msg: str) -> None:
     console.print(f"[warning] {escape(msg)}[/warning]")
-    console.print("[muted]Press [key]any key[/key] to continue…[/muted]")
+    console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
     readchar.readkey()
 
 
@@ -90,12 +94,12 @@ def _pick_entity(entities, facet):
     if len(entities) == 1:
         return entities[0]
     items = [SelectItem(label=e.name, value=e, description=escape(e.detail)) for e in entities]
-    items.append(SelectItem(label="Back", value="__back__", is_action=True))
+    items.append(SelectItem(label=t("Back"), value="__back__", is_action=True))
     idx = arrow_select(
         items,
-        title=f"Select {facet.label.lower()}",
+        title=t("Select {facet}", facet=t(facet.label).lower()),
         banner=_make_banner_panel(),
-        footer="↑/↓ navigate  •  Enter select  •  Esc back",
+        footer=t("↑/↓ navigate  •  Enter select  •  Esc back"),
     )
     if idx is None:
         return None
@@ -129,8 +133,8 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
             any_partial = True
             hint = f"{w.subtitle}  ◐ {note}" if w.subtitle else f"◐ {note}"
             description = (
-                f"◐ {escape(entity.name)} directed only specific episodes: {escape(note)}. "
-                "The torrent search still covers the whole title."
+                t("◐ {name} directed only specific episodes: {episodes}. The torrent search still covers the whole title.",
+                  name=escape(entity.name), episodes=escape(note))
             )
         items.append(SelectItem(
             label=w.title, value=("work", w), toggled=(w.title in preselected),
@@ -138,30 +142,30 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
         ))
         work_item_indexes.append(len(items) - 1)
 
-    items.append(SelectItem(label="Select all", value="all", is_action=True, hint="a"))
-    items.append(SelectItem(label="Invert selection", value="invert", is_action=True, hint="i"))
-    items.append(SelectItem(label="Clear", value="clear", is_action=True, hint="c"))
+    items.append(SelectItem(label=t("Select all"), value="all", is_action=True, hint="a"))
+    items.append(SelectItem(label=t("Invert selection"), value="invert", is_action=True, hint="i"))
+    items.append(SelectItem(label=t("Clear"), value="clear", is_action=True, hint="c"))
     prev_idx = next_idx = None
     if has_prev:
         items.append(SelectItem(
-            label="Previous page", value="prev", is_action=True, hint="p",
-            description="Go back to the previous page of titles.",
+            label=t("Previous page"), value="prev", is_action=True, hint="p",
+            description=t("Go back to the previous page of titles."),
         ))
         prev_idx = len(items) - 1
     if has_next:
         items.append(SelectItem(
-            label="Next page", value="next", is_action=True, hint="n",
-            description="Load the next page of titles (ordered by popularity).",
+            label=t("Next page"), value="next", is_action=True, hint="n",
+            description=t("Load the next page of titles (ordered by popularity)."),
         ))
         next_idx = len(items) - 1
     items.append(SelectItem(
-        label="Filters", value="filters", is_action=True, hint="f",
-        description="Set quality/preset filters — applied when the torrents are fetched.",
+        label=t("Filters"), value="filters", is_action=True, hint="f",
+        description=t("Set quality/preset filters — applied when the torrents are fetched."),
     ))
     filters_idx = len(items) - 1
-    items.append(SelectItem(label="Confirm", value="confirm", is_action=True, hint="w"))
+    items.append(SelectItem(label=t("Confirm"), value="confirm", is_action=True, hint="w"))
     confirm_idx = len(items) - 1
-    items.append(SelectItem(label="Back", value="cancel", is_action=True))
+    items.append(SelectItem(label=t("Back"), value="cancel", is_action=True))
 
     anchor = {"idx": None}
 
@@ -244,24 +248,24 @@ def _works_select_prompt(works, entity, facet, preselected=None, page_no=1,
         " ": _toggle_current,
     }
 
-    nav_bits = []
-    if has_prev:
-        nav_bits.append("[warning]p[/warning] prev")
-    if has_next:
-        nav_bits.append("[warning]n[/warning] next")
-    nav = ("  •  " + " / ".join(nav_bits) + " page") if nav_bits else ""
+    if has_prev and has_next:
+        nav = "  •  " + t("[warning]p[/warning] prev / [warning]n[/warning] next page")
+    elif has_prev:
+        nav = "  •  " + t("[warning]p[/warning] prev page")
+    elif has_next:
+        nav = "  •  " + t("[warning]n[/warning] next page")
+    else:
+        nav = ""
     footer = (
-        "↑/↓ nav  •  Space/Enter toggle  •  a all  •  i invert  •  c clear  •  "
-        "w confirm" + nav + "  •  f filters  •  Esc back\n"
-        "Pick titles to search (none selected by default; a/i/c act on this page)."
+        t("↑/↓ nav  •  Space/Enter toggle  •  a all  •  i invert  •  c clear  •  w confirm") + nav + "  •  " + t("f filters  •  Esc back\nPick titles to search (none selected by default; a/i/c act on this page).")
     )
     if any_partial:
-        footer += "\n[warn]◐ = director handled only some episodes (highlight a title for details)[/warn]"
+        footer += "\n" + t("[warn]◐ = director handled only some episodes (highlight a title for details)[/warn]")
 
-    page_label = f"page {page_no}" + (f"/{total_pages}" if total_pages else "")
+    page_label = t("page {page}/{total}", page=page_no, total=total_pages) if total_pages else t("page {page}", page=page_no)
     result = arrow_select(
         items,
-        title=f"{facet.label} › {escape(entity.name)}",
+        title=f"{t(facet.label)} › {escape(entity.name)}",
         status=page_label,
         multi=True,
         banner=_make_banner_panel(),
@@ -334,7 +338,7 @@ def _apply_prefetch(cache):
     if holder is None:
         return
     if not holder["done"]:
-        with console.status("[accent]Fetching more titles…[/accent]", spinner=theme.SPINNER):
+        with console.status(t("[accent]Fetching more titles…[/accent]"), spinner=theme.SPINNER):
             holder["thread"].join()
     have = {w.title for w in cache["all"]}
     cache["all"].extend(w for w in holder["works"] if w.title not in have)
@@ -353,12 +357,12 @@ def _name_input(provider, facet):
     typed = ""
     while True:
         hist = creator_history(provider.slug, facet.key)
-        nav = "  •  ↑/↓ past searches" if hist else ""
+        nav = "  •  " + t("↑/↓ past searches") if hist else ""
         render = input_screen(
-            f"{provider.name} › search by {facet.label.lower()}",
-            f"Type a {facet.label.lower()} name and press Enter.",
-            escape(facet.note) if facet.note else "",
-            keys=f"Enter search  •  Ctrl+F filters{nav}  •  Esc back",
+            t("{provider} › search by {facet}", provider=t(provider.name), facet=t(facet.label).lower()),
+            t("Type a {facet} name and press Enter.", facet=t(facet.label).lower()),
+            escape(t(facet.note)) if facet.note else "",
+            keys=t("Enter search  •  Ctrl+F filters") + nav + "  •  " + t("Esc back"),
         )
         try:
             name = get_query_with_shortcut(
@@ -418,7 +422,7 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
             if entities is None:
                 cancelled, result = _run_cancellable(
                     lambda: facet.search_entities(name),
-                    f"Looking up {facet.label.lower()}…",
+                    t("Looking up {facet}…", facet=t(facet.label).lower()),
                 )
                 if cancelled:
                     stage = "name"
@@ -428,14 +432,14 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
                     # a genuine empty result). Leave `entities` None so retrying
                     # the name refetches instead of caching the failure.
                     _notice(
-                        f"Couldn't reach the {facet.label.lower()} lookup service "
-                        "(it may be temporarily down). Try again in a bit."
+                        t("Couldn't reach the {facet} lookup service (it may be temporarily down). Try again in a bit.",
+                          facet=t(facet.label).lower())
                     )
                     stage = "name"
                     continue
                 entities = result
             if not entities:
-                _notice(f"No {facet.label.lower()} found for “{name}”.")
+                _notice(t("No {facet} found for “{name}”.", facet=t(facet.label).lower(), name=name))
                 stage = "name"
                 continue
             stage = "entity"
@@ -457,15 +461,15 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
             if cache is None:
                 cancelled, res = _run_cancellable(
                     lambda: facet.list_works(entity, 1),
-                    f"Fetching titles for {entity.name}…",
+                    t("Fetching titles for {name}…", name=entity.name),
                 )
                 if cancelled:
                     stage = "entity" if disambig_shown else "name"
                     continue
                 if res is None:  # resolver raised — treat as service unavailable
                     _notice(
-                        f"Couldn't reach the {facet.label.lower()} lookup service "
-                        "(it may be temporarily down). Try again in a bit."
+                        t("Couldn't reach the {facet} lookup service (it may be temporarily down). Try again in a bit.",
+                          facet=t(facet.label).lower())
                     )
                     stage = "entity" if disambig_shown else "name"
                     continue
@@ -480,7 +484,7 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
                 works_by_entity[entity.id] = cache
             _apply_prefetch(cache)  # merge any page prefetched in the background
             if not cache["all"]:
-                _notice(f"No titles found for {entity.name}.")
+                _notice(t("No titles found for {name}.", name=entity.name))
                 stage = "entity" if disambig_shown else "name"
                 continue
 
@@ -491,7 +495,7 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
             if len(cache["all"]) < need and cache["net_more"]:
                 _run_cancellable(
                     lambda: _fill_to(cache, facet, entity, need),
-                    "Fetching more titles…",
+                    t("Fetching more titles…"),
                 )
             # Stepped past the end (e.g. a cancelled/empty fetch) → clamp back.
             while cache["page_idx"] > 0 and cache["page_idx"] * _WORKS_PAGE >= len(cache["all"]):
@@ -545,7 +549,7 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
             cancel = threading.Event()
             cancelled, results = _run_cancellable(
                 lambda: fan_out(provider, picked, cli_filters, cancel_event=cancel),
-                f"Searching {provider.name} for {len(picked)} title(s)…",
+                tn("Searching {provider} for {n} title…", "Searching {provider} for {n} titles…", len(picked), provider=t(provider.name)),
                 cancel=cancel,
             )
             if cancelled:
@@ -557,7 +561,7 @@ def creator_search_flow(provider, cli_filters, facet, browse_fn, initial_name=No
                 continue
             results = results if results is not None else []
             if not results and getattr(results, "session", None) is None:
-                _notice("No torrents found for the selected title(s).")
+                _notice(t("No torrents found for the selected title(s)."))
                 stage = "works"
                 continue
             provider.last_queries = results.session.queries if getattr(results, "session", None) else [w.title for w in picked]

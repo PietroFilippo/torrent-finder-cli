@@ -6,6 +6,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import lru_cache
 
+from torrent_finder.i18n import t
+
+# i18n: converted
+
 
 @dataclass
 class FilterConfig:
@@ -41,12 +45,22 @@ class FilterPreset:
       - ``require_engines``: engines forced On for the duration of a search
         while this preset is active, by ``SearchEngine.name``. Engines the user
         left Off stay Off afterwards — this does not rewrite saved modes.
+
+    ``name`` is the preset's identity: saved filter state, history and
+    ``typed_presets`` hold it in English. Providers mark it (and
+    ``description``) with ``N_()``; screens draw ``label`` and
+    ``t(description)``.
     """
     name: str
     config: FilterConfig
     query_terms: tuple[str, ...] = ()
     require_engines: tuple[str, ...] = ()
     description: str = ""
+
+    @property
+    def label(self) -> str:
+        """The name as drawn, in the interface language (the name itself when it has no translation)."""
+        return t(self.name)
 
 
 def strip_accents(text: str) -> str:

@@ -4,6 +4,10 @@ Profiles contain settings, never credentials or shared provider instances.
 Each invocation gets its own provider copies, request budget and notices.
 """
 
+from torrent_finder.i18n import N_, t, tn
+
+# i18n: converted
+
 from dataclasses import dataclass, replace
 import re
 
@@ -17,16 +21,22 @@ from torrent_finder.state import apply_provider_state, provider_snapshot
 _REQUEST_LIMIT = 6
 SEARCH_SECONDS = 30.0
 _LABELS = {
-    "games": "Games · General", "online-fix": "Games · Online-Fix",
-    "fitgirl": "Games · FitGirl", "software": "Software · Desktop",
-    "mobile": "Software · Mobile", "rutracker": "Software · RuTracker",
-    "manga": "Manga · General", "madokami": "Manga · Madokami",
+    "games": N_("Games · General"), "online-fix": N_("Games · Online-Fix"),
+    "fitgirl": N_("Games · FitGirl"), "software": N_("Software · Desktop"),
+    "mobile": N_("Software · Mobile"), "rutracker": N_("Software · RuTracker"),
+    "manga": N_("Manga · General"), "madokami": N_("Manga · Madokami"),
 }
-_SEED_SOURCES = {"Apibay", "Nyaa", "Knaben", "SolidTorrents", "YTS", "RuTracker"}
+_SEED_SOURCES = {"Apibay", "Nyaa", "Knaben", "SolidTorrents", "YTS", "RuTracker"}  # i18n: ignore — service/engine identity, including external category values
 
 
 def provider_label(provider) -> str:
     return _LABELS.get(provider.slug, provider.name)
+
+
+def provider_display_label(provider) -> str:
+    """Qualified on-screen name; provider_label stays suitable for saved rows."""
+    label = provider_label(provider)
+    return t(label)
 
 
 def result_identity(row) -> tuple:
@@ -73,13 +83,13 @@ class SearchProgress:
 
 
 class CombinedProvider(BaseProvider):
-    name = "Search across providers"
+    name = N_("Search across providers")
     slug = "all"
     icon = "🌐"
     categories = []
     is_combined = True
     supports_subtitles = supports_episode_picker = supports_streaming = False
-    search_note = "Search selected providers together; each keeps its own engines and filters."
+    search_note = N_("Search selected providers together; each keeps its own engines and filters.")
 
     def __init__(self, templates):
         super().__init__()
@@ -88,7 +98,7 @@ class CombinedProvider(BaseProvider):
         self.selected_slugs = set()
         self.shared_filters = FilterConfig()
         self.profile_id = "default"
-        self.profile_name = "Default"
+        self.profile_name = "Default"  # i18n: ignore — persisted name; translate only when drawn
 
     def _init_engines(self):
         return []
@@ -105,7 +115,7 @@ class CombinedProvider(BaseProvider):
 
     def restore_history(self, profile):
         self.restore(profile)
-        self.profile_id, self.profile_name = None, "History search (unsaved)"
+        self.profile_id, self.profile_name = None, "History search (unsaved)"  # i18n: ignore — persisted name; translate only when drawn
 
     def restore(self, profile):
         from torrent_finder.name_rules import NameRules
@@ -152,9 +162,9 @@ class CombinedProvider(BaseProvider):
             library.select(self.profile_id)
             library.update(snapshot)
         else:
-            name, number = "History search", 2
+            name, number = "History search", 2  # i18n: ignore — persisted name; translate only when drawn
             while library.find(name):
-                name, number = f"History search {number}", number + 1
+                name, number = f"History search {number}", number + 1  # i18n: ignore — persisted name; translate only when drawn
             library.create(name, snapshot)
         return library
 
@@ -167,14 +177,39 @@ class CombinedProvider(BaseProvider):
     def summary(self):
         selected = [p for p in self.children if p.slug in self.selected_slugs]
         names = ", ".join(provider_label(p) for p in selected)
-        selection = names if len(selected) <= 3 else f"{len(selected)} providers selected"
+        selection = names if len(selected) <= 3 else f"{len(selected)} providers selected"  # i18n: ignore — stable diagnostic value; translate with the display helper
         required = sum(len(p.active_presets) for p in selected)
         preferred = sum(len(p.preferred_presets) for p in selected)
         shared = (len(self.shared_filters.include_keywords) + len(self.shared_filters.exclude_keywords)
                   + sum(bool(value.strip()) for value in self.name_rules.snapshot().values()))
-        return (selection or "No providers selected",
-                f"{self.profile_name} · Require: {required}; Prefer: {preferred}; {shared} name rules"
+        return (selection or "No providers selected",  # i18n: ignore — stable diagnostic value; translate with the display helper
+                f"{self.profile_name} · Require: {required}; Prefer: {preferred}; {shared} name rules"  # i18n: ignore — stable diagnostic value; translate with the display helper
                 + (" · " + self.name_rules.summary() if self.name_rules.summary() else ""))
+
+    @property
+    def profile_label(self):
+        # Profile names are user data. Only the generated default and unsaved
+        # history name are translated; a renamed default retains its exact name.
+        from torrent_finder.search_profiles import profile_label
+        return profile_label({"id": self.profile_id, "name": self.profile_name})
+
+    def summary_label(self):
+        selected = [p for p in self.children if p.slug in self.selected_slugs]
+        names = ", ".join(provider_display_label(p) for p in selected)
+        selection = names if len(selected) <= 3 else tn("{n} provider selected", "{n} providers selected", len(selected))
+        required = sum(len(p.active_presets) for p in selected)
+        preferred = sum(len(p.preferred_presets) for p in selected)
+        shared = (len(self.shared_filters.include_keywords) + len(self.shared_filters.exclude_keywords)
+                  + sum(bool(value.strip()) for value in self.name_rules.snapshot().values()))
+        details = t("{profile} · Require: {required}; Prefer: {preferred}; {rules}",
+                    profile=self.profile_label, required=required, preferred=preferred,
+                    rules=tn("{n} name rule", "{n} name rules", shared))
+        if self.name_rules.summary():
+            details += " · " + self.name_rules.summary_label()
+        return selection or t("No providers selected"), details
+
+    def filter_summary_label(self):
+        return self.summary_label()[1]
 
     def filter_summary(self):
         return self.summary()[1]
@@ -189,7 +224,7 @@ class CombinedProvider(BaseProvider):
         session.restore(self.snapshot())
         providers = [p for p in session.children if p.slug in session.selected_slugs]
         if not providers:
-            raise SearchError("No providers selected. Press Ctrl+F to choose at least one.")
+            raise SearchError(t("No providers selected. Press Ctrl+F to choose at least one."))
 
         def matches_shared_rules(row):
             if not session.name_rules.matches(row.name):
@@ -204,8 +239,8 @@ class CombinedProvider(BaseProvider):
 
         return SearchSession(providers, queries, combined=True, result_filter=matches_shared_rules,
                              workers=_REQUEST_LIMIT, work_titles=work_titles, work_authors=work_authors,
-                             shared_summary="Shared: " + session.name_rules.summary() +
-                             f"; include {session.shared_filters.include_keywords}; exclude {session.shared_filters.exclude_keywords}"
-                             + (f"; CLI {cli_filters}" if cli_filters else "")).run(
+                             shared_summary="Shared: " + session.name_rules.summary() +  # i18n: ignore — stable diagnostic value; translate with the display helper
+                             f"; include {session.shared_filters.include_keywords}; exclude {session.shared_filters.exclude_keywords}"  # i18n: ignore — stable diagnostic value; translate with the display helper
+                             + (f"; CLI {cli_filters}" if cli_filters else "")).run(  # i18n: ignore — stable diagnostic value; translate with the display helper
             cancel_event=cancel_event, finish_event=finish_event, on_progress=on_progress,
             timeout=SEARCH_SECONDS if timeout is None else timeout)

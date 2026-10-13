@@ -11,6 +11,10 @@ Developer vs publisher are kept separate via the `involved_companies` table's
 which a plain `/games` filter can't distinguish.
 """
 
+from torrent_finder.i18n import t
+
+# i18n: converted
+
 import time
 
 import requests
@@ -61,7 +65,7 @@ def _post(endpoint: str, body: str, _retry: bool = True) -> list | None:
     try:
         resp = requests.post(
             f"{_API}/{endpoint}", data=body.encode("utf-8"),
-            headers={"Client-ID": cid, "Authorization": f"Bearer {tok}", "Accept": "application/json"},
+            headers={"Client-ID": cid, "Authorization": f"Bearer {tok}", "Accept": "application/json"},  # i18n: ignore — service query/protocol, never interface text
             timeout=12,
         )
         if resp.status_code == 401 and _retry:  # token went stale — refresh once
@@ -81,7 +85,7 @@ def company_search(name: str) -> "list[Entity] | None":
     a case-insensitive ``where name ~ *"…"*`` and rank client-side (exact, then
     prefix, then shortest) since `where` has no relevance ordering.
     """
-    data = _post("companies", f'fields id,name; where name ~ *"{_esc(name)}"*; limit 50;')
+    data = _post("companies", f'fields id,name; where name ~ *"{_esc(name)}"*; limit 50;')  # i18n: ignore — service query/protocol, never interface text
     if data is None:
         return None
     low = name.lower()
@@ -96,7 +100,7 @@ def company_search(name: str) -> "list[Entity] | None":
         cid = c.get("id")
         if cid is None:
             continue
-        out.append(Entity(id=str(cid), name=c.get("name") or "Unknown", detail="Game company"))
+        out.append(Entity(id=str(cid), name=c.get("name") or "Unknown", detail=t("Game company")))  # i18n: ignore — fallback name is also a search query / saved result
     return out
 
 
@@ -104,7 +108,7 @@ def _company_games(entity: Entity, role: str) -> "tuple[list[Work], bool]":
     """Games where the company holds ``role`` (developer/publisher) — two-step via
     involved_companies so the role boolean is checked on the same record."""
     inv = _post("involved_companies",
-                f"fields game; where company = {int(entity.id)} & {role} = true; limit {_LIMIT};")
+                f"fields game; where company = {int(entity.id)} & {role} = true; limit {_LIMIT};")  # i18n: ignore — service query/protocol, never interface text
     if inv is None:
         return [], False
     ids = list(dict.fromkeys(r.get("game") for r in inv if r.get("game")))
@@ -113,7 +117,7 @@ def _company_games(entity: Entity, role: str) -> "tuple[list[Work], bool]":
     ids_csv = ",".join(str(i) for i in ids[:_LIMIT])
     games = _post("games",
                   f"fields name,first_release_date; where id = ({ids_csv}); "
-                  f"sort total_rating_count desc; limit {_LIMIT};")
+                  f"sort total_rating_count desc; limit {_LIMIT};")  # i18n: ignore — service query/protocol, never interface text
     if games is None:
         return [], False
     works: list[Work] = []
@@ -143,15 +147,15 @@ def test_credentials(client_id: str, client_secret: str) -> "tuple[bool | None, 
     """Validate Twitch/IGDB creds: get a token, then a trivial IGDB query."""
     tok = _get_token(client_id, client_secret)
     if not tok:
-        return False, "couldn't get a Twitch token — check Client ID and Secret"
+        return False, t("couldn't get a Twitch token — check Client ID and Secret")
     try:
         resp = requests.post(f"{_API}/games", data=b"fields id; limit 1;", headers={
-            "Client-ID": client_id, "Authorization": f"Bearer {tok}", "Accept": "application/json",
+            "Client-ID": client_id, "Authorization": f"Bearer {tok}", "Accept": "application/json",  # i18n: ignore — service query/protocol, never interface text
         }, timeout=10)
     except requests.RequestException as exc:
-        return None, f"couldn't reach IGDB ({exc})"
+        return None, t("couldn't reach IGDB ({error})", error=exc)
     if resp.status_code == 200:
-        return True, "IGDB credentials valid"
+        return True, t("IGDB credentials valid")
     if resp.status_code in (401, 403):
-        return False, "rejected by IGDB (Client-ID / token mismatch)"
-    return None, f"unexpected response ({resp.status_code})"
+        return False, t("rejected by IGDB (Client-ID / token mismatch)")
+    return None, t("unexpected response ({status})", status=resp.status_code)

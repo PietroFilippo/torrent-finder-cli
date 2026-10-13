@@ -10,17 +10,21 @@ page) and hands it to the system torrent client rather than building a magnet
 (see ``online_fix.fetch_torrent_for`` and main.py's Online-Fix branch).
 """
 
+from torrent_finder.i18n import N_
+
+# i18n: converted
+
 from torrent_finder import online_fix
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
 
 
 class OnlineFixProvider(BaseProvider):
-    name = "Online-Fix"
+    name = N_("Online-Fix")
     slug = "online-fix"
     icon = "🔧"
     categories = []  # not Apibay-based; the engine talks to online-fix.me directly
-    search_note = "Co-op / online game cracks from online-fix.me — no account needed; a pick downloads the .torrent and opens it in your torrent client."
+    search_note = N_("Co-op / online game cracks from online-fix.me — no account needed; a pick downloads the .torrent and opens it in your torrent client.")
 
     # Games behind a private tracker — no public swarm, so none of the video/
     # magnet-centric features apply.

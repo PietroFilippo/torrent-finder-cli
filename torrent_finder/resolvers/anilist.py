@@ -10,6 +10,10 @@ manga we keep the writer/author roles (Story, Story & Art, Original Creator) and
 drop the pure "Art" credit.
 """
 
+from torrent_finder.i18n import t
+
+# i18n: converted
+
 import requests
 
 from torrent_finder.resolvers.types import Entity, Work
@@ -24,7 +28,7 @@ _DIRECTOR_ROLE_EXCLUDE = (
 
 # Manga writer/author roles. Substring match keeps "Story", "Story & Art" and
 # "Original Creator"/"Original Story"; the pure "Art" credit (artist) is dropped.
-_WRITER_ROLE_INCLUDE = ("story", "original creator", "original story")
+_WRITER_ROLE_INCLUDE = ("story", "original creator", "original story")  # i18n: ignore — literal service or release-name match data
 
 
 def _post(query: str, variables: dict) -> dict | None:
@@ -86,7 +90,7 @@ def _node_to_work(node: dict, role: str = "") -> Work:
     title = node.get("title") or {}
     romaji = title.get("romaji")
     english = title.get("english")
-    primary = romaji or english or "Unknown"
+    primary = romaji or english or "Unknown"  # i18n: ignore — fallback name is also a search query / saved result
 
     alts: list[str] = []
     for cand in (english, romaji):
@@ -123,7 +127,7 @@ query ($search: String) {
     }
   }
 }
-"""
+"""  # i18n: ignore — service query/protocol, never interface text
 
 _STAFF_MEDIA_Q = """
 query ($id: Int, $page: Int, $type: MediaType) {
@@ -137,7 +141,7 @@ query ($id: Int, $page: Int, $type: MediaType) {
     }
   }
 }
-"""
+"""  # i18n: ignore — service query/protocol, never interface text
 
 
 def staff_search(name: str) -> "list[Entity] | None":
@@ -152,14 +156,14 @@ def staff_search(name: str) -> "list[Entity] | None":
     out: list[Entity] = []
     for staff in (data.get("Page") or {}).get("staff") or []:
         nm = staff.get("name") or {}
-        full = nm.get("full") or nm.get("native") or "Unknown"
+        full = nm.get("full") or nm.get("native") or "Unknown"  # i18n: ignore — fallback name is also a search query / saved result
         occ = ", ".join((staff.get("primaryOccupations") or [])[:2])
         known: list[str] = []
         # A person often holds several roles on one title (director + writer + …),
         # which shows up as duplicate edges — dedupe so the hint lists 3 distinct.
         for edge in (staff.get("staffMedia") or {}).get("edges") or []:
-            t = (edge.get("node") or {}).get("title") or {}
-            tt = t.get("romaji") or t.get("english")
+            titles = (edge.get("node") or {}).get("title") or {}
+            tt = titles.get("romaji") or titles.get("english")
             if tt and tt not in known:
                 known.append(tt)
             if len(known) >= 3:
@@ -168,7 +172,7 @@ def staff_search(name: str) -> "list[Entity] | None":
         if occ:
             bits.append(occ)
         if known:
-            bits.append("known for " + ", ".join(known))
+            bits.append(t("known for {works}", works=", ".join(known)))
         out.append(Entity(id=str(staff.get("id")), name=full, detail=" · ".join(bits)))
     return out
 
@@ -229,7 +233,7 @@ query ($search: String) {
     }
   }
 }
-"""
+"""  # i18n: ignore — service query/protocol, never interface text
 
 _STUDIO_MEDIA_Q = """
 query ($id: Int, $page: Int) {
@@ -243,7 +247,7 @@ query ($id: Int, $page: Int) {
     }
   }
 }
-"""
+"""  # i18n: ignore — service query/protocol, never interface text
 
 
 def studio_search(name: str) -> "list[Entity] | None":
@@ -256,17 +260,17 @@ def studio_search(name: str) -> "list[Entity] | None":
         return None
     out: list[Entity] = []
     for st in (data.get("Page") or {}).get("studios") or []:
-        kind = "Animation studio" if st.get("isAnimationStudio") else "Studio"
+        kind = t("Animation studio") if st.get("isAnimationStudio") else t("Studio")
         known: list[str] = []
         for node in (st.get("media") or {}).get("nodes") or []:
-            t = node.get("title") or {}
-            tt = t.get("romaji") or t.get("english")
+            titles = node.get("title") or {}
+            tt = titles.get("romaji") or titles.get("english")
             if tt and tt not in known:
                 known.append(tt)
             if len(known) >= 3:
                 break
-        detail = kind + (" · known for " + ", ".join(known) if known else "")
-        out.append(Entity(id=str(st.get("id")), name=st.get("name") or "Unknown", detail=detail))
+        detail = t("{kind} · known for {works}", kind=kind, works=", ".join(known)) if known else kind
+        out.append(Entity(id=str(st.get("id")), name=st.get("name") or "Unknown", detail=detail))  # i18n: ignore — fallback name is also a search query / saved result
     return out
 
 

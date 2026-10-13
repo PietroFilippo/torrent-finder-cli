@@ -9,6 +9,8 @@ reachable mid-flow), so ``search`` and ``works`` for one journey always hit the
 same backend — the Entity id produced by one is consumed by the same one.
 """
 
+# i18n: converted
+
 from torrent_finder import credentials
 from torrent_finder.resolvers import tmdb, wikidata
 

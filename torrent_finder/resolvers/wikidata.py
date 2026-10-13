@@ -12,6 +12,8 @@ directors/companies via FILTER EXISTS so it doesn't surface random same-named
 items.
 """
 
+# i18n: converted
+
 import re
 
 import requests
@@ -19,7 +21,7 @@ import requests
 from torrent_finder.resolvers.types import Entity, Work
 
 _SPARQL = "https://query.wikidata.org/sparql"
-_UA = "torrent-finder-cli/1.0 (creator search; https://github.com/PietroFilippo/movie-finder-cli)"
+_UA = "torrent-finder-cli/1.0 (creator search; https://github.com/PietroFilippo/movie-finder-cli)"  # i18n: ignore — service query/protocol, never interface text
 _WORKS_LIMIT = 300
 _QID_RE = re.compile(r"Q\d+")
 
@@ -39,7 +41,7 @@ SELECT ?item ?itemLabel ?desc WHERE {
   OPTIONAL { ?item schema:description ?desc . FILTER(LANG(?desc) = "en") }
 }
 LIMIT 10
-"""
+"""  # i18n: ignore — service query/protocol, never interface text
 
 _WORKS_Q = """
 SELECT ?film ?label (MIN(?yr) AS ?year) WHERE {
@@ -50,7 +52,7 @@ SELECT ?film ?label (MIN(?yr) AS ?year) WHERE {
 GROUP BY ?film ?label
 ORDER BY DESC(?year)
 LIMIT __LIMIT__
-"""
+"""  # i18n: ignore — service query/protocol, never interface text
 
 
 def _sparql(query: str) -> dict | None:

@@ -1,5 +1,9 @@
 """Catalog identification and alternate names, separate from release search."""
 
+from torrent_finder.i18n import N_, t
+
+# i18n: converted
+
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import re
@@ -47,11 +51,11 @@ class Catalog:
 
 
 CATALOGS = (
-    Catalog("anime", "Anime · AniList", ("anime", "rutracker")),
-    Catalog("manga", "Manga · AniList", ("manga", "madokami", "rutracker")),
-    Catalog("movies", "Movies / Series · TMDB", ("movies", "rutracker"), ("TMDB_API_KEY",)),
-    Catalog("games", "Games · IGDB", ("games", "fitgirl", "online-fix", "rutracker"), ("IGDB_CLIENT_ID", "IGDB_CLIENT_SECRET")),
-    Catalog("books", "Books · Open Library", ("books", "rutracker")),
+    Catalog("anime", N_("Anime · AniList"), ("anime", "rutracker")),
+    Catalog("manga", N_("Manga · AniList"), ("manga", "madokami", "rutracker")),
+    Catalog("movies", N_("Movies / Series · TMDB"), ("movies", "rutracker"), ("TMDB_API_KEY",)),
+    Catalog("games", N_("Games · IGDB"), ("games", "fitgirl", "online-fix", "rutracker"), ("IGDB_CLIENT_ID", "IGDB_CLIENT_SECRET")),
+    Catalog("books", N_("Books · Open Library"), ("books", "rutracker")),
 )
 
 
@@ -70,7 +74,7 @@ query ($search: String, $type: MediaType, $page: Int) {
     }
   }
 }
-"""
+"""  # i18n: ignore — service query/protocol, never interface text
 
 
 def _with_names(work, names):
@@ -133,15 +137,15 @@ def _alias_names(title, synonyms, query, limit):
 def search_titles(catalog, query, page=1):
     """One user-requested page; unavailable catalogs are never an empty match."""
     if page < 1 or page > MAX_CATALOG_PAGES:
-        raise ValueError("Catalog page outside the bounded range")
+        raise ValueError(t("Catalog page outside the bounded range"))
     missing = catalog.missing_credentials()
     if missing:
-        raise SearchError("Configure " + ", ".join(missing) + " in Credentials to use this catalog.")
+        raise SearchError(t("Configure {credentials} in Credentials to use this catalog.", credentials=", ".join(missing)))
     key = catalog.key
     if key in {"anime", "manga"}:
         data = anilist._post(_MEDIA_SEARCH, {"search": query, "type": key.upper(), "page": page})
         if data is None or not isinstance(data.get("Page"), dict):
-            raise SearchError("AniList is unavailable or rejected this request. Try again later.")
+            raise SearchError(t("AniList is unavailable or rejected this request. Try again later."))
         result = data["Page"]
         matches = []
         for node in result.get("media") or []:
@@ -154,14 +158,14 @@ def search_titles(catalog, query, page=1):
     if key == "movies":
         data = tmdb._get("/search/multi", {"query": query, "page": page, "include_adult": "false"})
         if data is None:
-            raise SearchError("TMDB request failed. Check Credentials or try again later.")
+            raise SearchError(t("TMDB request failed. Check Credentials or try again later."))
         matches = [TitleMatch(key, f"{row['media_type']}/{row['id']}", tmdb._credit_to_work(row))
                    for row in data.get("results", []) if row.get("media_type") in {"movie", "tv"} and row.get("id")]
         return matches, page < min(MAX_CATALOG_PAGES, data.get("total_pages", 1))
     if key == "games":
-        data = igdb._post("games", f'search "{igdb._esc(query)}"; fields name,alternative_names.name,first_release_date,platforms.name,version_title; limit {PAGE_SIZE}; offset {(page - 1) * PAGE_SIZE};')
+        data = igdb._post("games", f'search "{igdb._esc(query)}"; fields name,alternative_names.name,first_release_date,platforms.name,version_title; limit {PAGE_SIZE}; offset {(page - 1) * PAGE_SIZE};')  # i18n: ignore — service query/protocol, never interface text
         if data is None:
-            raise SearchError("IGDB request failed. Check Credentials or try again later.")
+            raise SearchError(t("IGDB request failed. Check Credentials or try again later."))
         matches = []
         for row in data:
             if not row.get("id") or not row.get("name"):
@@ -178,7 +182,7 @@ def search_titles(catalog, query, page=1):
         data = openlibrary._get("/search.json", {"title": query, "page": page, "limit": PAGE_SIZE,
             "fields": "key,title,first_publish_year,author_name"})
         if data is None:
-            raise SearchError("Open Library request failed. Try again later.")
+            raise SearchError(t("Open Library request failed. Try again later."))
         matches = []
         for row in data.get("docs", []):
             if not re.fullmatch(r"/works/OL\d+W", row.get("key", "")) or not row.get("title"):
@@ -189,7 +193,7 @@ def search_titles(catalog, query, page=1):
                                                             authors=tuple(row.get("author_name", [])[:3]))))
         total = data.get("numFound", data.get("num_found", 0))
         return matches, page * PAGE_SIZE < total and page < MAX_CATALOG_PAGES
-    raise ValueError("Unknown title catalog")
+    raise ValueError(t("Unknown title catalog"))
 
 
 def resolve_names(match):
@@ -197,7 +201,7 @@ def resolve_names(match):
     if match.catalog == "movies":
         data = tmdb._get(f"/{match.id}/alternative_titles")
         if data is None:
-            return replace(match, note="Alternative titles could not be fetched; primary/original names are still available.")
+            return replace(match, note=t("Alternative titles could not be fetched; primary/original names are still available."))
         rows = data.get("titles", data.get("results", []))
         # Keep Portuguese/English names accessible ahead of dozens of others.
         rows = sorted(rows, key=lambda r: r.get("iso_3166_1") not in {"BR", "PT", "US", "GB"})
@@ -205,6 +209,6 @@ def resolve_names(match):
     if match.catalog == "books":
         data = openlibrary._get(match.id + ".json")
         if data is None:
-            return replace(match, note="Additional names could not be fetched; the catalog title is still available.")
+            return replace(match, note=t("Additional names could not be fetched; the catalog title is still available."))
         return replace(match, work=_with_names(match.work, data.get("alternative_titles") or []))
     return match

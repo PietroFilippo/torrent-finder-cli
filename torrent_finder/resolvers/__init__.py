@@ -6,6 +6,8 @@ torrent backends stay keyword-only — this package is the lookup that sits in
 front of them.
 """
 
+# i18n: converted
+
 from torrent_finder.resolvers.types import CreatorFacet, Entity, Work
 
 __all__ = ["CreatorFacet", "Entity", "Work"]

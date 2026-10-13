@@ -1,7 +1,16 @@
 """Portable, literal release-name rules; never native indexer operators."""
 
 from dataclasses import asdict, dataclass
+from torrent_finder.i18n import N_, t
 from torrent_finder.result_view import words
+
+# i18n: converted
+
+# How summary() shows each populated rule.
+_SUMMARY = {
+    "all_words": N_("All: {words}"), "any_words": N_("Any: {words}"),
+    "phrase": N_("Phrase: {words}"), "exclude_words": N_("Exclude: {words}"),
+}
 
 
 @dataclass
@@ -17,7 +26,7 @@ class NameRules:
             key not in cls.__dataclass_fields__ or not isinstance(value, str)
             for key, value in data.items()
         ):
-            raise ValueError("Invalid release-name rules")
+            raise ValueError(t("Invalid release-name rules"))
         return cls(**data)
 
     def snapshot(self):
@@ -35,5 +44,9 @@ class NameRules:
                                        for i in range(len(tokens) - len(phrase) + 1))))
 
     def summary(self):
-        labels = {"all_words": "All", "any_words": "Any", "phrase": "Phrase", "exclude_words": "Exclude"}
-        return "; ".join(f"{labels[k]}: {v}" for k, v in self.snapshot().items() if v.strip())
+        """Stable English summary for diagnostics and existing callers."""
+        return "; ".join(_SUMMARY[k].format(words=v) for k, v in self.snapshot().items() if v.strip())
+
+    def summary_label(self):
+        """The populated rules in the current interface language; empty when none."""
+        return "; ".join(t(_SUMMARY[k], words=v) for k, v in self.snapshot().items() if v.strip())

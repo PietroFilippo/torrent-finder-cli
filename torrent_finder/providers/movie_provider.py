@@ -1,5 +1,9 @@
 """Movie torrent provider — searches video/movie categories."""
 
+from torrent_finder.i18n import N_
+
+# i18n: converted
+
 from typing import Iterator
 
 import requests
@@ -43,7 +47,7 @@ def _fetch_yts_movies(query: str) -> list[dict]:
 
 
 class MovieProvider(BaseProvider):
-    name = "Movies & Series"
+    name = N_("Movies & Series")
     slug = "movies"
     cli_aliases = ("movie",)
     icon = "🎬"
@@ -54,7 +58,7 @@ class MovieProvider(BaseProvider):
     apibay_fallback_categories = (201, 207)
     # Knaben's normalized TV + Movies parent categories.
     knaben_categories = (2_000_000, 3_000_000)
-    solidtorrents_category = "Movie"
+    solidtorrents_category = "Movie"  # i18n: ignore — service/engine identity, including external category values
     nyaa_category = "4_1"  # Live Action - English-translated (J-dramas, Asian films/TV)
     # Rank the requested film above sequels, remakes and franchise bundles.
     prefer_title_matches = True
@@ -64,35 +68,35 @@ class MovieProvider(BaseProvider):
     supports_episode_picker = True
 
     presets = [
-        FilterPreset("720p", FilterConfig(quality=["720p"])),
-        FilterPreset("1080p", FilterConfig(quality=["1080p"])),
-        FilterPreset("4K / 2160p", FilterConfig(quality=["2160p", "4k"])),
-        FilterPreset("With Subtitles", FilterConfig(include_keywords=["sub", "srt"])),
-        FilterPreset("x265 / HEVC", FilterConfig(include_keywords=["x265", "hevc"])),
-        FilterPreset("HDR", FilterConfig(include_keywords=["hdr", "dolby vision", "dv"])),
-        FilterPreset("Remux", FilterConfig(include_keywords=["remux"])),
-        FilterPreset("Trusted Uploaders", FilterConfig(include_keywords=[
+        FilterPreset(N_("720p"), FilterConfig(quality=["720p"])),
+        FilterPreset(N_("1080p"), FilterConfig(quality=["1080p"])),
+        FilterPreset(N_("4K / 2160p"), FilterConfig(quality=["2160p", "4k"])),
+        FilterPreset(N_("With Subtitles"), FilterConfig(include_keywords=["sub", "srt"])),
+        FilterPreset(N_("x265 / HEVC"), FilterConfig(include_keywords=["x265", "hevc"])),
+        FilterPreset(N_("HDR"), FilterConfig(include_keywords=["hdr", "dolby vision", "dv"])),  # i18n: ignore — literal service or release-name match data
+        FilterPreset(N_("Remux"), FilterConfig(include_keywords=["remux"])),
+        FilterPreset(N_("Trusted Uploaders"), FilterConfig(include_keywords=[
             "yify", "yts", "rarbg", "fgt", "sparks", "evo",
             "qxr", "tgx", "anoxmous", "etrg", "mkvcage", "galaxy",
         ])),
         FilterPreset(
-            "Dublado (PT-BR)",
+            N_("Dublado (PT-BR)"),
             FilterConfig(name_predicate=has_brazilian_audio),
             query_terms=("pt-br", "dublado"),
-            require_engines=("Knaben", "SolidTorrents"),
+            require_engines=("Knaben", "SolidTorrents"),  # i18n: ignore — service/engine identity, including external category values
             description=(
-                "Explicit PT-BR audio tags only; generic Portuguese/subtitles do not qualify. "
-                "Also searches pt-br/dublado with Knaben + SolidTorrents, even if saved Off."
+                N_("Explicit PT-BR audio tags only; generic Portuguese/subtitles do not qualify. "
+                "Also searches pt-br/dublado with Knaben + SolidTorrents, even if saved Off.")
             ),
         ),
         FilterPreset(
-            "Legendado (PT subs)",
+            N_("Legendado (PT subs)"),
             FilterConfig(name_predicate=has_portuguese_subtitles),
             query_terms=("legendado",),
-            require_engines=("Knaben", "SolidTorrents"),
+            require_engines=("Knaben", "SolidTorrents"),  # i18n: ignore — service/engine identity, including external category values
             description=(
-                "Portuguese subtitle tags; audio language alone is not enough. "
-                "Also searches legendado with Knaben + SolidTorrents, even if saved Off."
+                N_("Portuguese subtitle tags; audio language alone is not enough. "
+                "Also searches legendado with Knaben + SolidTorrents, even if saved Off.")
             ),
         ),
     ]
@@ -102,18 +106,18 @@ class MovieProvider(BaseProvider):
     # resolvers/movies.py). Director = films + TV; Studio = a company's films.
     creator_facets = [
         CreatorFacet(
-            key="director", label="Director", icon="🎬",
+            key="director", label=N_("Director"), icon="🎬",
             search_entities=movies.director_search,
             list_works=movies.director_works,
-            note="Find a director's films & shows, then search each title. "
-                 "Add a TMDB key (Credentials) for richer results.",
+            note=N_("Find a director's films & shows, then search each title. "
+                 "Add a TMDB key (Credentials) for richer results."),
         ),
         CreatorFacet(
-            key="studio", label="Studio", icon="🏢",
+            key="studio", label=N_("Studio"), icon="🏢",
             search_entities=movies.studio_search,
             list_works=movies.studio_works,
-            note="Find a studio/company's films, then search each title. "
-                 "Add a TMDB key (Credentials) for richer results.",
+            note=N_("Find a studio/company's films, then search each title. "
+                 "Add a TMDB key (Credentials) for richer results."),
         ),
     ]
 
@@ -132,15 +136,15 @@ class MovieProvider(BaseProvider):
     def _init_engines(self) -> list[SearchEngine]:
         """APIBay + Nyaa on, Knaben auto, noisier engines manually off."""
         return [
-            SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),
+            SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine(
-                "Knaben", "🧭", self._search_knaben,
+                "Knaben", "🧭", self._search_knaben,  # i18n: ignore — service/engine identity, including external category values
                 enabled=False, emergency_fallback=True,
             ),
-            SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),
+            SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine("YTS", "🎥", self._search_yts, enabled=False),
             SearchEngine(
-                "SolidTorrents", "🔗", self._search_solidtorrents,
+                "SolidTorrents", "🔗", self._search_solidtorrents,  # i18n: ignore — service/engine identity, including external category values
                 enabled=False,
             ),
         ]

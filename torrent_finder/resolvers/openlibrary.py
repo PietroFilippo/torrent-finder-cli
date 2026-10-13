@@ -11,11 +11,15 @@ this call volume (one search + one page per picker step).
 
 import requests
 
+from torrent_finder.i18n import t, tn
+
+# i18n: converted
+
 from torrent_finder.resolvers.types import Entity, Work
 
 _API = "https://openlibrary.org"
 _UA = {
-    "User-Agent": "torrent-finder-cli (https://github.com/PietroFilippo/torrent-finder-cli)",
+    "User-Agent": "torrent-finder-cli (https://github.com/PietroFilippo/torrent-finder-cli)",  # i18n: ignore — service query/protocol, never interface text
     "Accept": "application/json",
 }
 _PAGE_SIZE = 50
@@ -84,12 +88,12 @@ def author_search(name: str) -> "list[Entity] | None":
             continue
         bits = []
         if doc.get("top_work"):
-            bits.append(f"known for {doc['top_work']}")
+            bits.append(t("known for {works}", works=doc["top_work"]))
         if doc.get("work_count"):
-            bits.append(f"{doc['work_count']} works")
+            bits.append(tn("{n} work", "{n} works", doc["work_count"]))
         out.append(Entity(
             id=str(key),
-            name=doc.get("name") or "Unknown",
+            name=doc.get("name") or "Unknown",  # i18n: ignore — fallback name is also a search query / saved result
             detail=" · ".join(bits),
         ))
     return out

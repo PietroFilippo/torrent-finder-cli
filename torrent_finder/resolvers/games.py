@@ -10,6 +10,8 @@ happens in the works step), while Wikidata's search pre-filters to companies
 that actually developed/published a game.
 """
 
+# i18n: converted
+
 from torrent_finder import credentials
 from torrent_finder.resolvers import igdb, wikidata
 

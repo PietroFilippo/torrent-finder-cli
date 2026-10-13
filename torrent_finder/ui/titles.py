@@ -1,5 +1,9 @@
 """Identify one catalog work, review its names, then search selected providers."""
 
+from torrent_finder.i18n import t
+
+# i18n: converted
+
 import threading
 
 from rich.markup import escape
@@ -21,27 +25,28 @@ def pick_names(match):
     message = ""
     if match.note:
         from torrent_finder.ui.search_diagnostics import read_details
-        read_details(match.note, "Catalog notice")
+        read_details(match.note, t("Catalog notice"))
     while True:
         items = [SelectItem(name, toggled=name in selected, value=name,
-                            description=escape(ellipsize_cells(match.work.subtitle, 60)) or "Space toggles this name.") for name in names]
-        items += [SelectItem("Add a name manually", value="add", is_action=True),
-                  SelectItem("Search selected names", value="search", is_action=True),
-                  SelectItem("Back to titles", value="back", is_action=True)]
+                            description=escape(ellipsize_cells(match.work.subtitle, 60)) or t("Space toggles this name.")) for name in names]
+        items += [SelectItem(t("Add a name manually"), value="add", is_action=True),
+                  SelectItem(t("Search selected names"), value="search", is_action=True),
+                  SelectItem(t("Back to titles"), value="back", is_action=True)]
         def toggle_name(cursor, rows):
             if cursor < len(names):
                 rows[cursor].cycle_toggle()
             return True
-        index = arrow_select(items, title=f"Names to search (up to {MAX_ALIASES})", multi=True,
+        index = arrow_select(items, title=t("Names to search (up to {limit})", limit=MAX_ALIASES), multi=True,
                              banner=_make_banner_panel(),
-                             footer=escape(message) if message else "Space toggle • w search • Esc back",
+                             footer=escape(message) if message else t("Space toggle • w search • Esc back"),
                              key_actions={"w": lambda *_: len(names) + 1, " ": toggle_name})
         selected = {item.value for item in items[:len(names)] if item.toggled}
         if index is None or items[index].value == "back":
             return None
         if items[index].value == "add":
             value = get_query_with_shortcut(PROMPT, screen_renderer=input_screen(
-                "Additional title", "Another name to search together with the others."))
+                t("Additional title"), t("Another name to search together with the others."),
+                keys=t("Enter confirm  •  Esc cancel")))
             if isinstance(value, str) and value not in {"", "GO_BACK"}:
                 names = distinct_names([*names, value])
                 if len(selected) < MAX_ALIASES:
@@ -50,27 +55,28 @@ def pick_names(match):
             queries = [name for name in names if name in selected]
             if 1 <= len(queries) <= MAX_ALIASES:
                 return queries
-            message = f"Choose between 1 and {MAX_ALIASES} names."
+            message = t("Choose between 1 and {limit} names.", limit=MAX_ALIASES)
 
 
 def title_search_flow(provider, cli_filters, browse_fn, initial=""):
     catalogs = catalogs_for(provider)
     while True:
-        items = [SelectItem(c.label, value=c,
-                            description=("Needs " + ", ".join(c.missing_credentials()) + ". Configure in Credentials."
-                                         if c.missing_credentials() else "Identify a work by year/type, then choose its release names.")) for c in catalogs]
-        items.append(SelectItem("Enter known names manually", value="manual",
-                                description="Use names you know. Catalogs are unavailable for Desktop/Mobile Software; manual names work with every provider."))
-        items.append(SelectItem("Back", value=None, is_action=True))
-        picked = arrow_select(items, title="Alternate-title search", banner=_make_banner_panel(),
-                              footer="Catalog identifies works; release availability varies.")
+        items = [SelectItem(t(c.label), value=c,
+                            description=(t("Needs {credentials}. Configure in Credentials.", credentials=", ".join(c.missing_credentials()))
+                                         if c.missing_credentials() else t("Identify a work by year/type, then choose its release names."))) for c in catalogs]
+        items.append(SelectItem(t("Type known names manually"), value="manual",
+                                description=t("Use names you know. Catalogs are unavailable for Desktop/Mobile Software; manual names work with every provider.")))
+        items.append(SelectItem(t("Back"), value=None, is_action=True))
+        picked = arrow_select(items, title=t("Alternate-title search"), banner=_make_banner_panel(),
+                              footer=t("Catalog identifies works; release availability varies."))
         if picked is None or items[picked].value is None:
             return "back"
         catalog = items[picked].value
         if catalog != "manual" and catalog.missing_credentials():
-            _notice("Configure " + ", ".join(catalog.missing_credentials()) + " in Credentials.")
+            _notice(t("Configure {credentials} in Credentials.", credentials=", ".join(catalog.missing_credentials())))
             continue
-        query = get_query_with_shortcut(PROMPT, initial=initial, screen_renderer=input_screen("Identify title"))
+        query = get_query_with_shortcut(PROMPT, initial=initial, screen_renderer=input_screen(
+            t("Identify title"), keys=t("Enter confirm  •  Esc cancel")))
         initial = ""
         if not isinstance(query, str) or query == "GO_BACK" or not query.strip():
             continue
@@ -79,37 +85,37 @@ def title_search_flow(provider, cli_filters, browse_fn, initial=""):
             if catalog == "manual":
                 matches, more = [TitleMatch("manual", "", Work(query.strip()))], False
             else:
-                cancelled, value = _run_cancellable(lambda: search_titles(catalog, query, page), "Looking up catalog titles…")
+                cancelled, value = _run_cancellable(lambda: search_titles(catalog, query, page), t("Looking up catalog titles…"))
                 if cancelled:
                     break
                 if isinstance(value, SearchError) or value is None:
-                    _notice(str(value) if value else "Catalog lookup failed; try again later.")
+                    _notice(str(value) if value else t("Catalog lookup failed; try again later."))
                     break
                 matches, more = value
             choices = [SelectItem(m.work.title, value=m, hint=ellipsize_cells(m.work.subtitle, 60),
-                                  description=escape(f"{m.catalog} · ID {m.id}")) for m in matches]
+                                  description=escape(t("{catalog} · ID {id}", catalog=m.catalog, id=m.id))) for m in matches]
             if not matches:
-                choices.append(SelectItem("No catalog matches on this page", passive=True))
+                choices.append(SelectItem(t("No catalog matches on this page"), passive=True))
             if page > 1:
-                choices.append(SelectItem("Previous catalog page", value="prev", is_action=True))
+                choices.append(SelectItem(t("Previous catalog page"), value="prev", is_action=True))
             if more:
-                choices.append(SelectItem("Next catalog page", value="next", is_action=True))
-            choices.append(SelectItem("Back", value=None, is_action=True))
+                choices.append(SelectItem(t("Next catalog page"), value="next", is_action=True))
+            choices.append(SelectItem(t("Back"), value=None, is_action=True))
             index = (0 if catalog == "manual" else arrow_select(
-                choices, title="Choose work", status=f"page {page} of up to {MAX_CATALOG_PAGES}",
+                choices, title=t("Choose work"), status=t("page {page} of up to {limit}", page=page, limit=MAX_CATALOG_PAGES),
                 banner=_make_banner_panel(),
-                footer="Check year/type to distinguish sequels and adaptations."))
+                footer=t("Check year/type to distinguish sequels and adaptations.")))
             if index is None or choices[index].value is None:
                 break
             choice = choices[index].value
             if choice in ("prev", "next"):
                 page += 1 if choice == "next" else -1
                 continue
-            cancelled, match = _run_cancellable(lambda: resolve_names(choice), "Reading alternate names…")
+            cancelled, match = _run_cancellable(lambda: resolve_names(choice), t("Reading alternate names…"))
             if cancelled:
                 continue
             if not isinstance(match, TitleMatch):
-                _notice("Could not read the selected work's names. Try again.")
+                _notice(t("Could not read the selected work's names. Try again."))
                 continue
             queries = pick_names(match)
             if not queries:
@@ -121,11 +127,11 @@ def title_search_flow(provider, cli_filters, browse_fn, initial=""):
                 lambda: search_many(provider, queries, cli_filters, cancel_event=cancel,
                                     work_titles={q: match.work.title for q in queries},
                                     work_authors={q: match.work.authors for q in queries if match.work.authors}),
-                "Searching selected names (30s limit)…", cancel=cancel)
+                t("Searching selected names (30s limit)…"), cancel=cancel)
             if cancelled:
                 continue
             if results is None or isinstance(results, SearchError):
-                _notice(str(results) if results else "Search failed; try again later.")
+                _notice(str(results) if results else t("Search failed; try again later."))
                 continue
             provider.last_queries = queries
             from torrent_finder.state import add_history_entry
@@ -137,5 +143,5 @@ def title_search_flow(provider, cli_filters, browse_fn, initial=""):
             add_history_entry(match.work.title, provider.slug, presets, queries=queries, **extra)
             record_search(provider.slug, match.work.title, presets)
             clear_screen()
-            if browse_fn(provider, results, note="Names searched: " + "; ".join(queries)) == "next":
+            if browse_fn(provider, results, note=t("Names searched: {names}", names="; ".join(queries))) == "next":
                 return "next"

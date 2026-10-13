@@ -6,6 +6,8 @@ caller then feeds into the normal provider search. Each facet is two functions:
 (a chosen candidate -> the titles to search for).
 """
 
+# i18n: converted
+
 from dataclasses import dataclass
 from typing import Callable
 

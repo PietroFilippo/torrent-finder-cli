@@ -7,24 +7,28 @@ user at the credentials menu. Search results carry the topic id as a placeholder
 result is selected (see rutracker.resolve_info_hash).
 """
 
+from torrent_finder.i18n import N_
+
+# i18n: converted
+
 from torrent_finder import rutracker
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
 
 
 class RuTrackerProvider(BaseProvider):
-    name = "RuTracker"
+    name = N_("RuTracker")
     slug = "rutracker"
     icon = "🧲"
     categories = []  # not Apibay-based; the engine talks to rutracker.org directly
-    search_note = "Needs a RuTracker login — add it under the credentials menu on the provider screen."
+    search_note = N_("Needs a RuTracker login — add it under the credentials menu on the provider screen.")
 
     supports_subtitles = False
     supports_streaming = False
     supports_episode_picker = False
 
     def _init_engines(self) -> list[SearchEngine]:
-        return [SearchEngine("RuTracker", "🧲", self._search_rutracker, enabled=True)]
+        return [SearchEngine("RuTracker", "🧲", self._search_rutracker, enabled=True)]  # i18n: ignore — service/engine identity, including external category values
 
     def _search_rutracker(self, query: str) -> list[SearchResult]:
         return rutracker.search(query)
