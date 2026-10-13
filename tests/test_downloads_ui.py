@@ -55,6 +55,15 @@ def capture(target, module, run) -> dict:
     return seen
 
 
+def startup_untouched():
+    """main()'s process-wide setup (key decoder, argparse words, early language) left out of a test."""
+    stack = ExitStack()
+    stack.enter_context(patch("torrent_finder.ui.keyboard.install"))
+    stack.enter_context(patch.object(main, "_early_language"))
+    stack.enter_context(patch.object(main, "_speak_argparse"))
+    return stack
+
+
 class DownloadsUITests(unittest.TestCase):
     def setUp(self):
         isolate_store(self)
@@ -324,6 +333,37 @@ class DownloadsUITests(unittest.TestCase):
         with patch.object(prompts, "confirm_prompt") as confirm:
             self.assertTrue(main._confirm_quit(guarded=True))
         confirm.assert_not_called()
+
+    def test_a_stray_ctrl_c_asks_before_stopping_downloads_and_can_return_to_the_menu(self):
+        install(self, FakeManager(sample_jobs()))
+        loops = []
+
+        def main_loop(args):
+            loops.append(args)
+            if len(loops) == 1:
+                raise KeyboardInterrupt  # a Ctrl+C no screen caught
+
+        argv = ["torrent", "-q", "dune", "-t", "movie", "--skip-warning"]
+        with startup_untouched(), patch.object(main.sys, "argv", argv),              patch.object(main, "_main_loop", side_effect=main_loop), \
+             patch.object(main, "_goodbye") as goodbye, patch.object(main, "_opened_in_profile_tab", return_value=False), \
+             patch.object(main, "record_session_start"), patch.object(main, "add_runtime_seconds"), \
+             patch.object(downloads_ui, "quit_prompt", return_value=False), \
+             patch.object(downloads, "shutdown_all"):
+            main.main()
+        self.assertEqual(len(loops), 2)  # kept open: back where the session began
+        self.assertEqual((loops[1].query, loops[1].type, loops[1].skip_warning), (None, "movie", True))
+        goodbye.assert_not_called()
+
+    def test_a_stray_ctrl_c_without_downloads_says_goodbye(self):
+        install(self, FakeManager([]))
+        with startup_untouched(), patch.object(main.sys, "argv", ["torrent"]), \
+             patch.object(main, "_main_loop", side_effect=KeyboardInterrupt), \
+             patch.object(main, "_goodbye") as goodbye, patch.object(main, "_opened_in_profile_tab", return_value=False), \
+             patch.object(main, "record_session_start"), patch.object(main, "add_runtime_seconds"), \
+             patch.object(downloads_ui, "quit_prompt") as asked:
+            main.main()
+        goodbye.assert_called_once()
+        asked.assert_not_called()
 
     def test_updates_wait_while_downloads_run(self):
         install(self, FakeManager(sample_jobs()))

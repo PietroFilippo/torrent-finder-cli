@@ -1198,6 +1198,23 @@ def _confirm_quit(guarded: bool = False) -> bool:
     return guarded or confirm_prompt(t('Quit torrent-finder?'), title=t('Quit'))
 
 
+def _stay_for_downloads() -> bool:
+    """After a stray Ctrl+C: True when background downloads run and the user keeps the app open."""
+    from torrent_finder import downloads
+    if not downloads.busy():
+        return False
+    try:
+        return not _confirm_quit(guarded=True)
+    except (KeyboardInterrupt, EOFError):
+        return True  # Ctrl+C on the question itself keeps the app open, as Esc does
+
+
+def _menu_only(args):
+    """*args* for going back to where the session began, without its one-time search, creator
+    lookup or network check (the provider, profile and filters stay, so they still agree)."""
+    return argparse.Namespace(**{**vars(args), "query": None, "by": None, "name": None, "skip_warning": True})
+
+
 def _run_update_flow(info: dict) -> bool:
     """Run the install-appropriate update (git pull / pip and pipx / open Releases) in this terminal.
 
@@ -1965,17 +1982,26 @@ def main() -> None:
     t0 = time.monotonic()
     restart = False
     try:
-        _main_loop(args)
+        while True:
+            try:
+                _main_loop(args)
+                break
+            except (KeyboardInterrupt, EOFError):
+                # Ctrl+C / Ctrl+D from any menu (readchar raises these from readkey).
+                # Caught here so every entry point — the console script, python -m,
+                # and the frozen binary — exits cleanly instead of dumping a traceback.
+                # With background downloads running it asks first, like every other
+                # way out; keeping the app open returns to the main menu.
+                if _stay_for_downloads():
+                    args = _menu_only(args)
+                    continue
+                _goodbye()
+                break
     except RestartRequested:
         restart = True
     except ProfileError as error:
         from rich.markup import escape
         console.print(f"[warning]{escape(str(error))}[/warning]")
-    except (KeyboardInterrupt, EOFError):
-        # Ctrl+C / Ctrl+D from any menu (readchar raises these from readkey).
-        # Caught here so every entry point — the console script, python -m,
-        # and the frozen binary — exits cleanly instead of dumping a traceback.
-        _goodbye()
     finally:
         # Background downloads never outlive the app: the engine's --stop-with-process
         # covers a crash, this covers every ordinary way out.
