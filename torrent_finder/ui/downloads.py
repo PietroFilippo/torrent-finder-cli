@@ -272,9 +272,9 @@ def _state_hint(job) -> Text:
     if job.state == "done":
         return Text.assemble(("✓", theme.GOOD), (" " + format_size(job.total_bytes or job.done_bytes), ""))
     if job.state in ("failed", "interrupted"):
-        return Text(job.state_label, style=theme.BAD)
+        return Text.assemble((job.state_label, theme.BAD))  # a span: the row's muted base style can't cover it
     if job.state == "stopped":
-        hint = Text(job.state_label, style=theme.WARN)
+        hint = Text.assemble((job.state_label, theme.WARN))
         percent = _percent(job)
         if percent:
             hint.append(" · ", style=muted)

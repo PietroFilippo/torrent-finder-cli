@@ -121,6 +121,15 @@ class DownloadsUITests(unittest.TestCase):
         self.assertIn("no peers for 10 minutes", failed.description)
         self.assertTrue(any(line.plain.startswith("Log  ") for line in failed.details()))
 
+    def test_failed_and_stopped_keep_their_state_colours_under_a_muted_row(self):
+        # The selector draws hints on a muted base: a Text's own base style would be covered.
+        items = downloads_ui._rows(sample_jobs())
+        for title, role in (("Blue Giant 2023 1080p", theme.BAD), ("One Piece 1090 (1080p)", theme.WARN)):
+            with self.subTest(title=title):
+                hint = next(item.hint for item in items if plain(item.label) == title).copy()
+                hint.stylize_before(theme.MUTED)
+                self.assertIn(role, [str(span.style) for span in hint.spans[1:]])
+
     def test_rows_follow_the_jobs_while_the_screen_is_open(self):
         manager = install(self, FakeManager(sample_jobs()))
         seen = capture(None, downloads_ui, downloads_ui.downloads_screen)
