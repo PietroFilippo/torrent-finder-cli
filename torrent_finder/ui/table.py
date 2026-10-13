@@ -910,6 +910,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     ticker_thread.start()
                 elif key in ("f", "F"):
                     num_buffer = ""
+                    selected_id = result_identity(page_items[current]) if total else None
+                    previous_refinement = (view_query, view_mode, view_order)
                     # Stop background redraws while the modal owns the terminal.
                     stop_event.set()
                     ticker_thread.join(timeout=1)
@@ -920,13 +922,24 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         pass
                     view_indexes = result_indices(results, view_query, view_mode, view_order)
                     all_results = [results[i] for i in view_indexes]
+                    cleared = len(picked.difference(view_indexes))
                     picked.intersection_update(view_indexes)
+                    if cleared:
+                        feedback = f"{cleared} hidden selection{'s' if cleared != 1 else ''} cleared"
+                        feedback_style = theme.WARN
                     total_all = len(all_results)
                     total_pages = max(1, math.ceil(total_all / RESULTS_PER_PAGE))
-                    current_page = current = scroll_offset = global_offset = 0
+                    position = next((i for i, row in enumerate(all_results)
+                                     if result_identity(row) == selected_id), 0)
+                    current_page, current = divmod(position, RESULTS_PER_PAGE)
+                    global_offset = current_page * RESULTS_PER_PAGE
+                    if previous_refinement != (view_query, view_mode, view_order):
+                        scroll_offset = 0
                     page_items = page_results()
                     total = len(page_items)
                     visible_count = _fit_rows()
+                    # Refining is not a cursor move: keep its feedback through the redraw.
+                    prev_page, prev_current = current_page, current
                     marquee_state["tick"] = 0
                     marquee_state["cursor_changed_at"] = time.monotonic()
                     live.start()

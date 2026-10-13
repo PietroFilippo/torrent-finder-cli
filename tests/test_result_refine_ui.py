@@ -46,7 +46,51 @@ class ResultRefineUITests(unittest.TestCase):
 
     def test_sorted_enter_returns_original_result_index(self):
         rows = [{"name":"Old", "uploaded_at":10}, {"name":"New", "uploaded_at":30}]
-        self.assertEqual(self._select(rows, ("", "contains", "newest"), ["f", readchar.key.ENTER]), ("one", 1))
+        self.assertEqual(self._select(rows, ("", "contains", "newest"),
+                         [readchar.key.DOWN, "f", readchar.key.ENTER]), ("one", 1))
+
+    def test_unchanged_refinement_keeps_focus_and_scroll(self):
+        rows = [{"name": f"Keep {i}"} for i in range(20)]
+        state = table.ResultsViewState()
+        screen = Console(file=io.StringIO(), width=72, height=20, color_system=None)
+        frames = []
+        build = table.build_table
+        def record(*args, **kwargs):
+            frames.append(args[1:3])
+            return build(*args, **kwargs)
+        with patch.object(table, "console", screen), \
+             patch.object(table, "build_table", side_effect=record), \
+             patch.object(table, "refine_results", side_effect=lambda *args: args), \
+             patch.object(table.readchar, "readkey", side_effect=[readchar.key.DOWN] * 8 + ["f", readchar.key.ENTER]):
+            self.assertEqual(table.interactive_select(rows, view_state=state), ("one", 8))
+        self.assertEqual(frames[-1], frames[-2])
+        self.assertGreater(state.scroll, 0)
+
+    def test_changed_refinement_keeps_a_visible_focused_result(self):
+        rows = [{"name": "Other"}, {"name": "Keep Z"}, {"name": "Keep A"}]
+        self.assertEqual(self._select(rows, ("Keep", "contains", "name"),
+                         [readchar.key.DOWN, "f", readchar.key.ENTER]), ("one", 1))
+
+    def test_filter_announces_cleared_checks_and_batch_only_uses_visible_rows(self):
+        rows = [{"name": "Other"}, {"name": "Keep Z"}, {"name": "Keep A"}]
+        screen = Console(file=io.StringIO(), width=100, height=30, color_system=None)
+        frames = []
+        class Live:
+            def __init__(self, renderable, **kwargs):
+                self.update(renderable)
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def start(self): pass
+            def stop(self): pass
+            def update(self, renderable):
+                out = io.StringIO()
+                Console(file=out, width=100, height=30).print(renderable)
+                frames.append(out.getvalue())
+        with patch.object(table, "console", screen), patch.object(table, "Live", Live), \
+             patch.object(table, "refine_results", return_value=("Keep", "contains", "name")), \
+             patch.object(table.readchar, "readkey", side_effect=["a", "f", readchar.key.ENTER]):
+            self.assertEqual(table.interactive_select(rows), ("many", [1, 2]))
+        self.assertIn("1 hidden selection cleared", frames[-1])
 
     def test_select_all_only_selects_visible_filtered_results(self):
         rows = [{"name":"Other"}, {"name":"Saki 720p"}, {"name":"Saki 1080p"}]
