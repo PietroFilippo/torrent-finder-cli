@@ -483,6 +483,8 @@ def _browse_results(provider, results, note: str = "") -> str:
     (what's next). Completed download-menu actions offer Continue or Back to
     the same session; standalone acquisitions handle their own completion.
     """
+    from torrent_finder.ui.table import ResultsViewState
+    view_state = ResultsViewState()
     while True:
         clear_screen()
         from torrent_finder.bookmarks import save_results
@@ -495,7 +497,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                                     search_summary=provider.filter_summary(),
                                     on_bookmark=lambda rows: save_results(provider, rows),
                                     heading=" › ".join(part for part in crumbs if part),
-                                    describe=ranking_notes(provider, queries))
+                                    describe=ranking_notes(provider, queries), view_state=view_state)
         if choice is None:
             return "back"
 

@@ -71,6 +71,18 @@ class DownloadNavigationTests(unittest.TestCase):
             with self.subTest(method=method):
                 self.assertEqual(self.run_single(method, after="next").call_count, 1)
 
+    def test_back_to_results_reuses_only_this_browsing_sessions_state(self):
+        adapter = Mock(style="magnet-direct")
+        adapter.pick.return_value = acquisition.PickOutcome("menu", self.magnet)
+        with patch.object(main.acquisition, "for_result", return_value=adapter), \
+             patch.object(main, "interactive_select", side_effect=[("one", 0), None, None]) as select, \
+             patch.object(main, "download_method_prompt", return_value="back"):
+            main.browse_results(self.provider, [self.result])
+            main.browse_results(self.provider, [self.result])
+        states = [call.kwargs["view_state"] for call in select.call_args_list]
+        self.assertIs(states[0], states[1])
+        self.assertIsNot(states[0], states[2])
+
     def test_unsent_webui_returns_directly_to_download_choices(self):
         self.assertEqual(self.run_single("qbittorrent", accepted=False).call_count, 2)
 

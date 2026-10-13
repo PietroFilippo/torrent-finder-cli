@@ -3,7 +3,7 @@
 import math
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 import readchar
@@ -20,6 +20,7 @@ from torrent_finder.utils import format_size, leech_style, seed_style
 from torrent_finder.result_view import SORT_ORDERS, result_indices, timestamp
 from torrent_finder.ui.result_filters import refine_results
 from torrent_finder.result_details import detail_lines, release_tags, tag_matches
+from torrent_finder.providers.combined_provider import result_identity
 
 
 # Marquee timing for the selected-row name
@@ -544,9 +545,21 @@ def _source_counts(rows: list[dict], most: int = 4) -> str:
     return text + (f" · +{len(ranked) - most}" if len(ranked) > most else "")
 
 
+@dataclass
+class ResultsViewState:
+    """The workspace of one result set, including returns from download options."""
+    query: str = ""
+    mode: str = "contains"
+    order: str | None = None
+    focused: tuple | None = None
+    checked: set[tuple] = field(default_factory=set)
+    page: int = 0
+    scroll: int = 0
+
+
 def interactive_select(results: list[dict], note: str = "", *, initial_order: str = "relevance",
                        search_summary: str = "", on_bookmark=None, heading: str = "",
-                       describe=None) -> "tuple | None":
+                       describe=None, view_state: ResultsViewState | None = None) -> "tuple | None":
     """Interactive torrent results table with multi-select.
 
     Navigate with arrows; Left/Right switch pages; type a number to jump.
@@ -563,7 +576,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     place: its title match and the preferred presets it matches, shown under
     it while the order is Recommended. ``?`` lists every key.
     """
-    view_query, view_mode, view_order = "", "contains", initial_order
+    workspace = view_state if view_state is not None else ResultsViewState()
+    view_query, view_mode, view_order = workspace.query, workspace.mode, workspace.order or initial_order
 
     def notes():
         """The focused-row notes for the current order: the reason only means something for Recommended."""
@@ -576,7 +590,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     if session is not None:
         # Reserve one compact line for diagnostics/actions even with zero rows.
         note = note or "Search diagnostics"
-    view_indexes = result_indices(results, order=view_order)
+    view_indexes = result_indices(results, view_query, view_mode, view_order)
     all_results = [results[i] for i in view_indexes]
     total_all = len(all_results)
     # Provenance "From" column: only when results came from more than one searched
@@ -584,7 +598,9 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     show_from = len({r.get("from_work") for r in all_results if r.get("from_work")}) > 1
     show_provider = any(r.get("provider_slug") for r in all_results)
     total_pages = max(1, math.ceil(total_all / RESULTS_PER_PAGE))
-    current_page = 0
+    position = next((i for i, row in enumerate(all_results) if result_identity(row) == workspace.focused),
+                    min(workspace.page * RESULTS_PER_PAGE, max(0, total_all - 1)))
+    current_page, current = divmod(position, RESULTS_PER_PAGE)
 
     def page_results():
         start = current_page * RESULTS_PER_PAGE
@@ -592,11 +608,10 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         return all_results[start:end]
 
     # Current selection index (local to the page)
-    current = 0
     num_buffer = ""
     # Checkbox multi-select: global indexes the user has ticked. Persists across
     # page flips (it stores global indexes, not page-local ones).
-    picked: set[int] = set()
+    picked = {i for i in view_indexes if result_identity(results[i]) in workspace.checked}
     page_items = page_results()
     total = len(page_items)
     global_offset = current_page * RESULTS_PER_PAGE
@@ -610,7 +625,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     # Reserve room for the header, notices, details and key bar.
     visible_count = _fit_rows()
 
-    scroll_offset = 0
+    scroll_offset = min(workspace.scroll, max(0, total - visible_count))
+    scroll_offset = min(current, max(scroll_offset, current - visible_count + 1))
     expanded, detail_offset, saved_scroll = False, 0, 0
     feedback, feedback_style = "", theme.WARN  # a one-line outcome; green when it worked
     # The Athanor message line while the table is open; without one, the message waits for a screen that has it.
@@ -819,7 +835,6 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         feedback, feedback_style = "Bookmark not saved: " + str(error), theme.BAD
                 elif key.lower() in ("n", "r", "m") and session is not None:
                     from torrent_finder.ui.search_diagnostics import diagnostics_menu, run_action
-                    from torrent_finder.providers.combined_provider import result_identity
                     selected_id = result_identity(page_items[current]) if total else None
                     checked_ids = {result_identity(results[i]) for i in picked}
                     stop_event.set()
@@ -978,5 +993,9 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         finally:
             stop_event.set()
             ticker_thread.join(timeout=1)
+            workspace.query, workspace.mode, workspace.order = view_query, view_mode, view_order
+            workspace.focused = result_identity(page_items[current]) if total else None
+            workspace.checked = {result_identity(results[i]) for i in picked}
+            workspace.page, workspace.scroll = current_page, scroll_offset
 
     return None

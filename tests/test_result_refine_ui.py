@@ -10,6 +10,33 @@ from torrent_finder.ui.selector import SelectItem
 
 
 class ResultRefineUITests(unittest.TestCase):
+    def test_reopening_restores_workspace_by_identity(self):
+        rows = [{"name": f"Keep {i:03}", "info_hash": f"{i:040x}"} for i in range(70)]
+        rows.append({"name": "Other"})
+        state = table.ResultsViewState()
+        screen = Console(file=io.StringIO(), width=72, height=20, color_system=None)
+        with patch.object(table, "console", screen), \
+             patch.object(table, "refine_results", return_value=("Keep", "contains", "name")), \
+             patch.object(table.readchar, "readkey", side_effect=["f", table.readchar.key.RIGHT] +
+                          [table.readchar.key.DOWN] * 8 + [" ", table.readchar.key.ENTER]):
+            first = table.interactive_select(rows, view_state=state)
+        focused = rows[first[1]]
+        before = (state.page, state.scroll)
+        rows.reverse()  # indices can change; identity cannot
+        with patch.object(table, "console", screen), \
+             patch.object(table.readchar, "readkey", side_effect=[table.readchar.key.ENTER]):
+            second = table.interactive_select(rows, view_state=state)
+        self.assertIs(rows[second[1]], focused)
+        self.assertEqual((state.query, state.mode, state.order), ("Keep", "contains", "name"))
+        self.assertEqual((state.page, state.scroll), before)
+        self.assertGreater(state.scroll, 0)
+        with patch.object(table, "console", screen), \
+             patch.object(table.readchar, "readkey", side_effect=["c", table.readchar.key.ENTER]):
+            self.assertEqual(table.interactive_select(rows, view_state=state), second)
+        with patch.object(table, "console", screen), \
+             patch.object(table.readchar, "readkey", side_effect=[table.readchar.key.ENTER]):
+            self.assertEqual(table.interactive_select(rows), ("one", 0))
+
     def _select(self, rows, refinement, keys):
         screen = Console(file=io.StringIO(), width=72, height=20, color_system=None)
         with patch.object(table, "console", screen), \
