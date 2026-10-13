@@ -359,6 +359,7 @@ def capture(label: str, appearance: str = "") -> None:
                 stack.enter_context(patch("sys.stdout", buffer))
                 stack.enter_context(patch("os.system", lambda *_a: 0))
                 stack.enter_context(patch.object(console, "_force_terminal", True))
+                stack.enter_context(patch.object(type(console), "is_dumb_terminal", property(lambda _self: False)))
                 stack.enter_context(patch.object(console, "_color_system", None))
                 stack.enter_context(patch.object(console, "is_interactive", True))
                 stack.enter_context(patch.object(console, "legacy_windows", False))
@@ -391,6 +392,8 @@ SEPARATOR = "=" * 20 + " next frame " + "=" * 20
 def _overflow(text: str, width: int, height: int) -> list[str]:
     """Frames of a capture that are taller or wider than their terminal."""
     from rich.cells import cell_len
+    if not any(frame.strip() for frame in text.split(SEPARATOR)):
+        return ["no non-empty frames"]
     problems = []
     for i, frame in enumerate(text.split(SEPARATOR)):
         lines = frame.strip("\n").split("\n")
@@ -410,7 +413,8 @@ def _size(name: str) -> tuple[int, int]:
 def _failed(label: str) -> int:
     """Print and count the scenarios of one capture that raised instead of drawing."""
     report = OUT / label / "_report.log"
-    failed = [line for line in report.read_text(encoding="utf-8").splitlines() if " error: " in line] \
+    failed = [line for line in report.read_text(encoding="utf-8").splitlines()
+              if " error: " in line or re.search(r"\bframes=0\b", line)] \
         if report.exists() else []
     for line in failed:
         print(f"--- scenario failed in {label}: {line}")
@@ -420,7 +424,11 @@ def _failed(label: str) -> int:
 def check(label: str) -> int:
     """Report every frame in one capture that overflows its terminal, and every scenario that failed."""
     problems = _failed(label)
-    for path in sorted((OUT / label).glob("*.txt")):
+    paths = sorted((OUT / label).glob("*.txt"))
+    if not paths:
+        print(f"--- no captures in {label}")
+        problems += 1
+    for path in paths:
         found = _overflow(path.read_text(encoding="utf-8"), *_size(path.name))
         if found:
             problems += 1
@@ -486,7 +494,7 @@ def main() -> None:
     elif len(sys.argv) >= 4 and sys.argv[1] == "compare":
         compare(sys.argv[2], sys.argv[3])
     elif len(sys.argv) >= 3 and sys.argv[1] == "check":
-        check(sys.argv[2])
+        sys.exit(1 if check(sys.argv[2]) else 0)
     else:
         print(__doc__)
 

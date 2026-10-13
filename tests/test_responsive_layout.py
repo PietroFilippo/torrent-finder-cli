@@ -35,6 +35,41 @@ def _render(renderable, width, height=40):
     return output
 
 
+class SnapshotCaptureTests(unittest.TestCase):
+    def test_results_capture_overrides_dumb_terminal_detection(self):
+        import tempfile
+        from pathlib import Path
+        from scripts import ui_snapshots as snapshots
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(snapshots, "OUT", Path(directory)), \
+             patch.object(snapshots, "SIZES", [(80, 24)]), \
+             patch.object(snapshots, "_fresh_state"), patch.object(snapshots, "_seed_state"), \
+             patch.object(snapshots.console, "_environ", {"TERM": "dumb"}), \
+             patch.object(snapshots, "_scenarios", return_value=[
+                 ("results", lambda: table.interactive_select([{"name": "Example"}]))]), \
+             patch("sys.stdout", io.StringIO()):
+            snapshots.capture("test", "quiet")
+            output = (Path(directory) / "test" / "results@80x24.txt").read_text(encoding="utf-8")
+            self.assertIn("Example", output)
+            self.assertEqual(snapshots.check("test"), 0)
+
+    def test_empty_capture_fails_check_and_its_command(self):
+        import tempfile
+        from pathlib import Path
+        from scripts import ui_snapshots as snapshots
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(snapshots, "OUT", Path(directory)), patch("sys.stdout", io.StringIO()):
+            target = Path(directory) / "empty"
+            target.mkdir()
+            (target / "results@80x24.txt").write_text(" \n\n", encoding="utf-8")
+            (target / "_report.log").write_text("results 80x24 frames=0  ok", encoding="utf-8")
+            self.assertGreater(snapshots.check("empty"), 0)
+            with patch("sys.argv", ["ui_snapshots.py", "check", "empty"]), self.assertRaises(SystemExit) as caught:
+                snapshots.main()
+            self.assertEqual(caught.exception.code, 1)
+            self.assertGreater(snapshots.check("missing"), 0)
+
+
 class ResponsiveSelectorTests(unittest.TestCase):
     def test_multi_selector_renders_named_toggle_state(self):
         items = [
