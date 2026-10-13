@@ -102,8 +102,9 @@ def _load_file() -> dict:
     with _lock:
         if _file_cache is None:
             try:
-                _migrate_legacy_file()
-                _file_cache = _read_credentials(_CRED_FILE) if _CRED_FILE.exists() else {}
+                with _transaction():
+                    _migrate_legacy_file()
+                    _file_cache = _read_credentials(_CRED_FILE) if _CRED_FILE.exists() else {}
                 _file_problem = ""
             except (OSError, ValueError):
                 # Do not cache a transient read error as an empty credential store.
@@ -213,7 +214,7 @@ def opensubtitles_config() -> dict | None:
 
 def export_file_values() -> dict:
     """Explicit local transfer: saved file values only, never environment secrets."""
-    with _lock:
+    with _transaction():
         _migrate_legacy_file()
         data = _read_credentials(_CRED_FILE) if _CRED_FILE.exists() else {}
         return {env: data[key] for env, key in _FILE_KEYS.items() if key in data}

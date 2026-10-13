@@ -2,6 +2,7 @@ import json
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -39,6 +40,31 @@ class CredentialRecoveryTests(unittest.TestCase):
                  patch.object(credentials, "_file_cache", None):
                 self.assertEqual(credentials._load_file(), {})
 
+    def test_first_read_and_export_wait_for_another_windows_migration(self):
+        from torrent_finder import store
+
+        for read in (credentials._load_file, credentials.export_file_values):
+            with self.subTest(read=read.__name__), tempfile.TemporaryDirectory() as directory:
+                old, new = Path(directory) / "old.json", Path(directory) / "stable.json"
+                old.write_text('{"jimaku_api_key":"old"}', encoding="utf-8")
+                saved = {"jimaku_api_key": "new", "tmdb_api_key": "another integration"}
+
+                @contextmanager
+                def other_window_finishes(path, timeout):
+                    # The other window migrates and saves before we acquire its lock.
+                    new.write_text(json.dumps(saved), encoding="utf-8")
+                    yield
+
+                with patch.object(credentials, "_CRED_FILE", new), \
+                     patch.object(credentials, "_LEGACY_CRED_PATHS", [str(old)]), \
+                     patch.object(credentials, "_file_cache", None), \
+                     patch.object(store, "_file_lock", side_effect=other_window_finishes) as lock:
+                    values = read()
+                    key = "jimaku_api_key" if read is credentials._load_file else "JIMAKU_API_KEY"
+                    self.assertEqual(values[key], "new")
+                    lock.assert_called_once_with(str(new), store.LOCK_TIMEOUT)
+                self.assertEqual(json.loads(new.read_text(encoding="utf-8")), saved)
+
     def test_saving_after_parse_failure_preserves_original_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "credentials.json"
@@ -54,6 +80,7 @@ class CredentialRecoveryTests(unittest.TestCase):
 
     def test_transient_read_error_is_retried(self):
         with patch.object(credentials, "_migrate_legacy_file"), \
+             patch.object(credentials, "_transaction", side_effect=nullcontext), \
              patch.object(credentials, "_CRED_FILE") as path, \
              patch.object(credentials, "_file_cache", None), \
              patch.object(credentials, "_read_credentials", side_effect=[PermissionError(), {"x": "fixture"}]):
