@@ -489,6 +489,28 @@ usage stats, and installers. `scripts/preview_update.py` exports a browser repla
 from the same renderer for visual QA. Neither preview changes update status or
 opens the application.
 
+## Languages
+
+The **interface language** translates what screens draw; the English text is
+the key. `i18n.t("Back")`, `i18n.tn("{n} result", "{n} results", count)`
+and `i18n.N_()` (marks text defined at import time) look a message up when
+a screen draws, never at import, so a run can switch language; a missing
+translation shows the English. A **context** (`ctx="engine mode"`) tells
+identical English apart: engine mode Off is *Nunca*, preset state Off is
+*Não*. Identity never sees a translation: comparisons, persisted values and
+lookups keep English or a key (a translated label would unmask the IP in
+`security.py`'s warning).
+
+**Catalogues** are the JSON files in `assets/locales/<code>/`, all merged;
+English needs none. Shipped: `en` and `pt-BR`; `qps` is a pseudo-locale for
+development that brackets, accents and pads every message. Startup resolves
+`--lang`, `TORRENT_FINDER_LANG`, the saved `settings.language` (`auto`, `en`
+or `pt-BR`), then the system's **display language** (not its regional
+format, which only suggests a language), then English. Tests run in English.
+`scripts/i18n.py` extracts messages, lists what a language lacks and runs
+the checks `tests/test_i18n.py` enforces; `docs/i18n/pt-BR.md` is the style
+guide. See [ADR-0028](docs/adr/0028-interface-languages.md).
+
 ## Code map
 
 Everything lives in the `torrent_finder/` package; `torrent-finder` and
@@ -545,10 +567,12 @@ including the migrations from boolean engine toggles and display-name keys),
 `stats.py`, `bookmarks.py`, `settings_backup.py`, `credentials.py` and
 `credential_registry.py`.
 
-**Appearance, launcher and updates.** `paintings.py` (catalogue in
+**Appearance, languages, launcher and updates.** `paintings.py` (catalogue in
 `assets/paintings`, a dependency-free 1-bit PNG reader and writer, recolouring,
 export; `scripts/build_paintings.py` rebuilds the assets), `terminal_profile.py`,
-`launcher_alias.py`, `updates.py`.
+`i18n.py` (interface languages: lookup, catalogues in `assets/locales`,
+startup resolution, the `qps` pseudo-locale; `scripts/i18n.py` extracts and
+checks), `launcher_alias.py`, `updates.py`.
 
 **UI (`ui/`).** Frame and layout: `display.py` (alternate screen, flicker-free
 frames), `theme.py`, `chrome.py`, `layout.py`, `selector.py`, `inspector.py`.
