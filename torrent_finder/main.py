@@ -8,6 +8,7 @@ Usage:
 """
 # i18n: converted
 import argparse
+from dataclasses import dataclass
 import sys
 import threading
 import time
@@ -17,7 +18,7 @@ import warnings
 warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
-from rich.markup import escape as markup_escape  # _main_loop imports `escape` locally further down
+from rich.markup import escape as markup_escape
 
 import torrent_finder
 from torrent_finder import acquisition, store
@@ -1368,7 +1369,40 @@ def _apply_appearance(args) -> str:
     return apply_startup(getattr(args, "theme", None), saved_settings=not getattr(args, "preview_update", None))
 
 
-def _main_loop(args=None) -> None:
+@dataclass
+class _Session:
+    """Startup values and the update offer shared with idle-menu callbacks."""
+
+    query: str | None
+    current_provider: object | None
+    cli_filters: FilterConfig | None
+    cli_facet: object | None
+    pending_creator_name: str | None
+    update_check: UpdateCheck
+    update_msg: str = ""
+    update_info: dict | None = None
+    update_loaded: bool = False
+
+    def poll_update(self) -> tuple[dict | None, str]:
+        from rich.markup import escape
+        from torrent_finder.ui import chrome as frames
+
+        if not self.update_loaded and self.update_check.done.is_set():
+            self.update_loaded = True
+            self.update_info = self.update_check.info
+            self.update_msg = "\n".join(filter(None, (notice_line(self.update_info), self.update_msg)))
+            if self.update_info:
+                frames.announce(t('A raven arrives: {version}. U installs it.', version=escape(status_label(self.update_info))))
+        return self.update_info, self.update_msg
+
+    def run_pending_update(self) -> None:
+        if self.update_info and not _run_update_flow(self.update_info):
+            return  # refused while downloads run: the update stays offered
+        self.update_info, self.update_msg = None, ""
+
+
+def _start_session(args=None) -> _Session | None:
+    """Prepare a session, or return None when startup ends before navigation."""
     parser = _build_parser()
     args = args or parser.parse_args()
     # Either one names an environment value it ignored; both rare, so they share the notice.
@@ -1464,7 +1498,7 @@ def _main_loop(args=None) -> None:
 
     # The check started before the warning gate. Collect it only when ready;
     # the main menu also polls while idle so its update row can appear in place.
-    update_info, update_msg, update_loaded = None, "", False
+    update_msg = ""
     if theme_notice:
         update_msg = "\n".join(filter(None, (update_msg, f"[warning]{markup_escape(theme_notice)}[/warning]")))
     from rich.markup import escape
@@ -1479,27 +1513,154 @@ def _main_loop(args=None) -> None:
         frames.announce(f"[warn]{markup_escape(theme_notice)}[/warn]")
     _offer_language_once()
 
-    def poll_update():
-        nonlocal update_info, update_msg, update_loaded
-        if not update_loaded and update_check.done.is_set():
-            update_loaded = True
-            update_info = update_check.info
-            update_msg = "\n".join(filter(None, (notice_line(update_info), update_msg)))
-            if update_info:
-                frames.announce(t('A raven arrives: {version}. U installs it.', version=escape(status_label(update_info))))
-        return update_info, update_msg
-
-    poll_update()
-    if current_provider and update_msg:
+    session = _Session(query, current_provider, cli_filters, cli_facet,
+                       pending_creator_name, update_check, update_msg=update_msg)
+    session.poll_update()
+    if current_provider and session.update_msg:
         # highlight=False: the auto-highlighter would restyle the version
         # digits (bold → bright black) on the yellow banner.
-        console.print(update_msg + "\n", highlight=False)
+        console.print(session.update_msg + "\n", highlight=False)
+    return session
 
-    def run_pending_update():
-        nonlocal update_info, update_msg
-        if update_info and not _run_update_flow(update_info):
-            return  # refused while downloads run: the update stays offered
-        update_info, update_msg = None, ""
+
+def _search_and_browse(provider, queries: list[str],
+                       cli_filters: FilterConfig | None) -> tuple[str, str | None]:
+    """Run one keyword search and browse it; return navigation and any notice."""
+    from rich.markup import escape
+    from torrent_finder.ui import chrome as frames
+
+    # Search the provider. Multiple titles fan out across the same engines
+    # and merge (dedupe by hash, ranked like a single search), reusing the
+    # by-creator search path.
+    shown = ", ".join(queries)
+    combined = getattr(provider, "is_combined", False)
+    # The header names the provider and the search (``Provider › query``);
+    # the intro adds only what it does not say.
+    if combined:
+        # CLI -q can reach this screen before the lazy profile is loaded.
+        count = sum(p.slug in provider.selected_slugs for p in provider.children)
+        intro = ""
+        notes = [tn('{n} provider · results appear when the search finishes or after 30 seconds.',
+            '{n} providers · results appear when the search finishes or after 30 seconds.',
+            count)]
+    else:
+        intro = ""
+        notes = [escape(t(provider.search_note))] if getattr(provider, "search_note", "") else []
+        notes.append(t('30 s search limit; Enter shows the results received so far.'))
+
+    # Run the search on a worker thread so Esc can abort the wait instead of
+    # forcing the user to sit through the engine timeouts (or Ctrl+C).
+    search_result: dict = {}
+    cancel_event = threading.Event()
+    finish_event = threading.Event()
+
+    def report_progress(progress, target=search_result):
+        target["progress"] = progress
+
+    def _run_search(provider=provider, queries=queries, cli_filters=cli_filters,
+                    cancel_event=cancel_event, finish_event=finish_event,
+                    search_result=search_result, report_progress=report_progress) -> None:
+        try:
+            from torrent_finder.search_session import search_many
+            search_result["results"] = search_many(
+                provider, queries, cli_filters, cancel_event=cancel_event,
+                finish_event=finish_event, on_progress=report_progress,
+            )
+        except Exception as error:
+            from torrent_finder.search_errors import SearchError
+            search_result["results"] = []
+            if isinstance(error, SearchError):
+                search_result["error"] = str(error)
+            else:
+                search_result["error"] = t('Search could not be completed. Please try again.')
+        finally:
+            search_result["done"] = True
+
+    worker = threading.Thread(target=_run_search, daemon=True)
+    worker.start()
+    stop_listener = start_esc_listener(cancel_event, finish_event=finish_event)
+    started = time.monotonic()
+    waiting_label = t('Contacting selected providers…') if combined else t('Searching {provider}…', provider=t(provider.name))
+    title = f"{escape(t(provider.name))} › {escape(shown)}"
+    try:
+        with ProgressScreen() as screen:
+            drawn_at = 0.0
+            while True:
+                now = time.monotonic()
+                if now - drawn_at >= SEARCH_REDRAW_S:
+                    screen.draw(progress_frame(title, intro, notes, search_result.get("progress"),
+                                               now - started, waiting_label, now))
+                    drawn_at = now
+                if search_result.get("done") or cancel_event.is_set():
+                    break
+                time.sleep(0.05)
+    except KeyboardInterrupt:
+        cancel_event.set()
+    finally:
+        stop_listener.set()
+
+    if cancel_event.is_set():
+        return "back", _history_notice(provider, t('[warning] Search cancelled — returning to the prompt.[/warning]\n'))
+
+    raw_results = search_result.get("results")
+    notices = list(getattr(raw_results, "notices", ()))
+    results = raw_results if raw_results is not None else []
+    provider.last_queries = queries
+    if not results and getattr(results, "session", None) is None:
+        from rich.markup import escape
+        message = search_result.get("error") or "\n".join([t('No results found.'), *notices])
+        return "back", _history_notice(provider, f"[warning] {escape(message)}[/warning]\n")
+
+    # Record the successful search in history + stats — each title
+    # individually so ↑/↓ recall offers them separately.
+    from torrent_finder.state import add_history_entry
+    active_preset_names = [pr.name for pr in getattr(provider, "active_presets", [])]
+    for q in queries:
+        extra = {"search_profile": provider.snapshot()} if getattr(provider, "is_combined", False) else {}
+        add_history_entry(q, provider.slug, active_preset_names, **extra)
+        record_search(provider.slug, q, active_preset_names)
+
+    # Note any searched titles that returned nothing (multi-title only). It
+    # rides above the results table (a pre-table print would be wiped by the
+    # table's own screen clear).
+    note = ""
+    if len(queries) > 1:
+        found = {q for r in results for q in r.get("matched_queries", [r.get("from_work")])}
+        missing = [q for q in queries if q not in found]
+        if missing:
+            cap = 4
+            more = t(' +{count} more', count=len(missing) - cap) if len(missing) > cap else ""
+            note = t('No torrents for {missing} of {total} titles: {titles}{more}',
+                missing=len(missing),
+                total=len(queries),
+                titles=', '.join(missing[:cap]),
+                more=more)
+    if notices:
+        note = "\n".join(filter(None, [note, *notices]))
+
+    # Results + download (shared with the by-creator flow). Esc on the
+    # results table steps back to the keyword prompt; a completed download
+    # proceeds to "what's next?".
+    frames.clear_messages()
+    if not getattr(provider, "_history_notice", ""):
+        frames.announce(tn('You find {n} result for {queries}.',
+            'You find {n} results for {queries}.',
+            len(results),
+            queries=escape(', '.join(queries))))
+    if browse_results(provider, results, note=note) == "back":
+        return "back", None
+    return "next", None
+
+
+def _main_loop(args=None) -> None:
+    session = _start_session(args)
+    if session is None:
+        return
+    query = session.query
+    current_provider = session.current_provider
+    cli_filters = session.cli_filters
+    cli_facet = session.cli_facet
+    pending_creator_name = session.pending_creator_name
 
     # One-line status (e.g. "No results", "cancelled") carried to the next
     # prompt render so it shows on the freshly-cleared screen instead of
@@ -1528,7 +1689,7 @@ def _main_loop(args=None) -> None:
     quit_guard = QuitGuard()
 
     while True:
-        poll_update()
+        session.poll_update()
         if not query and cli_facet is None:
             current_provider = getattr(current_provider, "_history_original", current_provider)
         # One-shot CLI creator search (--by/--name): jump into the by-creator
@@ -1546,7 +1707,7 @@ def _main_loop(args=None) -> None:
                 creator_outcome = "back"
             current_provider = getattr(current_provider, "_history_original", current_provider)
             if creator_outcome == "next":
-                res = _handle_whats_next(current_provider, cli_filters, run_pending_update if update_info else None)
+                res = _handle_whats_next(current_provider, cli_filters, session.run_pending_update if session.update_info else None)
                 if res == "EXIT":
                     _goodbye()
                     break
@@ -1561,12 +1722,12 @@ def _main_loop(args=None) -> None:
         if not current_provider:
             try:
                 result = provider_select_prompt(
-                    notice="" if theme.FRAMED else update_msg or "",  # Athanor: the message line says it
+                    notice="" if theme.FRAMED else session.update_msg or "",  # Athanor: the message line says it
                     quit_guard=quit_guard,  # its hint is the line under the keys
                     open_group=pending_open_group,
-                    update_available=bool(update_info),
-                    update_status=status_label(update_info),
-                    refresh_update=poll_update,
+                    update_available=bool(session.update_info),
+                    update_status=status_label(session.update_info),
+                    refresh_update=session.poll_update,
                 )
             except (KeyboardInterrupt, EOFError):
                 result = None  # Ctrl+C/Ctrl+D arm the same quit guard as Esc
@@ -1582,12 +1743,12 @@ def _main_loop(args=None) -> None:
                 continue
             quit_guard.armed = False
             if result == "__update__":
-                if _run_update_flow(update_info):
-                    update_info = None   # consumed → drop the notice + menu row
-                    update_msg = ""
+                if _run_update_flow(session.update_info):
+                    session.update_info = None   # consumed → drop the notice + menu row
+                    session.update_msg = ""
                 continue
             if result == "__actions__":
-                outcome = _quick_actions_flow(cli_filters=cli_filters, on_update=run_pending_update if update_info else None)
+                outcome = _quick_actions_flow(cli_filters=cli_filters, on_update=session.run_pending_update if session.update_info else None)
                 if outcome == "EXIT":
                     _goodbye()
                     return
@@ -1634,7 +1795,7 @@ def _main_loop(args=None) -> None:
                 current_provider = None
                 continue
             if nxt == "next":
-                res = _handle_whats_next(current_provider, cli_filters, run_pending_update if update_info else None)
+                res = _handle_whats_next(current_provider, cli_filters, session.run_pending_update if session.update_info else None)
                 if res == "EXIT":
                     _goodbye()
                     break
@@ -1715,7 +1876,7 @@ def _main_loop(args=None) -> None:
                 typed = query[1]
                 titles = query[2] if len(query) > 2 else []
                 query = None
-                outcome = _quick_actions_flow(provider, cli_filters, typed, run_pending_update if update_info else None)
+                outcome = _quick_actions_flow(provider, cli_filters, typed, session.run_pending_update if session.update_info else None)
                 if outcome == "EXIT":
                     _goodbye()
                     return
@@ -1742,136 +1903,15 @@ def _main_loop(args=None) -> None:
             query = None
             continue
 
-        # Search the provider. Multiple titles fan out across the same engines
-        # and merge (dedupe by hash, ranked like a single search), reusing the
-        # by-creator search path.
-        shown = ", ".join(queries)
-        combined = getattr(provider, "is_combined", False)
-        # The header names the provider and the search (``Provider › query``);
-        # the intro adds only what it does not say.
-        if combined:
-            # CLI -q can reach this screen before the lazy profile is loaded.
-            count = sum(p.slug in provider.selected_slugs for p in provider.children)
-            intro = ""
-            notes = [tn('{n} provider · results appear when the search finishes or after 30 seconds.',
-                '{n} providers · results appear when the search finishes or after 30 seconds.',
-                count)]
-        else:
-            intro = ""
-            notes = [escape(t(provider.search_note))] if getattr(provider, "search_note", "") else []
-            notes.append(t('30 s search limit; Enter shows the results received so far.'))
-
-        # Run the search on a worker thread so Esc can abort the wait instead of
-        # forcing the user to sit through the engine timeouts (or Ctrl+C).
-        search_result: dict = {}
-        cancel_event = threading.Event()
-        finish_event = threading.Event()
-
-        def report_progress(progress, target=search_result):
-            target["progress"] = progress
-
-        def _run_search(provider=provider, queries=queries, cli_filters=cli_filters,
-                        cancel_event=cancel_event, finish_event=finish_event,
-                        search_result=search_result, report_progress=report_progress) -> None:
-            try:
-                from torrent_finder.search_session import search_many
-                search_result["results"] = search_many(
-                    provider, queries, cli_filters, cancel_event=cancel_event,
-                    finish_event=finish_event, on_progress=report_progress,
-                )
-            except Exception as error:
-                from torrent_finder.search_errors import SearchError
-                search_result["results"] = []
-                if isinstance(error, SearchError):
-                    search_result["error"] = str(error)
-                else:
-                    search_result["error"] = t('Search could not be completed. Please try again.')
-            finally:
-                search_result["done"] = True
-
-        worker = threading.Thread(target=_run_search, daemon=True)
-        worker.start()
-        stop_listener = start_esc_listener(cancel_event, finish_event=finish_event)
-        started = time.monotonic()
-        waiting_label = t('Contacting selected providers…') if combined else t('Searching {provider}…', provider=t(provider.name))
-        title = f"{escape(t(provider.name))} › {escape(shown)}"
-        try:
-            with ProgressScreen() as screen:
-                drawn_at = 0.0
-                while True:
-                    now = time.monotonic()
-                    if now - drawn_at >= SEARCH_REDRAW_S:
-                        screen.draw(progress_frame(title, intro, notes, search_result.get("progress"),
-                                                   now - started, waiting_label, now))
-                        drawn_at = now
-                    if search_result.get("done") or cancel_event.is_set():
-                        break
-                    time.sleep(0.05)
-        except KeyboardInterrupt:
-            cancel_event.set()
-        finally:
-            stop_listener.set()
-
-        if cancel_event.is_set():
-            notice_msg = _history_notice(provider, t('[warning] Search cancelled — returning to the prompt.[/warning]\n'))
-            clear_screen()
-            query = None
-            continue
-
-        raw_results = search_result.get("results")
-        notices = list(getattr(raw_results, "notices", ()))
-        results = raw_results if raw_results is not None else []
-        provider.last_queries = queries
-        if not results and getattr(results, "session", None) is None:
-            from rich.markup import escape
-            message = search_result.get("error") or "\n".join([t('No results found.'), *notices])
-            notice_msg = _history_notice(provider, f"[warning] {escape(message)}[/warning]\n")
-            clear_screen()
-            query = None
-            continue
-
-        # Record the successful search in history + stats — each title
-        # individually so ↑/↓ recall offers them separately.
-        from torrent_finder.state import add_history_entry
-        active_preset_names = [pr.name for pr in getattr(provider, "active_presets", [])]
-        for q in queries:
-            extra = {"search_profile": provider.snapshot()} if getattr(provider, "is_combined", False) else {}
-            add_history_entry(q, provider.slug, active_preset_names, **extra)
-            record_search(provider.slug, q, active_preset_names)
-
-        # Note any searched titles that returned nothing (multi-title only). It
-        # rides above the results table (a pre-table print would be wiped by the
-        # table's own screen clear).
-        note = ""
-        if len(queries) > 1:
-            found = {q for r in results for q in r.get("matched_queries", [r.get("from_work")])}
-            missing = [q for q in queries if q not in found]
-            if missing:
-                cap = 4
-                more = t(' +{count} more', count=len(missing) - cap) if len(missing) > cap else ""
-                note = t('No torrents for {missing} of {total} titles: {titles}{more}',
-                    missing=len(missing),
-                    total=len(queries),
-                    titles=', '.join(missing[:cap]),
-                    more=more)
-        if notices:
-            note = "\n".join(filter(None, [note, *notices]))
-
-        # Results + download (shared with the by-creator flow). Esc on the
-        # results table steps back to the keyword prompt; a completed download
-        # proceeds to "what's next?".
-        frames.clear_messages()
-        if not getattr(provider, "_history_notice", ""):
-            frames.announce(tn('You find {n} result for {queries}.',
-                'You find {n} results for {queries}.',
-                len(results),
-                queries=escape(', '.join(queries))))
-        if browse_results(provider, results, note=note) == "back":
+        outcome, search_notice = _search_and_browse(provider, queries, cli_filters)
+        if search_notice is not None:
+            notice_msg = search_notice
+        if outcome == "back":
             query = None
             clear_screen()
             continue
 
-        res = _handle_whats_next(current_provider, cli_filters, run_pending_update if update_info else None)
+        res = _handle_whats_next(current_provider, cli_filters, session.run_pending_update if session.update_info else None)
         if res == "EXIT":
             _goodbye()
             break
