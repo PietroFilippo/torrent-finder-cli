@@ -135,13 +135,14 @@ class FakeManager:
             del self._jobs[job_id]
         self.bump()
 
-    def enqueue_aria2(self, title, magnet, select=None, *, source, provider_slug, method, group=None) -> Job:
+    def enqueue_aria2(self, title, magnet, select=None, *, source, provider_slug, method, group=None,
+                      folder=None) -> Job:
         self.calls.append(("enqueue", title, magnet, select, source, provider_slug, method, group))
         if self.closed:
             raise RuntimeError("The background download manager is closed.")
         if any(job.magnet == magnet and job.state in ACTIVE_STATES for job in self._jobs.values()):
             raise DuplicateDownloadError("This torrent and file selection are already downloading to this folder.")
-        job = Job(f"job{len(self._jobs) + 100}", title, source, provider_slug, method, ANIME, magnet,
+        job = Job(f"job{len(self._jobs) + 100}", title, source, provider_slug, method, folder or ANIME, magnet,
                   select=tuple(select) if select else None, group=group, log_path=LOG)
         self._jobs[job.id] = job
         self.bump()

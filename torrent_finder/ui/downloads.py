@@ -469,8 +469,9 @@ def _stop(manager, job) -> None:
 def _again(manager, job) -> None:
     """Retry a failed download or resume a stopped one: the same magnet, folder and files."""
     try:
+        # Its own folder, even after the download folder setting changed: aria2c continues the partial files there.
         manager.enqueue_aria2(job.title, job.magnet, job.select, source=job.source,
-                              provider_slug=job.provider_slug, method=job.method)
+                              provider_slug=job.provider_slug, method=job.method, folder=job.target_dir)
     except downloads.DuplicateDownloadError as error:
         _say(f"[warn]{escape(str(error))}[/warn]")
         return

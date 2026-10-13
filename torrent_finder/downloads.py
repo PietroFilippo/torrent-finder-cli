@@ -159,7 +159,9 @@ class JobManager:
                 pass  # a broken UI subscriber cannot strand downloads
 
     def enqueue_aria2(self, title: str, magnet: str, select=None, *, source: str,
-                      provider_slug: str, method: str, group: str | None = None) -> Job:
+                      provider_slug: str, method: str, group: str | None = None,
+                      folder: str | None = None) -> Job:
+        """Queue an aria2c download into *folder*, by default the download folder setting."""
         selection = tuple(select) if select is not None else None
         if selection is not None and (not selection or any(type(i) is not int or i < 1 for i in selection)):
             raise ValueError(t("Select at least one file using 1-based file indexes."))
@@ -170,7 +172,7 @@ class JobManager:
                 if self._closed:
                     raise RuntimeError(t("The background download manager is closed."))
             try:
-                folder = os.path.abspath(prepare_download_dir())
+                folder = os.path.abspath(prepare_download_dir(folder))
             except OSError as error:
                 raise OSError(t("Could not prepare the download folder: {error}", error=error)) from error
             identity = _identity(magnet, folder, selection)

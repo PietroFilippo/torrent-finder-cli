@@ -144,14 +144,14 @@ def get_download_dir() -> str:
     return DOWNLOADS_DIR
 
 
-def prepare_download_dir() -> str:
-    """Create the download folder if needed and confirm it accepts new files.
+def prepare_download_dir(directory: str | None = None) -> str:
+    """Create the download folder (or *directory*) if needed and confirm it accepts new files.
 
     Returns the folder. Raises ``OSError`` when it can't be used (e.g. a
     disconnected drive or a missing permission), so callers can say so before
     any transfer starts.
     """
-    directory = get_download_dir()
+    directory = directory or get_download_dir()
     os.makedirs(directory, exist_ok=True)
     with tempfile.TemporaryFile(dir=directory):
         pass

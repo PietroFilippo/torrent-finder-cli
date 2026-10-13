@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 import isolation  # noqa: F401  # redirects saved settings before anything reads them
 from isolation import isolate_store
-from fake_downloads import FRIEREN, GIB, FakeManager, install, sample_jobs
+from fake_downloads import FRIEREN, GIB, MOVIES, FakeManager, install, sample_jobs
 from readchar import key as K
 from rich.console import Console
 
@@ -182,6 +182,13 @@ class DownloadsUITests(unittest.TestCase):
         enqueued = [call for call in manager.calls if call[0] == "enqueue"]
         self.assertEqual(enqueued[-1][1], "One Piece 1090 (1080p)")
         self.assertIn(("remove", "job7"), manager.calls)  # the stopped row makes way for the resumed one
+
+    def test_retry_and_resume_use_the_jobs_own_folder_after_the_setting_changed(self):
+        manager = install(self, FakeManager(sample_jobs()))
+        with patch.object(downloads_ui, "arrow_select", return_value=0):
+            downloads_ui._actions(manager, manager.job("job6"))  # Retry, in Movies; the fake's default is Anime
+        retried = next(job for job in manager.snapshot() if job.title == "Blue Giant 2023 1080p")
+        self.assertEqual(retried.target_dir, MOVIES)
 
     def test_an_empty_screen_says_how_to_start(self):
         install(self, None)

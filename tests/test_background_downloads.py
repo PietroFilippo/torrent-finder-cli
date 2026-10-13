@@ -73,6 +73,14 @@ class BackgroundDownloadsTests(unittest.TestCase):
         self.workers.start()
         self.addCleanup(self.workers.stop)
 
+    def test_a_given_folder_is_used_instead_of_the_setting(self):
+        own = os.path.join(self.root.name, "own")
+        with patch("torrent_finder.downloads.prepare_download_dir",
+                   side_effect=lambda folder=None: folder or self.root.name) as prepare:
+            job = self.enqueue(folder=own)
+        prepare.assert_called_once_with(own)
+        self.assertEqual(job.target_dir, os.path.abspath(own))
+
     def enqueue(self, uri="http://local.test/file", select=None, **kwargs):
         return self.manager.enqueue_aria2("Example", uri, select, source="Nyaa",
                                           provider_slug="anime", method="aria", **kwargs)
