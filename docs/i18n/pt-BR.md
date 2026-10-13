@@ -77,7 +77,12 @@ magnet*), seeds, leechers, swarm, release. Units (GB, MB/s) stay as they are.
 - The designs **Athanor** and **Simple**; the colourways **Citrinitas,
   Rubedo, Albedo, Viriditas, Nigredo** (Latin); the Simple themes **Quiet
   Blue, Iris, Lagoon, Ember, Mono, Paper**.
-- Font names (PxPlus IBM VGA 8x16, Cascadia Mono…) and painting titles.
+- Font names (PxPlus IBM VGA 8x16, Cascadia Mono…).
+- Painting titles and the works they come from stay in English unless
+  Portuguese has an established title: *O Corvo*, *Caronte*, *A gravura de
+  Flammarion*, *O Eremita*, *Paraíso Perdido*, *Dom Quixote*, *Tarô
+  Rider–Waite*. When Portuguese editions disagree (Coleridge's *The Rime of
+  the Ancient Mariner*), keep the English.
 - Torrent Finder, torrent-finder, Windows Terminal, qBittorrent, source and
   site names (Apibay, Knaben, Nyaa, RuTracker, FitGirl…).
 - Command-line flags (`--theme`, `-t`), file names (`filter_state.json`),
