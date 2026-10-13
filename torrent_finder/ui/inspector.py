@@ -276,6 +276,15 @@ def appearance_details() -> list[Text]:
     return [heading(t("Appearance")), *_pairs(rows)]
 
 
+def language_details() -> list[Text]:
+    """What Automatic gives on this system, and each language the app speaks, in its own words."""
+    from torrent_finder import i18n
+    system = i18n.languages().get(i18n.detect(), i18n.languages()[i18n.DEFAULT])
+    rows = [(t("Automatic"), t("the system language: {language} here", language=system))]
+    rows += [(name, i18n.OWN_WORDS.get(code, "")) for code, name in i18n.languages().items()]
+    return [heading(t("Language", ctx="setting")), *_pairs(rows)]
+
+
 def command_details() -> list[Text]:
     from torrent_finder.launcher_alias import current_status
     command = current_status()

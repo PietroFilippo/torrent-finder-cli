@@ -2395,6 +2395,11 @@ def settings_menu() -> None:
                        hint=f"{palette.name} · {t(_FOCUS_LABELS[focus]).lower()} · {t(_DENSITY_LABELS[density])}",
                        description=t("Theme colours, how the focused row is marked, and spacing."),
                        inspect=inspector.appearance_details),
+            SelectItem(t("Language", ctx="setting"), "__language__", hint=_language_hint(),
+                       description=(t("The language of menus and messages. Automatic follows the Windows display "
+                                      "language.") if sys.platform == "win32" else
+                                    t("The language of menus and messages. Automatic follows the system language.")),
+                       inspect=inspector.language_details),
             SelectItem(t('Terminal command: {name}', name=command.name), "__terminal_command__",
                        hint=t("ready") if command.available else t("setup needed"),
                        description=(t("Choose a preferred quick-launch command for new terminal sessions. "
@@ -2414,11 +2419,66 @@ def settings_menu() -> None:
         action = items[index].value
         if action == "appearance":
             appearance_menu()
+        elif action == "__language__":
+            language_menu()
         elif action == "__terminal_command__":
             from torrent_finder.ui.launcher import terminal_command_prompt
             terminal_command_prompt()
         elif action == "__network_info__":
             show_security_warning(force=True)
+
+
+def _language_hint() -> str:
+    """The language in use and what chose it: ``English (system)``, ``Português (Brasil)``."""
+    from torrent_finder import i18n
+    from torrent_finder.state import load_setting
+    code = i18n.current()
+    name = i18n.languages().get(code, code)
+    source = i18n.source()
+    if source == "system" or (source == "saved" and load_setting(i18n.SETTING) == i18n.AUTO):
+        return t("{language} (system)", language=name)
+    if source == "cli":
+        return f"{name} (--lang)"
+    if source == "env":
+        return f"{name} ({i18n.ENV})"
+    return name
+
+
+def language_menu() -> None:
+    """Settings › Language: Automatic (the system's display language) or a language the app speaks.
+
+    The choice is saved and used at once; the menus a user returns to are
+    built again, so they redraw in the new language.
+    """
+    from torrent_finder import i18n, store
+    from torrent_finder.state import commit_setting, load_setting
+    windows = sys.platform == "win32"
+    system = i18n.languages().get(i18n.detect(), i18n.languages()[i18n.DEFAULT])
+    items = [SelectItem(t("Automatic (system: {language})", language=system), i18n.AUTO,
+                        hint=t("changes with Windows") if windows else t("follows the system"),
+                        description=(t("Uses the Windows display language when the app has it; English otherwise.")
+                                     if windows else
+                                     t("Uses the system language when the app has it; English otherwise.")))]
+    items += [SelectItem(name, code, hint=i18n.OWN_WORDS.get(code, ""),
+                         description=t("Keys stay the same in every language."))
+              for code, name in i18n.languages().items()]
+    items.append(SelectItem(t("Back"), None, is_action=True))
+    saved = load_setting(i18n.SETTING, None) or i18n.AUTO
+    start = next((i for i, item in enumerate(items) if item.value == saved), 0)
+    index = arrow_select(items, title=t("Settings › Language"), start_index=start,
+                         footer=t("↑/↓ navigate  •  Enter apply  •  Esc back"))
+    if index is None or items[index].value is None:
+        return
+    value, before = items[index].value, i18n.source()
+    try:
+        commit_setting(i18n.SETTING, value)
+    except (ValueError, store.SaveError) as error:
+        frames.announce(f"[warn]{escape(t('The language was not saved: {error}', error=str(error)))}[/warn]")
+    code = i18n.choose(value)
+    frames.announce(escape(t("Language: {language}.", language=i18n.languages().get(code, code))))
+    if before in ("cli", "env"):
+        frames.announce(escape(t("Saved; --lang and {variable} still choose the language at startup.",
+                                 variable=i18n.ENV)))
 
 
 def provider_select_prompt(

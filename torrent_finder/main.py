@@ -1150,6 +1150,20 @@ def _apply_language(args) -> str:
     return i18n.apply_startup(getattr(args, "lang", None), saved=saved)
 
 
+def _offer_language_once() -> None:
+    """Windows in English with a Brazilian region: say once, in Portuguese, where the language is chosen."""
+    from torrent_finder import i18n
+    from torrent_finder.state import load_setting, save_setting
+    from torrent_finder.ui import chrome as frames
+    try:
+        suggested = i18n.suggestion()
+        if suggested in i18n.SUGGESTION_HINTS and not load_setting(i18n.HINT_SETTING, False):
+            frames.announce(markup_escape(i18n.SUGGESTION_HINTS[suggested]))
+            save_setting(i18n.HINT_SETTING, True)
+    except Exception:  # a hint must never stop the app from starting
+        pass
+
+
 def _apply_appearance(args) -> str:
     """Apply the theme before the first frame; returns a notice for the main menu.
 
@@ -1268,6 +1282,7 @@ def _main_loop(args=None) -> None:
         frames.announce(escape(update_report.splitlines()[0]))
     if theme_notice:
         frames.announce(f"[warn]{markup_escape(theme_notice)}[/warn]")
+    _offer_language_once()
 
     def poll_update():
         nonlocal update_info, update_msg, update_loaded

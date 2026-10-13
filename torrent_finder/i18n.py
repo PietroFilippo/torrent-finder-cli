@@ -363,6 +363,21 @@ def source() -> str:
     return _session["source"]
 
 
+def choose(value: str) -> str:
+    """Speak *value* (``auto`` or a code) from now on as the user's saved choice; returns the code in use."""
+    code = use(value)
+    _session["source"] = "saved"
+    return code
+
+
+# Offered once at startup, in the language it offers (the user may not read the current one's
+# word for "Language"), when Windows speaks English but the regional format is one the app has.
+SUGGESTION_HINTS = {"pt-BR": "Prefere português? Configurações › Idioma"}
+HINT_SETTING = "language_hint_shown"
+# Each language described in its own words, for the Language menu.
+OWN_WORDS = {"en": "menus and messages in English", "pt-BR": "menus e mensagens em português"}
+
+
 def suggestion(region: str | None = None) -> str | None:
     """The language a one-time hint may offer at startup, or None.
 

@@ -1,0 +1,19 @@
+{
+  "Automatic": "Automático",
+  "the system language: {language} here": "o idioma do sistema: {language} aqui",
+  "setting::Language": "Idioma · Language",
+  "The language of menus and messages. Automatic follows the Windows display language.": "O idioma dos menus e mensagens. Automático segue o idioma de exibição do Windows.",
+  "The language of menus and messages. Automatic follows the system language.": "O idioma dos menus e mensagens. Automático segue o idioma do sistema.",
+  "{language} (system)": "{language} · sistema",
+  "Automatic (system: {language})": "Automático (sistema: {language})",
+  "changes with Windows": "muda com o Windows",
+  "follows the system": "segue o sistema",
+  "Uses the Windows display language when the app has it; English otherwise.": "Usa o idioma de exibição do Windows quando o app o tem; senão, inglês.",
+  "Uses the system language when the app has it; English otherwise.": "Usa o idioma do sistema quando o app o tem; senão, inglês.",
+  "Keys stay the same in every language.": "As teclas são as mesmas em todos os idiomas.",
+  "Settings › Language": "Configurações › Idioma",
+  "↑/↓ navigate  •  Enter apply  •  Esc back": "↑/↓ navegar  •  Enter aplicar  •  Esc voltar",
+  "The language was not saved: {error}": "O idioma não foi salvo: {error}",
+  "Language: {language}.": "Idioma: {language}.",
+  "Saved; --lang and {variable} still choose the language at startup.": "Salvo; --lang e {variable} ainda escolhem o idioma ao iniciar."
+}

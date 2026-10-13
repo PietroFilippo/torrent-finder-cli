@@ -217,7 +217,7 @@ class HomeTests(unittest.TestCase):
         with patch.object(prompts, "arrow_select", side_effect=lambda items, **kw: captured.append(items)):
             prompts.settings_menu()
         values = [item.value for item in captured[0]]
-        self.assertEqual(values, ["appearance", "__terminal_command__", "__network_info__", None])
+        self.assertEqual(values, ["appearance", "__language__", "__terminal_command__", "__network_info__", None])
         self.assertIn("Quiet Blue", captured[0][0].hint)
 
 
