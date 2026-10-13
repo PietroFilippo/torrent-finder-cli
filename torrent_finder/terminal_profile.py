@@ -482,4 +482,16 @@ def remove(environ=None) -> None:
     if target.exists() and _package_family():
         subprocess.run(["cmd", "/d", "/c", "rmdir", "/s", "/q", str(target)], capture_output=True, check=False)
     if target.exists():
-        shutil.rmtree(target)
+        _remove_tree(target)
+
+
+def _remove_tree(target: Path) -> None:
+    """Delete *target*; a file that went away meanwhile (a finished rename, a virus scan) is fine."""
+    def gone(error: BaseException) -> None:
+        if not isinstance(error, FileNotFoundError):
+            raise error
+
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(target, onexc=lambda _function, _path, error: gone(error))
+    else:
+        shutil.rmtree(target, onerror=lambda _function, _path, info: gone(info[1]))
