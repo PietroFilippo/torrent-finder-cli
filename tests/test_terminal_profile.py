@@ -80,6 +80,19 @@ class FragmentTests(ProfileCase):
         self.assertIn("torrent_finder", profile["commandline"] + profile.get("startingDirectory", ""))
         self.assertTrue(terminal_profile.installed())
 
+    def test_the_picture_follows_the_painting_side(self):
+        palette = theme.THEMES["citrinitas"]
+        for placement, stretch, alignment in (("right", "uniform", "right"), ("left", "uniform", "left"),
+                                              ("facing", "uniformToFill", "center")):
+            with self.subTest(placement=placement):
+                terminal_profile.write(palette, "flammarion", placement=placement)
+                profile = self.fragment()["profiles"][0]
+                self.assertEqual((profile["backgroundImageStretchMode"], profile["backgroundImageAlignment"]),
+                                 (stretch, alignment))
+        self.assertEqual(self.pictures(), ["torrent-finder-flammarion+smith-hermit-citrinitas.png"])  # the spread
+        terminal_profile.write(palette, "flammarion", placement="left")
+        self.assertEqual(self.pictures(), ["torrent-finder-flammarion-citrinitas.png"])
+
     def test_every_scheme_is_complete_in_hex(self):
         for palette in theme.THEMES.values():
             with self.subTest(palette=palette.key):
@@ -362,6 +375,10 @@ class AppearanceRowTests(ProfileCase):
         self.assertEqual(self.fragment()["schemes"][0]["name"], "torrent-finder Viriditas")
         self.run_menu(("painting", "smith-hermit"))
         self.assertEqual(self.pictures(), ["torrent-finder-smith-hermit-viriditas.png"])
+        self.run_menu(("placement", "left"))
+        self.assertEqual(self.fragment()["profiles"][0]["backgroundImageAlignment"], "left")
+        self.run_menu(("placement", "facing"))
+        self.assertEqual(self.pictures(), ["torrent-finder-smith-hermit+flammarion-viriditas.png"])
 
         self.run_menu(("profile", "remove"))
         self.assertFalse(terminal_profile.installed())

@@ -247,7 +247,9 @@ def appearance_details() -> list[Text]:
              pair("Design", f"{theme.DESIGNS[palette.design].name} · {palette.name}")]
     if palette.design == "athanor":
         shown = paintings.catalog().get(appearance.painting())
-        lines.append(pair("Painting", shown.title if shown else "none"))
+        side = appearance.placement()
+        where = "" if side == "right" or not shown else f" · {paintings.PLACEMENTS[side].lower()}"
+        lines.append(pair("Painting", (shown.title if shown else "none") + where))
     lines += [pair("Focus", theme.FOCUS_STYLES[focus]), pair("Density", theme.DENSITIES[density])]
     if terminal_profile.supported():
         plain = appearance.profile_look(palette.design) == "plain"

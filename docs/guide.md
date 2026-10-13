@@ -835,6 +835,9 @@ apps, so:
   restart. Athanor's profile has a **full look** (page, painting, pixel font) or
   a **plain look** (Windows Terminal's own page and font). Removing the profile
   deletes its folder; the fonts stay installed.
+- **Painting side** puts the painting on the right (the default, like the plate
+  facing a page of text), on the left (behind the menus) or on both sides (the
+  chosen plate on the right and a faded companion plate on the left).
 - **Open from other tabs** (off by default) makes the command, typed in another
   Windows Terminal tab, open the app in a torrent-finder tab of the same window,
   because a program cannot change the picture or font of the tab it runs in.

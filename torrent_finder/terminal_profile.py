@@ -301,12 +301,20 @@ def _number(value: float) -> "int | float":
     return int(value) if float(value).is_integer() else round(value, 2)
 
 
+# How Windows Terminal places the picture for each painting placement (stretch mode, alignment).
+_PICTURE_PLACEMENT = {"right": ("uniform", "right"), "left": ("uniform", "left"),
+                      "facing": ("uniformToFill", "center")}
+
+
 def fragment(palette, image: "Path | None", font: "Font | None", launch: list[str], starting: str,
-             size: "float | None" = None, *, plain: bool = False) -> dict:
+             size: "float | None" = None, *, plain: bool = False,
+             placement: str = paintings.DEFAULT_PLACEMENT) -> dict:
     """The fragment: one profile and its colour scheme; *font* at *size* when Windows has it.
 
     A *plain* profile keeps Windows Terminal's own page and font: no scheme,
-    picture or font, as the app looks in any other tab.
+    picture or font, as the app looks in any other tab. *placement* says
+    where the picture goes: fitted to the right or the left of the window, or
+    (a spread of two plates) covering it.
     """
     colours = scheme(palette)
     profile = {
@@ -322,8 +330,9 @@ def fragment(palette, image: "Path | None", font: "Font | None", launch: list[st
         return {"profiles": [profile], "schemes": []}
     if image:
         # A bare file name: Windows Terminal looks for it beside the fragment.
-        profile.update(backgroundImage=image.name, backgroundImageStretchMode="uniform",
-                       backgroundImageAlignment="right", backgroundImageOpacity=1.0)
+        stretch, alignment = _PICTURE_PLACEMENT.get(placement, _PICTURE_PLACEMENT["right"])
+        profile.update(backgroundImage=image.name, backgroundImageStretchMode=stretch,
+                       backgroundImageAlignment=alignment, backgroundImageOpacity=1.0)
     if font:
         profile["font"] = {"face": font.face, "size": _number(font.points(size))}
         if font.pixel:
@@ -397,13 +406,13 @@ def install_fonts(environ=None) -> list[Font]:
 
 
 def write(palette, painting: str, environ=None, *, font: "Font | None" = None, size: "float | None" = None,
-          add_font: bool = False, plain: bool = False) -> Path:
+          add_font: bool = False, plain: bool = False, placement: str = paintings.DEFAULT_PLACEMENT) -> Path:
     """Write (or rewrite) the profile for *palette*, *painting* and *font* at *size*; returns the fragment's path.
 
-    The painting shows only with an Athanor colourway; *font* defaults to the
-    design's own. With *add_font* the bundled fonts Windows lacks are
-    installed first. A font Windows does not have is left out, so the
-    profile keeps Windows Terminal's.
+    The painting shows only with an Athanor colourway, at *placement* (see
+    ``paintings.PLACEMENTS``); *font* defaults to the design's own. With
+    *add_font* the bundled fonts Windows lacks are installed first. A font
+    Windows does not have is left out, so the profile keeps Windows Terminal's.
     """
     target = folder(environ)
     _drop_private_copy(target, environ)
@@ -413,10 +422,11 @@ def write(palette, painting: str, environ=None, *, font: "Font | None" = None, s
     font = font or default_font(palette.design)
     image = None
     if palette.design == "athanor" and painting in paintings.catalog() and not plain:
-        image = paintings.export(painting, palette, target)
+        image = paintings.export(painting, palette, target, placement=placement)
     launch = command()
     starting = str(Path(__file__).resolve().parent.parent) if launch[1:2] == ["-m"] else "%USERPROFILE%"
-    data = fragment(palette, image, font if font_installed(font) else None, launch, starting, size, plain=plain)
+    data = fragment(palette, image, font if font_installed(font) else None, launch, starting, size, plain=plain,
+                    placement=placement)
     path = fragment_path(environ)
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")

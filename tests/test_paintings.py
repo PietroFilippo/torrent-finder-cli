@@ -87,6 +87,43 @@ class PngTests(unittest.TestCase):
             self.assertTrue(path.read_bytes().startswith(b"\x89PNG"))
             self.assertEqual(list(path.parent.iterdir()), [path])  # no temporary file left behind
 
+    def test_a_spread_puts_the_faded_companion_left_and_the_plate_right(self):
+        palette = theme.THEMES["citrinitas"]
+        with patch.object(paintings, "bitmap", side_effect=lambda key: {
+                "a": (2, 2, [bytes([0b11000000])] * 2), "b": (1, 2, [bytes([0b10000000])] * 2)}[key]):
+            blob = paintings.spread("b", "a", palette.ink, palette.page, factor=1, aspect=3)
+        found = chunks(blob)
+        self.assertEqual(struct.unpack(">IIBB", found[b"IHDR"][:10]), (6, 2, 2, 3))  # 2-bit, palette, 3:1
+        faint = paintings.faint(palette.ink, palette.page)
+        self.assertEqual(found[b"PLTE"].hex(), (palette.page[1:] + palette.ink[1:] + faint[1:]).lower())
+        rows = zlib.decompress(found[b"IDAT"])
+        # Each row: a filter byte, then 6 pixels of 2 bits: companion (2) twice, page (0) three times, plate (1).
+        self.assertEqual(rows, bytes([0, 0b10100000, 0b00010000]) * 2)
+        self.assertEqual(paintings.faint("#3A3026", "#16120E", 1), "#3A3026")
+        self.assertEqual(paintings.faint("#3A3026", "#16120E", 0), "#16120E")
+
+    def test_the_facing_placement_exports_the_spread_under_its_own_name(self):
+        palette = theme.THEMES["citrinitas"]
+        with tempfile.TemporaryDirectory() as folder:
+            path = paintings.export("flammarion", palette, folder, placement="facing")
+            self.assertEqual(path.name, "torrent-finder-flammarion+smith-hermit-citrinitas.png")
+            width, height = struct.unpack(">II", chunks(path.read_bytes())[b"IHDR"][:8])
+            self.assertEqual(width, round(height * paintings.SPREAD_ASPECT))
+            # Left and right share one picture: only the terminal's alignment differs.
+            self.assertEqual(paintings.export("flammarion", palette, folder, placement="left").name,
+                             "torrent-finder-flammarion-citrinitas.png")
+
+    def test_placements_and_companions(self):
+        self.assertEqual(list(paintings.PLACEMENTS), ["right", "left", "facing"])
+        self.assertEqual(paintings.placement_key("left"), "left")
+        self.assertIsNone(paintings.placement_key("middle"))
+        for key in paintings.catalog():
+            with self.subTest(key=key):
+                companion = paintings.facing(key)
+                self.assertIn(companion, paintings.catalog())
+                self.assertNotEqual(companion, key)
+                self.assertEqual(paintings.facing(companion), key)  # pairs face each other
+
 
 class PaintingChoiceTests(unittest.TestCase):
     def setUp(self):
@@ -142,10 +179,32 @@ class PaintingChoiceTests(unittest.TestCase):
         self.assertEqual([p.name for p in folder.iterdir()], ["torrent-finder-dore-satan-citrinitas.png"])
         self.assertIsNone(state.load_setting(appearance.SETTING))  # saving an image changes no setting
 
+    def test_the_painting_side_is_chosen_beside_the_painting(self):
+        items = self.capture()
+        labels = [item.label for item in items]
+        self.assertLess(labels.index("─── Painting ───"), labels.index("─── Painting side ───"))
+        self.assertLess(labels.index("─── Painting side ───"), labels.index("─── Font ───") if "─── Font ───" in labels
+                        else labels.index("─── Focus ───"))
+        rows = [item for item in items if isinstance(item.value, tuple) and item.value[0] == "placement"]
+        self.assertEqual([(row.label, row.value[1]) for row in rows],
+                         [("Right", "right"), ("Left", "left"), ("Both sides", "facing")])
+        self.assertEqual([row.marker for row in rows], ["●", "○", "○"])  # right is the default
+        self.assertIn("Satan's despair", rows[2].description)  # the default painting's companion
+        self.run_menu(self.downs_to(("placement", "facing")) + [K.ENTER, K.ESC])
+        self.assertEqual(appearance.placement(), "facing")
+        self.assertEqual(appearance.saved()["placement"], "facing")
+        appearance.save("rubedo", "bar", "comfortable")  # a colour change keeps the side
+        self.assertEqual(appearance.saved()["placement"], "facing")
+        self.run_menu(self.downs_to(("painting", "none")) + [K.ENTER, K.ESC])
+        self.assertNotIn("─── Painting side ───", [item.label for item in self.capture()])  # no painting, no side
+
     def test_settings_validate_and_back_up_the_painting(self):
         self.assertEqual(appearance.normalize({"painting": "none"})["painting"], "none")
         self.assertEqual(appearance.normalize({"painting": "mona-lisa"})["painting"], paintings.DEFAULT)
-        settings_backup.validate_payload({"settings": {"appearance": {"theme": "rubedo", "painting": "flammarion"}}})
+        self.assertEqual(appearance.normalize({"placement": "left"})["placement"], "left")
+        self.assertEqual(appearance.normalize({"placement": "top"})["placement"], "right")
+        settings_backup.validate_payload({"settings": {"appearance": {"theme": "rubedo", "painting": "flammarion",
+                                                                      "placement": "facing"}}})
         with self.assertRaises(ValueError):
             settings_backup.validate_payload({"settings": {"appearance": {"painting": 7}}})
 

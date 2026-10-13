@@ -372,7 +372,7 @@ def credentials_menu() -> None:
             banner=_make_banner_panel(),
             footer=(
                 (escape(problem) + "\n" if problem else "")
-                + t("Stored in plaintext in subtitle_credentials.json; environment variables override it.")
+                + t("Stored in plaintext in subtitle_credentials.json; env vars override it.")
             ),
             start_index=1,
         )

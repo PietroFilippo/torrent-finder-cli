@@ -72,8 +72,8 @@ def _validate_appearance(value):
     from torrent_finder import terminal_profile
     from torrent_finder.ui import appearance, theme
 
-    _object(value, {"theme", "focus", "density", "painting", "fonts", "profile"})
-    for key in ("theme", "focus", "density", "painting"):
+    _object(value, {"theme", "focus", "density", "painting", "placement", "fonts", "profile"})
+    for key in ("theme", "focus", "density", "painting", "placement"):
         if key in value and not isinstance(value[key], str):
             raise ValueError(t("Invalid appearance settings"))
     fonts = value.get("fonts", {})

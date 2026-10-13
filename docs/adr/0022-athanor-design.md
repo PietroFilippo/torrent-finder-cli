@@ -91,6 +91,21 @@ Painting for the Athanor design.
   it ran was loaded without a restart.)
 - The profile's font and text size are chosen per design
   ([ADR-0026](0026-profile-fonts.md)); the VGA font at 12 pt is Athanor's default.
+- *Added 2026-10-13: the painting's side.* Settings › Appearance › Painting
+  side (saved as `appearance.placement`) puts the picture on the **right**
+  (the default: fitted to the window's height and right-aligned, like the
+  plate facing a page of text, so menus keep a plain page), on the **left**
+  (behind the menus; the ink is dark enough to read through) or on **both
+  sides**: one picture holding the chosen plate on the right and its
+  companion plate, faded toward the page, on the left, with the page between
+  them, 1.9 times wider than tall and set to cover the window centred, so
+  each plate stays at its edge and windows of other proportions lose a little
+  of each. Companions are fixed pairs from the same book or mood
+  (`paintings.FACING`). The spread is a 2-bit palette PNG (page, ink, faded
+  ink) written with the same codec. Rejected: a faint watermark or one plate
+  stretched across the window (`uniformToFill` cuts more than half of the tall
+  Doré plates on a 16:9 window and turns the engraving into texture), and the
+  plate mirrored on the other side (a butterfly, not a book).
 - Elsewhere, "Save the painting as an image" writes the PNG in the colours on
   screen to `~/Pictures/torrent-finder`, for the terminal's own background
   setting.
