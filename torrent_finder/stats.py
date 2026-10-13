@@ -7,6 +7,7 @@ overwriting the other. Timestamps are taken once, outside the operation.
 """
 
 from datetime import datetime, timezone
+import math
 
 from torrent_finder import store
 
@@ -23,8 +24,8 @@ def _record(change) -> None:
     store.update(lambda data: change(store.section(data, _STATS_KEY)))
 
 
-def _bump(stats: dict, *path: str, by: int = 1) -> None:
-    """Increment an int at stats[path[0]][path[1]]...[path[-1]] by `by`.
+def _bump(stats: dict, *path: str, by: int | float = 1) -> None:
+    """Increment an integer counter, or a finite numeric runtime total, by `by`.
     A part of the path that isn't the expected kind (a hand-edited file) is reset."""
     d = stats
     for k in path[:-1]:
@@ -32,7 +33,10 @@ def _bump(stats: dict, *path: str, by: int = 1) -> None:
             d[k] = {}
         d = d[k]
     current = d.get(path[-1], 0)
-    d[path[-1]] = (current if isinstance(current, int) and not isinstance(current, bool) else 0) + by
+    valid = isinstance(current, int) and not isinstance(current, bool)
+    if path == ("total_runtime_s",) and isinstance(current, float):
+        valid = math.isfinite(current)
+    d[path[-1]] = (current if valid else 0) + by
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +107,7 @@ def record_episode_picker_used() -> None:
 
 
 def add_runtime_seconds(seconds: float) -> None:
-    if seconds <= 0:
+    if isinstance(seconds, bool) or not math.isfinite(seconds) or seconds <= 0:
         return
     _record(lambda stats: _bump(stats, "total_runtime_s", by=float(seconds)))
 
