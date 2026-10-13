@@ -179,5 +179,6 @@
   "Wipes every counter (asks for confirmation)": "Zera todos os contadores (pede confirmação)",
   "Write saved passwords/API keys to a separate plaintext file?": "Gravar senhas/chaves de API salvas em um arquivo separado de texto simples?",
   "Writer": "Roteirista",
-  "Wrong backup type or unsupported version": "Tipo de backup incorreto ou versão incompatível"
+  "Wrong backup type or unsupported version": "Tipo de backup incorreto ou versão incompatível",
+  "Invalid background download preference": "Preferência de download em segundo plano inválida"
 }

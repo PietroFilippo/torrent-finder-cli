@@ -74,6 +74,15 @@ class BackupTests(IsolatedState):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 backup.validate_payload({"settings": {"language": value}})
 
+    def test_the_background_download_setting_travels_and_must_be_true_or_false(self):
+        state.save_setting("background_downloads", True)
+        target = self.root / "background.json"
+        backup.export_settings(target)
+        self.assertIs(backup.read_backup(target)["settings"]["background_downloads"], True)
+        backup.validate_payload({"settings": {"background_downloads": False}})
+        with self.assertRaises(ValueError):
+            backup.validate_payload({"settings": {"background_downloads": "yes"}})
+
     def test_replace_without_appearance_keeps_local_terminal_profile(self):
         local = {"look": "plain", "open_from_tabs": True}
         appearance.save("rubedo", "bar", "compact", profile=local)
