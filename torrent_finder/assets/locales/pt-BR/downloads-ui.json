@@ -57,7 +57,7 @@
   "The log is empty.": "O log está vazio.",
   "Downloads › Log": "Downloads › Log",
   "Stop": "Parar",
-  "aria2c keeps the partial files; Resume picks them up later.": "aria2c mantém os arquivos parciais; Retomar continua deles depois.",
+  "aria2c keeps the partial files; Resume picks them up later.": "aria2c mantém os arquivos parciais; Retomar continua de onde parou.",
   "Resume": "Retomar",
   "Downloads the same files to the same folder; aria2c continues from the partial files.": "Baixa os mesmos arquivos na mesma pasta; aria2c continua dos arquivos parciais.",
   "Retry": "Tentar de novo",

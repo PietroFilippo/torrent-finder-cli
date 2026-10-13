@@ -87,7 +87,7 @@
   },
   "[success]Saved. Next stream will use[/success] [highlight]{name}[/highlight] [success]as the subtitle source.[/success]": "[success]Salvo. A próxima transmissão usará[/success] [highlight]{name}[/highlight] [success]como fonte de legendas.[/success]",
   "[success]Saved[/success] [highlight]{name}[/highlight][success].[/success]": "[success]Salvo[/success] [highlight]{name}[/highlight][success].[/success]",
-  "Saved listing; current availability is unverified. i: metadata details": "Lista salva; disponibilidade atual não verificada. i: detalhes dos metadados",
+  "Saved listing; current availability is unverified. i: metadata details": "Resultado salvo; disponibilidade atual não verificada. i: detalhes dos metadados",
   "Searching saved names…": "Buscando nomes salvos…",
   "Saved search failed. Try again later.": "A busca salva falhou. Tente mais tarde.",
   "Alternate titles": "Títulos alternativos",

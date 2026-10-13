@@ -49,8 +49,8 @@
   "Ranked: {reason}": "Classificação: {reason}",
   "i close • {scroll} scroll details • b bookmark • Esc back": "i fechar • {scroll} rolar detalhes • b favoritar • Esc voltar",
   "Enter download {n} selected": {
-    "one": "Enter baixar {n} marcado",
-    "other": "Enter baixar {n} marcados"
+    "one": "Enter baixar {n} selecionado",
+    "other": "Enter baixar {n} selecionados"
   },
   "Enter open": "Enter abrir",
   "↑/↓ navigate • Space select • {enter} • i details • f refine/sort • b bookmark": "↑/↓ navegar • Space selecionar • {enter} • i detalhes • f filtrar/ordenar • b favoritar",
@@ -62,7 +62,7 @@
   "jump to a result number": "ir ao número de um resultado",
   "first / last result": "primeiro / último resultado",
   "move a page of rows": "mover uma página de linhas",
-  "download the picked results": "baixar os resultados marcados",
+  "download the picked results": "baixar os resultados selecionados",
   "search notices and diagnostics": "avisos e diagnósticos da busca",
   "retry failed sources": "repetir fontes com falha",
   "load more results": "carregar mais resultados",

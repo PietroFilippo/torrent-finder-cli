@@ -1318,7 +1318,7 @@ def download_dir_prompt() -> None:
         SelectItem(
             label=t('Default ({value}/)', value=os.path.basename(DOWNLOADS_DIR)),
             value="__default__",
-            description=t("Save into the project's downloads/ folder.\nPath: {value}", value=escape(DOWNLOADS_DIR)),
+            description=t("Save into the downloads folder in the app's user data directory.\nPath: {value}", value=escape(DOWNLOADS_DIR)),
         ),
         SelectItem(
             label="~/Downloads",
@@ -1860,7 +1860,7 @@ def download_method_prompt(
         value="set_download_dir",
         is_action=True,
         description=(
-            t("Choose where non-magnet downloads + subtitles save to. Default: the project's downloads/ folder.\nCurrent: {value}", value=escape(_dl_dir))
+            t("Choose where to save downloads made by the app and subtitles. Default: the downloads folder in the app's user data directory.\nCurrent: {value}", value=escape(_dl_dir))
         ),
     ))
 
