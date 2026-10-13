@@ -65,6 +65,7 @@ class NoticeLineTests(unittest.TestCase):
         theme.apply("quiet")
         self.assertTrue(chrome.shows_message(80, 24))
         self.assertTrue(chrome.shows_message(40, 12))
+        self.assertFalse(chrome.shows_message(20, 5))  # only "Enlarge the window" fits: the message waits
         theme.apply("citrinitas")
         self.assertTrue(chrome.shows_message(80, 24))
         self.assertFalse(chrome.shows_message(80, 20))  # no bars: the message waits for a screen with them

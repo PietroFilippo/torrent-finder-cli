@@ -188,9 +188,10 @@ def shows_message(width: int, height: int) -> bool:
     """True when a screen this size has a place for an announcement.
 
     Athanor shows it on the message line, so a framed window needs its bars;
-    Simple shows it on a notice line above the key bar at any size.
+    Simple shows it on a notice line above the key bar at any usable size. A
+    window too small for any screen shows neither: the message waits.
     """
-    return theme.bars(width, height) or not theme.FRAMED
+    return not too_small(width, height) and (theme.bars(width, height) or not theme.FRAMED)
 
 
 def notice_line(message: "str | Text", width: int) -> Text:
