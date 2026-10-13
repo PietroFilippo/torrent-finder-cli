@@ -27,6 +27,7 @@ from torrent_finder.i18n import N_, current, t, tn
 from torrent_finder.providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
 from torrent_finder.ui import chrome as frames, display, inspector, theme
 from torrent_finder.ui.selector import SelectItem, arrow_select
+from torrent_finder.ui.selection import MultiSelection, SelectionPolicy
 
 @dataclass
 class QuitGuard:
@@ -910,97 +911,41 @@ def filter_menu(provider, on_save=None) -> None:
     # All toggleable rows (engines + presets)
     toggle_indexes = engine_indices + preset_indices
 
-    # Anchor state for range-toggle (v/V)
-    anchor = {"idx": None}
+    def _is_active(index, item):
+        return (item.toggle_state == "On" if index in engine_indices
+                else item.toggle_state != "Off")
 
-    def _toggle_set() -> set[int]:
-        return set(toggle_indexes)
+    def _set_active(index, item, active):
+        if item.toggle_states:
+            item.toggle_state = ("On" if index in engine_indices else "Require") if active else "Off"  # i18n: ignore — toggle identity
+        else:
+            item.toggled = active
 
-    def _is_active(index, rows):
-        return (rows[index].toggle_state == "On" if index in engine_indices
-                else rows[index].toggle_state != "Off")
+    def _clear_item(index, item):
+        # Clear preset toggles only — leave engine toggles alone, including Auto.
+        if index in preset_indices:
+            item.toggle_state = "Off"  # i18n: ignore — toggle identity
 
-    def _select_all(cursor, items_list):
-        for i in toggle_indexes:
-            if items_list[i].enabled:
-                if items_list[i].toggle_states:
-                    items_list[i].toggle_state = "On" if i in engine_indices else "Require"  # i18n: ignore — toggle identity
-                else:
-                    items_list[i].toggled = True
-        return True
+    def _invert_item(index, item):
+        if item.toggle_states:
+            _set_active(index, item, not _is_active(index, item))
+        else:
+            item.toggled = not item.toggled
 
-    def _invert(cursor, items_list):
-        for i in toggle_indexes:
-            if items_list[i].enabled:
-                if items_list[i].toggle_states:
-                    items_list[i].toggle_state = (
-                        "Off"  # i18n: ignore — toggle identity
-                        if _is_active(i, items_list)
-                        else "On" if i in engine_indices else "Require"  # i18n: ignore — toggle identity
-                    )
-                else:
-                    items_list[i].toggled = not items_list[i].toggled
-        return True
-
-    def _clear(cursor, items_list):
-        # Clear preset toggles only — leave engine toggles alone
-        for pi in preset_indices:
-            items_list[pi].toggle_state = "Off"  # i18n: ignore — toggle identity
-        return True
-
-    def _confirm_now(cursor, items_list):
-        return confirm_idx
-
-    def _set_anchor(cursor, items_list):
-        t_set = _toggle_set()
-        if cursor not in t_set:
-            return True
-        if anchor["idx"] is not None and 0 <= anchor["idx"] < len(items_list):
-            items_list[anchor["idx"]].marker = ""
-        anchor["idx"] = cursor
-        items_list[cursor].marker = theme.MARKER
-        return True
-
-    def _range_toggle(cursor, items_list):
-        if anchor["idx"] is None:
-            return _set_anchor(cursor, items_list)
-        t_set = _toggle_set()
-        lo, hi = sorted([anchor["idx"], cursor])
-        anchor_now = _is_active(anchor["idx"], items_list)
-        target = not anchor_now
-        for i in range(lo, hi + 1):
-            if i in t_set and items_list[i].enabled:
-                if items_list[i].toggle_states:
-                    items_list[i].toggle_state = ("On" if i in engine_indices else "Require") if target else "Off"  # i18n: ignore — toggle identity
-                else:
-                    items_list[i].toggled = target
-        items_list[anchor["idx"]].marker = ""
-        anchor["idx"] = None
-        return True
-
-    def _toggle_current(cursor, items_list):
-        if cursor in _toggle_set() and items_list[cursor].enabled:
-            items_list[cursor].cycle_toggle()
-        return True
+    selection = MultiSelection(toggle_indexes, confirm_idx, SelectionPolicy(
+        is_active=_is_active,
+        set_active=_set_active,
+        invert=_invert_item,
+        toggle=lambda index, item: item.cycle_toggle(),
+        clear=_clear_item,
+    ))
 
     def handle_filter_action(idx, items):
         if items[idx].value == "clear":
-            return _clear(idx, items)
+            return selection.clear(idx, items)
         return False  # Exit for Confirm / Go Back
 
-    key_actions = {
-        "a": _select_all,
-        "A": _select_all,
-        "i": _invert,
-        "I": _invert,
-        "c": _clear,
-        "C": _clear,
-        "w": _confirm_now,
-        "W": _confirm_now,
-        "v": _set_anchor,
-        "V": _range_toggle,
-        " ": _toggle_current,
-    }
+    key_actions = selection.key_actions
 
     # Start cursor on first enabled item (skip header)
     start = 1 if has_engines else 0
@@ -1146,88 +1091,25 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
     # Index of the Confirm action — returned when `w` is pressed
     confirm_idx = len(items) - 2
 
-    # Anchor state for range-toggle (v/V)
-    anchor = {"idx": None}
-
-    def _file_item_set() -> set[int]:
-        return set(file_item_indexes)
-
-    def _select_all(cursor, items):
-        for i in file_item_indexes:
-            if items[i].enabled:
-                items[i].toggled = True
-        return True
-
-    def _invert(cursor, items):
-        for i in file_item_indexes:
-            if items[i].enabled:
-                items[i].toggled = not items[i].toggled
-        return True
-
-    def _clear(cursor, items):
-        for i in file_item_indexes:
-            items[i].toggled = False
-        return True
-
-    def _confirm_now(cursor, items):
-        return confirm_idx
-
-    def _set_anchor(cursor, items):
-        file_set = _file_item_set()
-        if cursor not in file_set:
-            return True  # ignore on non-file rows
-        # Clear any previous anchor marker
-        if anchor["idx"] is not None and 0 <= anchor["idx"] < len(items):
-            items[anchor["idx"]].marker = ""
-        anchor["idx"] = cursor
-        items[cursor].marker = theme.MARKER
-        return True
-
-    def _range_toggle(cursor, items):
-        if anchor["idx"] is None:
-            # No anchor yet — treat as anchor set
-            return _set_anchor(cursor, items)
-        file_set = _file_item_set()
-        lo, hi = sorted([anchor["idx"], cursor])
-        # Derive target toggle state from anchor row (flip it for the whole range)
-        anchor_now = items[anchor["idx"]].toggled
-        target = not anchor_now
-        for i in range(lo, hi + 1):
-            if i in file_set and items[i].enabled:
-                items[i].toggled = target
-        # Clear anchor after range apply
-        items[anchor["idx"]].marker = ""
-        anchor["idx"] = None
-        return True
-
-    def _toggle_current(cursor, items):
-        if cursor in _file_item_set() and items[cursor].enabled:
-            items[cursor].toggled = not items[cursor].toggled
-        return True
+    selection = MultiSelection(file_item_indexes, confirm_idx, SelectionPolicy(
+        is_active=lambda index, item: item.toggled,
+        set_active=lambda index, item, active: setattr(item, "toggled", active),
+        invert=lambda index, item: setattr(item, "toggled", not item.toggled),
+        toggle=lambda index, item: setattr(item, "toggled", not item.toggled),
+        clear=lambda index, item: setattr(item, "toggled", False),
+    ))
 
     def on_action(idx, items):
         val = items[idx].value
         if val == "all":
-            return _select_all(idx, items)
+            return selection.select_all(idx, items)
         if val == "invert":
-            return _invert(idx, items)
+            return selection.invert(idx, items)
         if val == "clear":
-            return _clear(idx, items)
+            return selection.clear(idx, items)
         return False
 
-    key_actions = {
-        "a": _select_all,
-        "A": _select_all,
-        "i": _invert,
-        "I": _invert,
-        "c": _clear,
-        "C": _clear,
-        "w": _confirm_now,
-        "W": _confirm_now,
-        "v": _set_anchor,
-        "V": _range_toggle,
-        " ": _toggle_current,
-    }
+    key_actions = selection.key_actions
 
     result = arrow_select(
         items,
