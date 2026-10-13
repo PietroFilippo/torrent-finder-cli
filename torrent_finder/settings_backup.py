@@ -6,13 +6,14 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
-from torrent_finder import store
+from torrent_finder import i18n, store
 from torrent_finder.name_rules import NameRules
 from torrent_finder.result_view import SORT_ORDERS
 from torrent_finder.search_profiles import ProfileLibrary
 from torrent_finder.state import compact_history, load_history
 
-PREFERENCES = {"download_dir", "hide_stream_output", "search_profiles", "combined_search", "appearance"}
+PREFERENCES = {"download_dir", "hide_stream_output", "search_profiles", "combined_search", "appearance",
+               "language"}
 
 
 def _object(value, allowed=None):
@@ -100,6 +101,8 @@ def validate_payload(data):
             raise ValueError("Invalid download folder")
         if key == "hide_stream_output" and type(value) is not bool:
             raise ValueError("Invalid stream preference")
+        if key == "language" and value != i18n.AUTO and value not in i18n.LANGUAGES:
+            raise ValueError("Invalid interface language")
         if key == "appearance":
             _validate_appearance(value)
         if key == "combined_search":

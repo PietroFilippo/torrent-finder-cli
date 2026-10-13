@@ -11,7 +11,7 @@ from rich.console import Console, Group
 from rich.text import Text
 
 import isolation  # noqa: F401  # redirected settings and the shared test baseline
-from torrent_finder import bookmarks, credentials, settings_backup as backup, store
+from torrent_finder import bookmarks, credentials, settings_backup as backup, state, store
 from torrent_finder.name_rules import NameRules
 from torrent_finder.providers import PROVIDERS
 from torrent_finder.providers.anime_provider import AnimeProvider
@@ -61,6 +61,18 @@ class BackupTests(IsolatedState):
                 self.assertEqual(candidate["settings"]["appearance"]["fonts"], fonts)
                 store.commit(backup.import_change(incoming, mode))
                 self.assertEqual(store.read()["settings"]["appearance"]["profile"], local)
+
+    def test_the_interface_language_travels_and_unknown_ones_are_refused(self):
+        state.save_setting("language", "pt-BR")
+        target = self.root / "language.json"
+        backup.export_settings(target)
+        data = backup.read_backup(target)
+        self.assertEqual(data["settings"]["language"], "pt-BR")
+        for value in ("auto", "en", "pt-BR"):
+            backup.validate_payload({"settings": {"language": value}})
+        for value in ("klingon", "qps", 3, None):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                backup.validate_payload({"settings": {"language": value}})
 
     def test_replace_without_appearance_keeps_local_terminal_profile(self):
         local = {"look": "plain", "open_from_tabs": True}
