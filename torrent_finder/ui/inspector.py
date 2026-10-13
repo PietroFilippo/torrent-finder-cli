@@ -264,7 +264,7 @@ def appearance_details() -> list[Text]:
         shown = paintings.catalog().get(appearance.painting())
         side = appearance.placement()
         where = "" if side == "right" or not shown else f" · {t(paintings.PLACEMENTS[side]).lower()}"
-        rows.append((t("Painting"), (shown.title if shown else t("none")) + where))
+        rows.append((t("Painting"), (shown.title_label() if shown else t("none", ctx="painting")) + where))
     rows += [(t("Focus"), t(theme.FOCUS_STYLES[focus])), (t("Density"), t(theme.DENSITIES[density]))]
     if terminal_profile.supported():
         plain = appearance.profile_look(palette.design) == "plain"

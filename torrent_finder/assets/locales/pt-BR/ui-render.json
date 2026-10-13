@@ -116,5 +116,6 @@
   "Comfortable": "Confortável",
   "Compact": "Compacta",
   "continue": "continuar",
-  "[muted]Press [key]any key[/key] to {action}…[/muted]": "[muted]Pressione [key]qualquer tecla[/key] para {action}…[/muted]"
+  "[muted]Press [key]any key[/key] to {action}…[/muted]": "[muted]Pressione [key]qualquer tecla[/key] para {action}…[/muted]",
+  "painting::none": "nenhuma"
 }
