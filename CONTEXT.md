@@ -179,6 +179,23 @@ consumer path drives the same interface: `magnet()` (silent; copy-magnets and
 batch-aria2), `pick()` (interactive single pick), `batch_item()` (batch
 handoff). A new non-standard source is one adapter plus one registry line.
 
+## Background downloads
+
+`downloads.py` owns session-only aria2 jobs; `manager()` is lazy and `busy()`
+is the update/quit guard. `JobManager.enqueue_aria2` captures the prepared
+download folder and file selection. One hidden `Aria2Engine` (`aria2_rpc.py`)
+serves two concurrent torrents, with one RPC poller following magnet metadata
+to its payload GID. A separate finisher optionally unpacks RPC's exact
+selected paths and records a method completion once per standalone job or
+successful batch group. Use a fresh group ID and `with jobs.batch():` around
+batch enrollment. Failed/stopped members keep the group from counting even
+if their rows are removed. Snapshots are copies, summaries are immutable,
+and `on_change` signals redraws without workers writing to the console.
+Stop preserves partial data; shutdown stops jobs, reaps aria2 and joins
+workers. The current unpack may finish, but no further archives or stats run
+after cancellation. UI integration and persistence belong to later phases.
+See [ADR-0029](docs/adr/0029-background-downloads.md).
+
 ## Session
 
 `TorrentSession` (`torrent_session.py`): post-pick state owner, constructed
