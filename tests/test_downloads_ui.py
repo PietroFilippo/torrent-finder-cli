@@ -190,6 +190,21 @@ class DownloadsUITests(unittest.TestCase):
         retried = next(job for job in manager.snapshot() if job.title == "Blue Giant 2023 1080p")
         self.assertEqual(retried.target_dir, MOVIES)
 
+    def test_keys_act_on_the_row_that_stays_focused_while_rows_move(self):
+        manager = install(self, FakeManager(sample_jobs()))
+        keys = iter([K.DOWN, "z", "x", K.ESC])
+
+        def press():
+            key = next(keys)
+            if key == "z":  # an unbound key; meanwhile the download above finishes and moves to FINISHED
+                manager.set_state("job1", "done", done_bytes=int(1.4 * GIB), speed_bps=0, eta_s=None)
+            return key
+
+        with driving([]), patch.object(selector.readchar, "readkey", side_effect=press):
+            downloads_ui.downloads_screen()
+        stops = [call for call in manager.calls if call[0] == "stop"]
+        self.assertEqual(stops, [("stop", "job2")])  # the focused Dune download, not the row now in its place
+
     def test_an_empty_screen_says_how_to_start(self):
         install(self, None)
         seen = capture(None, downloads_ui, downloads_ui.downloads_screen)

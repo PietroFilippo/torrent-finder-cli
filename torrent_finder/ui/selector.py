@@ -790,6 +790,25 @@ def _next_enabled(items: list[SelectItem], current: int, direction: int) -> int:
     return current  # All disabled — stay put
 
 
+def _focused_value(items: list[SelectItem], cursor: int):
+    """The focused row's value when it names that row alone, so a live list can keep the focus on it."""
+    if not 0 <= cursor < len(items):
+        return None
+    value = items[cursor].value
+    if not isinstance(value, str) or sum(item.value == value for item in items) != 1:
+        return None
+    return value
+
+
+def _follow(items: list[SelectItem], value, cursor: int) -> int:
+    """The cursor after a live list changed: on the same row when it is still there, else near where it was."""
+    if value is not None:
+        for index, item in enumerate(items):
+            if item.value == value and item.enabled:
+                return index
+    return _valid_cursor(items, cursor)
+
+
 def _valid_cursor(items: list[SelectItem], cursor: int) -> int:
     """Keep the cursor on an existing enabled row, e.g. after an action rebuilt *items*."""
     direction = 1
@@ -886,8 +905,9 @@ def arrow_select(
         on_action: Optional callback for action items. Called with
                    (index, items). Return True to stay in the menu,
                    False to exit and return the index.
-        refresh: Optional non-blocking poll for background content. May append
-                 items without changing existing indexes; True requests a redraw.
+        refresh: Optional non-blocking poll for background content; True requests
+                 a redraw. It may rebuild *items* in place: the focus stays on the
+                 row with the same string value when exactly one row has it.
 
     Returns:
         - Single-select mode: index of chosen item, or None if cancelled.
@@ -936,7 +956,10 @@ def arrow_select(
 
     def refresh_content() -> bool:
         nonlocal announcement
+        focused = _focused_value(items, state["cursor"]) if refresh is not None else None
         changed = refresh is not None and refresh()
+        if changed and items:
+            state["cursor"] = _follow(items, focused, state["cursor"])
         if downloads_ui.poll(watched):
             changed = True
         if changed:
@@ -1034,6 +1057,13 @@ def arrow_select(
                 # Some terminals raise for Ctrl+C instead of returning \x03.
                 # Treat both forms exactly like Esc at the active selector.
                 return None
+            if refresh is not None:
+                # A key acts on the list as it is now: a live list may have moved the focused row.
+                with render_lock:
+                    refresh_content()
+                    cursor = state["cursor"]
+                if not items:
+                    return None
             prev_cursor = cursor
 
             if key == readchar.key.UP:
