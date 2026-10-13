@@ -1,0 +1,43 @@
+{
+  "language": "pt-BR",
+  "about": "Terms for translating torrent-finder into Brazilian Portuguese; docs/i18n/pt-BR.md explains them. scripts/i18n.py shows the terms a message contains (todo) and fails on forbidden words and missing kept names (check). A forbidden entry is a whole word, or a word start when it ends with *; case-insensitive. An entry with a ctx is the exact translation of that message.",
+  "terms": [
+    {"term": "provider", "use": "categoria", "forbidden": ["provedor*"],
+     "note": "The main menu lists what you look for (Filmes e séries, Jogos, Anime). A provider group (Games, Software, Manga) is also a categoria, with subcategorias or fontes. \"Provedor\" reads like an internet provider."},
+    {"term": "engine", "use": "mecanismo", "forbidden": ["motor", "motores"]},
+    {"term": "source", "use": "fonte"},
+    {"term": "preset", "use": "filtro", "forbidden": ["predefiniç*", "preset*"],
+     "note": "Presets live under \"Filtros e mecanismos\"; \"predefinição\" is too long for badges."},
+    {"term": "search", "use": "buscar (verb), busca (noun)", "forbidden": ["pesquis*"]},
+    {"term": "bookmark", "use": "favorito", "forbidden": ["marcador*"]},
+    {"term": "download", "use": "baixar (verb), download (noun)", "forbidden": ["descarreg*", "transferênc*"]},
+    {"term": "stream", "use": "assistir (stream), transmitir"},
+    {"term": "subtitles", "use": "legendas"},
+    {"term": "dubbed", "use": "dublado", "forbidden": ["dobrad*"]},
+    {"term": "settings", "use": "Configurações", "forbidden": ["definições"]},
+    {"term": "credentials", "use": "Credenciais"},
+    {"term": "What's Next?", "use": "E agora?"},
+    {"term": "Goodbye!", "use": "Até logo!"},
+    {"term": "torrent", "use": "torrent", "forbidden": ["torrente*"], "note": "Scene jargon stays: torrent, seeds, leechers, swarm, release."},
+    {"term": "magnet", "use": "link magnet", "forbidden": ["ímã", "imã", "magnétic*"]},
+    {"term": "seeds", "use": "seeds", "forbidden": ["semente*", "semeador*"]},
+    {"term": "leechers", "use": "leechers", "forbidden": ["sanguessuga*"]},
+    {"term": "swarm", "use": "swarm", "forbidden": ["enxame*"]},
+    {"term": "release", "use": "release", "note": "A release name or group; \"lançamento\" only for a work's release date."},
+    {"term": "file", "use": "arquivo", "forbidden": ["ficheiro*"]},
+    {"term": "screen", "use": "tela", "forbidden": ["ecrã*"]},
+    {"term": "user", "use": "usuário", "forbidden": ["utilizador*"]},
+    {"term": "press", "use": "pressione", "forbidden": ["prima", "carregue"]},
+    {"term": "On", "ctx": "engine mode", "use": "Sempre"},
+    {"term": "Auto", "ctx": "engine mode", "use": "Auto"},
+    {"term": "Off", "ctx": "engine mode", "use": "Nunca"},
+    {"term": "Off", "ctx": "preset state", "use": "Não"},
+    {"term": "Require", "ctx": "preset state", "use": "Exigir"},
+    {"term": "Prefer", "ctx": "preset state", "use": "Preferir"}
+  ],
+  "keep": [
+    "Athanor", "Simple", "Citrinitas", "Rubedo", "Albedo", "Viriditas", "Nigredo",
+    "Quiet Blue", "Iris", "Lagoon", "Ember", "Mono", "Paper",
+    "Torrent Finder", "torrent-finder", "Windows Terminal", "PxPlus"
+  ]
+}
