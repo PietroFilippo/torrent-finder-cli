@@ -2594,14 +2594,26 @@ def provider_select_prompt(
         return value
 
 
-def download_complete_prompt(message: str = "Download action finished", *, summary: str = "") -> str:
-    """Leave a completed action or revisit its choices without repeating it."""
+def download_complete_prompt(message: str = "Download action finished", *, summary: str = "",
+                             retry: str = "") -> str:
+    """Leave a completed action or revisit its choices without repeating it.
+
+    *retry*, a row label such as "Retry the 2 that failed", adds a row after a
+    partial failure; choosing it returns ``"retry"``.
+    """
     items = [
         SelectItem("Continue to What's Next", value="next", description=summary),
+    ]
+    if retry:
+        items.append(SelectItem(retry, value="retry",
+                                description=(summary + "\n" if summary else "")
+                                + "Runs only those again. To run the whole selection again, "
+                                  "go back to download options and open all."))
+    items.append(
         SelectItem("Back to download options", value="back",
                    description=(summary + "\n" if summary else "")
                    + "Keep this selection. Returning does not repeat the download or handoff."),
-    ]
+    )
     index = arrow_select(items, title=message, banner=_make_banner_panel(),
                          footer="↑/↓ select • Enter confirm • Esc back to download options")
     return "back" if index is None else items[index].value

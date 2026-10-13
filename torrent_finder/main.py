@@ -170,8 +170,19 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
     A results list can mix acquisition styles (magnet, torrent-file handoff,
     direct download), so each item drives its own adapter's ``batch_item``;
     the outcomes aggregate into one summary. Esc stops the run between items
-    (and mid-transfer for direct downloads).
+    (and mid-transfer for direct downloads). After a partial failure or a
+    stop, the finished prompt offers to run the failed and unprocessed items
+    again, and only those.
     """
+    pending = list(idxs)
+    while True:
+        outcome, pending = _batch_handoff_run(provider, results, pending)
+        if outcome != "retry" or not pending:
+            return outcome
+
+
+def _batch_handoff_run(provider, results: list, idxs: list[int]) -> tuple[str, list[int]]:
+    """One pass of ``_batch_handoff``: the prompt's outcome and the indexes that failed or were left."""
     from torrent_finder.constants import get_download_dir
     from torrent_finder.ui.prompts import download_dir_ready
 
@@ -180,11 +191,13 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
                       for gi in idxs if 0 <= gi < len(results))
     if saves_files and not download_dir_ready():
         clear_screen()
-        return "back"
+        return "back", []
     n = len(idxs)
     sent = 0
     saved_direct = 0
     failed: list[str] = []
+    failed_idxs: list[int] = []
+    stopped_at: int | None = None  # the position in *idxs* from which nothing was processed
     manual_urls: list[str] = []
     ofix_pw = None
 
@@ -202,6 +215,7 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
         with status:
             for k, gi in enumerate(idxs, 1):
                 if cancel_event.is_set():
+                    stopped_at = k - 1
                     break
                 if not (0 <= gi < len(results)):
                     continue
@@ -234,13 +248,17 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
                     if not outcome.saved_direct:  # a saved file isn't a magnet dispatch
                         record_magnet_dispatch()
                 elif cancel_event.is_set():
-                    break  # aborted mid-transfer — cancelled, not failed
+                    stopped_at = k - 1  # aborted mid-transfer — cancelled, not failed: it runs again on retry
+                    break
                 else:
                     if outcome is not None and outcome.manual_url:
                         manual_urls.append(outcome.manual_url)
                     failed.append(name)
+                    failed_idxs.append(gi)
     finally:
         stop_listener.set()
+    left = idxs[stopped_at:] if stopped_at is not None else []
+    remaining = failed_idxs + [gi for gi in left if gi not in failed_idxs]
 
     if cancel_event.is_set():
         lines = [f"[warning] Stopped after {sent} of {n}.[/warning]"]
@@ -259,7 +277,12 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
         lines.append(f"[warning] Couldn't open {len(failed)}:[/warning] {escape(shown)}")
         for u in manual_urls[:6]:
             lines.append(f"[dim]Grab manually: {escape(u)}[/dim]")
-    return download_complete_prompt("Batch handoff finished", summary="\n".join(lines))
+    # A partial failure or a stop offers the rest again, and only the rest.
+    retry = ""
+    if remaining and sent:
+        retry = (f"Retry the {len(remaining)} that failed" if not left
+                 else f"Continue with the {len(remaining)} left")
+    return download_complete_prompt("Batch handoff finished", summary="\n".join(lines), retry=retry), remaining
 
 
 def _batch_copy_magnets(provider, results: list, idxs: list[int]) -> None:
