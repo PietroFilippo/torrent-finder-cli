@@ -82,6 +82,17 @@ class MadokamiAuthTests(unittest.TestCase):
 
 
 class CredentialScreenTests(unittest.TestCase):
+    def test_portuguese_characters_survive_special_keys(self):
+        from torrent_finder.ui import credentials as screen
+        from torrent_finder.credential_registry import CREDENTIAL_REGISTRY
+        meta = CREDENTIAL_REGISTRY[0]
+        text = "aàbáâãçéêíóôõú"
+        keys = list(text) + [screen.readchar.key.F1] + [screen.readchar.key.ENTER] * (len(meta.fields) + 1)
+        with patch.object(screen, "_render"), \
+             patch.object(screen.readchar, "readkey", side_effect=keys):
+            result = screen._credentials_form(meta, {})
+        self.assertEqual(result[meta.fields[0].env_key], text)
+
     def test_a_verifier_error_is_reported_not_raised(self):
         from torrent_finder.ui import credentials as screen
         meta = Mock()

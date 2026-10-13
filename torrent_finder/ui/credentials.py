@@ -152,7 +152,7 @@ def _credentials_form(meta: CredentialSpec, buffers: dict[str, str]) -> dict[str
                     env_key = fields[focus].env_key
                     if buffers.get(env_key):
                         buffers[env_key] = buffers[env_key][:-1]
-            elif len(key) == 1 and key >= " " and not key.startswith(("\x1b", "\x00", "\xe0")):
+            elif len(key) == 1 and key >= " ":
                 if focus < n:
                     env_key = fields[focus].env_key
                     buffers[env_key] = buffers.get(env_key, "") + key

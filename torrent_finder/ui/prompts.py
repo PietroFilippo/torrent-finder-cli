@@ -720,7 +720,6 @@ def get_query_with_shortcut(
             if (
                 len(key) == 1
                 and key >= ' '
-                and not key.startswith(('\x1b', '\x00', '\xe0'))
             ):
                 prev_col, prev_len = pos, len(buffer)
                 buffer.insert(pos, key)

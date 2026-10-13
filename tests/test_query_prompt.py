@@ -26,6 +26,10 @@ def _run(keys, **kwargs):
 
 
 class MultiEscBackoutTests(unittest.TestCase):
+    def test_portuguese_characters_survive_special_keys(self):
+        text = "aàbáâãçéêíóôõú"
+        self.assertEqual(_run(list(text) + [readchar.key.F1, "\x00H", _ENTER]), text)
+
     def test_esc_leaves_immediately_in_single_mode(self):
         self.assertEqual(_run(["a", "b", _ESC]), "GO_BACK")
 
