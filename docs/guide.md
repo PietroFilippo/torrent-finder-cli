@@ -618,9 +618,9 @@ time taken, unpack notes and, for a failure, the last lines of aria2c's log.
 Keys: **X** stops the focused download, **O** opens its folder, **C** clears
 the finished rows, and **Enter** lists its actions: Stop, Resume or Retry,
 Open folder, Remove from the list, Show log. A stopped download keeps its
-partial files. Resume uses the currently configured download folder; leave it
-at the original folder to continue those files. Downloading the same torrent
-to that folder later also continues from them.
+partial files. Resume continues them in the download's own folder, even if
+the download folder setting changed since; downloading the same torrent to
+that folder later continues from them too.
 
 Quitting while downloads run asks first: **Keep Torrent Finder open** (the
 default; Esc and Ctrl+C choose it too) or **Stop N downloads and quit**. An
@@ -817,8 +817,8 @@ keeps the old entry; saved details don't prove the torrent is still available.
 ### Settings backup and import
 
 **Tab → Settings backup / import** moves settings between computers as a JSON
-file. A normal export holds provider choices, profiles, the download folder and
-stream preferences; history is optional. Credentials, bookmarks, stats and
+file. A normal export holds provider choices, profiles, the download folder,
+stream preferences and where aria2c downloads run; history is optional. Credentials, bookmarks, stats and
 machine-specific launcher and update state are left out. Appearance, font and
 language choices travel; the Windows Terminal profile's look and "open from
 other tabs" stay with each computer. Exports always use a new file name,
