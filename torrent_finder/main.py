@@ -1203,6 +1203,7 @@ def _main_loop(args=None) -> None:
     # In-progress query preserved across a Tab quick-action excursion, so popping
     # into Filters/Stats/Tips and back doesn't lose what was typed.
     pending_query = ""
+    pending_titles = []
 
     # When set, the next provider selection re-opens this group's submenu (so
     # backing out of a group child returns to its source list, not the top list).
@@ -1352,11 +1353,13 @@ def _main_loop(args=None) -> None:
             )
             notice_msg = None
             initial, pending_query = pending_query, ""
+            initial_titles, pending_titles = pending_titles, []
             try:
                 query = get_query_with_shortcut(
                     PROMPT,
                     initial=initial, history=prov_history, filters_shortcut=True,
                     multi=True, screen_renderer=screen_renderer, propagate_interrupt=True,
+                    initial_committed=initial_titles,
                 )
             except (EOFError, KeyboardInterrupt):
                 # Ctrl+C at the search prompt: route to the provider menu with
@@ -1385,6 +1388,7 @@ def _main_loop(args=None) -> None:
             # Ctrl+F → jump straight to the filter menu, keeping the typed query.
             if isinstance(query, tuple) and query and query[0] == "FILTERS":
                 pending_query = query[1]
+                pending_titles = query[2] if len(query) > 2 else []
                 filter_menu(provider)
                 query = None
                 clear_screen()
@@ -1395,6 +1399,7 @@ def _main_loop(args=None) -> None:
             # to this menu); only Esc in the menu itself drops to the prompt.
             if isinstance(query, tuple) and query and query[0] == "ACTIONS":
                 typed = query[1]
+                titles = query[2] if len(query) > 2 else []
                 query = None
                 outcome = _quick_actions_flow(provider, cli_filters, typed, run_pending_update if update_info else None)
                 if outcome == "EXIT":
@@ -1406,6 +1411,7 @@ def _main_loop(args=None) -> None:
                         cli_facet, pending_creator_name = _hf, _hn
                 else:
                     pending_query = typed
+                    pending_titles = titles
                 clear_screen()
                 continue
 

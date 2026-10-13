@@ -26,6 +26,14 @@ def _run(keys, **kwargs):
 
 
 class MultiEscBackoutTests(unittest.TestCase):
+    def test_shortcuts_carry_committed_titles_and_the_current_line(self):
+        for key, action in ((readchar.key.TAB, "ACTIONS"), (readchar.key.CTRL_F, "FILTERS")):
+            with self.subTest(action=action):
+                result = _run(["a", _CTRL_N, "b", key], multi=True, filters_shortcut=True)
+                self.assertEqual(result, (action, "b", ["a"]))
+                self.assertEqual(_run(["c", _ENTER], initial=result[1], initial_committed=result[2],
+                                      multi=True), ["a", "bc"])
+
     def test_portuguese_characters_survive_special_keys(self):
         text = "aàbáâãçéêíóôõú"
         self.assertEqual(_run(list(text) + [readchar.key.F1, "\x00H", _ENTER]), text)

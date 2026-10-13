@@ -438,13 +438,14 @@ def get_query_with_shortcut(
     multi: bool = False,
     screen_renderer: Callable[[Console], None] | None = None,
     propagate_interrupt: bool = False,
+    initial_committed: list[str] | None = None,
 ) -> "str | tuple | list | None":
     """Read a search query with inline editing.
 
     With ``multi=True``, Ctrl+N commits the current line and starts another;
-    Enter then returns the full ``list[str]`` of titles. Ctrl+F / Tab are
-    suppressed once a title has been committed so the in-progress list isn't
-    lost, and Esc backs out progressively — it clears the line being typed,
+    Enter then returns the full ``list[str]`` of titles. Ctrl+F / Tab carry
+    committed titles as a third tuple entry, restored via ``initial_committed``.
+    Esc backs out progressively — it clears the line being typed,
     then restores the last committed title for editing, and only returns
     "GO_BACK" once nothing is left. Without ``multi`` the return is a single
     string and Esc leaves immediately, exactly as before.
@@ -460,7 +461,7 @@ def get_query_with_shortcut(
     """
     buffer: list[str] = list(initial)
     pos = len(buffer)
-    committed: list[str] = []
+    committed = list(initial_committed or []) if multi else []
 
     hist = history or []
     # Taken only when this screen has a message line to show it on; otherwise it waits for one.
@@ -615,18 +616,18 @@ def get_query_with_shortcut(
                 return "GO_BACK"
 
             if key in (readchar.key.TAB, '\t'):
-                if multi and committed:
-                    continue
                 if screen_renderer is None:
                     print()
+                if committed:
+                    return ("ACTIONS", "".join(buffer), list(committed))
                 return ("ACTIONS", "".join(buffer))
 
             if key == readchar.key.CTRL_F:
                 if filters_shortcut:
-                    if multi and committed:
-                        continue
                     if screen_renderer is None:
                         print()
+                    if committed:
+                        return ("FILTERS", "".join(buffer), list(committed))
                     return ("FILTERS", "".join(buffer))
                 continue
 
