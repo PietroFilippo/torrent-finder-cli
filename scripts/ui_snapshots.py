@@ -5,6 +5,7 @@
     python scripts/ui_snapshots.py compare before after
     python scripts/ui_snapshots.py check after        # overflow only, every size
     python scripts/ui_snapshots.py capture iris iris:fill   # in a theme, focus style or density
+    python scripts/ui_snapshots.py capture pt citrinitas:lang=pt-BR   # in a language (lang=qps: pseudo)
     python scripts/ui_snapshots.py themes              # every theme shows exactly the same words
 
 Each scenario opens a real screen with every key press answered by Ctrl+C, so
@@ -317,11 +318,16 @@ def _frames(raw: str) -> list[str]:
 
 
 def _apply(spec: str) -> None:
-    """``iris``, ``paper:fill``, ``quiet:compact``: a theme, then optional focus and density."""
+    """``iris``, ``paper:fill``, ``quiet:compact``, ``citrinitas:lang=pt-BR``: a theme, then
+    optional focus, density and interface language (English unless given)."""
+    from torrent_finder import i18n
     from torrent_finder.ui import theme
     parts = spec.split(":") if spec else [theme.DEFAULT_THEME]
     theme.apply(parts[0] or theme.DEFAULT_THEME, focus="fill" if "fill" in parts else "bar",
                 density="compact" if "compact" in parts else "comfortable")
+    language = next((part[len("lang="):] for part in parts if part.startswith("lang=")), i18n.DEFAULT)
+    if i18n.use(language) != i18n.normalise(language):
+        raise SystemExit(f"Unknown language {language!r}: choose from {', '.join(i18n.LANGUAGES)} or qps")
 
 
 def _fresh_state() -> None:
