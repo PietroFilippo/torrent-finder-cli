@@ -48,7 +48,7 @@
   "Size: {size}": "Tamanho: {size}",
   "Seeds: {count}": "Seeds: {count}",
   "Leeches: {count}": "Leechers: {count}",
-  "Ranked: {reason}": "Ordem: {reason}",
+  "Ranked: {reason}": "Classificação: {reason}",
   "i close • {scroll} scroll details • b bookmark • Esc back": "i fechar • {scroll} rolar detalhes • b favoritar • Esc voltar",
   "Enter download {n} selected": {
     "one": "Enter baixar {n} marcado",
