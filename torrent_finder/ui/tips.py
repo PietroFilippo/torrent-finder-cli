@@ -2,15 +2,26 @@
 
 The random footer tip and the searchable all-tips browser read from the same
 catalog so shortcut hints, menu guidance, and safety notes stay in one place.
+
+Tip texts and category names are English, marked with ``N_`` and translated
+when shown (``Tip.display_text``, ``TipCategory.display_name``). Tags stay
+English search keywords. The English stays what the tips page compares, and
+``find_tips`` matches the English and the interface language alike.
 """
+
+# i18n: converted
+# Tags are English search keys, not text: lines whose tags hold a space carry '# i18n: ignore'.
 
 from __future__ import annotations
 
 import random
+import unicodedata
 from dataclasses import dataclass
+from functools import lru_cache
 
 from rich.markup import escape
 
+from torrent_finder.i18n import N_, t
 from torrent_finder.providers import provider_cli_choices
 
 
@@ -21,210 +32,235 @@ _PROVIDER_CLI_NAMES = ", ".join(provider_cli_choices())
 class Tip:
     """A single user-facing hint.
 
-    ``tags`` are intentionally plain text so the tips browser can filter
-    by query without knowing about UI labels or categories.
+    ``text`` is the English (marked with ``N_``): the catalogue key, and what
+    the tips page and ``find_tips`` compare. ``tags`` are intentionally plain
+    English so the tips browser can filter by query without knowing about UI
+    labels or categories. A text filled in at import (the CLI provider names)
+    keeps its message in ``template`` and the values in ``values``.
     """
 
     text: str
     tags: tuple[str, ...] = ()
     rotating: bool = True
+    template: str = ""
+    values: tuple[tuple[str, str], ...] = ()
+
+    def display_text(self) -> str:
+        """The tip in the interface language, as plain text (escape it for Rich markup)."""
+        if self.template:
+            return t(self.template, **dict(self.values))
+        return t(self.text)
 
 
 @dataclass(frozen=True)
 class TipCategory:
-    """A named group of related tips."""
+    """A named group of related tips; ``name`` is English, the identity the tips page compares."""
 
     name: str
     tips: tuple[Tip, ...]
 
+    def display_name(self) -> str:
+        """The category's name in the interface language."""
+        return category_label(self.name)
+
+
+def _filled(message: str, tags: tuple[str, ...], **values: str) -> Tip:
+    """A tip whose English is *message* filled with *values*; other languages fill their own text."""
+    return Tip(message.format(**values), tags, template=message, values=tuple(values.items()))
+
 
 TIP_CATEGORIES: tuple[TipCategory, ...] = (
     TipCategory(
-        "Search & Navigation",
+        N_("Search & Navigation", ctx="tip category"),
         (
-            Tip("For best results, search using the complete release name.", ("search", "query")),
-            Tip("Search across providers combines categories in one list. Ctrl+F at the search prompt chooses sources and edits shared name rules or provider-specific presets; these settings are separate from solo searches.", ("search", "all", "providers", "filters")),
-            Tip("During a combined search, Enter opens results received so far; Esc cancels. After 30 seconds, available results open with notices for unfinished sources.", ("search", "all", "providers", "cancel")),
-            Tip("Anime starts without a resolution filter. If older shows are missing, check Ctrl+F for a previously saved 1080p or 4K preset and clear it.", ("anime", "resolution", "filters", "1080p")),
-            Tip("The search prompt has no single-letter shortcuts, so a query can start with any letter (even F, H, S, or T).", ("search", "navigation", "query")),
-            Tip("Press Tab at the search prompt for quick actions, including Bookmarks (B), Bookmark search (L), and Settings backup/import (E). Your typed query is kept.", ("search", "actions", "hotkey", "bookmarks", "backup")),
-            Tip("In results, i expands details and [ / ] scrolls them. Filename hints do not verify media tracks. Press b to bookmark checked results or the current row.", ("results", "details", "bookmarks", "hotkey")),
-            Tip("Literal name rules under Ctrl+F combine all words, any word, an exact phrase and excluded words. They match normalized release names only, across every provider.", ("filters", "keywords", "names")),
-            Tip("Anime's Nyaa category selector and Manga's EN / Non-English / Raw engines control Nyaa scope only. Other engines do not enforce those language categories.", ("anime", "manga", "language", "raw", "nyaa")),
-            Tip("Search several titles at once: press Ctrl+N at the prompt to add another title, then Enter to search them all and merge the results into one list.", ("search", "multi-title", "hotkey")),
-            Tip("Press Esc at the search prompt to go back to provider selection.", ("search", "navigation", "hotkey")),
-            Tip("Added a title by mistake? With Ctrl+N titles queued, Esc backs out one step at a time — it clears the line being typed, then restores the last added title for editing; leaving the screen takes one more Esc once everything is empty.", ("search", "multi-title", "undo", "hotkey")),
-            Tip("Esc or Ctrl+C on the provider menu asks for a second press before quitting, so a stray key can't close the app; Ctrl+C during an operation still cancels just that operation.", ("navigation", "quit", "hotkey")),
-            Tip("On the What's Next screen, choosing Exit or pressing Esc/Ctrl+C opens a confirmation; declining it returns to the menu.", ("navigation", "quit", "confirmation", "hotkey")),
-            Tip("Is a search slow? Press Esc to cancel it instead of waiting out the engine timeouts.", ("search", "cancel", "hotkey")),
-            Tip("While typing a query, Left/Right move the cursor and Home/End jump to the ends, so you can fix a typo mid-word.", ("search", "editing", "cursor")),
-            Tip("APIBay can be slow or intermittently empty. Where Knaben is Auto it is a category-scoped backup when every On engine returns nothing; Desktop and Mobile already search Knaben On. Set APIBay to Off if you prefer speed over its coverage.", ("search", "apibay", "knaben", "auto", "speed", "fallback")),
-            Tip("Press F on a highlighted provider to configure its engines and filters without leaving the provider menu.", ("provider", "filters", "hotkey")),
-            Tip("Press H on the provider screen to browse search history.", ("provider", "history", "hotkey")),
-            Tip("Press S on the provider screen to open usage stats.", ("provider", "stats", "hotkey")),
-            Tip("Press T on the provider screen to open this searchable tips browser.", ("provider", "tips", "hotkey")),
-            Tip("Press ? on any menu, or on the results, to list every key that screen understands, including those a narrow key bar leaves out.", ("navigation", "keys", "hotkey")),
-            Tip("Continue, at the top of the main menu, reopens your newest search in the search field: Enter runs it again, or edit it first.", ("provider", "history", "navigation")),
-            Tip("At the search prompt, Recent lists this provider's past searches containing what you have typed; Up/Down walk that list.", ("search", "history", "hotkey")),
-            Tip("Each provider row on the main menu shows the engines it will search and any Prefer or Require presets, so you see the setup before searching.", ("provider", "filters", "engines")),
-            Tip("Under the focused result, Tags lists what its name carries (resolution, source, codec, audio, PT-BR, group), ticking those a preferred preset asks for, and Ranked says why it sits there.", ("results", "details", "presets")),
-            Tip("History entries remember the filter presets you had active at search time.", ("history", "filters", "presets")),
-            Tip("History can be filtered by provider, date range, and sort order with P, D, and S.", ("history", "filters", "hotkey")),
-            Tip("Use -f and -x on the CLI to add ad-hoc include or exclude keywords.", ("cli", "filters")),
-            Tip(f"Use -t with a provider name for direct CLI searches. Accepted names: {_PROVIDER_CLI_NAMES}.", ("cli", "provider")),
-            Tip("Software is a group: pick it to choose Desktop, Mobile, or RuTracker as the source.", ("software", "apps", "provider")),
-            Tip("Need a desktop program? Software → Desktop searches APIBay and Knaben together, keeps the noisier SolidTorrents Off unless you enable it, and lists the program itself above longer products with its name (Photoshop before Photoshop Lightroom); or use -t software.", ("software", "apps", "apibay", "knaben", "solidtorrents", "cli")),
-            Tip("Looking for an Android app? Software → Mobile searches Knaben's Android category first, with APIBay as the Auto backup; it's Android-only. Turn on F-Droid in Filters & engines for open-source apps downloaded from the official repository. Try -t mobile.", ("mobile", "android", "apibay", "knaben", "cli")),
-            Tip("RuTracker (Software → RuTracker) is great for software, audio, and rare content — add your rutracker.org login under Credentials first.", ("rutracker", "credentials", "cli")),
-            Tip("Games is a group: pick General (public trackers), Online-Fix (co-op / online game cracks from online-fix.me — no account needed; it saves the .torrent, opens your client, and shows the archive password), or FitGirl (repacks).", ("games", "online-fix", "fitgirl", "provider")),
-            Tip("FitGirl (Games → FitGirl) searches the official fitgirl-repacks.site — the trustworthy source for FitGirl repacks (fake 'FitGirl' uploads on public trackers are a known malware vector). No account needed; try -t fitgirl.", ("games", "fitgirl", "cli")),
-            Tip("Looking for J-dramas or Asian live-action? Movies & Series searches Nyaa too.", ("movies", "nyaa")),
-            Tip("Manga is a group: pick General (Nyaa Literature + APIBay Comics, with Knaben Auto fallback; try -t manga) or Madokami (private library, direct downloads).", ("manga", "nyaa", "apibay", "knaben", "madokami", "provider", "cli")),
-            Tip("Madokami (Manga → Madokami) downloads volume archives directly — no torrent client involved; picking a folder opens it — step into release folders and check the volumes you want. Needs a madokami.al login under Credentials; try -t madokami.", ("manga", "madokami", "credentials", "cli")),
-            Tip("Two or more Madokami files from one series are saved together in a folder named after it. Turn on Unpack page archives (Download folder) to get chapters and volumes as folders of pages instead of .zip/.cbz/.rar files.", ("manga", "madokami", "downloads", "folder", "unpack", "settings")),
-            Tip("Books keeps Libgen and APIBay's E-books/Audio books search On, with Knaben Auto fallback — no login needed; try -t books.", ("books", "libgen", "apibay", "knaben", "provider", "cli")),
-            Tip("Libgen results download the file directly (no torrent client) and show the format and language in the name; Libgen rows lead among equally good title matches.", ("books", "libgen", "downloads", "sorting")),
-            Tip("Books filter presets cover EPUB, PDF, Kindle (MOBI/AZW3), Audiobook, and English — they match both Libgen rows and torrent release names.", ("books", "filters", "presets")),
+            Tip(N_("For best results, search using the complete release name."), ("search", "query")),
+            Tip(N_("Search across providers combines categories in one list. Ctrl+F at the search prompt chooses sources and edits shared name rules or provider-specific presets; these settings are separate from solo searches."), ("search", "all", "providers", "filters")),
+            Tip(N_("During a combined search, Enter opens results received so far; Esc cancels. After 30 seconds, available results open with notices for unfinished sources."), ("search", "all", "providers", "cancel")),
+            Tip(N_("Anime starts without a resolution filter. If older shows are missing, check Ctrl+F for a previously saved 1080p or 4K preset and clear it."), ("anime", "resolution", "filters", "1080p")),
+            Tip(N_("The search prompt has no single-letter shortcuts, so a query can start with any letter (even F, H, S, or T)."), ("search", "navigation", "query")),
+            Tip(N_("Press Tab at the search prompt for quick actions, including Bookmarks (B), Bookmark search (L), and Settings backup/import (E). Your typed query is kept."), ("search", "actions", "hotkey", "bookmarks", "backup")),
+            Tip(N_("In results, i expands details and [ / ] scrolls them. Filename hints do not verify media tracks. Press b to bookmark checked results or the current row."), ("results", "details", "bookmarks", "hotkey")),
+            Tip(N_("Literal name rules under Ctrl+F combine all words, any word, an exact phrase and excluded words. They match normalized release names only, across every provider."), ("filters", "keywords", "names")),
+            Tip(N_("Anime's Nyaa category selector and Manga's EN / Non-English / Raw engines control Nyaa scope only. Other engines do not enforce those language categories."), ("anime", "manga", "language", "raw", "nyaa")),
+            Tip(N_("Search several titles at once: press Ctrl+N at the prompt to add another title, then Enter to search them all and merge the results into one list."), ("search", "multi-title", "hotkey")),
+            Tip(N_("Press Esc at the search prompt to go back to provider selection."), ("search", "navigation", "hotkey")),
+            Tip(N_("Added a title by mistake? With Ctrl+N titles queued, Esc backs out one step at a time — it clears the line being typed, then restores the last added title for editing; leaving the screen takes one more Esc once everything is empty."), ("search", "multi-title", "undo", "hotkey")),
+            Tip(N_("Esc or Ctrl+C on the provider menu asks for a second press before quitting, so a stray key can't close the app; Ctrl+C during an operation still cancels just that operation."), ("navigation", "quit", "hotkey")),
+            Tip(N_("On the What's Next screen, choosing Exit or pressing Esc/Ctrl+C opens a confirmation; declining it returns to the menu."), ("navigation", "quit", "confirmation", "hotkey")),
+            Tip(N_("Is a search slow? Press Esc to cancel it instead of waiting out the engine timeouts."), ("search", "cancel", "hotkey")),
+            Tip(N_("While typing a query, Left/Right move the cursor and Home/End jump to the ends, so you can fix a typo mid-word."), ("search", "editing", "cursor")),
+            Tip(N_("APIBay can be slow or intermittently empty. Where Knaben is Auto it is a category-scoped backup when every On engine returns nothing; Desktop and Mobile already search Knaben On. Set APIBay to Off if you prefer speed over its coverage."), ("search", "apibay", "knaben", "auto", "speed", "fallback")),
+            Tip(N_("Press F on a highlighted provider to configure its engines and filters without leaving the provider menu."), ("provider", "filters", "hotkey")),
+            Tip(N_("Press H on the provider screen to browse search history."), ("provider", "history", "hotkey")),
+            Tip(N_("Press S on the provider screen to open usage stats."), ("provider", "stats", "hotkey")),
+            Tip(N_("Press T on the provider screen to open this searchable tips browser."), ("provider", "tips", "hotkey")),
+            Tip(N_("Press ? on any menu, or on the results, to list every key that screen understands, including those a narrow key bar leaves out."), ("navigation", "keys", "hotkey")),
+            Tip(N_("Continue, at the top of the main menu, reopens your newest search in the search field: Enter runs it again, or edit it first."), ("provider", "history", "navigation")),
+            Tip(N_("At the search prompt, Recent lists this provider's past searches containing what you have typed; Up/Down walk that list."), ("search", "history", "hotkey")),
+            Tip(N_("Each provider row on the main menu shows the engines it will search and any Prefer or Require presets, so you see the setup before searching."), ("provider", "filters", "engines")),
+            Tip(N_("Under the focused result, Tags lists what its name carries (resolution, source, codec, audio, PT-BR, group), ticking those a preferred preset asks for, and Ranked says why it sits there."), ("results", "details", "presets")),
+            Tip(N_("History entries remember the filter presets you had active at search time."), ("history", "filters", "presets")),
+            Tip(N_("History can be filtered by provider, date range, and sort order with P, D, and S."), ("history", "filters", "hotkey")),
+            Tip(N_("Use -f and -x on the CLI to add ad-hoc include or exclude keywords."), ("cli", "filters")),
+            _filled(N_("Use -t with a provider name for direct CLI searches. Accepted names: {names}."), ("cli", "provider"), names=_PROVIDER_CLI_NAMES),
+            Tip(N_("Software is a group: pick it to choose Desktop, Mobile, or RuTracker as the source."), ("software", "apps", "provider")),
+            Tip(N_("Need a desktop program? Software → Desktop searches APIBay and Knaben together, keeps the noisier SolidTorrents Off unless you enable it, and lists the program itself above longer products with its name (Photoshop before Photoshop Lightroom); or use -t software."), ("software", "apps", "apibay", "knaben", "solidtorrents", "cli")),
+            Tip(N_("Looking for an Android app? Software → Mobile searches Knaben's Android category first, with APIBay as the Auto backup; it's Android-only. Turn on F-Droid in Filters & engines for open-source apps downloaded from the official repository. Try -t mobile."), ("mobile", "android", "apibay", "knaben", "cli")),
+            Tip(N_("RuTracker (Software → RuTracker) is great for software, audio, and rare content — add your rutracker.org login under Credentials first."), ("rutracker", "credentials", "cli")),
+            Tip(N_("Games is a group: pick General (public trackers), Online-Fix (co-op / online game cracks from online-fix.me — no account needed; it saves the .torrent, opens your client, and shows the archive password), or FitGirl (repacks)."), ("games", "online-fix", "fitgirl", "provider")),
+            Tip(N_("FitGirl (Games → FitGirl) searches the official fitgirl-repacks.site — the trustworthy source for FitGirl repacks (fake 'FitGirl' uploads on public trackers are a known malware vector). No account needed; try -t fitgirl."), ("games", "fitgirl", "cli")),
+            Tip(N_("Looking for J-dramas or Asian live-action? Movies & Series searches Nyaa too."), ("movies", "nyaa")),
+            Tip(N_("Manga is a group: pick General (Nyaa Literature + APIBay Comics, with Knaben Auto fallback; try -t manga) or Madokami (private library, direct downloads)."), ("manga", "nyaa", "apibay", "knaben", "madokami", "provider", "cli")),
+            Tip(N_("Madokami (Manga → Madokami) downloads volume archives directly — no torrent client involved; picking a folder opens it — step into release folders and check the volumes you want. Needs a madokami.al login under Credentials; try -t madokami."), ("manga", "madokami", "credentials", "cli")),
+            Tip(N_("Two or more Madokami files from one series are saved together in a folder named after it. Turn on Unpack page archives (Download folder) to get chapters and volumes as folders of pages instead of .zip/.cbz/.rar files."), ("manga", "madokami", "downloads", "folder", "unpack", "settings")),
+            Tip(N_("Books keeps Libgen and APIBay's E-books/Audio books search On, with Knaben Auto fallback — no login needed; try -t books."), ("books", "libgen", "apibay", "knaben", "provider", "cli")),
+            Tip(N_("Libgen results download the file directly (no torrent client) and show the format and language in the name; Libgen rows lead among equally good title matches."), ("books", "libgen", "downloads", "sorting")),
+            Tip(N_("Books filter presets cover EPUB, PDF, Kindle (MOBI/AZW3), Audiobook, and English — they match both Libgen rows and torrent release names."), ("books", "filters", "presets")),
         ),
     ),
     TipCategory(
-        "Search by Creator",
+        N_("Search by Creator", ctx="tip category"),
         (
-            Tip("Search by the people behind the content: after picking a provider, choose a by-creator option instead of keyword search — director or studio (anime, movies & series), writer or magazine (manga), developer or publisher (games), author (books).", ("creator", "search")),
-            Tip("By-creator search works keyless out of the box (AniList, Jikan, Wikidata, OpenLibrary); a TMDB key (movies & series) or Twitch/IGDB creds (games) under Credentials upgrade those two to richer, better-ranked results.", ("creator", "credentials", "keyless")),
-            Tip("Books → Author lists an author's works via OpenLibrary, ordered so their best-known books come first; pick titles and each is searched on Libgen + the torrent engines.", ("creator", "books", "author", "openlibrary")),
-            Tip('From the CLI: --by <role> --name "<creator>" alongside -t, e.g. torrent -t anime --by director --name "Hayao Miyazaki".', ("creator", "cli")),
-            Tip("After choosing a creator, multi-select which of their titles to search — a paged checklist, with n and p to flip pages; the app searches each and merges the results.", ("creator", "selection", "paging")),
-            Tip("Two people or studios share a name? The by-creator flow shows a disambiguation list before fetching their titles.", ("creator", "disambiguation")),
-            Tip("A warning mark on a title in the by-creator picker means that director only handled some episodes — highlight it to see which ones.", ("creator", "anime", "episodes")),
+            Tip(N_("Search by the people behind the content: after picking a provider, choose a by-creator option instead of keyword search — director or studio (anime, movies & series), writer or magazine (manga), developer or publisher (games), author (books)."), ("creator", "search")),
+            Tip(N_("By-creator search works keyless out of the box (AniList, Jikan, Wikidata, OpenLibrary); a TMDB key (movies & series) or Twitch/IGDB creds (games) under Credentials upgrade those two to richer, better-ranked results."), ("creator", "credentials", "keyless")),
+            Tip(N_("Books → Author lists an author's works via OpenLibrary, ordered so their best-known books come first; pick titles and each is searched on Libgen + the torrent engines."), ("creator", "books", "author", "openlibrary")),
+            Tip(N_('From the CLI: --by <role> --name "<creator>" alongside -t, e.g. torrent -t anime --by director --name "Hayao Miyazaki".'), ("creator", "cli")),
+            Tip(N_("After choosing a creator, multi-select which of their titles to search — a paged checklist, with n and p to flip pages; the app searches each and merges the results."), ("creator", "selection", "paging")),
+            Tip(N_("Two people or studios share a name? The by-creator flow shows a disambiguation list before fetching their titles."), ("creator", "disambiguation")),
+            Tip(N_("A warning mark on a title in the by-creator picker means that director only handled some episodes — highlight it to see which ones."), ("creator", "anime", "episodes")),
         ),
     ),
     TipCategory(
-        "Filters & Selection",
+        N_("Filters & Selection", ctx="tip category"),
         (
-            Tip("Filter menu keybinds: a sets engines On and presets Require; i toggles On/Off or Require/Off (Prefer becomes Off); c clears presets; w saves.", ("filters", "engines", "modes", "keybinds")),
-            Tip("Episode and filter pickers share keybinds: v drops an anchor, Shift+V toggles the range.", ("selection", "keybinds", "range")),
-            Tip("In Filters & engines, Space or Enter cycles engine modes or preset Off / Require / Prefer. Require excludes nonmatches; Prefer ranks similar matches higher. Episode rows still toggle checkboxes.", ("selection", "filters", "engines", "modes", "keybinds")),
-            Tip("On engines run every search; Auto runs after all primary engines return zero raw rows (Books and Mobile: also when no row matches the title). Off engines are skipped unless an active preset (or a preset word typed after the title) requires them. Presets never change your saved engine modes.", ("filters", "engines", "on", "auto", "off", "fallback")),
-            Tip("Knaben starts on Auto for Movies, Games, Anime, Manga and Books (On for Desktop and Mobile). It makes one category-scoped request when On engines return no raw rows, or for Books when none is the requested book.", ("filters", "engines", "knaben", "auto", "fallback", "categories")),
-            Tip("YTS and SolidTorrents start Off because they can be unreliable or noisy; enable them manually when you want their extra coverage.", ("filters", "engines", "yts", "solidtorrents", "off", "coverage")),
-            Tip("Knaben results show the originating tracker as Knaben tracker under the selected row, so you can see which index supplied the torrent.", ("results", "knaben", "origin", "tracker", "provenance")),
-            Tip("The Clear filters action clears preset toggles only; engine modes are preserved.", ("filters", "presets", "engines", "modes")),
-            Tip("Want a Brazilian Portuguese dub? Enable Dublado (PT-BR) in Movies & Series. It also searches pt-br/dublado; Legendado (PT subs) adds legendado for subtitles. Both include Knaben + SolidTorrents while active without changing your saved engine modes.", ("filters", "presets", "movies", "portuguese", "pt-br", "dublado", "legendado", "language")),
-            Tip("Dublado (PT-BR) requires Brazilian audio tags such as PT-BR or Português Brasileiro. Generic dublado/nacional/Português, PT-PT-only audio, uploader names, and PT-BR subtitles alone do not qualify. Releases without regional tags stay hidden. Try the Portuguese title too — titles are not translated automatically.", ("filters", "presets", "portuguese", "pt-br", "dublado", "language", "limitations")),
-            Tip("Your engine modes and preset toggles persist across runs in filter_state.json.", ("filters", "engines", "modes", "state", "persistence")),
-            Tip("Results are deduped by info hash across engines, then ranked by title match where the provider supports it, otherwise by seeders.", ("results", "dedupe", "sorting")),
-            Tip("Want untranslated manga? Turn on the Nyaa (Raw) engine from the filter menu (press F on the provider screen); it is off by default.", ("manga", "nyaa", "filters")),
-            Tip("The result table stays on screen after selection so you can see what you picked.", ("results", "ui")),
-            Tip("Grab more than one torrent at once: in the results table press Space to tick rows (a selects all, c clears), then Enter to open the batch menu.", ("results", "multi-select", "batch", "hotkey")),
-            Tip("Tick exactly one result and Enter still opens that torrent's full download menu; tick two or more and Enter switches to the batch menu.", ("results", "multi-select", "batch")),
-            Tip("Searched several titles? A From column in the results table shows which searched title each torrent came from.", ("results", "multi-title", "provenance")),
+            Tip(N_("Filter menu keybinds: a sets engines On and presets Require; i toggles On/Off or Require/Off (Prefer becomes Off); c clears presets; w saves."), ("filters", "engines", "modes", "keybinds")),
+            Tip(N_("Episode and filter pickers share keybinds: v drops an anchor, Shift+V toggles the range."), ("selection", "keybinds", "range")),
+            Tip(N_("In Filters & engines, Space or Enter cycles engine modes or preset Off / Require / Prefer. Require excludes nonmatches; Prefer ranks similar matches higher. Episode rows still toggle checkboxes."), ("selection", "filters", "engines", "modes", "keybinds")),
+            Tip(N_("On engines run every search; Auto runs after all primary engines return zero raw rows (Books and Mobile: also when no row matches the title). Off engines are skipped unless an active preset (or a preset word typed after the title) requires them. Presets never change your saved engine modes."), ("filters", "engines", "on", "auto", "off", "fallback")),
+            Tip(N_("Knaben starts on Auto for Movies, Games, Anime, Manga and Books (On for Desktop and Mobile). It makes one category-scoped request when On engines return no raw rows, or for Books when none is the requested book."), ("filters", "engines", "knaben", "auto", "fallback", "categories")),
+            Tip(N_("YTS and SolidTorrents start Off because they can be unreliable or noisy; enable them manually when you want their extra coverage."), ("filters", "engines", "yts", "solidtorrents", "off", "coverage")),
+            Tip(N_("Knaben results show the originating tracker as Knaben tracker under the selected row, so you can see which index supplied the torrent."), ("results", "knaben", "origin", "tracker", "provenance")),
+            Tip(N_("The Clear filters action clears preset toggles only; engine modes are preserved."), ("filters", "presets", "engines", "modes")),
+            Tip(N_("Want a Brazilian Portuguese dub? Enable Dublado (PT-BR) in Movies & Series. It also searches pt-br/dublado; Legendado (PT subs) adds legendado for subtitles. Both include Knaben + SolidTorrents while active without changing your saved engine modes."), ("filters", "presets", "movies", "portuguese", "pt-br", "dublado", "legendado", "language")),
+            Tip(N_("Dublado (PT-BR) requires Brazilian audio tags such as PT-BR or Português Brasileiro. Generic dublado/nacional/Português, PT-PT-only audio, uploader names, and PT-BR subtitles alone do not qualify. Releases without regional tags stay hidden. Try the Portuguese title too — titles are not translated automatically."), ("filters", "presets", "portuguese", "pt-br", "dublado", "language", "limitations")),
+            Tip(N_("Your engine modes and preset toggles persist across runs in filter_state.json."), ("filters", "engines", "modes", "state", "persistence")),
+            Tip(N_("Results are deduped by info hash across engines, then ranked by title match where the provider supports it, otherwise by seeders."), ("results", "dedupe", "sorting")),
+            Tip(N_("Want untranslated manga? Turn on the Nyaa (Raw) engine from the filter menu (press F on the provider screen); it is off by default."), ("manga", "nyaa", "filters")),
+            Tip(N_("The result table stays on screen after selection so you can see what you picked."), ("results", "ui")),
+            Tip(N_("Grab more than one torrent at once: in the results table press Space to tick rows (a selects all, c clears), then Enter to open the batch menu."), ("results", "multi-select", "batch", "hotkey")),
+            Tip(N_("Tick exactly one result and Enter still opens that torrent's full download menu; tick two or more and Enter switches to the batch menu."), ("results", "multi-select", "batch")),
+            Tip(N_("Searched several titles? A From column in the results table shows which searched title each torrent came from."), ("results", "multi-title", "provenance")),
         ),
     ),
     TipCategory(
-        "Downloads",
+        N_("Downloads", ctx="tip category"),
         (
-            Tip("aria2c is the only downloader that strictly honors your file selection.", ("downloads", "aria2c", "selection")),
-            Tip("webtorrent and peerflix may pull the whole torrent even when a file selection is active.", ("downloads", "webtorrent", "peerflix", "selection")),
-            Tip("aria2c handles multi-file selection in a single process, which is fastest for batches.", ("downloads", "aria2c", "selection")),
-            Tip("Batch download: with several results ticked, the batch menu can open them all in your torrent client, download them all with aria2c in one parallel process, or copy every magnet at once.", ("downloads", "batch", "aria2c", "magnet")),
-            Tip("No torrent client installed? The batch menu's Download all with aria2c pulls every pick in parallel — no client needed.", ("downloads", "batch", "aria2c")),
-            Tip("Batches can mix sources — a Games selection may hold magnet torrents and Online-Fix entries; Open all in client handles each correctly.", ("downloads", "batch", "online-fix")),
-            Tip("Browse torrent files before downloading to pick just the episodes or extras you want.", ("downloads", "episode picker", "selection")),
-            Tip("Book torrents are often bundles (\"500 EPUBs\", audiobook chapter folders) — Browse torrent files + aria2c grabs only the files you tick.", ("books", "downloads", "episode picker", "selection")),
-            Tip("The episode picker remembers your previous selection; re-open it to refine, not rebuild.", ("episode picker", "selection", "state")),
-            Tip("Confirming the picker with nothing checked clears the selection; Esc keeps your prior picks.", ("episode picker", "selection", "hotkey")),
-            Tip("File-list fetch stalling on a low-seed torrent? Press Esc or Ctrl+C to cancel it and return to the download menu — Ctrl+C does not exit the app there.", ("episode picker", "metadata", "cancel", "hotkey")),
-            Tip("The desktop-client magnet option cannot pre-filter files; uncheck unwanted files in the client dialog.", ("downloads", "magnet", "selection")),
-            Tip("Copy magnet link puts the selected torrent's magnet URI on your clipboard.", ("downloads", "magnet", "clipboard")),
-            Tip("Set a default save folder with Save to (download menu) or Download folder (provider screen); it applies to aria2c, webtorrent, peerflix, subtitles, and Online-Fix / Madokami / Libgen / F-Droid file saves.", ("downloads", "settings", "folder", "provider")),
-            Tip("Quiet mode replaces aria2c, webtorrent, and peerflix native progress UIs with a minimal spinner.", ("downloads", "quiet mode", "settings")),
-            Tip("Direct download methods print a Ctrl+C reminder because the child process owns the active transfer.", ("downloads", "cancel", "keybinds")),
-            Tip("Single-file torrents can be browsed too — open Browse torrent files to inspect or pick the one file.", ("downloads", "episode picker", "single-file")),
-            Tip("Open torrent page launches the source page (Nyaa, PirateBay, YTS, Knaben, F-Droid, …) in your browser.", ("downloads", "torrent info", "browser")),
-            Tip("Torrent info pulls the source page's category, description, and full file list straight into the app.", ("downloads", "torrent info", "origin")),
-            Tip("Torrent info flags whether subtitles are embedded in the video: definitively via ffprobe once the file is downloaded, otherwise a release-name heuristic.", ("downloads", "torrent info", "subtitles")),
+            Tip(N_("aria2c is the only downloader that strictly honors your file selection."), ("downloads", "aria2c", "selection")),
+            Tip(N_("webtorrent and peerflix may pull the whole torrent even when a file selection is active."), ("downloads", "webtorrent", "peerflix", "selection")),
+            Tip(N_("aria2c handles multi-file selection in a single process, which is fastest for batches."), ("downloads", "aria2c", "selection")),
+            Tip(N_("Batch download: with several results ticked, the batch menu can open them all in your torrent client, download them all with aria2c in one parallel process, or copy every magnet at once."), ("downloads", "batch", "aria2c", "magnet")),
+            Tip(N_("No torrent client installed? The batch menu's Download all with aria2c pulls every pick in parallel — no client needed."), ("downloads", "batch", "aria2c")),
+            Tip(N_("Batches can mix sources — a Games selection may hold magnet torrents and Online-Fix entries; Open all in client handles each correctly."), ("downloads", "batch", "online-fix")),
+            Tip(N_("Browse torrent files before downloading to pick just the episodes or extras you want."), ("downloads", "episode picker", "selection")),  # i18n: ignore
+            Tip(N_("Book torrents are often bundles (\"500 EPUBs\", audiobook chapter folders) — Browse torrent files + aria2c grabs only the files you tick."), ("books", "downloads", "episode picker", "selection")),  # i18n: ignore
+            Tip(N_("The episode picker remembers your previous selection; re-open it to refine, not rebuild."), ("episode picker", "selection", "state")),  # i18n: ignore
+            Tip(N_("Confirming the picker with nothing checked clears the selection; Esc keeps your prior picks."), ("episode picker", "selection", "hotkey")),  # i18n: ignore
+            Tip(N_("File-list fetch stalling on a low-seed torrent? Press Esc or Ctrl+C to cancel it and return to the download menu — Ctrl+C does not exit the app there."), ("episode picker", "metadata", "cancel", "hotkey")),  # i18n: ignore
+            Tip(N_("The desktop-client magnet option cannot pre-filter files; uncheck unwanted files in the client dialog."), ("downloads", "magnet", "selection")),
+            Tip(N_("Copy magnet link puts the selected torrent's magnet URI on your clipboard."), ("downloads", "magnet", "clipboard")),
+            Tip(N_("Set a default save folder with Save to (download menu) or Download folder (provider screen); it applies to aria2c, webtorrent, peerflix, subtitles, and Online-Fix / Madokami / Libgen / F-Droid file saves."), ("downloads", "settings", "folder", "provider")),
+            Tip(N_("Quiet mode replaces aria2c, webtorrent, and peerflix native progress UIs with a minimal spinner."), ("downloads", "quiet mode", "settings")),  # i18n: ignore
+            Tip(N_("Direct download methods print a Ctrl+C reminder because the child process owns the active transfer."), ("downloads", "cancel", "keybinds")),
+            Tip(N_("Single-file torrents can be browsed too — open Browse torrent files to inspect or pick the one file."), ("downloads", "episode picker", "single-file")),  # i18n: ignore
+            Tip(N_("Open torrent page launches the source page (Nyaa, PirateBay, YTS, Knaben, F-Droid, …) in your browser."), ("downloads", "torrent info", "browser")),  # i18n: ignore
+            Tip(N_("Torrent info pulls the source page's category, description, and full file list straight into the app."), ("downloads", "torrent info", "origin")),  # i18n: ignore
+            Tip(N_("Torrent info flags whether subtitles are embedded in the video: definitively via ffprobe once the file is downloaded, otherwise a release-name heuristic."), ("downloads", "torrent info", "subtitles")),  # i18n: ignore
         ),
     ),
     TipCategory(
-        "Streaming",
+        N_("Streaming", ctx="tip category"),
         (
-            Tip("webtorrent is the default streaming backend; peerflix is the fallback if it stalls.", ("streaming", "webtorrent", "peerflix")),
-            Tip("VLC is required for Stream to VLC actions.", ("streaming", "vlc")),
-            Tip("Press v while streaming to reopen VLC without losing torrent progress.", ("streaming", "vlc", "hotkey")),
-            Tip("The v hotkey is a no-op while VLC is already running, which prevents duplicate VLC windows.", ("streaming", "vlc", "hotkey")),
-            Tip("Multi-episode streams show n for next and b for previous episode.", ("streaming", "episodes", "hotkey")),
-            Tip("Even without a picker selection, multi-episode torrents auto-enable n and b navigation.", ("streaming", "episodes", "metadata")),
-            Tip("Pick non-video files such as .srt, .nfo, or .jpg in the browser; downloads grab them, streams skip them.", ("streaming", "downloads", "selection")),
-            Tip("If a stream selection contains only non-video files, the stream errors instead of silently choosing another file.", ("streaming", "selection", "video")),
-            Tip('If VLC errors with "cannot open MRL", press v after a moment to retry the same stream.', ("streaming", "vlc", "retry")),
-            Tip("Quiet mode keeps stream headers and hotkeys visible while hiding backend progress noise.", ("streaming", "quiet mode")),
+            Tip(N_("webtorrent is the default streaming backend; peerflix is the fallback if it stalls."), ("streaming", "webtorrent", "peerflix")),
+            Tip(N_("VLC is required for Stream to VLC actions."), ("streaming", "vlc")),
+            Tip(N_("Press v while streaming to reopen VLC without losing torrent progress."), ("streaming", "vlc", "hotkey")),
+            Tip(N_("The v hotkey is a no-op while VLC is already running, which prevents duplicate VLC windows."), ("streaming", "vlc", "hotkey")),
+            Tip(N_("Multi-episode streams show n for next and b for previous episode."), ("streaming", "episodes", "hotkey")),
+            Tip(N_("Even without a picker selection, multi-episode torrents auto-enable n and b navigation."), ("streaming", "episodes", "metadata")),
+            Tip(N_("Pick non-video files such as .srt, .nfo, or .jpg in the browser; downloads grab them, streams skip them."), ("streaming", "downloads", "selection")),
+            Tip(N_("If a stream selection contains only non-video files, the stream errors instead of silently choosing another file."), ("streaming", "selection", "video")),
+            Tip(N_('If VLC errors with "cannot open MRL", press v after a moment to retry the same stream.'), ("streaming", "vlc", "retry")),
+            Tip(N_("Quiet mode keeps stream headers and hotkeys visible while hiding backend progress noise."), ("streaming", "quiet mode")),  # i18n: ignore
         ),
     ),
     TipCategory(
-        "Subtitles",
+        N_("Subtitles", ctx="tip category"),
         (
-            Tip("Subtitle Source auto-detect pulls .srt and .ass files out of the torrent and attaches them to VLC.", ("subtitles", "auto-detect", "streaming")),
-            Tip("Auto-detected subtitle matches are downloaded before VLC launches so the first stream can attach them.", ("subtitles", "auto-detect", "vlc")),
-            Tip("English-tagged subtitles are prioritized as the primary VLC subtitle track when present.", ("subtitles", "language", "vlc")),
-            Tip("Need subs the torrent does not ship? Search & download subtitles auto-pins the result to the next stream.", ("subtitles", "download", "streaming")),
-            Tip("Switch Subtitle Source to external to pick any .srt or .ass file from your downloads folder.", ("subtitles", "external", "folder")),
-            Tip("Switch Subtitle Source to off when you want VLC to launch without attached subtitles.", ("subtitles", "off", "streaming")),
-            Tip("Search several subtitle languages at once: type e.g. eng, por or pt-BR; the first one found becomes the primary track.", ("subtitles", "language", "multi")),
-            Tip("Want Brazilian Portuguese specifically? Enter pt-BR; OpenSubtitles treats it separately from European Portuguese.", ("subtitles", "language", "portuguese")),
-            Tip("Manage OpenSubtitles, Addic7ed, Jimaku, RuTracker, Online-Fix, Madokami, TMDB, IGDB and qBittorrent logins in-app: Credentials on the Select Provider screen.", ("subtitles", "credentials", "provider")),
-            Tip("OpenSubtitles.com credentials greatly improve subtitle matches; add them under Credentials.", ("subtitles", "credentials", "opensubtitles")),
-            Tip("The RuTracker provider needs a rutracker.org account — set it under Credentials on the Select Provider screen.", ("rutracker", "credentials", "provider")),
-            Tip("For anime, a Jimaku API key enables a dedicated fansub lookup that runs before the general subtitle providers.", ("subtitles", "anime", "jimaku")),
-            Tip("Already downloaded the video? Subtitle search hash-matches the real file for frame-accurate sync.", ("subtitles", "hash", "sync")),
-            Tip("No subtitles found by name? Download the video first, then search again; hash matching is more reliable, especially for non-English titles.", ("subtitles", "hash", "name")),
-            Tip("Downloaded subtitles are saved as UTF-8, so accented characters render correctly instead of as mojibake.", ("subtitles", "encoding", "utf-8")),
+            Tip(N_("Subtitle Source auto-detect pulls .srt and .ass files out of the torrent and attaches them to VLC."), ("subtitles", "auto-detect", "streaming")),
+            Tip(N_("Auto-detected subtitle matches are downloaded before VLC launches so the first stream can attach them."), ("subtitles", "auto-detect", "vlc")),
+            Tip(N_("English-tagged subtitles are prioritized as the primary VLC subtitle track when present."), ("subtitles", "language", "vlc")),
+            Tip(N_("Need subs the torrent does not ship? Search & download subtitles auto-pins the result to the next stream."), ("subtitles", "download", "streaming")),
+            Tip(N_("Switch Subtitle Source to external to pick any .srt or .ass file from your downloads folder."), ("subtitles", "external", "folder")),
+            Tip(N_("Switch Subtitle Source to off when you want VLC to launch without attached subtitles."), ("subtitles", "off", "streaming")),
+            Tip(N_("Search several subtitle languages at once: type e.g. eng, por or pt-BR; the first one found becomes the primary track."), ("subtitles", "language", "multi")),
+            Tip(N_("Want Brazilian Portuguese specifically? Enter pt-BR; OpenSubtitles treats it separately from European Portuguese."), ("subtitles", "language", "portuguese")),
+            Tip(N_("Manage OpenSubtitles, Addic7ed, Jimaku, RuTracker, Online-Fix, Madokami, TMDB, IGDB and qBittorrent logins in-app: Credentials on the Select Provider screen."), ("subtitles", "credentials", "provider")),
+            Tip(N_("OpenSubtitles.com credentials greatly improve subtitle matches; add them under Credentials."), ("subtitles", "credentials", "opensubtitles")),
+            Tip(N_("The RuTracker provider needs a rutracker.org account — set it under Credentials on the Select Provider screen."), ("rutracker", "credentials", "provider")),
+            Tip(N_("For anime, a Jimaku API key enables a dedicated fansub lookup that runs before the general subtitle providers."), ("subtitles", "anime", "jimaku")),
+            Tip(N_("Already downloaded the video? Subtitle search hash-matches the real file for frame-accurate sync."), ("subtitles", "hash", "sync")),
+            Tip(N_("No subtitles found by name? Download the video first, then search again; hash matching is more reliable, especially for non-English titles."), ("subtitles", "hash", "name")),
+            Tip(N_("Downloaded subtitles are saved as UTF-8, so accented characters render correctly instead of as mojibake."), ("subtitles", "encoding", "utf-8")),
         ),
     ),
     TipCategory(
-        "Safety & Privacy",
+        N_("Safety & Privacy", ctx="tip category"),
         (
-            Tip("Your public IP is visible to every peer; a VPN is the only real mitigation.", ("safety", "privacy", "vpn")),
-            Tip("The network exposure warning shows public IP, ISP, ASN, location, and proxy or hosting flags.", ("safety", "network exposure")),
-            Tip("Press Enter on the network exposure warning to acknowledge and continue.", ("safety", "network exposure", "hotkey")),
-            Tip("Press D on the startup warning to permanently dismiss it in filter_state.json.", ("safety", "network exposure", "settings")),
-            Tip("Press Esc on the network exposure warning to abort before joining any swarm.", ("safety", "network exposure", "hotkey")),
-            Tip("Re-open the network exposure panel anytime from Settings › Network exposure info on the main menu; afterwards its header says VPN or IP visible.", ("safety", "network exposure", "provider")),
-            Tip("The Trusted Uploaders preset is a community reputation heuristic, not a safety guarantee.", ("safety", "filters", "presets")),
-            Tip("Seed counts, file names, and uploader tags are not proof that content is safe.", ("safety", "results", "risk")),
+            Tip(N_("Your public IP is visible to every peer; a VPN is the only real mitigation."), ("safety", "privacy", "vpn")),
+            Tip(N_("The network exposure warning shows public IP, ISP, ASN, location, and proxy or hosting flags."), ("safety", "network exposure")),  # i18n: ignore
+            Tip(N_("Press Enter on the network exposure warning to acknowledge and continue."), ("safety", "network exposure", "hotkey")),  # i18n: ignore
+            Tip(N_("Press D on the startup warning to permanently dismiss it in filter_state.json."), ("safety", "network exposure", "settings")),  # i18n: ignore
+            Tip(N_("Press Esc on the network exposure warning to abort before joining any swarm."), ("safety", "network exposure", "hotkey")),  # i18n: ignore
+            Tip(N_("Re-open the network exposure panel anytime from Settings › Network exposure info on the main menu; afterwards its header says VPN or IP visible."), ("safety", "network exposure", "provider")),  # i18n: ignore
+            Tip(N_("The Trusted Uploaders preset is a community reputation heuristic, not a safety guarantee."), ("safety", "filters", "presets")),
+            Tip(N_("Seed counts, file names, and uploader tags are not proof that content is safe."), ("safety", "results", "risk")),
         ),
     ),
     TipCategory(
-        "State & Stats",
+        N_("State & Stats", ctx="tip category"),
         (
-            Tip("Search history, usage stats, quiet mode, download folder, filters, and warning dismissal live in filter_state.json.", ("state", "persistence")),
-            Tip("Searches and counters are saved in the background about a second after they change; explicit saves are written immediately.", ("state", "performance")),
-            Tip("Destructive actions such as clear history and reset stats ask for confirmation first.", ("state", "confirmation", "safety")),
-            Tip("Reset stats deletes only usage counters; filters, settings, and history are preserved.", ("stats", "reset", "state")),
-            Tip("Usage stats track searches, picked torrents, method picks, completions, runtime, and preset usage.", ("stats", "metrics")),
-            Tip("Method completion rates count only paths that can report a successful finish.", ("stats", "methods", "completion")),
+            Tip(N_("Search history, usage stats, quiet mode, download folder, filters, and warning dismissal live in filter_state.json."), ("state", "persistence")),
+            Tip(N_("Searches and counters are saved in the background about a second after they change; explicit saves are written immediately."), ("state", "performance")),
+            Tip(N_("Destructive actions such as clear history and reset stats ask for confirmation first."), ("state", "confirmation", "safety")),
+            Tip(N_("Reset stats deletes only usage counters; filters, settings, and history are preserved."), ("stats", "reset", "state")),
+            Tip(N_("Usage stats track searches, picked torrents, method picks, completions, runtime, and preset usage."), ("stats", "metrics")),
+            Tip(N_("Method completion rates count only paths that can report a successful finish."), ("stats", "methods", "completion")),
         ),
     ),
     TipCategory(
-        "Install & Updates",
+        N_("Install & Updates", ctx="tip category"),
         (
-            Tip("Install with pipx to keep it isolated in its own environment: pipx install torrent-finder-cli (or pip install torrent-finder-cli).", ("install", "pipx", "pip"), rotating=False),
-            Tip("No Python? Download a standalone, no-install binary for your OS from the GitHub Releases page.", ("install", "binary", "releases"), rotating=False),
-            Tip("The app checks for a newer version on startup — at most once a day, and silently if you are offline — and shows a notice when one is available.", ("updates", "version")),
-            Tip("Update from inside the app: when the yellow update banner shows, press U on the provider menu (an Install update row also appears there), or Tab → Install update at the search prompt. It updates in the same window with its download percentage (pip, then pipx's refresh; or git pull), then restarts the app on a key press; standalone binaries open the Releases page.", ("updates", "hotkey")),
-            Tip("Interface garbled on Windows 10? The legacy console can't render it — the app prints the fix commands at startup; the best one is installing Windows Terminal: winget install -e --id Microsoft.WindowsTerminal.", ("install", "windows", "terminal"), rotating=False),
-            Tip("Check which version you are running anytime with torrent-finder --version.", ("version", "cli")),
-            Tip("Choose Settings › Terminal command on the main menu to use torrent-finder, tf, torrent, find-torrent, or tfind from new terminals.", ("install", "command", "launcher")),
-            Tip("Settings › Appearance picks a design and its colours: Athanor's framed scriptorium (Citrinitas, Rubedo, Albedo, Viriditas, Nigredo) or the Simple look (Quiet Blue, Iris, Lagoon, Ember, Mono, Paper). Space previews, Enter saves.", ("appearance", "theme", "settings")),
-            Tip("Athanor's painting is chosen apart from its colours under Settings › Appearance › Painting. On Windows, Add a torrent-finder profile shows it behind the app in Windows Terminal; elsewhere, save it as an image for your terminal's background.", ("appearance", "painting", "windows", "terminal")),
-            Tip("In the Windows Terminal profile, Settings › Appearance › Font and Text size pick each design's font: Athanor's pixel fonts at sharp multiples (×2 fills a big screen), Cascadia or Consolas for Simple.", ("appearance", "font", "windows", "terminal")),
-            Tip("Like Athanor on a plain tab? Settings › Appearance › Windows Terminal › Plain look keeps the profile on Windows Terminal's own page and font. Open from other tabs makes the command open the profile's tab.", ("appearance", "profile", "windows", "terminal")),
-            Tip("Prefer the focused row on a tinted background, or more rows per screen? Settings › Appearance also sets the focus style and a Compact density.", ("appearance", "density", "settings")),
-            Tip("torrent --theme rubedo, or TORRENT_FINDER_THEME=paper, uses a theme for one run or shell without changing the saved one.", ("appearance", "theme", "cli")),
-            Tip("History, stats, and settings use machine-stable storage, so changing networks or launch methods does not reset them.", ("state", "data", "settings")),
+            Tip(N_("Install with pipx to keep it isolated in its own environment: pipx install torrent-finder-cli (or pip install torrent-finder-cli)."), ("install", "pipx", "pip"), rotating=False),
+            Tip(N_("No Python? Download a standalone, no-install binary for your OS from the GitHub Releases page."), ("install", "binary", "releases"), rotating=False),
+            Tip(N_("The app checks for a newer version on startup — at most once a day, and silently if you are offline — and shows a notice when one is available."), ("updates", "version")),
+            Tip(N_("Update from inside the app: when the yellow update banner shows, press U on the provider menu (an Install update row also appears there), or Tab → Install update at the search prompt. It updates in the same window with its download percentage (pip, then pipx's refresh; or git pull), then restarts the app on a key press; standalone binaries open the Releases page."), ("updates", "hotkey")),
+            Tip(N_("Interface garbled on Windows 10? The legacy console can't render it — the app prints the fix commands at startup; the best one is installing Windows Terminal: winget install -e --id Microsoft.WindowsTerminal."), ("install", "windows", "terminal"), rotating=False),
+            Tip(N_("Check which version you are running anytime with torrent-finder --version."), ("version", "cli")),
+            Tip(N_("Choose Settings › Terminal command on the main menu to use torrent-finder, tf, torrent, find-torrent, or tfind from new terminals."), ("install", "command", "launcher")),
+            Tip(N_("Settings › Appearance picks a design and its colours: Athanor's framed scriptorium (Citrinitas, Rubedo, Albedo, Viriditas, Nigredo) or the Simple look (Quiet Blue, Iris, Lagoon, Ember, Mono, Paper). Space previews, Enter saves."), ("appearance", "theme", "settings")),
+            Tip(N_("Athanor's painting is chosen apart from its colours under Settings › Appearance › Painting. On Windows, Add a torrent-finder profile shows it behind the app in Windows Terminal; elsewhere, save it as an image for your terminal's background."), ("appearance", "painting", "windows", "terminal")),
+            Tip(N_("In the Windows Terminal profile, Settings › Appearance › Font and Text size pick each design's font: Athanor's pixel fonts at sharp multiples (×2 fills a big screen), Cascadia or Consolas for Simple."), ("appearance", "font", "windows", "terminal")),
+            Tip(N_("Like Athanor on a plain tab? Settings › Appearance › Windows Terminal › Plain look keeps the profile on Windows Terminal's own page and font. Open from other tabs makes the command open the profile's tab."), ("appearance", "profile", "windows", "terminal")),
+            Tip(N_("Prefer the focused row on a tinted background, or more rows per screen? Settings › Appearance also sets the focus style and a Compact density."), ("appearance", "density", "settings")),
+            Tip(N_("torrent --theme rubedo, or TORRENT_FINDER_THEME=paper, uses a theme for one run or shell without changing the saved one."), ("appearance", "theme", "cli")),
+            Tip(N_("History, stats, and settings use machine-stable storage, so changing networks or launch methods does not reset them."), ("state", "data", "settings")),
         ),
     ),
 )
+
+
+def category_label(name: str) -> str:
+    """A category's English *name* in the interface language (for the tips page's titles and rows)."""
+    return t(name, ctx="tip category")
 
 
 def iter_tip_categories() -> tuple[TipCategory, ...]:
@@ -245,9 +281,11 @@ def iter_tips(*, rotating_only: bool = False) -> tuple[Tip, ...]:
 def find_tips(query: str = "", category: str | None = None) -> list[tuple[TipCategory, Tip]]:
     """Return catalog tips matching a text query and optional category name.
 
-    Matching is case-insensitive across category name, tip text, and tags.
+    Matching ignores case and accents, across the category name, tip text and
+    English tags, and translated categories and tips alike ("legendas" and
+    "subtitles" both find the subtitle tips). *category* is the English name.
     """
-    needle = query.strip().lower()
+    needle = _folded(query.strip())
     category_key = category.strip().lower() if category else ""
     matches: list[tuple[TipCategory, Tip]] = []
 
@@ -255,18 +293,32 @@ def find_tips(query: str = "", category: str | None = None) -> list[tuple[TipCat
         if category_key and tip_category.name.lower() != category_key:
             continue
         for tip in tip_category.tips:
-            haystack = " ".join((tip_category.name, tip.text, *tip.tags)).lower()
-            if not needle or needle in haystack:
+            if not needle or needle in _haystack(tip_category, tip):
                 matches.append((tip_category, tip))
 
     return matches
 
 
-# Backwards-compatible flat pool for existing callers.
+def _haystack(category: TipCategory, tip: Tip) -> str:
+    """What a query is matched against: the English and the interface language's words, folded."""
+    english = (category.name, tip.text, *tip.tags)
+    shown = (category.display_name(), tip.display_text())
+    return _folded(" ".join(dict.fromkeys(english + shown)))
+
+
+@lru_cache(maxsize=1024)
+def _folded(text: str) -> str:
+    """*text* without case or accents, so "configuracoes" finds "Configurações"."""
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    return "".join(character for character in decomposed if not unicodedata.combining(character))
+
+
+# Backwards-compatible flat pool (English) for existing callers.
 TIPS: list[str] = [tip.text for tip in iter_tips(rotating_only=True)]
+_ROTATING = iter_tips(rotating_only=True)
 
 
 def random_tip() -> str:
-    """Return a randomly-picked tip rendered as Rich markup."""
-    text = random.choice(TIPS)
-    return f"[accent]Tip[/accent]  {escape(text)}"
+    """Return a randomly-picked tip rendered as Rich markup, in the interface language."""
+    tip = random.choice(_ROTATING)
+    return t("[accent]Tip[/accent]  {text}", text=escape(tip.display_text()))
