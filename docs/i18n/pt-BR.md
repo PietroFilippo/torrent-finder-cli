@@ -32,8 +32,8 @@ which `python scripts/i18n.py todo pt-BR` shows beside each message and
   `Esc voltar`, never an action that begins with an accented letter.
 - Prose uses the imperative: "Pressione F para filtrar", "Pressione
   [key]qualquer tecla[/key] para continuar…".
-- Yes/no prompts will accept **S** and **sim** as well as Y in pt-BR (a later
-  phase wires the keys). Until then keep the prompt's letter: `Y confirmar`.
+- Yes/no prompts accept **S** and **sim** as well as Y in pt-BR; the prompt
+  shows `S confirmar`.
 
 ## Words
 

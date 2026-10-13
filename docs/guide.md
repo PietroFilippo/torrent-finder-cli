@@ -36,8 +36,8 @@ as it was when you quit.
 - **TOOLS**: **Install update** (only when one is available), **Quick
   actions**, **Credentials** (with how many are set), **Download folder** (with
   its path), **Downloads** (once a background download was started this
-  session, with a live count) and **Settings** (appearance, terminal command,
-  network check).
+  session, with a live count) and **Settings** (appearance, language, terminal
+  command, network check).
 - The header shows the version, a pending update and, once the network check
   has run, **VPN** or **IP visible**.
 
@@ -89,6 +89,7 @@ Long lists show your position at the right of the header line.
 | L | Bookmark current search |
 | E | [Settings backup / import](#settings-backup-and-import) |
 | Q | [qBittorrent connection / progress](#qbittorrent-webui) |
+| G | [Background downloads](#the-downloads-screen) |
 | S | [Usage stats](#usage-stats) |
 | T | Tips & shortcuts |
 | U | Install update (when one is available) |
@@ -106,14 +107,18 @@ or handoff.
 
 What's Next has a key for every row: **R** search again, **P** change provider,
 **M** main menu, **Tab** quick actions, **H** history, **S** stats, **T** tips,
-**C** credentials, **Q** exit. Lowercase letters work too. Exit, **Q**, **Esc**
-or **Ctrl+C** ask for confirmation; declining returns to the menu.
+**C** credentials, **D** downloads (once started), **Q** exit. Lowercase
+letters work too. Exit, **Q**, **Esc** or **Ctrl+C** ask for confirmation;
+declining returns to the menu.
 
 ### Quitting
 
 On the main menu, quitting takes two presses of **Esc** or **Ctrl+C**, in any
 mix. After the first, "Press Esc or Ctrl+C again to quit" appears under the key
 bar; any other choice, a submenu included, cancels it.
+
+If background downloads are active, every exit asks whether to keep the app
+open or stop them and quit; keeping it open is selected by default.
 
 ### Tips
 
@@ -574,12 +579,12 @@ torrent** goes to What's Next.
 
 | Section | Rows |
 |---|---|
-| Torrent & files | Browse torrent files (episode selection); Torrent info |
-| Subtitles | Subtitle source for streams; Search & download subtitles |
-| Stream to VLC | webtorrent, then peerflix |
-| Download | Open in your torrent client (recommended, and the only one that seeds); Send to qBittorrent WebUI; aria2c; webtorrent; peerflix |
-| Other | Copy magnet link; Open torrent page in the browser |
-| Settings | Save to (download folder); Quiet mode; Downloads run (in this screen / in background); Unpack page archives |
+| Torrent & files | Browse torrent files…; Torrent info (when the source has a page) |
+| Subtitles | Subtitles: auto-detect from torrent (or your chosen source); Search & download subtitles |
+| Stream to VLC | Stream with webtorrent; Stream with peerflix (video providers) |
+| Download | Open in your torrent client (recommended, and the only one that seeds); Send to qBittorrent WebUI (when configured); Download with aria2c, webtorrent or peerflix |
+| Other | Copy magnet link; Open torrent page (when available) |
+| Settings | Save to: folder; Quiet mode: ON/OFF; Downloads run: in this screen/in background; Unpack page archives |
 
 The focused row's help explains each option's trade-offs (speed, seeding, file
 selection).
@@ -613,8 +618,9 @@ time taken, unpack notes and, for a failure, the last lines of aria2c's log.
 Keys: **X** stops the focused download, **O** opens its folder, **C** clears
 the finished rows, and **Enter** lists its actions: Stop, Resume or Retry,
 Open folder, Remove from the list, Show log. A stopped download keeps its
-partial files; Resume (or downloading the same torrent to the same folder
-later) continues from them.
+partial files. Resume uses the currently configured download folder; leave it
+at the original folder to continue those files. Downloading the same torrent
+to that folder later also continues from them.
 
 Quitting while downloads run asks first: **Keep Torrent Finder open** (the
 default; Esc and Ctrl+C choose it too) or **Stop N downloads and quit**. An
@@ -634,10 +640,11 @@ creator search) and press **Enter**:
 Online-Fix, Madokami, Libgen and F-Droid entries have no magnet and are skipped
 by aria2c and copying.
 
-When some items fail, the menu adds **Retry the N that failed**, which runs only
-those again (or **Continue with the N left** when you stopped partway); the
-other rows still act on the whole selection, and **Done with this selection**
-goes to What's Next.
+For **Open all in your client**, a partial handoff adds **Retry the N that
+failed**, which opens only those again (or **Continue with the N left** when
+you stopped partway). The other rows still act on the whole selection, and
+**Done with this selection** goes to What's Next. The aria2c batch returns to
+download options on failure; it has no per-item retry row.
 
 ### Choosing files
 
@@ -812,9 +819,10 @@ keeps the old entry; saved details don't prove the torrent is still available.
 **Tab → Settings backup / import** moves settings between computers as a JSON
 file. A normal export holds provider choices, profiles, the download folder and
 stream preferences; history is optional. Credentials, bookmarks, stats and
-machine-specific launcher and update state are left out. Appearance and font
-choices travel; the Windows Terminal profile's look and "open from other tabs"
-stay with each computer. Exports always use a new file name, never overwriting one.
+machine-specific launcher and update state are left out. Appearance, font and
+language choices travel; the Windows Terminal profile's look and "open from
+other tabs" stay with each computer. Exports always use a new file name,
+never overwriting one.
 
 Import checks the file and previews it before **Apply import**:
 

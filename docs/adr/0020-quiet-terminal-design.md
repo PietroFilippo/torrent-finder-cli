@@ -6,6 +6,8 @@ live resize) stand. The colour paragraph below is amended by
 [ADR-0021](0021-themes.md): the roles stay, the shades come from a palette.
 Extended by [ADR-0023](0023-inspector-pane.md) (the inspector pane) and
 [ADR-0025](0025-tall-windows.md) (tall windows: the key bar on the bottom rows).
+Simple later gained a notice line above the key bar; section headings stay
+with their first row when a list scrolls.
 
 ## Context
 
@@ -78,7 +80,7 @@ drew their own panels and did not follow the menus' conventions.
   get more rows in the same window: the provider list fits at 80×24.
 - New screens describe keys in their footer string and get the key bar for
   free; prose belongs on its own footer line or segment.
-- `scripts/ui_snapshots.py` captures every screen at three sizes and reports
+- `scripts/ui_snapshots.py` captures every screen at five sizes and reports
   words that disappear and frames that overflow; run it before and after
   presentation changes. `tests/test_quiet_layout.py` covers the shared pieces.
 - Titles and footers are Rich markup; literal brackets in footers that are not

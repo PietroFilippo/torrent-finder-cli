@@ -1,7 +1,7 @@
 # ADR-0028: Interface languages: English as the key, looked up when drawn
 
-Status: accepted (2026-10-13). Phase 1 of three: the infrastructure. No
-screen is translated yet and nothing on screen changes.
+Status: accepted (2026-10-13). The three phases described below are complete:
+the interface, Settings › Language, prompts and CLI help are translated.
 
 ## Context
 
@@ -57,7 +57,7 @@ importing nothing from the app, so any module may import it):
 **Catalogues** are JSON objects in `torrent_finder/assets/locales/<code>/`.
 Every `*.json` in a language's folder is merged, so each translator (or
 agent) owns a file: `common.json` for shared words, one file per converted
-module (`ui.appearance.json`). A value is a string, or `{"one", "other",
+module (`ui-appearance.json`). A value is a string, or `{"one", "other",
 "zero"}` for a counted message keyed by its singular. They are read on first
 use and kept. The package already ships `assets/**`; binaries use
 `--collect-data torrent_finder`.
@@ -85,7 +85,7 @@ reads no settings.
 The regional format only suggests: `region_suggests(code)` names the
 language a Portuguese region suggests while the display language gave
 English, and `suggestion()` does so only when nothing chose this run's
-language (no flag, no variable, nothing saved). A later phase shows it once:
+language (no flag, no variable, nothing saved). The app shows it once:
 "Prefere português? Configurações › Idioma". On the user's machine, auto
 gives English plus that hint.
 
@@ -153,17 +153,16 @@ Athanor, are never translated.
 
 ## Consequences
 
-- Phases. **1** (this ADR): the module, `--lang`, the saved setting read at
-  startup, the seed catalogue, the tools, the glossary and the style guide.
+- Phases, completed for v0.10.0. **1** (this ADR): the module, `--lang`, the
+  saved setting read at startup, the seed catalogue, the tools, the glossary
+  and the style guide.
   **2**: screens converted module by module, each adding its catalogue file
   and its `# i18n: converted` line, translated in the same change (the
   missing-message check is the gate); a qps mode for
-  `scripts/ui_snapshots.py` and a `leaks` command that finds English left in
-  qps captures. **3**, after the user approves its design: a Settings ›
-  Language row that saves `settings.language`, the one-time regional hint,
-  yes/no prompts that accept S and *sim* in pt-BR, `language` in
-  `settings_backup.PREFERENCES` if it should travel with backups, and the
-  README and guide.
+  `scripts/ui_snapshots.py`; qps captures expose English left untranslated.
+  **3**: a Settings › Language row that saves `settings.language`, the
+  one-time regional hint, yes/no prompts that accept S and *sim* in pt-BR,
+  `language` in `settings_backup.PREFERENCES`, and the README and guide.
 - A screen builds its text when it draws. Before a string is converted, any
   comparison or persistence that uses it moves to a key; `security.py`'s
   masked labels are the known case.

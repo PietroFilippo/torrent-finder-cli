@@ -9,7 +9,7 @@ the page the theme's colour and a painting. The profile is extended by
 ## Context
 
 ADR-0021 gave the Quiet look six palettes. Users liked a roguelike desktop
-style (a NetHack-like status line, the IBM VGA font, warm "srcery" colours and
+style (a NetHack-like status line, the IBM VGA font, warm "sorcery" colours and
 Gustave Doré engravings behind the terminal) and asked for it as the default,
 with the earlier themes kept as a "Simple" category, and with the painting
 chosen apart from the colours.
@@ -23,9 +23,10 @@ plate into noise at 80x24 and takes the rows the content needs.
 **Designs.** `theme.Design` holds a name, a note, a glyph set and whether it
 is framed. **Athanor** (the default) draws `@` for the cursor, `»` between
 the parts of a screen name, `√`/`∙` for checkboxes and `▓` bars. **Simple** is
-the ADR-0021 look, unchanged. Every `Palette` names its design;
+the ADR-0021 layout. Every `Palette` names its design;
 `theme.palettes(design)` lists them and `DEFAULT_THEMES` says which one a
-design starts on. Athanor has five colourways named for the stages of the
+design starts on. Simple later gained a notice line above the key bar for
+announcements. Athanor has five colourways named for the stages of the
 alchemical work: **Citrinitas** (the default: lamplight amber on parchment),
 **Rubedo**, **Albedo**, **Viriditas** and **Nigredo**. A colourway adds roles
 the frame needs: `page` (its background), `text`, `ink` (the painting),
@@ -71,10 +72,11 @@ Painting for the Athanor design.
   in `%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\torrent-finder`.
   Its colour scheme puts the theme's page and text in the background and
   foreground, with the states on the ANSI colours. Its background picture is
-  the painting in that colourway, uniform and right-aligned. The picture is a
+  the painting in that colourway, placed on the chosen side (right by default,
+  left, or both sides with a faded companion plate). The picture is a
   bare file name beside the fragment, which Windows Terminal 1.24 and later
-  resolve; earlier versions show the profile without it. Its font is PxPlus
-  IBM VGA 8x16 (bundled with its CC BY-SA 4.0 licence; installed for the
+  resolve; earlier versions show the profile without it. Its default font is
+  PxPlus IBM VGA 8x16 (bundled with its CC BY-SA 4.0 licence; installed for the
   current user, after a confirmation that says so), drawn aliased. The GUID
   follows Windows Terminal's rule for fragment profiles. The profile runs the
   frozen binary, the installed `torrent-finder` command, or this Python with

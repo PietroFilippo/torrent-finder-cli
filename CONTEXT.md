@@ -194,7 +194,10 @@ and `on_change` signals redraws without workers writing to the console.
 Stop preserves partial data; shutdown stops jobs, reaps aria2 and joins
 workers. `busy()` stays true until a stopped finisher returns as well.
 The current unpack may finish, but no further archives or stats run
-after cancellation. UI integration and persistence belong to later phases.
+after cancellation. `ui/downloads.py` owns the status figure, Downloads screen,
+completion notices and quit prompt; `main.py` queues single and batch jobs.
+The saved `settings.background_downloads` switch is off by default and affects
+aria2c only. Jobs do not persist after exit.
 See [ADR-0029](docs/adr/0029-background-downloads.md).
 
 ## Session
@@ -384,14 +387,17 @@ and Tab for quick actions; its footer responds to viewport changes.
 the download menu. Back (including Esc/Ctrl+C) returns to the same `TorrentSession`
 or batch selection; it never repeats a handoff. Summary text stays in the selector
 context so compact layouts retain it. `_batch_handoff` and `_batch_aria2` return
-the navigation choice to `_batch_flow`. Failed downloads keep their error output
+the navigation choice to `_batch_flow`. A partial client handoff offers retry of
+failed or unattempted items only. Failed downloads keep their error output
 until acknowledged, then return to download options.
 
 A viewport is the terminal's current width and height, which may change while
 an interactive screen is open. `ui/layout.py` owns terminal-cell-aware
 cropping and marquee primitives. Selectable rows remain one physical line so
 cursor movement and height windowing are stable; contextual hints,
-descriptions, footers, and result metadata may wrap.
+descriptions, footers, result metadata and torrent info may wrap by terminal
+cells. `ui/keyboard.py` reads Windows console key events so a typed `à` is not
+mistaken for the prefix of a special key.
 
 The result table progressively removes columns as the viewport narrows and
 shows the selected result's full name and hidden fields below it. Selectors and the
@@ -408,8 +414,11 @@ Windowed selectors show position in the header instead of extra “more
 above/below” rows and accept PgUp/PgDn/Home/End. Action-only menus scroll too.
 See [ADR-0020](docs/adr/0020-quiet-terminal-design.md). In the Athanor design,
 `ui/chrome.py` puts that content in a double-line frame whose top edge carries
-the header, with a message line above and a status line below; screens ask
-`theme.view_height()` for their rows. See [ADR-0022](docs/adr/0022-athanor-design.md).
+the header, with a message line above and a status line below; Simple shows
+announcements on a notice line above the keys. Windows under 30×8 draw one
+"Enlarge the window" line. Section headings stay with their first row.
+Screens ask `theme.view_height()` for their rows. See
+[ADR-0022](docs/adr/0022-athanor-design.md).
 Search notices collapse to one line in short windows; `n` opens a notice
 browser without resetting the result selection. Mixed results show provider
 labels and selected-row provenance even when columns collapse.
@@ -425,6 +434,8 @@ the saved `settings.appearance`, then Citrinitas; Settings › Appearance
 previews and saves. See [ADR-0021](docs/adr/0021-themes.md). Athanor's
 **painting** is a separate saved choice, recoloured by the colourway; the
 terminal shows it, through the Windows Terminal profile or an exported image.
+The saved painting side chooses right (default), left or both sides, the last
+with a faded companion plate (`paintings.FACING`).
 Each design also keeps the profile's **font** and **text size** (bundled pixel
 fonts for Athanor, Windows' own for Simple; `terminal_profile.FONTS`). The
 profile is a fragment Windows Terminal re-reads whenever its settings.json
@@ -535,7 +546,8 @@ Everything lives in the `torrent_finder/` package; `torrent-finder` and
 `torrent` both map to `torrent_finder.main:main`. Paths are relative to the
 package. The sections above explain the concepts.
 
-**Entry and startup.** `main.py` (argparse and the top-level flows: search loop,
+**Entry and startup.** `__init__.py` (version from Git tags in a checkout,
+built version elsewhere). `main.py` (argparse and the top-level flows: search loop,
 quick actions, bookmarks, What's Next; `_available_facets` hides a creator facet
 whose credential is missing when it has no keyless fallback). `__main__.py`
 (`python -m torrent_finder` and the PyInstaller binary). `torrent.bat` (repo
@@ -549,8 +561,11 @@ for terminals without VT processing or `TERM=dumb`, with the `winget` and
 **Providers and search.** `providers/`: the registry with `ProviderGroup` and
 CLI choices (`__init__.py`), `base.py` (`BaseProvider`, `SearchEngine`, engine
 modes, preset query shaping, and the APIBay, Nyaa RSS and SolidTorrents calls),
-one module per Provider (YTS lives in the movie provider), and
-`combined_provider.py`. A provider may set
+`movie_provider.py`, `game_provider.py`, `online_fix_provider.py`,
+`fitgirl_provider.py`, `software_provider.py`, `mobile_provider.py`,
+`rutracker_provider.py`, `anime_provider.py`, `manga_provider.py`,
+`madokami_provider.py`, `book_provider.py` (YTS lives in the movie provider),
+and `combined_provider.py`. A provider may set
 `nyaa_category`, `creator_facets`, `prefer_title_matches` with `title_relevance`,
 and `_sort_results` for ties (Books: Libgen first; Madokami: a series folder
 before its contents). Search runs in `search_session.py`, `search_control.py`
@@ -563,7 +578,8 @@ Filtering and ranking: `filters.py`, `language_tags.py`, `name_rules.py`,
 `result_view.py`, `result_details.py` (listing metadata, filename hints,
 `release_tags`).
 
-**Resolvers.** `resolvers/types.py` (`CreatorFacet`, `Entity`, `Work`); facets
+**Resolvers.** `resolvers/__init__.py` re-exports the common types;
+`resolvers/types.py` defines `CreatorFacet`, `Entity` and `Work`; facets
 expose `search_entities(name)` and `list_works(entity, page)` → `(works,
 has_more)`. `anilist.py` (anime director and studio, manga writer), `jikan.py`
 (manga magazines), `wikidata.py` (keyless movie and game fallback),
@@ -577,6 +593,7 @@ otherwise. `titles.py` and `topics.py` serve alternate titles and discovery;
 subtitle classification, `match_subtitles_for`, `--select-file` ranges),
 `torrent_info.py` (source-page details for Nyaa, APIBay and YTS),
 `downloader.py` (aria2c, webtorrent, peerflix, VLC and quiet mode),
+`downloads.py` (session job manager), `aria2_rpc.py` (hidden aria2 engine),
 `direct_download.py` (safe names, `.part` files, numbered names), `unpack.py`,
 `qbittorrent.py`, `subtitles.py` (subliminal) and `jimaku.py`.
 
@@ -592,12 +609,14 @@ export; `scripts/build_paintings.py` rebuilds the assets), `terminal_profile.py`
 startup resolution, the `qps` pseudo-locale; `scripts/i18n.py` extracts and
 checks), `launcher_alias.py`, `updates.py`.
 
-**UI (`ui/`).** Frame and layout: `display.py` (alternate screen, flicker-free
-frames), `theme.py`, `chrome.py`, `layout.py`, `selector.py`, `inspector.py`.
+**UI (`ui/`).** `__init__.py` marks the UI package. Frame and layout:
+`display.py` (alternate screen, flicker-free frames), `theme.py`, `chrome.py`,
+`layout.py`, `selector.py`, `inspector.py`,
+`keyboard.py` (Windows key events), `selection.py` (shared multi-select mechanics).
 Screens: `prompts.py` (menus, download method, confirmations, provider source
 menu), `table.py`, `result_filters.py`, `search_progress.py`,
 `search_diagnostics.py`, `streaming.py`, `appearance.py`, `history.py`,
 `stats.py`, `tips.py` and `tips_page.py`, `creator.py`, `titles.py`,
 `discovery.py`, `combined.py`, `name_rules.py`, `bookmarks.py`, `backup.py`,
 `credentials.py`, `qbittorrent.py`, `launcher.py`, `storage.py` (unreadable
-settings at startup) and `update_progress.py`.
+settings at startup), `downloads.py` (background jobs) and `update_progress.py`.

@@ -35,8 +35,8 @@ On/Auto/Off, its Require/Prefer presets, recent searches there and its search
 and pick counts; a group's sources; the selected providers of Search across
 providers; Continue's names, presets and the searches before it; which logins
 are set; the download folder's free space and unpack setting; the appearance,
-terminal command and network verdict in use. Every other selector with row
-help gets the pane with that help.
+language, terminal command and network verdict in use. Every other selector
+with row help gets the pane with that help.
 
 ## Consequences
 

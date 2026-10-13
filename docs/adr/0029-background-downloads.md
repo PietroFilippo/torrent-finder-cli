@@ -1,6 +1,6 @@
 # ADR-0029: Session background downloads through aria2 JSON-RPC
 
-Status: accepted (2026-10-13). Phase A: engine and tests; screens follow.
+Status: accepted (2026-10-13). The engine and session screens ship in v0.10.0.
 
 ## Context
 
@@ -36,11 +36,11 @@ without drawing into the terminal or sharing its Ctrl+C delivery.
   process-tree kill and reaping. An unpack already executing is allowed to
   return; cancellation prevents more archives or completion statistics.
   `--stop-with-process` covers parent crashes. `downloads.busy()` supplies the
-  future update/quit guard, including queued, paused and unpacking jobs and a
+  update/quit guard, including queued, paused and unpacking jobs and a
   stopped finisher that has not returned yet.
 - State identities remain English; labels and diagnostics use `t()` and the
-  Brazilian Portuguese catalogue. Notifications reach the later UI through
-  `on_change`, rather than calling chrome from the engine.
+  Brazilian Portuguese catalogue. Notifications reach `ui/downloads.py`
+  through `on_change`, rather than calling chrome from the engine.
 
 ## Rejected
 
@@ -52,9 +52,13 @@ without drawing into the terminal or sharing its Ctrl+C delivery.
 
 ## Consequences
 
-The UI can read immutable summary values and independent job copies while
-RPC or unpack work runs. The next phase must subscribe to changes, enroll
-batches together, call shutdown in its finally block, and refuse in-app
-updates while busy: a POSIX exec restart keeps the watched parent PID.
+The UI reads immutable summary values and independent job copies while RPC or
+unpack work runs. `ui/downloads.py` draws the Downloads screen and status
+figure; `main.py` enrolls batches together, calls shutdown in its finally
+block, and refuses in-app updates while busy: a POSIX exec restart keeps the
+watched parent PID. The saved "Downloads run: in background" switch defaults
+off; only aria2c uses this engine. Streaming and other backends stay in the
+foreground, and jobs do not outlive this process.
+
 Fake-RPC tests cover the lifecycle; a real aria2 test downloads from a local
 HTTP server into temporary storage and asserts that no child remains.

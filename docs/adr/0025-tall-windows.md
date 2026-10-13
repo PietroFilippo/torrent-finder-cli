@@ -27,11 +27,11 @@ threshold), every selector screen:
   stays at the top. The key bar is in the same place on every screen,
   whatever the length of the list. With the inspector pane, the key bar is
   at the bottom of the list column.
-- **shows the focused row's details below the list when there is no room
-  beside it**: the `SelectItem.inspect` lines the pane shows in wide windows
-  go under the focused row's help, in rows the list leaves empty (one row
-  stays between them), cut with "…" when they do not fit. They never cost
-  list rows.
+- **shows the focused row's help and details below the list when there is no
+  room beside it**: the `SelectItem.inspect` lines the pane shows in wide
+  windows follow the row's help, in rows the list leaves empty (one row stays
+  between the list and help), cut with "…" when they do not fit. They never
+  cost list rows.
 
 *Amended 2026-10-13.* At first the focused row's help and its details sat
 with the key bar on the bottom rows, so a four-row menu in a 36-row window
@@ -40,8 +40,8 @@ details follow the list, one row under it, and the rows the list leaves
 empty come after them, before the notices, rule and keys. Short windows and
 compact density are unchanged: they had no empty rows to move.
 
-Settings' rows got such details (the appearance in use, the terminal command,
-the network check), split out of the main menu's Settings row.
+Settings' rows got such details (the appearance in use, language, the terminal
+command, the network check), split out of the main menu's Settings row.
 
 Compact density and short windows keep the old layout, so they keep every
 row for the list.
@@ -51,8 +51,8 @@ which is what shrinks a fullscreen grid; the layout only uses the rows it has.
 
 ## Consequences
 
-- Short menus read as one full-screen layout: list on top, help and keys at
-  the bottom, instead of a block at the top of an empty frame. The eye
-  travels further from a short list to its keys in very tall windows.
+- Short menus read as one full-screen layout: list and help at the top, keys
+  at the bottom. The eye travels further from a short list to its keys in
+  very tall windows.
 - `tests/test_tall_layout.py` pins the footer's place, the tip, compact
   density, short and wide windows, and the details' room.

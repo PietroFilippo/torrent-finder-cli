@@ -102,7 +102,7 @@ Converting a module:
 3. `python scripts/i18n.py todo pt-BR --files torrent_finder/ui/x.py` lists
    the new messages with the code around them, any width budget, the glossary
    terms they contain and a JSON skeleton. Translate into
-   `torrent_finder/assets/locales/pt-BR/ui.x.json` (one file per module, so
+   `torrent_finder/assets/locales/pt-BR/ui-x.json` (one file per module, so
    parallel work never edits the same file; shared words in `common.json`),
    following [the style guide](i18n/pt-BR.md).
 4. `python scripts/i18n.py check pt-BR` must say "No problems"; so must the
