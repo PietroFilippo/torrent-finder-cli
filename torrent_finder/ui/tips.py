@@ -170,6 +170,8 @@ TIP_CATEGORIES: tuple[TipCategory, ...] = (
             Tip(N_("Copy magnet link puts the selected torrent's magnet URI on your clipboard."), ("downloads", "magnet", "clipboard")),
             Tip(N_("Set a default save folder with Save to (download menu) or Download folder (provider screen); it applies to aria2c, webtorrent, peerflix, subtitles, and Online-Fix / Madokami / Libgen / F-Droid file saves."), ("downloads", "settings", "folder", "provider")),
             Tip(N_("Quiet mode replaces aria2c, webtorrent, and peerflix native progress UIs with a minimal spinner."), ("downloads", "quiet mode", "settings")),  # i18n: ignore
+            Tip(N_("Turn on Downloads run: in background (download menu › Settings) and aria2c downloads keep going while you search. The status line counts them, and D on the main menu opens Downloads: progress, X stops one, O opens its folder."), ("downloads", "background", "aria2c", "settings", "hotkey")),
+            Tip(N_("Quitting with downloads running asks first: keeping Torrent Finder open is the default. Stopping keeps the partial files, so downloading the same torrent to the same folder later resumes it."), ("downloads", "background", "quit", "resume")),
             Tip(N_("Direct download methods print a Ctrl+C reminder because the child process owns the active transfer."), ("downloads", "cancel", "keybinds")),
             Tip(N_("Single-file torrents can be browsed too — open Browse torrent files to inspect or pick the one file."), ("downloads", "episode picker", "single-file")),  # i18n: ignore
             Tip(N_("Open torrent page launches the source page (Nyaa, PirateBay, YTS, Knaben, F-Droid, …) in your browser."), ("downloads", "torrent info", "browser")),  # i18n: ignore

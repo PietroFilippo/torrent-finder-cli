@@ -35,13 +35,15 @@ as it was when you quit.
   preferred or required presets.
 - **TOOLS**: **Install update** (only when one is available), **Quick
   actions**, **Credentials** (with how many are set), **Download folder** (with
-  its path) and **Settings** (appearance, terminal command, network check).
+  its path), **Downloads** (once a background download was started this
+  session, with a live count) and **Settings** (appearance, terminal command,
+  network check).
 - The header shows the version, a pending update and, once the network check
   has run, **VPN** or **IP visible**.
 
 Keys: **F** opens the highlighted provider's filters and engines and comes
 back, **H** search history, **S** usage stats, **T** tips, **Tab** quick
-actions, **U** install update.
+actions, **D** downloads (when the row shows), **U** install update.
 
 Anime, Movies & Series, General Games, General Manga and Books open **Search
 options** first: keyword search, [alternate-title search](#alternate-titles),
@@ -577,7 +579,7 @@ torrent** goes to What's Next.
 | Stream to VLC | webtorrent, then peerflix |
 | Download | Open in your torrent client (recommended, and the only one that seeds); Send to qBittorrent WebUI; aria2c; webtorrent; peerflix |
 | Other | Copy magnet link; Open torrent page in the browser |
-| Settings | Save to (download folder); Quiet mode; Unpack page archives |
+| Settings | Save to (download folder); Quiet mode; Downloads run (in this screen / in background); Unpack page archives |
 
 The focused row's help explains each option's trade-offs (speed, seeding, file
 selection).
@@ -593,6 +595,31 @@ selection).
 - A failed or missing tool, or **Ctrl+C**, brings you back to this menu with
   your search kept. Failed downloads keep their error output until you
   acknowledge it.
+- **Downloads run: in background** (saved, off by default) makes aria2c
+  downloads, single and batch, keep going while you search: a hidden aria2c
+  takes them two at a time, and the menu confirms with Continue, Back to
+  download options or Open Downloads. The status line (Simple: the header)
+  counts them, `↓ 2 · 43% · 3.1 MB/s`, and reads `↓ ✓1 new` once one has
+  finished; a finished or failed download also says so on the message line.
+  webtorrent, peerflix and streaming stay in the foreground.
+
+### The Downloads screen
+
+**D** on the main menu or What's Next (once a background download was
+started), or **Background downloads** (**G**) under quick actions, opens
+it: ACTIVE and FINISHED rows with each download's progress, speed and time
+left, or its result; the focused row's folder, size, peers and seeds, files,
+time taken, unpack notes and, for a failure, the last lines of aria2c's log.
+Keys: **X** stops the focused download, **O** opens its folder, **C** clears
+the finished rows, and **Enter** lists its actions: Stop, Resume or Retry,
+Open folder, Remove from the list, Show log. A stopped download keeps its
+partial files; Resume (or downloading the same torrent to the same folder
+later) continues from them.
+
+Quitting while downloads run asks first: **Keep Torrent Finder open** (the
+default; Esc and Ctrl+C choose it too) or **Stop N downloads and quit**. An
+in-app update waits until they finish or are stopped. Downloads do not
+outlive the app yet.
 
 ### Batch downloads
 

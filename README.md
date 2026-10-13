@@ -109,6 +109,9 @@ open the download menu.
   with real progress, or download in the terminal with **aria2c**, webtorrent or
   peerflix.
 - **Batch**: tick several results and open, download or copy them all at once.
+- **Background downloads** (optional): aria2c keeps downloading while you
+  search; the status line counts them and a Downloads screen follows,
+  stops or resumes each one.
 - **Pick files** inside a torrent, such as single episodes or manga volumes.
 - **Direct downloads** from Libgen, Madokami and F-Droid, never overwriting a file.
 - **Stream to VLC** with next and previous episode keys, and subtitles found
