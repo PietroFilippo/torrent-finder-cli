@@ -1669,6 +1669,20 @@ def torrent_summary(torrent: "dict | None", *, file_count: "int | None" = None, 
     return summary
 
 
+def header_shows(subject: str, title: str, width: int, height: int, rows: int = 0) -> bool:
+    """True when the header of a screen named *title* shows the whole *subject* in a window this size.
+
+    The Athanor frame's top edge cuts a long title; Simple's header continues
+    it on a second line, which a narrow window cuts too. *rows* is the list's
+    length: a list longer than the window gets a position in the header, which
+    takes room from the title.
+    """
+    position = f"{rows}–{rows} of {rows}" if rows and theme.view_height(height, width) < rows + 8 else ""
+    if theme.framed(width, height):
+        return subject in frames.top_edge(title, position, width).plain
+    return subject in "".join(line.plain for line in theme.header_lines(title, position, width))
+
+
 def download_method_prompt(
     magnet: str = "",
     show_subtitles: bool = True,
@@ -1690,8 +1704,8 @@ def download_method_prompt(
     list is known, the subtitle choice and the picked files.
     Returns 't', 'd', 'p', 'aria', 'stream_w', 'stream_p', 's', 'pick_episodes',
     'torrent_info', 'set_subs', 'back', 'cancel', or None (Esc). 'back' and Esc
-    step back to the results table; 'cancel' (✕ Cancel) means "done with this
-    torrent" → caller goes to what's next. 'l' (copy magnet) and 'open_page'
+    step back to the results table; 'cancel' ("Done with this torrent") means
+    the caller goes to what's next. 'l' (copy magnet) and 'open_page'
     (browser) are handled internally. *focus* is the value of the row to start
     on (the option chosen last time); otherwise "Open in client" is focused.
     """
@@ -1943,7 +1957,8 @@ def download_method_prompt(
         is_action=True,
         description="Return to the search results list",
     ))
-    items.append(SelectItem(label="Cancel", value="cancel", is_action=True))
+    items.append(SelectItem(label="Done with this torrent", value="cancel", is_action=True,
+                            description="Leave this torrent and choose what to do next."))
 
     def handle_download_action(idx, items):
         if items[idx].value == "l" and magnet:
@@ -1985,18 +2000,31 @@ def download_method_prompt(
 
     # The header names the picked torrent; the summary under it says what it is.
     title = "Download"
+    name = str(torrent.get("name") or "Unknown") if torrent else ""
     if torrent:
-        title += f" › {escape(str(torrent.get('name') or 'Unknown'))}"
+        title += f" › {escape(name)}"
     summary = torrent_summary(torrent, file_count=file_count,
                               subtitles=sub_label if show_subtitles else "",
                               selected=selected_indexes if has_selection else None)
 
+    def intro() -> "Text | list[Text]":
+        """The summary, under the name when a narrow window's header cuts it to a stump.
+
+        A short window keeps one intro line, so there the name stands alone.
+        """
+        width, height = console.size.width, console.size.height
+        if torrent and not header_shows(name, title, width, height, len(items)):
+            name_line = Text(name, style="bold")
+            return [name_line, summary] if theme.roomy(theme.view_height(height, width), 20) else [name_line]
+        return summary
+
     idx = arrow_select(
         items,
         title=title,
-        intro=summary,
+        intro=intro,
         banner=_make_banner_panel(),
         on_action=handle_download_action,
+        footer="↑/↓ navigate  •  Enter select  •  Esc back to results",
         # Return to the option chosen last time, else "Open in client" (the primary action).
         start_index=next((i for i, item in enumerate(items) if focus and item.value == focus), default_focus),
     )
@@ -2017,8 +2045,8 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
 
     ``copyable`` is how many of the selected items actually have a magnet
     (Online-Fix and Madokami have none); Copy is disabled when it's zero.
-    Returns "open", "copy", "back", "cancel", or None (Esc — caller treats it
-    as back).
+    Returns "open", "copy", "back", "cancel" ("Done with this selection"), or
+    None (Esc — caller treats it as back).
     """
     from torrent_finder.downloader import detect_torrent_client
 
@@ -2073,7 +2101,8 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
             is_action=True,
             description="Return to the results list to change your selection.",
         ),
-        SelectItem(label="Cancel", value="cancel", is_action=True),
+        SelectItem(label="Done with this selection", value="cancel", is_action=True,
+                   description="Leave these torrents and choose what to do next."),
     ]
 
     from torrent_finder.qbittorrent import configured

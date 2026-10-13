@@ -478,9 +478,9 @@ def _browse_results(provider, results, note: str = "") -> str:
 
     Returns ``"back"`` if the user Esc'd the results table (caller steps back a
     screen), or ``"next"`` if a download action completed (caller shows "what's
-    next?"). On the download menu, Esc / "↩ Go back to results" step back to the
-    results table; "✕ Cancel" means "done with this torrent" → returns ``"next"``
-    (what's next). Completed download-menu actions offer Continue or Back to
+    next?"). On the download menu, Esc / "Back to results" step back to the
+    results table; "Done with this torrent" returns ``"next"`` (what's next).
+    Completed download-menu actions offer Continue or Back to
     the same session; standalone acquisitions handle their own completion.
     """
     from torrent_finder.ui.table import ResultsViewState
@@ -765,7 +765,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                 console.print("\n[muted]Press [key]any key[/key] to continue…[/muted]")
                 readchar.readkey()
                 continue
-            elif method == "cancel":  # ✕ Cancel → done with this torrent → what's next
+            elif method == "cancel":  # "Done with this torrent" → what's next
                 clear_screen()
                 return "next"
             else:  # "back" (Go back to results) or Esc → step back to the results table

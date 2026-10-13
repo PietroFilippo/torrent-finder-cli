@@ -26,6 +26,12 @@ def plain_lines(text: str) -> list[str]:
     return [Text.from_ansi(line).plain for line in text.rstrip("\n").split("\n")]
 
 
+def plain_console(file, width, height=None) -> Console:
+    """A colourless off-screen console: Rich keeps a style's first ANSI rendering, and the 16-colour
+    fallback of a console without a terminal would stick to the palette's styles for later tests."""
+    return Console(file=file, width=width, height=height, color_system=None)
+
+
 class EnlargeNoticeTests(unittest.TestCase):
     def setUp(self):
         self.addCleanup(theme.apply, "quiet", focus="bar", density="comfortable")
@@ -107,6 +113,7 @@ class MenuTests(unittest.TestCase):
             return next(keys)
 
         with patch.object(type(selector.console), "size", property(lambda _self: size[0])), \
+             patch.object(selector, "buffer_console", side_effect=plain_console), \
              patch.object(display, "paint", side_effect=paint), \
              patch.object(selector.sys, "stdout", io.StringIO()), \
              patch.object(selector.readchar, "readkey", side_effect=key):
@@ -161,6 +168,7 @@ class TextFieldTests(unittest.TestCase):
         size = [ConsoleDimensions(20, 6)]
         painted = []
         with patch.object(type(prompts.console), "size", property(lambda _self: size[0])), \
+             patch.object(selector, "buffer_console", side_effect=plain_console), \
              patch.object(display, "paint", side_effect=lambda content, *a, **k: painted.append(content) or ""), \
              patch.object(selector.sys, "stdout", io.StringIO()), patch.object(prompts.sys, "stdout", io.StringIO()), \
              patch.object(prompts.readchar, "readkey", return_value="n"):

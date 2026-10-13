@@ -283,7 +283,8 @@ class DownloadMenuHeaderTests(unittest.TestCase):
                                            show_episode_picker=True, selected_indexes=[1, 2])
         title = Text.from_markup(captured["title"]).plain
         self.assertIn("Big Buck Bunny [1080p]", title)
-        summary = captured["intro"].plain  # the facts sit under the header, not in its status
+        intro = captured["intro"]() if callable(captured["intro"]) else captured["intro"]
+        summary = intro.plain if isinstance(intro, Text) else intro[-1].plain  # the facts sit under the header
         self.assertIn("844.7 MB · 12 seeds · 0 leeches", summary)
         self.assertIn("2 picked (1-2)", summary)
         self.assertNotIn("status", captured)
