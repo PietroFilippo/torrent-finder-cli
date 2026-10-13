@@ -163,7 +163,7 @@ class ResultsLanguageTests(unittest.TestCase):
             table._visible_count(10, 40, 80, "", False)
         expected = table.results_status(887, 1, 888, 87, 88, frozenset(range(888)))
         self.assertEqual(header.call_args.args[1], expected)
-        self.assertEqual(expected, "888–888 de 888 · página 88/88 · 888 marcados")
+        self.assertEqual(expected, "888–888 de 888 · página 88/88 · 888 selecionados")
 
     def test_key_bar_switches_using_translated_width_and_preserves_keys(self):
         for language in ("en", "pt-BR", "qps"):

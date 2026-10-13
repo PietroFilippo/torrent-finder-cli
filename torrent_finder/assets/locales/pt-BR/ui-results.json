@@ -89,8 +89,8 @@
   "{start}–{end} of {total}": "{start}–{end} de {total}",
   "page {page}/{pages}": "página {page}/{pages}",
   "{n} picked": {
-    "one": "{n} marcado",
-    "other": "{n} marcados"
+    "one": "{n} selecionado",
+    "other": "{n} selecionados"
   },
   "{order} (overrides preferences)": "{order} (substitui preferências)",
   "Sort: {order}": "Ordem: {order}",
