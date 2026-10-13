@@ -271,7 +271,7 @@ def _detail_count():
     return max(2, min(8, _rows() // 4) - 1)
 
 
-def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = False) -> str:
+def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = False, *, full: bool = False) -> str:
     """The results key bar as plain text (it contains "[/]"), most frequent keys first."""
     if expanded:
         return t("i close • {scroll} scroll details • b bookmark • Esc back", scroll="[/]")
@@ -282,7 +282,7 @@ def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = Fa
         tail += " • " + t("←/→ page")
     tail += " • " + t("Esc back")
     # Measure the rendered key bar: spacing is owned by the theme, and labels vary by language.
-    if len(theme.wrap_keys(theme.parse_footer(Text(keys + tail)).keys, console.size.width)) > 1:
+    if not full and len(theme.wrap_keys(theme.parse_footer(Text(keys + tail)).keys, console.size.width)) > 1:
         enter = t("Enter download {count}", count=len(picked)) if picked else t("Enter open")
         keys = t("↑/↓ move • Space pick • {enter} • i details • b save • f refine", enter=enter)
     return keys + tail
@@ -293,7 +293,7 @@ RESULT_EXTRA_KEYS = (("←/→", N_("previous / next page")), ("0-9", N_("jump t
                      ("Home/End", N_("first / last result")), ("PgUp/PgDn", N_("move a page of rows")),
                      ("d", N_("download the picked results")), ("n", N_("search notices and diagnostics")),
                      ("r", N_("retry failed sources")), ("m", N_("load more results")),
-                     ("[/]", N_("scroll the details (with i)")), ("Esc", N_("back")))
+                     ("[/]", N_("scroll the details (with i)")), ("Esc", N_("back")), ("Ctrl+C", N_("back")))
 
 
 def _table_caption(
@@ -997,7 +997,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     live.stop()
                     try:
                         from torrent_finder.ui.selector import show_keys
-                        show_keys(Text(heading or t("Results")), Text(_result_keys(total_pages, frozenset(picked))),
+                        show_keys(Text(heading or t("Results")), Text(_result_keys(total_pages, frozenset(picked), full=True)),
                                   extra=tuple((key, t(action)) for key, action in RESULT_EXTRA_KEYS))
                     except KeyboardInterrupt:
                         pass

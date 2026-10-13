@@ -745,7 +745,8 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
 
 # Keys every selector understands, listed by show_keys after the screen's own.
 _STANDARD_KEYS = (("↑/↓", N_("move", ctx="key bar")), ("PgUp/PgDn", N_("page", ctx="key bar")),
-                  ("Home/End", N_("first / last", ctx="key bar")), ("Esc", N_("back", ctx="key bar")))
+                  ("Home/End", N_("first / last", ctx="key bar")), ("Esc", N_("back", ctx="key bar")),
+                  ("Ctrl+C", N_("back", ctx="key bar")))
 _SELECT = N_("Select")
 
 
@@ -850,6 +851,7 @@ def arrow_select(
     help: bool = True,
     tip: str = "",
     refresh: Callable[[], bool] | None = None,
+    help_footer: "str | Text | Callable[[], str | Text]" = "",
 ) -> int | list[int] | tuple | None:
     """Interactive arrow-key selector.
 
@@ -869,6 +871,8 @@ def arrow_select(
                The caller reads items[i].toggled to see what was toggled.
                If False, Enter returns the index of the highlighted item.
         footer: Custom footer text (overrides default).
+        help_footer: Complete key bar for ``?`` when footer uses compact labels
+                     or omits keys. May be a callable, like footer.
         start_index: Initial cursor position.
         banner: Accepted for older callers; every frame draws its own header.
         status: Optional right-aligned header text (str or callable).
@@ -1075,7 +1079,7 @@ def arrow_select(
                 return None
             elif key == "?" and help_enabled:
                 try:
-                    aside(show_keys, _resolve(title), _resolve(footer) or _default_footer(multi))
+                    aside(show_keys, _resolve(title), _resolve(help_footer) or _resolve(footer) or _default_footer(multi))
                 except KeyboardInterrupt:
                     pass
             elif hotkeys and key in hotkeys:

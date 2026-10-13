@@ -808,7 +808,7 @@ def quick_actions_menu(update_available: bool = False, provider=None) -> "str | 
         title=t("Quick actions › {provider}", provider=provider.label) if provider else t("Quick actions"),
         intro=lambda: "" if provider or console.size.height < 20 else t("Search actions ask for a provider first."),
         banner=_make_banner_panel(),
-        footer=t('↑/↓ select  •  {jump} jump  •  Esc back', jump=jump),
+        footer=t('↑/↓ select  •  Enter select  •  {jump} jump  •  Esc back', jump=jump),
         key_actions=key_actions,
     )
     if idx is None:
@@ -2528,7 +2528,7 @@ def provider_select_prompt(
         # (that would re-roll on every keypress and make the screen jitter).
         tip_line = random_tip()
 
-        def footer():
+        def footer(complete=False):
             # Re-evaluated on every render: resizing the open menu switches
             # between the full key bar and a compact one.
             if downloads_row is not None:
@@ -2537,6 +2537,10 @@ def provider_select_prompt(
             else:
                 full = t("↑/↓ navigate  •  Enter select  •  F filters  •  H history  •  S stats  •  T tips  •  Tab actions  •  Esc quit")
                 compact = t("↑/↓ move • Enter select • Tab actions • Esc quit\nF filters • H history • S stats")
+            if update_available:
+                full += " • " + t("U update")
+            if complete:
+                return full
             keys = compact if console.size.height < 24 or _keybar_wraps(full, console.size.width, items) else full
             return (notice + "\n" if notice else "") + keys
 
@@ -2574,6 +2578,7 @@ def provider_select_prompt(
             status=lambda: home_status(update_status),
             intro=room,
             footer=footer,
+            help_footer=lambda: footer(complete=True),
             banner=_make_banner_panel(),
             start_index=start,
             alert=quit_guard.hint if quit_guard else "",

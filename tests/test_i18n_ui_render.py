@@ -132,7 +132,8 @@ class RenderLanguageTests(unittest.TestCase):
             selector.show_keys("Back", i18n.t("Enter select"))
         items = select.call_args.args[0]
         self.assertEqual([item.label.plain.strip() for item in items[:-1]],
-                         ["Enter      selecionar", "↑/↓        mover", "PgUp/PgDn  paginar", "Home/End   primeiro / último", "Esc        voltar"])
+                         ["Enter      selecionar", "↑/↓        mover", "PgUp/PgDn  paginar", "Home/End   primeiro / último",
+                          "Esc        voltar", "Ctrl+C     voltar"])
         self.assertEqual(items[-1].label, "Voltar")
         self.assertEqual(select.call_args.kwargs["title"].plain, "Teclas › Back")
 
