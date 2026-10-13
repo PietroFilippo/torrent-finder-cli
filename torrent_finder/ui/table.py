@@ -666,6 +666,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     global_offset = current_page * RESULTS_PER_PAGE
     # The Athanor message line while the table is open (Simple: a notice above the keys); without one, the
     # message waits for a screen that has it.
+    from torrent_finder.ui import downloads as downloads_ui
+    watched = downloads_ui.watch()
     announcement = frames.take_message() if frames.shows_message(console.size.width, console.size.height) else ""
     simple_notice = "" if theme.FRAMED else announcement
 
@@ -696,6 +698,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         nonlocal counts_revision, source_counts
         status = results_status(current if expanded else scroll_offset, 1 if expanded else visible_count,
                                 total, current_page, total_pages, frozenset(picked))
+        if not theme.FRAMED:
+            status = " · ".join(part for part in (downloads_ui.badge(), status) if part)
         width, full_height = console.size.width, console.size.height
         if frames.too_small(width, full_height):
             return Group(*frames.enlarge_notice(width, full_height))
@@ -762,7 +766,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
     ) as live:
 
         def ticker():
-            nonlocal scroll_offset, visible_count
+            nonlocal scroll_offset, visible_count, announcement, simple_notice
             last_tick = 0
             previous_size = console.size
             measured_key = None
@@ -776,7 +780,12 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                 previous_size = current_size
                 cur = current
 
-                if size_changed:
+                downloads_changed = downloads_ui.poll(watched)
+                old_notice = simple_notice
+                if (downloads_changed or size_changed) and frames.shows_message(*current_size):
+                    announcement = frames.take_message() or announcement
+                    simple_notice = "" if theme.FRAMED else announcement
+                if size_changed or simple_notice != old_notice:
                     visible_count = _fit_rows()
                     if cur < scroll_offset:
                         scroll_offset = cur
@@ -807,7 +816,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                 elif last_tick:
                     tick_changed = True
 
-                if not size_changed and not tick_changed and not layout_changed:
+                if not size_changed and not tick_changed and not layout_changed and not downloads_changed:
                     continue
                 last_tick = new_tick
                 marquee_state["tick"] = new_tick

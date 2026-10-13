@@ -241,7 +241,9 @@ def make_search_screen_renderer(
     def render(target: Console) -> None:
         width, full_height = target.size.width, target.size.height
         height = theme.view_height(full_height, width)
-        for line in theme.frame_header(title, "", width, full_height):
+        from torrent_finder.ui import downloads as downloads_ui
+        status = downloads_ui.badge() if not theme.FRAMED else ""
+        for line in theme.frame_header(title, status, width, full_height):
             target.print(line)
         if theme.roomy(height, 14):
             for line in theme.frame_rule(width, full_height):
@@ -477,6 +479,8 @@ def get_query_with_shortcut(
     committed = list(initial_committed or []) if multi else []
 
     hist = history or []
+    from torrent_finder.ui import downloads as downloads_ui
+    watched = downloads_ui.watch() if screen_renderer is not None else {}
     # Taken only when this screen has a message line to show it on; otherwise it waits for one.
     announcement = (frames.take_message()
                     if screen_renderer is not None and frames.shows_message(console.size.width, console.size.height)
@@ -523,11 +527,14 @@ def get_query_with_shortcut(
         return typed, matching_history(hist, typed), -1
 
     def watcher() -> None:
-        nonlocal observed_size
+        nonlocal observed_size, announcement
         while not stop_event.wait(0.05):
             current_size = console.size
-            if current_size != observed_size:
+            downloads_changed = downloads_ui.poll(watched)
+            if current_size != observed_size or downloads_changed:
                 observed_size = current_size
+                if frames.shows_message(*current_size):
+                    announcement = frames.take_message() or announcement
                 draw()
 
     def repaint(prev_col: int, prev_len: int) -> None:
