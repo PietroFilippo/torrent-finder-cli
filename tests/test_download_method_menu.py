@@ -11,6 +11,33 @@ from torrent_finder.ui.selector import _next_enabled
 
 
 class DownloadMethodMenuTests(unittest.TestCase):
+    def test_source_page_reports_browser_refusal_and_clipboard_fallback(self):
+        from torrent_finder import main
+        url = "https://example.invalid/source"
+        for opened, copied, expected in ((True, False, "✓ opened"),
+                                         (False, True, "could not open the browser · URL copied"),
+                                         (False, False, "could not open the browser · could not copy URL"),
+                                         (OSError("no browser"), True, "could not open the browser · URL copied")):
+            with self.subTest(opened=opened, copied=copied):
+                hints = []
+                def menu(items, **kwargs):
+                    index = next(i for i, item in enumerate(items) if item.value == "open_page")
+                    self.assertTrue(kwargs["on_action"](index, items))
+                    hints.append(items[index].hint)
+                    return None
+                with patch.object(prompts, "arrow_select", side_effect=menu), \
+                     patch.object(prompts, "detect_torrent_client", return_value="client"), \
+                     patch("webbrowser.open", side_effect=opened if isinstance(opened, Exception) else None,
+                           return_value=opened) as browser, \
+                     patch.object(main, "_copy_to_clipboard", return_value=copied) as clipboard:
+                    prompts.download_method_prompt(page_url=url)
+                self.assertEqual(hints, [expected])
+                browser.assert_called_once_with(url)
+                if opened is True:
+                    clipboard.assert_not_called()
+                else:
+                    clipboard.assert_called_once_with(url)
+
     def test_uninstalled_methods_remain_navigable_and_show_install_links(self):
         captured = {}
 

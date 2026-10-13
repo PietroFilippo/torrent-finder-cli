@@ -1951,10 +1951,15 @@ def download_method_prompt(
         if items[idx].value == "open_page" and page_url:
             try:
                 import webbrowser
-                webbrowser.open(page_url)
-                items[idx].hint = "✓ opened"
+                opened = webbrowser.open(page_url)
             except Exception:
-                items[idx].hint = "could not open the browser"
+                opened = False
+            if opened:
+                items[idx].hint = "✓ opened"
+            else:
+                from torrent_finder.main import _copy_to_clipboard
+                copied = _copy_to_clipboard(page_url)
+                items[idx].hint = "could not open the browser · " + ("URL copied" if copied else "could not copy URL")
             return True  # Stay in menu
         if items[idx].value == "toggle_unpack":
             _toggle_unpack(items[idx])
