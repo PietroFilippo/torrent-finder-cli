@@ -190,7 +190,7 @@ class SearchSession:
                 else:
                     operation = lambda: task.engine.page_fn(task.query, task.page)
                 raw = control.run_engine(provider.slug, task.engine.name, operation, slots)
-                more = getattr(raw, "has_more", True)
+                more = getattr(raw, "has_more", None)
                 rows = [SearchResult.from_mapping(dict(normalize_result(r))) for r in raw or []]
                 rows = [r for r in rows if r.info_hash]
                 fetched = datetime.now(timezone.utc).isoformat()
@@ -244,8 +244,8 @@ class SearchSession:
 
     def _commit(self, task, outcome):
         rows, more, diagnostic = outcome
-        if task.page > task.engine.initial_page and not rows and not diagnostic.retryable:
-            more = False
+        if more is None:
+            more = not (task.page > task.engine.initial_page and not rows and not diagnostic.retryable)
         # Only identical consecutive catalog pages signal a stuck cursor. RSS
         # overlap with the first catalog page is normal and not exhaustion.
         previous = next((t for t in reversed(self.tasks) if t is not task and

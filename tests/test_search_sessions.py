@@ -236,6 +236,60 @@ class SearchSessionTests(unittest.TestCase):
         self.assertNotIn("unsafe", params)  # v2 hides unsafe and adult rows unless asked
         self.assertNotIn("xxx", params)
 
+    def test_knaben_load_more_crosses_a_page_with_only_rejected_hashes(self):
+        from torrent_finder import knaben
+
+        response = Mock(status_code=200)
+        response.json.side_effect = [
+            {"hits": [{"title": "Example", "hash": f"{number:040x}"} for number in range(1, 51)]},
+            {"hits": [{"title": "V2 only", "hash": "a" * 64}] * 50},
+            {"hits": [{"title": "Example later", "hash": f"{51:040x}"}]},
+        ]
+        p = self.provider(SearchEngine("Knaben", "", lambda q: knaben.search(q, [6000000]),
+                                      page_fn=lambda q, page: knaben.search(q, [6000000], page=page), initial_page=1))
+        with patch.object(knaben.requests, "get", return_value=response) as send:
+            session = p.search("Example").session
+            self.assertEqual(len(session.run("more")), 50)
+            self.assertTrue(session.can_load_more)
+            self.assertEqual(len(session.run("more")), 51)
+            self.assertFalse(session.can_load_more)
+        self.assertEqual(send.call_count, 3)
+
+    def test_plain_empty_pages_infer_exhaustion_without_adapter_metadata(self):
+        page = Mock(return_value=[])
+        session = self.provider(SearchEngine("Paged", "", lambda q: [row()], page_fn=page)).search("Example").session
+        session.run("more")
+        self.assertFalse(session.can_load_more)
+        session.run("more")
+        page.assert_called_once()
+
+    def test_empty_pages_with_explicit_more_remain_bounded(self):
+        page = Mock(return_value=PageRows([], has_more=True))
+        p = self.provider(SearchEngine("Paged", "", lambda q: PageRows([], has_more=True), page_fn=page))
+        session = SearchSession([p], [f"Query {number}" for number in range(30)]).run().session
+        session.run("more")
+        self.assertEqual(page.call_count, 24)
+        for _ in range(14):
+            session.run("more")
+        self.assertFalse(session.can_load_more)
+        self.assertEqual(max(task.page for task in session.tasks), 10)
+
+    def test_nyaa_load_more_stops_when_the_next_page_link_disappears(self):
+        from torrent_finder import nyaa
+
+        response = Mock(status_code=200)
+        response.text = '<table class="torrent-list"><tbody></tbody></table><a href="/?p=3">Next</a>'
+        p = self.provider(SearchEngine("Nyaa", "", lambda q: PageRows([row()], has_more=True),
+                                      page_fn=lambda q, page: nyaa.search_page(q, "1_2", page), initial_page=1))
+        with patch.object(nyaa.requests, "get", return_value=response) as send:
+            session = p.search("Example").session
+            session.run("more")
+            self.assertTrue(session.can_load_more)
+            response.text = '<table class="torrent-list"><tbody></tbody></table>'
+            session.run("more")
+            self.assertFalse(session.can_load_more)
+        self.assertEqual(send.call_count, 2)
+
     def test_knaben_malformed_payload_produces_source_error(self):
         from torrent_finder import knaben
         response = Mock(status_code=200)
