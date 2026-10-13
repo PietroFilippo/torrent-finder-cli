@@ -335,7 +335,10 @@ def _release_launcher() -> None:
     importlib.invalidate_caches()
     finder = getattr(md, "MetadataPathFinder", None)
     if finder is not None:  # the call above clears it too on newer Pythons
-        finder.invalidate_caches()
+        try:
+            finder.invalidate_caches()
+        except TypeError:  # Python 3.10 left it without @classmethod: call it on an instance
+            finder().invalidate_caches()
     gc.collect()
 
 
