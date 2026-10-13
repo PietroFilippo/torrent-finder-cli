@@ -562,19 +562,22 @@ def _wait_interruptibly(proc: subprocess.Popen, done_marker: str | None = None) 
 
     On Windows a plain ``proc.wait()`` holds Ctrl+C back until the child exits,
     and a detached child never sees Ctrl+C itself, so a download looked frozen.
-    Short timed waits let the KeyboardInterrupt land within a moment.
+    Polling between short sleeps lets the KeyboardInterrupt land within a
+    moment: ``time.sleep`` wakes for Ctrl+C, while timed ``proc.wait`` calls on
+    Python 3.10 for Windows could keep it pending until the child exited.
 
     A child that keeps running after its work is done (peerflix) creates
     *done_marker* instead; it is then stopped and counts as a clean exit.
     """
     while True:
-        try:
-            return proc.wait(timeout=0.25)
-        except subprocess.TimeoutExpired:
-            if done_marker and os.path.exists(done_marker):
-                _kill_process_tree(proc)
-                proc.wait()
-                return 0
+        code = proc.poll()
+        if code is not None:
+            return code
+        if done_marker and os.path.exists(done_marker):
+            _kill_process_tree(proc)
+            proc.wait()
+            return 0
+        time.sleep(0.25)
 
 
 def _run_download(cmd: list[str], quiet: bool, status_msg: str, done_marker: str | None = None) -> int | None:

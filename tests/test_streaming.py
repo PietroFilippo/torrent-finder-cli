@@ -1,10 +1,10 @@
 """Streaming owns its player, says how it ended, and prepares cancellably."""
 
+import _thread
 import io
 import json
 import os
 import shutil
-import signal
 import subprocess
 import sys
 import tempfile
@@ -310,7 +310,9 @@ class DownloadCancelTests(unittest.TestCase):
 
     def test_ctrl_c_cancels_a_running_download(self):
         child = [sys.executable, "-c", "import time; time.sleep(20)"]
-        threading.Timer(0.5, signal.raise_signal, (signal.SIGINT,)).start()
+        # interrupt_main is Ctrl+C as the main thread sees it; raise_signal from another
+        # thread sometimes never reached it on Windows with Python 3.10.
+        threading.Timer(0.5, _thread.interrupt_main).start()
         started = time.monotonic()
         with patch.object(downloader, "console", Console(file=io.StringIO())):
             self.assertIsNone(downloader._run_download(child, quiet=False, status_msg="x"))
