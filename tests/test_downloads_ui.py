@@ -1,6 +1,7 @@
 """Background downloads on screen: the figure, the Downloads screen, its keys and prompts, the quit and update guards."""
 
 import io
+import time
 import unittest
 import warnings
 from contextlib import ExitStack
@@ -204,6 +205,31 @@ class DownloadsUITests(unittest.TestCase):
             downloads_ui.downloads_screen()
         stops = [call for call in manager.calls if call[0] == "stop"]
         self.assertEqual(stops, [("stop", "job2")])  # the focused Dune download, not the row now in its place
+
+    def test_the_list_holds_still_between_a_key_and_its_action(self):
+        manager = install(self, FakeManager(sample_jobs()))
+        keys = iter([K.DOWN, "x", K.ESC])
+        armed = []
+
+        def press():
+            key = next(keys)
+            if key == "x":
+                armed.append(True)
+            return key
+
+        class Keys:
+            """readchar.key, pausing once while the selector matches the X: the moment a live refresh could slip in."""
+            def __getattr__(self, name):
+                if name == "UP" and armed:
+                    armed.clear()
+                    manager.set_state("job1", "done", done_bytes=int(1.4 * GIB), speed_bps=0, eta_s=None)
+                    time.sleep(0.2)  # many watcher ticks
+                return getattr(K, name)
+
+        with driving([]), patch.object(selector, "_TICK_INTERVAL_S", 0.005), \
+             patch.object(selector, "readchar", SimpleNamespace(readkey=press, key=Keys())):
+            downloads_ui.downloads_screen()
+        self.assertEqual([call for call in manager.calls if call[0] == "stop"], [("stop", "job2")])
 
     def test_an_empty_screen_says_how_to_start(self):
         install(self, None)

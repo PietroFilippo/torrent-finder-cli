@@ -930,6 +930,7 @@ def arrow_select(
         "tick": 0,
         "cursor_changed_at": time.monotonic(),
         "paused": False,  # another screen (the key list) owns the terminal
+        "holding": False,  # a key is being handled: the live list stays as that key saw it
     }
     help_enabled = help and "?" not in (hotkeys or {}) and "?" not in (key_actions or {})
     layout_cache = _LayoutCache()  # shared only while render_lock is held
@@ -1007,11 +1008,11 @@ def arrow_select(
         while not stop_event.is_set():
             if stop_event.wait(_TICK_INTERVAL_S):
                 break
-            if state["paused"]:
+            if state["paused"] or state["holding"]:
                 continue
 
             with render_lock:
-                if state["paused"]:
+                if state["paused"] or state["holding"]:
                     continue
                 content_changed = refresh_content()
                 size = console.size
@@ -1058,10 +1059,12 @@ def arrow_select(
                 # Treat both forms exactly like Esc at the active selector.
                 return None
             if refresh is not None:
-                # A key acts on the list as it is now: a live list may have moved the focused row.
+                # A key acts on the list as it is now (a live list may have moved the focused
+                # row), and the list holds still until the key is handled.
                 with render_lock:
                     refresh_content()
                     cursor = state["cursor"]
+                    state["holding"] = True
                 if not items:
                     return None
             prev_cursor = cursor
@@ -1138,6 +1141,7 @@ def arrow_select(
                     state["tick"] = 0
                     state["cursor_changed_at"] = time.monotonic()
                 state["cursor"] = cursor
+                state["holding"] = False
             draw(state["tick"])
 
     finally:
