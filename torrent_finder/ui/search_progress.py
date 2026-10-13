@@ -9,6 +9,7 @@ place, line by line, so a spinner refresh never flickers.
 
 from __future__ import annotations
 
+# i18n: converted
 import io
 import sys
 
@@ -21,8 +22,6 @@ from torrent_finder.constants import buffer_console, console
 from torrent_finder.i18n import N_, t, tn
 from torrent_finder.ui import chrome as frames, display, theme
 from torrent_finder.ui.layout import ellipsize_cells
-
-# i18n: converted
 
 KEYS = N_("Enter view results so far  •  Esc cancel")
 REDRAW_S = 0.1

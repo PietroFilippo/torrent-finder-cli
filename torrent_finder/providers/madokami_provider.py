@@ -8,11 +8,9 @@ archive(s) directly (a folder opens in place to browse and pick files) instead o
 entering the magnet pipeline (see main.py's Madokami branch).
 """
 
-from torrent_finder.i18n import N_
-
 # i18n: converted
-
 from torrent_finder import madokami
+from torrent_finder.i18n import N_
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
 

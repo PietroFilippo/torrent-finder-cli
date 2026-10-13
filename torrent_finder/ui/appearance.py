@@ -11,18 +11,16 @@ The Settings › Appearance screen previews a theme in place and saves the
 choice. See docs/adr/0021-themes.md and docs/adr/0022-athanor-design.md.
 """
 
-# i18n: converted
-
 from __future__ import annotations
 
+# i18n: converted
 import os
 import sys
 
 from rich.text import Text
 
-from torrent_finder.i18n import N_, t
-
 from torrent_finder import paintings, terminal_profile
+from torrent_finder.i18n import N_, t
 from torrent_finder.ui import theme
 
 SETTING = "appearance"

@@ -1,9 +1,9 @@
 """Review saved listings and searches using their original acquisition path."""
 
-from rich.markup import escape
 # i18n: converted
-from torrent_finder.i18n import N_, t, tn
+from rich.markup import escape
 from torrent_finder import bookmarks
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder.providers import display_name_for
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.utils import relative_time

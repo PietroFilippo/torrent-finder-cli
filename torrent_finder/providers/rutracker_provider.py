@@ -7,11 +7,9 @@ user at the credentials menu. Search results carry the topic id as a placeholder
 result is selected (see rutracker.resolve_info_hash).
 """
 
-from torrent_finder.i18n import N_
-
 # i18n: converted
-
 from torrent_finder import rutracker
+from torrent_finder.i18n import N_
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
 

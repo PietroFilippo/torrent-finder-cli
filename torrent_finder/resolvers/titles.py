@@ -1,15 +1,13 @@
 """Catalog identification and alternate names, separate from release search."""
 
-from torrent_finder.i18n import N_, t
-
 # i18n: converted
-
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import re
 import unicodedata
 
 from torrent_finder import credentials
+from torrent_finder.i18n import N_, t
 from torrent_finder.resolvers import anilist, tmdb, igdb, openlibrary
 from torrent_finder.resolvers.types import Work
 from torrent_finder.search_errors import SearchError

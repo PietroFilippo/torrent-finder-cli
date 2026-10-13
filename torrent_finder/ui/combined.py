@@ -1,9 +1,7 @@
 """Transactional settings for search across providers."""
 
-from torrent_finder.i18n import N_, t, tn
-
 # i18n: converted
-
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder.search_profiles import profile_label
 from torrent_finder.providers.combined_provider import CombinedProvider, provider_display_label
 from torrent_finder.ui.selector import SelectItem, arrow_select

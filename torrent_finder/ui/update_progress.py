@@ -1,5 +1,6 @@
 """The update screen: one renderer for real updates, the terminal preview and visual QA."""
 
+# i18n: converted
 from dataclasses import dataclass, replace
 import time
 
@@ -11,10 +12,9 @@ from rich.padding import Padding
 from rich.progress_bar import ProgressBar
 from rich.text import Text
 
-from torrent_finder.ui import theme
 from torrent_finder.i18n import N_, t
+from torrent_finder.ui import theme
 
-# i18n: converted
 
 @dataclass(frozen=True)
 class UpdateView:

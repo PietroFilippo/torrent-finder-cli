@@ -18,16 +18,15 @@ publishes a PGP signature beside each APK (``….apk.asc``); the app links it
 but does not check it.
 """
 
+# i18n: converted
 import os
 import re
 from urllib.parse import urlsplit
 
 import requests
 
-from torrent_finder.i18n import t
-
-# i18n: converted
 from torrent_finder.direct_download import Cancelled, save_response
+from torrent_finder.i18n import t
 from torrent_finder.search_control import search_request
 from torrent_finder.search_result import SearchResult
 

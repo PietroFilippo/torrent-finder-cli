@@ -7,13 +7,12 @@ and raise when saving fails; other changes are saved with the session.
 """
 
 # i18n: converted
-from torrent_finder.i18n import tn
-
 from copy import deepcopy
 import hashlib
 import json
 
 from torrent_finder import store
+from torrent_finder.i18n import tn
 
 
 # One-shot rename: legacy persistence keyed on display ``name``; new schema

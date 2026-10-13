@@ -8,10 +8,7 @@ source screen). The shared torrent-results + download UI is supplied by the
 caller as ``browse_fn`` so this flow reuses the same path as keyword search.
 """
 
-from torrent_finder.i18n import t, tn
-
 # i18n: converted
-
 import re
 import threading
 import time
@@ -21,6 +18,7 @@ from rich.markup import escape
 
 from torrent_finder.constants import console
 from torrent_finder.creator_search import fan_out
+from torrent_finder.i18n import t, tn
 from torrent_finder.search_errors import SearchError
 from torrent_finder.state import add_history_entry, creator_history
 from torrent_finder.stats import record_creator_search

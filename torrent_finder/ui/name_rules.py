@@ -1,10 +1,9 @@
 """Shared transactional editor for literal name rules."""
 
+# i18n: converted
 from torrent_finder.i18n import t
 from torrent_finder.name_rules import NameRules
 from torrent_finder.ui.selector import SelectItem, arrow_select
-
-# i18n: converted
 
 
 def edit_name_rules(rules):

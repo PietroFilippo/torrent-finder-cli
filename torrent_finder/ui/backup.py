@@ -1,11 +1,9 @@
 """Local-file transfer UI: preview first, then one explicit transaction."""
 
 # i18n: converted
-from torrent_finder.i18n import t, tn
-
-
 from rich.markup import escape
 from torrent_finder import settings_backup as backup, store
+from torrent_finder.i18n import t, tn
 from torrent_finder.ui.selector import SelectItem, arrow_select
 
 

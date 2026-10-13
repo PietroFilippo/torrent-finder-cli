@@ -1,7 +1,7 @@
 """Listing metadata and explicitly labelled filename hints, without network I/O."""
 
-import re
 # i18n: converted
+import re
 from torrent_finder.i18n import N_, t
 from torrent_finder.language_tags import has_brazilian_audio, has_brazilian_subtitles
 

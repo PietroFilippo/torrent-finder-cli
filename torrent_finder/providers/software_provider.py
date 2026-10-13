@@ -5,13 +5,11 @@ Windows / macOS / Linux programs. Android apps have their own provider
 mobile listings out unless they name a desktop platform.
 """
 
-from torrent_finder.i18n import N_
-
 # i18n: converted
-
 import re
 
 from torrent_finder.filters import FilterConfig, FilterPreset
+from torrent_finder.i18n import N_
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.result_view import product_title_score
 

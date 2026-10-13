@@ -1,7 +1,6 @@
 """Interactive table selection UI for torrent results."""
 
 # i18n: converted
-
 import math
 import threading
 import time

@@ -4,9 +4,8 @@ Only the coordinator commits completed attempts. Abandoned workers cannot
 change returned rows, pagination cursors or a subsequent retry.
 """
 
-from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 # i18n: converted
-from torrent_finder.i18n import N_, t, tn
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -14,6 +13,7 @@ import threading
 import time
 
 from torrent_finder.filters import apply_filters
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder.search_control import SearchControl, SearchInterrupted
 from torrent_finder.search_diagnostics import ACCESS_STATUSES, Diagnostic, RequestTrace
 from torrent_finder.search_errors import SearchError

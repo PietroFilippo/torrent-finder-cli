@@ -1,5 +1,6 @@
 """Abstract base class for torrent search providers."""
 
+# i18n: converted
 from abc import ABC, abstractmethod
 
 import re
@@ -20,8 +21,6 @@ from torrent_finder.search_errors import SearchError
 from torrent_finder.search_control import Cooldown, search_request
 from torrent_finder.search_diagnostics import ACCESS_STATUSES, record_failure
 from torrent_finder.result_view import split_release_tags, title_score
-
-# i18n: converted
 
 _APIBAY_NUMBER_WORDS = {
     "zero": "0",

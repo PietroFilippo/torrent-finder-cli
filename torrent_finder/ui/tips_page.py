@@ -1,9 +1,8 @@
 """Scrollable tips browser with search and category filtering."""
 
-# i18n: converted
-
 from __future__ import annotations
 
+# i18n: converted
 from rich.markup import escape
 
 from torrent_finder.i18n import N_, t

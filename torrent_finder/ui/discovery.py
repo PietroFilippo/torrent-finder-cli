@@ -1,12 +1,10 @@
 """Choose catalog terms, inspect works, then explicitly search their release names."""
 
-from torrent_finder.i18n import t
-
 # i18n: converted
-
 import threading
 from rich.markup import escape
 
+from torrent_finder.i18n import t
 from torrent_finder.resolvers import topics
 from torrent_finder.search_errors import SearchError
 from torrent_finder.search_session import search_many

@@ -16,6 +16,7 @@ HTML scraping behind a login, so it's inherently fragile: a RuTracker layout
 change will need updates here.
 """
 
+# i18n: converted
 import re
 import threading
 import time
@@ -32,7 +33,6 @@ from torrent_finder.credentials import rutracker_config
 
 _BASE = "https://rutracker.org/forum"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}  # i18n: ignore — HTTP header
-# i18n: converted
 
 _session: requests.Session | None = None
 _session_credentials: tuple[str, str] | None = None

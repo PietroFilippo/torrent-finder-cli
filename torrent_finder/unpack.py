@@ -14,8 +14,6 @@ deleted only after its pages are in place, so a failure keeps it untouched.
 """
 
 # i18n: converted
-from torrent_finder.i18n import N_, t, tn
-
 import ntpath
 import os
 import re
@@ -26,6 +24,8 @@ import tempfile
 import zipfile
 from dataclasses import dataclass, field
 from urllib.parse import parse_qs, urlparse
+
+from torrent_finder.i18n import N_, t, tn
 
 SETTING = "unpack_page_archives"
 

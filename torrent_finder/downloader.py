@@ -1,8 +1,6 @@
 """Download methods: torrent client (magnet) and webtorrent direct download."""
 
 # i18n: converted
-from torrent_finder.i18n import N_, t, tn
-
 import os
 import platform
 import re
@@ -20,6 +18,7 @@ from typing import TYPE_CHECKING
 from rich.markup import escape
 
 from torrent_finder.constants import console, get_download_dir, prepare_download_dir
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder.ui import theme
 from torrent_finder.state import load_setting
 from torrent_finder.torrent_meta import compact_ranges

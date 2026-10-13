@@ -1,5 +1,6 @@
 """Reusable arrow-key interactive selector using readchar + Rich."""
 
+# i18n: converted
 import sys
 import threading
 import time
@@ -15,8 +16,6 @@ from torrent_finder.constants import buffer_console, console
 from torrent_finder.i18n import N_, t
 from torrent_finder.ui import chrome as frames, display, theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
-
-# i18n: converted
 
 
 # Marquee timing

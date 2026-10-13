@@ -1,9 +1,6 @@
 """Catalog topics identify works; release-name keywords do not establish topics."""
 
-from torrent_finder.i18n import N_, t, tn
-
 # i18n: converted
-
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -11,6 +8,7 @@ import re
 import unicodedata
 from urllib.parse import quote
 
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder.resolvers import anilist, tmdb, igdb, openlibrary
 from torrent_finder.resolvers.titles import catalogs_for, TitleMatch, _with_names, distinct_names
 from torrent_finder.resolvers.types import Work

@@ -1,7 +1,7 @@
 """Actionable search failures that must not be shown as an empty result set."""
-
 # i18n: converted
 from torrent_finder.i18n import t
+
 
 class SearchError(Exception):
     """A failure to show instead of "no results".

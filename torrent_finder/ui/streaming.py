@@ -8,8 +8,6 @@ generic terminal toolkit.
 """
 
 # i18n: converted
-from torrent_finder.i18n import t, tn
-
 import os
 import sys
 
@@ -18,6 +16,7 @@ from rich.markup import escape
 from rich.text import Text
 
 from torrent_finder.constants import console
+from torrent_finder.i18n import t, tn
 from torrent_finder.ui import theme
 from torrent_finder.ui.layout import ellipsize_cells
 from torrent_finder.torrent_meta import format_size

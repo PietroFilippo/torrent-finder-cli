@@ -1,7 +1,6 @@
 """Network exposure warning shown at startup."""
 
 # i18n: converted
-
 import os
 import re
 import sys

@@ -9,12 +9,10 @@ OpenLibrary asks for an identifying User-Agent; no rate limit beyond that at
 this call volume (one search + one page per picker step).
 """
 
+# i18n: converted
 import requests
 
 from torrent_finder.i18n import t, tn
-
-# i18n: converted
-
 from torrent_finder.resolvers.types import Entity, Work
 
 _API = "https://openlibrary.org"

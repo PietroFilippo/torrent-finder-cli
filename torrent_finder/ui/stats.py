@@ -11,9 +11,8 @@ scrolling, so there's no bespoke redraw/overscroll logic and no flicker.
 from rich.cells import cell_len
 from rich.text import Text
 
-from torrent_finder.i18n import N_, t, tn
-
 from torrent_finder.constants import console
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder.providers import display_name_for
 from torrent_finder.ui import theme
 from torrent_finder.stats import (

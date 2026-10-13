@@ -1,14 +1,12 @@
 """Recovery screen for saved settings that could not be read at startup."""
 
 # i18n: converted
-from torrent_finder.i18n import t
-
-
 import readchar
 from rich.markup import escape
 
 from torrent_finder import store
 from torrent_finder.constants import console
+from torrent_finder.i18n import t
 from torrent_finder.ui.selector import SelectItem, arrow_select
 
 

@@ -10,12 +10,10 @@ manga we keep the writer/author roles (Story, Story & Art, Original Creator) and
 drop the pure "Art" credit.
 """
 
-from torrent_finder.i18n import t
-
 # i18n: converted
-
 import requests
 
+from torrent_finder.i18n import t
 from torrent_finder.resolvers.types import Entity, Work
 
 _API = "https://graphql.anilist.co"

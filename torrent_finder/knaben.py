@@ -10,6 +10,7 @@ keeps zero-seed rows, which v1 returned and v2 otherwise hides.
 
 from __future__ import annotations
 
+# i18n: converted
 import re
 from html import unescape
 from typing import Iterable
@@ -18,8 +19,6 @@ from urllib.parse import urlencode
 import requests
 
 from torrent_finder.i18n import t
-
-# i18n: converted
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
 

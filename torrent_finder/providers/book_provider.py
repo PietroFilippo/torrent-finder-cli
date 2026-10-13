@@ -6,12 +6,10 @@ releases; SolidTorrents' eBook category is available opt-in. Every default
 engine works without credentials.
 """
 
-from torrent_finder.i18n import N_
-
 # i18n: converted
-
 from torrent_finder import libgen
 from torrent_finder.filters import FilterConfig, FilterPreset
+from torrent_finder.i18n import N_
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.resolvers import CreatorFacet, openlibrary
 from torrent_finder.result_view import _BOOK_FORMATS, book_title_score

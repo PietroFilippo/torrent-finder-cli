@@ -21,12 +21,12 @@ from rich.markup import escape as markup_escape  # _main_loop imports `escape` l
 
 import torrent_finder
 from torrent_finder import acquisition, store
+from torrent_finder.i18n import t, tn
 from torrent_finder.ui import theme
 from torrent_finder.constants import console
 import readchar
 from torrent_finder.downloader import download_with_aria2, download_with_webtorrent, download_with_peerflix, has_aria2, open_magnet, stream_with_peerflix, stream_with_webtorrent
 from torrent_finder.filters import FilterConfig
-from torrent_finder.i18n import t, tn
 from torrent_finder.providers import (
     PROVIDERS,
     creator_facet_choices,

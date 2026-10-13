@@ -24,10 +24,9 @@ and a private copy left by an earlier version is removed. See
 docs/adr/0022-athanor-design.md.
 """
 
-# i18n: converted
-
 from __future__ import annotations
 
+# i18n: converted
 import json
 import os
 import shutil
@@ -38,9 +37,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from torrent_finder.i18n import N_, t
-
 from torrent_finder import paintings
+from torrent_finder.i18n import N_, t
 
 APP = NAME = "torrent-finder"
 FONT_DIR = Path(__file__).resolve().parent / "assets" / "fonts"

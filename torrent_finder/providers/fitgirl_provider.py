@@ -8,11 +8,9 @@ when a result is selected (see fitgirl.resolve_info_hash), same shape as the
 RuTracker lazy resolve.
 """
 
-from torrent_finder.i18n import N_
-
 # i18n: converted
-
 from torrent_finder import fitgirl
+from torrent_finder.i18n import N_
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
 

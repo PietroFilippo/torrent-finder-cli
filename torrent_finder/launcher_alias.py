@@ -7,8 +7,6 @@ deletes an unrelated command.
 """
 
 # i18n: converted
-from torrent_finder.i18n import t
-
 from dataclasses import dataclass
 import ctypes
 import os
@@ -18,6 +16,7 @@ import subprocess
 import sys
 import sysconfig
 
+from torrent_finder.i18n import t
 from torrent_finder.state import commit_setting, load_setting
 from torrent_finder.updates import install_kind
 

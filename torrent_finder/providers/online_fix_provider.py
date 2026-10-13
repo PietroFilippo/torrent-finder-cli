@@ -10,11 +10,9 @@ page) and hands it to the system torrent client rather than building a magnet
 (see ``online_fix.fetch_torrent_for`` and main.py's Online-Fix branch).
 """
 
-from torrent_finder.i18n import N_
-
 # i18n: converted
-
 from torrent_finder import online_fix
+from torrent_finder.i18n import N_
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
 

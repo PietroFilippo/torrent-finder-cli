@@ -6,7 +6,6 @@ translates when it draws it.
 """
 
 # i18n: converted
-
 from dataclasses import dataclass
 import base64
 import hashlib

@@ -1,5 +1,6 @@
 """Filter system for structuring and applying search filters."""
 
+# i18n: converted
 import re
 import unicodedata
 from collections.abc import Callable
@@ -7,8 +8,6 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 
 from torrent_finder.i18n import t
-
-# i18n: converted
 
 
 @dataclass

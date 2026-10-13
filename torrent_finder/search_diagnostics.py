@@ -1,11 +1,12 @@
 """Per-attempt evidence, scoped to a search worker rather than global state."""
 
-from contextvars import ContextVar
 # i18n: converted
-from torrent_finder.i18n import N_, t, tn
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 import requests
+
+from torrent_finder.i18n import N_, t, tn
 
 _trace = ContextVar("search_diagnostic_trace", default=None)
 

@@ -25,6 +25,7 @@ what the user explicitly picked — one search page, one directory listing, and
 the chosen files — never crawls.
 """
 
+# i18n: converted
 import os
 import re
 import threading
@@ -34,8 +35,8 @@ from urllib.parse import unquote, urlsplit
 
 import requests
 
-from torrent_finder.i18n import N_, t
 from torrent_finder.direct_download import Cancelled, safe_filename, save_response
+from torrent_finder.i18n import N_, t
 from torrent_finder.result_view import title_score
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
@@ -44,7 +45,6 @@ from torrent_finder.credentials import madokami_config
 
 _BASE = "https://manga.madokami.al"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}  # i18n: ignore — HTTP header
-# i18n: converted
 
 _session: requests.Session | None = None
 _session_lock = threading.Lock()

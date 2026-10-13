@@ -1,14 +1,12 @@
 """Terminal-command preset selector and launcher installation feedback."""
 
 # i18n: converted
-from torrent_finder.i18n import N_, t
-
-
 import os
 import sys
 
 from rich.markup import escape
 
+from torrent_finder.i18n import N_, t
 from torrent_finder.launcher_alias import (
     COMMAND_CHOICES,
     DEFAULT_COMMAND,

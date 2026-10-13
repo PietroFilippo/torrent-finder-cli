@@ -25,6 +25,7 @@ fragile: an online-fix.me layout change will need updates here. The selectors
 below are best-effort.
 """
 
+# i18n: converted
 import os
 import re
 import threading
@@ -43,7 +44,7 @@ from torrent_finder.result_view import game_title_query, matches_name
 
 _BASE = "https://online-fix.me"
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}  # i18n: ignore — HTTP header
-# i18n: converted
+
 # The uploads host gates files by HTTP referer (hotlink protection), not login —
 # sending the site's own referer is enough to list a directory or fetch a .torrent.
 _REFERER = {"Referer": _BASE + "/"}

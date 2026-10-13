@@ -12,6 +12,7 @@ cannot read. See docs/adr/0020-quiet-terminal-design.md.
 
 from __future__ import annotations
 
+# i18n: converted
 import os
 import shutil
 import threading
@@ -21,8 +22,6 @@ from rich.text import Text
 
 from torrent_finder.i18n import N_, t, tn
 from torrent_finder.ui import theme
-
-# i18n: converted
 
 _LABEL = 12   # the label column of a "label  value" line
 _RECENT = 5   # recent searches listed under Continue

@@ -5,15 +5,13 @@ provider instances or credentials. The legacy combined configuration remains
 available until the first explicit save, which materializes it as Default.
 """
 
-from torrent_finder.i18n import N_, t
-
 # i18n: converted
-
 from copy import deepcopy
 import unicodedata
 from uuid import uuid4
 
 from torrent_finder import store
+from torrent_finder.i18n import N_, t
 from torrent_finder.state import load_setting
 
 

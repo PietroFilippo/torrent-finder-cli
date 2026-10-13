@@ -11,6 +11,7 @@ docs/adr/0021-themes.md.
 
 from __future__ import annotations
 
+# i18n: converted
 import re
 from dataclasses import dataclass, field
 
@@ -18,8 +19,6 @@ from rich.cells import cell_len
 from rich.text import Text
 
 from torrent_finder.i18n import N_, t
-
-# i18n: converted
 
 APP_NAME = "torrent-finder"
 MARGIN = "  "

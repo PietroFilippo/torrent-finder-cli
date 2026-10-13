@@ -10,14 +10,12 @@ caps the page count — magazines like Shōnen Jump have hundreds of entries, an
 top-by-popularity slice is plenty for a picker.
 """
 
-from torrent_finder.i18n import t, tn
-
 # i18n: converted
-
 import time
 
 import requests
 
+from torrent_finder.i18n import t, tn
 from torrent_finder.resolvers.types import Entity, Work
 
 _API = "https://api.jikan.moe/v4"

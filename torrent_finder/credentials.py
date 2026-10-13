@@ -11,7 +11,6 @@ listed in ``.gitignore``. See docs/guide.md#credentials for setup.
 """
 
 # i18n: converted
-
 import json
 import os
 import tempfile

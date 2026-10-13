@@ -9,15 +9,13 @@ Director = eager (TMDB returns a person's whole filmography in one call).
 Studio  = network-paged (TMDB discover is 20/page with a total_pages count).
 """
 
-from torrent_finder.i18n import t, tn
-
 # i18n: converted
-
 import concurrent.futures
 
 import requests
 
 from torrent_finder import credentials
+from torrent_finder.i18n import t, tn
 from torrent_finder.resolvers.types import Entity, Work
 
 _API = "https://api.themoviedb.org/3"

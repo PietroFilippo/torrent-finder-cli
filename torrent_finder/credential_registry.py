@@ -8,7 +8,6 @@ English: other screens compare them.
 """
 
 # i18n: converted
-
 from dataclasses import dataclass
 from typing import Callable, Mapping
 

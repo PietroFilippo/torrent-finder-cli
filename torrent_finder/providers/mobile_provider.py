@@ -7,14 +7,12 @@ sideloading is impractical — so this provider advertises that it covers Androi
 official repository of free and open-source apps, downloaded directly.
 """
 
-from torrent_finder.i18n import N_
-
 # i18n: converted
-
 import re
 
 from torrent_finder import fdroid
 from torrent_finder.filters import FilterConfig, FilterPreset
+from torrent_finder.i18n import N_
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.result_view import product_title_score
 from torrent_finder.search_result import SearchResult

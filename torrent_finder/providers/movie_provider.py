@@ -1,14 +1,12 @@
 """Movie torrent provider — searches video/movie categories."""
 
-from torrent_finder.i18n import N_
-
 # i18n: converted
-
 from typing import Iterator
 
 import requests
 
 from torrent_finder.filters import FilterConfig, FilterPreset
+from torrent_finder.i18n import N_
 from torrent_finder.language_tags import has_brazilian_audio, has_portuguese_subtitles
 from torrent_finder.providers.base import _MAX_QUERY_EXPANSIONS, BaseProvider, SearchEngine
 from torrent_finder.result_view import movie_title_score, split_release_tags

@@ -1,7 +1,6 @@
 """Interactive rendering and workflows for the credentials registry."""
 
 # i18n: converted
-
 import sys
 
 import readchar

@@ -4,14 +4,15 @@ Calls outside a search session retain their own timeouts. An already-running
 request cannot be forcibly killed, but no retries start after its budget expires.
 """
 
-from contextvars import ContextVar
 # i18n: converted
-from torrent_finder.i18n import t
+from contextvars import ContextVar
 from dataclasses import dataclass
 import threading
 import time
 
 import requests
+
+from torrent_finder.i18n import t
 
 
 _ENGINE_SECONDS = 12.0

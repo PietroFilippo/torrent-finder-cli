@@ -1,7 +1,6 @@
 """Search history browser — arrow-select menu over past searches."""
 
 # i18n: converted
-
 from datetime import datetime, timedelta, timezone
 
 import readchar

@@ -8,10 +8,9 @@ colourway's ink and page colours and scaled up by whole pixels, using only
 Wikimedia Commons scans. See docs/adr/0022-athanor-design.md.
 """
 
-# i18n: converted
-
 from __future__ import annotations
 
+# i18n: converted
 import json
 import struct
 import zlib

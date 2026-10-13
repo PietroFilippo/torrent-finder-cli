@@ -23,8 +23,6 @@ Interface:
 """
 
 # i18n: converted
-from torrent_finder.i18n import N_, t, tn
-
 import os
 import threading
 
@@ -33,6 +31,7 @@ from rich.markup import escape
 
 from torrent_finder import unpack
 from torrent_finder.constants import console
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder.ui import theme
 from torrent_finder.utils import build_magnet
 

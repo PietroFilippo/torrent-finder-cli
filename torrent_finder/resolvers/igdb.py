@@ -11,15 +11,13 @@ Developer vs publisher are kept separate via the `involved_companies` table's
 which a plain `/games` filter can't distinguish.
 """
 
-from torrent_finder.i18n import t
-
 # i18n: converted
-
 import time
 
 import requests
 
 from torrent_finder import credentials
+from torrent_finder.i18n import t
 from torrent_finder.resolvers.types import Entity, Work
 
 _OAUTH = "https://id.twitch.tv/oauth2/token"

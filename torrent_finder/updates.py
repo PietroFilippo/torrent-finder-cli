@@ -16,6 +16,7 @@ sight with their output in update.log, pip reports download progress, and on
 Windows the running launcher is renamed out of the installer's way first.
 """
 
+# i18n: converted
 import json
 import os
 import queue
@@ -36,7 +37,6 @@ import torrent_finder
 from torrent_finder.i18n import t, tn
 from torrent_finder.state import load_setting, save_setting
 
-# i18n: converted
 PACKAGE = "torrent-finder-cli"
 _REPO_DIR = os.path.dirname(os.path.abspath(__file__))
 _FETCH_INTERVAL = 86400  # seconds — hit the network at most once per day

@@ -1,9 +1,6 @@
 """Versioned local transfer files with validation, preview and atomic restoration."""
 
 # i18n: converted
-from torrent_finder.i18n import t, tn
-
-
 from copy import deepcopy
 from datetime import datetime
 import json
@@ -11,6 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from torrent_finder import i18n, store
+from torrent_finder.i18n import t, tn
 from torrent_finder.name_rules import NameRules
 from torrent_finder.result_view import SORT_ORDERS
 from torrent_finder.search_profiles import ProfileLibrary

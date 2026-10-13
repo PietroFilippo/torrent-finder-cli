@@ -1,7 +1,6 @@
 """Optional client connection, explicit handoff, and refreshable real progress."""
 
 # i18n: converted
-
 from datetime import datetime
 import threading
 

@@ -1,10 +1,8 @@
 """Anime torrent provider — searches Nyaa by default, with optional Apibay/SolidTorrents."""
 
-from torrent_finder.i18n import N_
-
 # i18n: converted
-
 from torrent_finder.filters import FilterConfig, FilterPreset
+from torrent_finder.i18n import N_
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.resolvers import CreatorFacet, anilist
 from torrent_finder.language_tags import has_brazilian_audio, has_brazilian_subtitles

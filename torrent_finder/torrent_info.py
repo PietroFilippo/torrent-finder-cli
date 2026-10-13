@@ -12,8 +12,6 @@ copy of the video has already been downloaded.
 """
 
 # i18n: converted
-from torrent_finder.i18n import N_, t, tn
-
 import json
 import os
 import re
@@ -24,6 +22,7 @@ from html import unescape
 import requests
 
 from torrent_finder.constants import get_download_dir
+from torrent_finder.i18n import N_, t, tn
 
 _UA = {"User-Agent": "Mozilla/5.0"}
 _VIDEO_EXTS = (".mkv", ".mp4", ".avi", ".m4v", ".mov", ".ts")

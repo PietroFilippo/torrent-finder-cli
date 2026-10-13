@@ -1,11 +1,9 @@
 """Provider registry - import and expose all available providers."""
 
-from torrent_finder.i18n import N_, t
-
 # i18n: converted
-
 from dataclasses import dataclass, field
 
+from torrent_finder.i18n import N_, t
 from torrent_finder.providers.base import BaseProvider
 from torrent_finder.providers.anime_provider import AnimeProvider
 from torrent_finder.providers.book_provider import BookProvider

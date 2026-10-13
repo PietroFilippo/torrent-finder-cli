@@ -1,5 +1,6 @@
 """Bounded catalog supplement for older titles crowded out of Nyaa's RSS feed."""
 
+# i18n: converted
 import re
 from collections import Counter
 from html.parser import HTMLParser
@@ -7,8 +8,6 @@ from html.parser import HTMLParser
 import requests
 
 from torrent_finder.i18n import t
-
-# i18n: converted
 from torrent_finder.search_result import SearchResult
 from torrent_finder.search_control import search_request
 from torrent_finder.result_view import media_title, title_score, words

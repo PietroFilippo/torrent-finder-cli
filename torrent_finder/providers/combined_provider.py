@@ -4,14 +4,12 @@ Profiles contain settings, never credentials or shared provider instances.
 Each invocation gets its own provider copies, request budget and notices.
 """
 
-from torrent_finder.i18n import N_, t, tn
-
 # i18n: converted
-
 from dataclasses import dataclass, replace
 import re
 
 from torrent_finder.filters import FilterConfig, apply_filters
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder.providers.base import BaseProvider
 from torrent_finder.result_view import SORT_ORDERS
 from torrent_finder.search_profiles import ProfileLibrary
@@ -28,16 +26,13 @@ _LABELS = {
 }
 _SEED_SOURCES = {"Apibay", "Nyaa", "Knaben", "SolidTorrents", "YTS", "RuTracker"}  # i18n: ignore — service/engine identity, including external category values
 
-
 def provider_label(provider) -> str:
     return _LABELS.get(provider.slug, provider.name)
-
 
 def provider_display_label(provider) -> str:
     """Qualified on-screen name; provider_label stays suitable for saved rows."""
     label = provider_label(provider)
     return t(label)
-
 
 def result_identity(row) -> tuple:
     """Only genuine torrent hashes share identity across different sources.
@@ -50,7 +45,6 @@ def result_identity(row) -> tuple:
     if re.fullmatch(r"[0-9a-fA-F]{40}", value):
         return ("torrent", value.lower())
     return (row.get("source", ""), row.get("page_url") or value or row.get("name"))
-
 
 # Compatibility name for callers that inspect combined notices.
 from torrent_finder.search_session import SearchResults as CombinedResults

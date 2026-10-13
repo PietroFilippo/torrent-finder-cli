@@ -1,10 +1,8 @@
 """Game torrent provider — searches PC game and console categories."""
 
-from torrent_finder.i18n import N_
-
 # i18n: converted
-
 from torrent_finder.filters import FilterConfig, FilterPreset
+from torrent_finder.i18n import N_
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
 from torrent_finder.resolvers import CreatorFacet, games

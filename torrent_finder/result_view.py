@@ -1,12 +1,13 @@
 """Title matching and stable result views shared by search and the table."""
 
-import re
 # i18n: converted
-from torrent_finder.i18n import N_, t
+import re
 import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+
+from torrent_finder.i18n import N_, t
 
 
 SORT_ORDERS = {

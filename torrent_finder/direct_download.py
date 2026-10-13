@@ -13,12 +13,12 @@ file name inside the download folder before anything is written.
 """
 
 # i18n: converted
-from torrent_finder.i18n import t
-
 import os
 import re
 import tempfile
 import time
+
+from torrent_finder.i18n import t
 
 
 class Cancelled(Exception):

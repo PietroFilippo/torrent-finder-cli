@@ -12,6 +12,7 @@ See docs/adr/0022-athanor-design.md.
 
 from __future__ import annotations
 
+# i18n: converted
 import datetime as _dt
 from dataclasses import dataclass, field
 
@@ -20,8 +21,6 @@ from rich.text import Text
 
 from torrent_finder.i18n import N_, t
 from torrent_finder.ui import theme
-
-# i18n: converted
 
 _DAYS = (N_("Mon", ctx="weekday"), N_("Tue", ctx="weekday"), N_("Wed", ctx="weekday"),
          N_("Thu", ctx="weekday"), N_("Fri", ctx="weekday"), N_("Sat", ctx="weekday"), N_("Sun", ctx="weekday"))

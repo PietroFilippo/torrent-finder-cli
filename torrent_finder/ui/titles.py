@@ -1,13 +1,11 @@
 """Identify one catalog work, review its names, then search selected providers."""
 
-from torrent_finder.i18n import t
-
 # i18n: converted
-
 import threading
 
 from rich.markup import escape
 
+from torrent_finder.i18n import t
 from torrent_finder.resolvers.titles import (MAX_ALIASES, MAX_CATALOG_PAGES, TitleMatch,
                                            catalogs_for, distinct_names, search_titles, resolve_names)
 from torrent_finder.resolvers.types import Work

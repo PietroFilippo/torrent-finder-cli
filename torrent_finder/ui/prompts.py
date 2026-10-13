@@ -1,7 +1,6 @@
 """User-facing prompts: banner, download method selection."""
 
 # i18n: converted
-
 import io
 import sys
 import threading
@@ -29,7 +28,6 @@ from torrent_finder.providers import PROVIDER_MENU, PROVIDERS, ProviderGroup
 from torrent_finder.ui import chrome as frames, display, inspector, theme
 from torrent_finder.ui.selector import SelectItem, arrow_select
 
-
 @dataclass
 class QuitGuard:
     """The main menu's double-press quit: Esc arms it, a second Esc quits, any other choice disarms it."""
@@ -43,7 +41,6 @@ _ARIA2_INSTALL_URL = "https://aria2.github.io/"
 _WEBTORRENT_INSTALL_URL = "https://www.npmjs.com/package/webtorrent-cli"
 _PEERFLIX_INSTALL_URL = "https://www.npmjs.com/package/peerflix"
 
-
 # "Add another title" trigger for multi-line search entry. Ctrl+N on every
 # platform: it's distinct from Enter everywhere, whereas Ctrl+J is LF ('\n') and
 # would collide with Enter on POSIX — readchar leaves ICRNL set, so the Enter key
@@ -51,27 +48,22 @@ _PEERFLIX_INSTALL_URL = "https://www.npmjs.com/package/peerflix"
 _ADD_LINE_KEYS = {readchar.key.CTRL_N}
 MULTI_ADD_KEY_LABEL = "Ctrl+N"
 
-
 def search_shortcuts_line(has_history: bool) -> str:
     """Build the search-screen key line in display-priority order."""
     if has_history:
         return t("Enter search  •  Ctrl+F filters  •  Ctrl+N add another title  •  Tab actions  •  ↑/↓ recent  •  Esc back / undo title")
     return t("Enter search  •  Ctrl+F filters  •  Ctrl+N add another title  •  Tab actions  •  Esc back / undo title")
 
-
 # The prompt marker every text field uses.
 PROMPT = "[accent]›[/accent] "
-
 
 def _print_lines(target: Console, block: Text) -> None:
     for line in theme.wrap_block(block, target.size.width, target):
         target.print(line)
 
-
 def _print_keys(target: Console, footer: str) -> None:
     for line in theme.wrap_keys(theme.parse_footer(footer).keys, target.size.width):
         target.print(line)
-
 
 def _keybar_wraps(footer: str, width: int, items: list[SelectItem] | None = None) -> bool:
     """Measure the translated key segments using the renderer's spacing and margins."""
@@ -84,7 +76,6 @@ def _keybar_wraps(footer: str, width: int, items: list[SelectItem] | None = None
     cells = sum(cell_len(key.plain) for key in keys)
     cells += max(0, len(keys) - 1) * cell_len(theme.KEY_GAP)
     return cells > max(8, width - 2 * cell_len(theme.MARGIN))
-
 
 def input_screen(
     title: str,
@@ -125,19 +116,16 @@ def input_screen(
     render.title, render.status = title, status  # for the Athanor frame's top edge
     return render
 
-
 _LABEL_GAP = "  "
 _RECENT_ROWS = 5
 _FOCUS_LABELS = {"bar": N_("Cursor bar"), "fill": N_("Filled row")}
 _DENSITY_LABELS = {"comfortable": N_("comfortable"), "compact": N_("compact")}
-
 
 def _change_shortcut() -> Text:
     text = Text.from_markup(t("[key]Ctrl+F[/key] to change"), style=theme.MUTED)
     text.spans = [Span(span.start, span.end, theme.KEY if span.style == "key" else span.style)
                   for span in text.spans]
     return text
-
 
 def _join(parts: list[Text], separator: str = " · ") -> Text:
     joined = Text()
@@ -146,7 +134,6 @@ def _join(parts: list[Text], separator: str = " · ") -> Text:
             joined.append(separator, style=theme.MUTED)
         joined.append_text(part)
     return joined
-
 
 def engines_line(provider) -> Text:
     """``Engines  Apibay On · Knaben Auto · Nyaa On · YTS, SolidTorrents off``, states in their colours.
@@ -168,7 +155,6 @@ def engines_line(provider) -> Text:
     line.append_text(_join(parts) if parts else Text(t("none"), style=theme.MUTED))
     return line
 
-
 def filters_line(provider) -> Text:
     """``Filters  Require x · Prefer y · Names: … · Ctrl+F to change``; "no presets" when none apply."""
     parts = []
@@ -187,7 +173,6 @@ def filters_line(provider) -> Text:
     line.append_text(_join(parts))
     return line
 
-
 def combined_lines(provider) -> list[Text]:
     """``Providers  …`` and ``Profile  …`` for Search across providers."""
     selection, details = provider.summary_label()
@@ -196,12 +181,10 @@ def combined_lines(provider) -> list[Text]:
     second.append_text(_change_shortcut())
     return [first, second]
 
-
 def matching_history(history: list[str], typed: str) -> list[str]:
     """Past searches containing *typed* (any case), newest first; all of them when nothing is typed."""
     needle = typed.strip().casefold()
     return [entry for entry in history if needle in entry.casefold()] if needle else list(history)
-
 
 def _recent_row(text: str, needle: str, selected: bool, label_width: int, hint: str) -> Text:
     row = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
@@ -216,7 +199,6 @@ def _recent_row(text: str, needle: str, selected: bool, label_width: int, hint: 
         row.append(" " * (label_width - cell_len(text) + 2))
         row.append(hint, style=theme.MUTED)
     return row
-
 
 def make_search_screen_renderer(
     engine_names: str,
@@ -303,7 +285,6 @@ def make_search_screen_renderer(
     render.title, render.status = title, ""  # for the Athanor frame's top edge
     return render
 
-
 def _capture_lines(render: Callable[[Console], None], width: int, height: int) -> list[str]:
     """Run *render* against an off-screen console; return its ANSI lines."""
     buffer = io.StringIO()
@@ -313,7 +294,6 @@ def _capture_lines(render: Callable[[Console], None], width: int, height: int) -
     if lines and lines[-1] == "":
         lines.pop()
     return lines
-
 
 def _fold(line: Text, width: int) -> tuple[list[Text], list[int]]:
     """Cut *line* into rows of *width* cells at character boundaries.
@@ -335,12 +315,10 @@ def _fold(line: Text, width: int) -> tuple[list[Text], list[int]]:
     starts.append(start)
     return rows, starts
 
-
 def _ansi(row: Text, width: int) -> str:
     buffer = io.StringIO()
     buffer_console(buffer, width).print(row, no_wrap=True, overflow="crop", end="")
     return buffer.getvalue()
-
 
 def _render_query_frame(
     screen_renderer: Callable[[Console], None],
@@ -450,7 +428,6 @@ def _render_query_frame(
         max(1, min(width, cursor_col + 1)),
     )
 
-
 def _write_query_frame(
     content: str,
     cursor_row: int,
@@ -464,7 +441,6 @@ def _write_query_frame(
                                    after=f"\033[{cursor_row};{cursor_col}H"))
     sys.stdout.flush()
     return True
-
 
 def get_query_with_shortcut(
     prompt_str: str,
@@ -777,7 +753,6 @@ def get_query_with_shortcut(
                 watcher_thread.join(timeout=0.25)
             display.leave_screen()
 
-
 def quick_actions_menu(update_available: bool = False, provider=None) -> "str | None":
     """Search-prompt quick actions, opened with Tab.
 
@@ -831,7 +806,6 @@ def quick_actions_menu(update_available: bool = False, provider=None) -> "str | 
         return None
     return items[idx].value
 
-
 def action_provider_prompt(action):
     """A global search action chooses its scope without opening another menu."""
     from torrent_finder.providers import PROVIDERS
@@ -844,7 +818,6 @@ def action_provider_prompt(action):
                          footer=t("All / selected providers uses its current profile.\n"
                                 "↑/↓ navigate  •  Enter select  •  Esc back"))
     return None if index is None else items[index].value
-
 
 def filter_menu(provider, on_save=None) -> None:
     """Show engine toggles and filter presets in a single menu."""
@@ -1123,7 +1096,6 @@ def filter_menu(provider, on_save=None) -> None:
                 readchar.readkey()
     # "back" — just return
 
-
 def episode_select_prompt(files: list, preselected: list[int] | None = None) -> list[int] | None:
     """Multi-select menu for picking episodes from a torrent's file list.
 
@@ -1278,11 +1250,9 @@ def episode_select_prompt(files: list, preselected: list[int] | None = None) -> 
 
     return [items[i].value[1].index for i in file_item_indexes if items[i].toggled]
 
-
 def _make_banner_panel() -> Text:
     """The app's one-line header (kept under its old name for existing callers)."""
     return theme.header(width=console.size.width)
-
 
 def subtitle_source_prompt(current: dict | None = None) -> dict:
     """Pick the subtitle source for the next stream.
@@ -1396,7 +1366,6 @@ def subtitle_source_prompt(current: dict | None = None) -> dict:
         return {"mode": "external", "path": os.path.abspath(path)}
     return {"mode": "external", "path": chosen}
 
-
 def download_dir_ready() -> bool:
     """Confirm the download folder is usable before a transfer starts.
 
@@ -1424,10 +1393,8 @@ def download_dir_ready() -> bool:
             return False
         download_dir_prompt()
 
-
 def _unpack_label(on: bool) -> str:
     return t("Unpack page archives: ON") if on else t("Unpack page archives: OFF")
-
 
 _UNPACK_DESCRIPTION = (
     N_("Unpack downloaded manga/comic archives (.zip, .cbz, .rar, .cbr, .7z holding only images) into a "
@@ -1435,14 +1402,12 @@ _UNPACK_DESCRIPTION = (
     "webtorrent / peerflix downloads, not to your torrent client. Other archives are left alone.")
 )
 
-
 def _toggle_unpack(item) -> None:
     from torrent_finder.state import load_setting, save_setting
     from torrent_finder.unpack import SETTING
     on = not bool(load_setting(SETTING, False))
     save_setting(SETTING, on)
     item.label = _unpack_label(on)
-
 
 def download_dir_prompt() -> None:
     """Pick the default download directory. Persists via ``save_setting`` and
@@ -1537,7 +1502,6 @@ def download_dir_prompt() -> None:
         return
     save_setting("download_dir", path)
 
-
 def confirm_prompt(message: str, title: str = N_("Confirm")) -> bool:
     """Confirm with Y/yes in every language, or S/sim in Brazilian Portuguese."""
     from rich.console import Group
@@ -1578,14 +1542,13 @@ def confirm_prompt(message: str, title: str = N_("Confirm")) -> bool:
     finally:
         display.leave_screen(clear=True)
 
-
 def print_banner() -> None:
     """Start a main-screen log: the app name at column 0, then a spacer."""
     console.print(theme.log_header(width=console.size.width))
     console.print()
 
-
 import os
+
 
 def clear_screen() -> None:
     """Clear the console and reprint the banner to reduce visual pollution."""

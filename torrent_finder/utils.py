@@ -1,5 +1,6 @@
 """Utility functions for formatting, styling, and magnet link building."""
 
+# i18n: converted
 import re
 import threading
 import time
@@ -9,7 +10,6 @@ from torrent_finder.constants import TRACKERS
 from torrent_finder.i18n import t, tn
 from torrent_finder.ui import theme
 
-# i18n: converted
 
 def start_esc_listener(cancel_event: "threading.Event", *, finish_event=None) -> "threading.Event":
     """Watch for Esc on a daemon thread and set ``cancel_event`` when pressed.

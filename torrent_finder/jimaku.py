@@ -8,8 +8,6 @@ caller transparently falls back to subliminal.
 """
 
 # i18n: converted
-from torrent_finder.i18n import N_, t
-
 import os
 import re
 from typing import Optional
@@ -18,6 +16,7 @@ import requests
 from rich.markup import escape
 
 from torrent_finder.constants import console, get_download_dir
+from torrent_finder.i18n import N_, t
 from torrent_finder.ui import theme
 from torrent_finder.credentials import jimaku_api_key
 

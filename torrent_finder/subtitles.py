@@ -1,8 +1,6 @@
 """Subtitle downloading module using subliminal."""
 
 # i18n: converted
-from torrent_finder.i18n import N_, t
-
 import os
 import re
 import warnings
@@ -17,6 +15,7 @@ from subliminal.cache import region as _subliminal_region
 
 from rich.markup import escape
 from torrent_finder.constants import console, get_download_dir
+from torrent_finder.i18n import N_, t
 from torrent_finder.ui import theme
 
 # subliminal caches provider auth tokens (e.g. the OpenSubtitles.com session) in

@@ -1,10 +1,9 @@
 """Portable, literal release-name rules; never native indexer operators."""
 
+# i18n: converted
 from dataclasses import asdict, dataclass
 from torrent_finder.i18n import N_, t
 from torrent_finder.result_view import words
-
-# i18n: converted
 
 # How summary() shows each populated rule.
 _SUMMARY = {

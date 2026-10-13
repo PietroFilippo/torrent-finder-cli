@@ -13,7 +13,6 @@ where emoji and box-drawing output are already broken.
 """
 
 # i18n: converted
-
 import unicodedata
 
 import readchar

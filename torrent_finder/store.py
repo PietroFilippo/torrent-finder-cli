@@ -25,8 +25,6 @@ nothing is written, and ``problem()`` describes it until ``retry_load()`` or
 """
 
 # i18n: converted
-from torrent_finder.i18n import N_, t
-
 import atexit
 import json
 import os
@@ -38,6 +36,7 @@ from copy import deepcopy
 from datetime import datetime
 
 from torrent_finder.constants import legacy_data_paths, machine_state_path
+from torrent_finder.i18n import N_, t
 
 STATE_PATH = machine_state_path("filter_state.json")
 LEGACY_STATE_PATHS = legacy_data_paths("filter_state.json")

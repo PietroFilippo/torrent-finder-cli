@@ -4,12 +4,12 @@ Every change is committed against the collection as currently saved, so a
 bookmark added or removed in another window is never undone by this one.
 """
 
-from copy import deepcopy
 # i18n: converted
-from torrent_finder.i18n import N_, t
+from copy import deepcopy
 from datetime import datetime, timezone
 from uuid import uuid4
 from torrent_finder import store
+from torrent_finder.i18n import N_, t
 from torrent_finder.providers.combined_provider import provider_label, result_identity
 from torrent_finder.state import provider_snapshot
 

@@ -9,11 +9,11 @@ English search keywords. The English stays what the tips page compares, and
 ``find_tips`` matches the English and the interface language alike.
 """
 
-# i18n: converted
 # Tags are English search keys, not text: lines whose tags hold a space carry '# i18n: ignore'.
 
 from __future__ import annotations
 
+# i18n: converted
 import random
 import unicodedata
 from dataclasses import dataclass
