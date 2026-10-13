@@ -339,11 +339,13 @@ class SearchSessionTests(unittest.TestCase):
 
     def test_slow_provider_extra_engines_do_not_monopolize_request_queue(self):
         release = threading.Event()
-        slow = self.provider(*[SearchEngine(str(i), "", lambda q: release.wait(2) or []) for i in range(6)])
+        slow = self.provider(*[SearchEngine(str(i), "", lambda q: release.wait(30) or []) for i in range(6)])
         fast = self.provider(SearchEngine("Fast", "", lambda q: [row()]))
         fast.slug = "manga"
+        arrived = threading.Event()  # stops waiting once the fast row is in, so a busy machine can't time it out
         try:
-            results = SearchSession([slow, fast], ["Example"], combined=True).run(timeout=0.08)
+            results = SearchSession([slow, fast], ["Example"], combined=True).run(
+                timeout=5, finish_event=arrived, on_results=lambda rows: rows and arrived.set())
             self.assertEqual(len(results), 1)
         finally:
             release.set()

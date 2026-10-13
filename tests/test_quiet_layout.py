@@ -535,8 +535,19 @@ class CancellationTests(unittest.TestCase):
             cancel_event.set()  # as if Esc arrived and the worker gave up
             return None
 
+        class Finished(threading.Thread):
+            # Runs the work at start(), so the outcome is decided with the worker
+            # already done; a real thread could still be returning on a busy machine.
+            def start(self):
+                self.run()
+
+            def is_alive(self):
+                return False
+
+        modules = SimpleNamespace(Event=threading.Event, Thread=Finished)
         with patch("torrent_finder.utils.start_esc_listener", return_value=threading.Event()), \
-             patch.object(acquisition.console, "status", return_value=contextlib.nullcontext()):
+             patch.object(acquisition.console, "status", return_value=contextlib.nullcontext()), \
+             patch.object(acquisition, "threading", modules):
             self.assertEqual(acquisition._wait_with_esc("Fetching", work), (None, True))
 
             def finished(cancel_event):

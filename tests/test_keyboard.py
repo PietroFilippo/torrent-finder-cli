@@ -1,5 +1,6 @@
 """The Windows key decoder: "à" is a letter, special keys keep readchar's strings."""
 
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -82,10 +83,25 @@ class InstallTests(unittest.TestCase):
             self.assertIs(readchar.readkey, sentinel)
 
 
+# getwch's strings for special keys, under readchar's Windows names (readchar.key is
+# that module only on Windows; its private module isn't imported on other systems).
+_WINDOWS_KEYS = {
+    "UP": "\x00\x48", "DOWN": "\x00\x50", "LEFT": "\x00\x4b", "RIGHT": "\x00\x4d",
+    "HOME": "\x00\x47", "END": "\x00\x4f", "PAGE_UP": "\x00\x49", "PAGE_DOWN": "\x00\x51",
+    "DELETE": "\x00\x53", "INSERT": "\x00\x52", "F1": "\x00\x3b", "F10": "\x00\x44", "F12": "\x00\x86",
+}
+
+
 def _windows_key(name):
-    """readchar's Windows constant, read from its module so the test runs on any system."""
-    import importlib
-    return getattr(importlib.import_module("readchar._win_key"), name)
+    return _WINDOWS_KEYS[name]
+
+
+class ReadcharAgreementTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "win32", "readchar.key holds the Windows codes only on Windows")
+    def test_the_codes_are_readchars_own(self):
+        for name, code in _WINDOWS_KEYS.items():
+            with self.subTest(name=name):
+                self.assertEqual(getattr(readchar.key, name), code)
 
 
 if __name__ == "__main__":
