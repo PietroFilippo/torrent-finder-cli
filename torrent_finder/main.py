@@ -18,7 +18,8 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 from rich.markup import escape as markup_escape  # _main_loop imports `escape` locally further down
 
-from torrent_finder import __version__, acquisition, store
+import torrent_finder
+from torrent_finder import acquisition, store
 from torrent_finder.ui import theme
 from torrent_finder.constants import console
 import readchar
@@ -1039,7 +1040,7 @@ def _restart_args(args) -> list[str]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Search and download torrents.")
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {torrent_finder.__version__}")
     parser.add_argument("--preview-update", nargs="?", const="success", choices=("success", "failure"),
                         help="Preview the update display without installing anything")
     parser.add_argument("--providers", nargs="+", metavar="PROVIDER", choices=[p for p in provider_cli_choices() if p != "all"],

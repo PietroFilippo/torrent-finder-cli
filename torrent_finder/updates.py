@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import NamedTuple
 from uuid import uuid4
 
-from torrent_finder import __version__
+import torrent_finder
 from torrent_finder.state import load_setting, save_setting
 
 PACKAGE = "torrent-finder-cli"
@@ -158,8 +158,9 @@ def check_for_update(force: bool = False) -> "dict | None":
             return {"kind": "git", "behind": n} if n > 0 else None
         if kind in ("pip", "binary"):
             latest = _latest_version(force)
-            if _is_newer(latest, __version__):
-                return {"kind": kind, "current": __version__, "latest": latest}
+            current = torrent_finder.__version__
+            if _is_newer(latest, current):
+                return {"kind": kind, "current": current, "latest": latest}
         return None
     except Exception:
         return None
