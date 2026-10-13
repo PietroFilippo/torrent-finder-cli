@@ -17,6 +17,10 @@ from dataclasses import dataclass, field
 from rich.cells import cell_len
 from rich.text import Text
 
+from torrent_finder.i18n import N_, t
+
+# i18n: converted
+
 APP_NAME = "torrent-finder"
 MARGIN = "  "
 KEY_GAP = "   "
@@ -49,10 +53,10 @@ class Design:
 
 DESIGNS: dict[str, Design] = {design.key: design for design in (
     Design("athanor", "Athanor", Glyphs("@", "√", "∙", "♦", " » ", "▓", "line"), True,
-           "A roguelike scriptorium: a double-line frame, a message line, a status line, "
-           "glyphs from the IBM PC character set, and a painting behind the terminal."),
+           N_("A roguelike scriptorium: a double-line frame, a message line, a status line, "
+              "glyphs from the IBM PC character set, and a painting behind the terminal.")),
     Design("simple", "Simple", Glyphs("▍", "✓", "•", "◆", " › ", "▇", "dots"), False,
-           "The quiet look: a header line, thin rules and a key bar; no frame."),
+           N_("The quiet look: a header line, thin rules and a key bar; no frame.")),
 )}
 
 
@@ -104,41 +108,41 @@ THEMES: dict[str, Palette] = {palette.key: palette for palette in (
     _colourway("citrinitas", "Citrinitas", "#D49A3A", "#E3C27A", "#83745E", "#5C4C39", "#2B2117",
                "#8F9A5A", "#C8742E", "#C2452D", page="#16120E", text="#CFC1A3", ink="#3A3026",
                frame="#AC7D31", bar_bg="#0D0B08",
-               note="Lamplight amber on parchment: the scriptorium as first seen."),
+               note=N_("Lamplight amber on parchment: the scriptorium as first seen.")),
     _colourway("rubedo", "Rubedo", "#D86A45", "#EBA987", "#8D6F65", "#5A3A33", "#2C1714",
                "#8F9A5A", "#D9A441", "#C23A3A", page="#150E0D", text="#D9C6B8", ink="#3A2420",
                frame="#A8472F", bar_bg="#0C0807",
-               note="Vermilion and rust: the reddening, the work's last stage."),
+               note=N_("Vermilion and rust: the reddening, the work's last stage.")),
     _colourway("albedo", "Albedo", "#E6E1D6", "#B9C6D2", "#7C8088", "#43474E", "#24272C",
                "#8FA68A", "#D3A955", "#C9675A", page="#121315", text="#D2CEC6", ink="#2E3237",
                frame="#9AA0A8", bar_bg="#0B0C0E",
-               note="Bone and silver: the whitening, cool and quiet."),
+               note=N_("Bone and silver: the whitening, cool and quiet.")),
     _colourway("viriditas", "Viriditas", "#5FB3A1", "#A7D8C8", "#6E8577", "#3A4D42", "#16241F",
                "#A3C25E", "#D9A441", "#CF5D4B", page="#0F1412", text="#C6D1C3", ink="#26342D",
                frame="#4E8F7F", bar_bg="#090C0B",
-               note="Verdigris on copper: the greening of old metal."),
+               note=N_("Verdigris on copper: the greening of old metal.")),
     _colourway("nigredo", "Nigredo", "#C8643C", "#D8CFC3", "#6E6A64", "#3A3835", "#1E1C1B",
                "#8F9A5A", "#D9A441", "#B83A3A", page="#0E0E0E", text="#BDB6AD", ink="#2B2928",
                frame="#6E6A64", bar_bg="#080808",
-               note="Ash and a single ember: the blackening."),
+               note=N_("Ash and a single ember: the blackening.")),
     Palette("quiet", "Quiet Blue", "bright_blue", "#7DAEFF", "#6A86B3", "#3A5A8C", "#16233D",
-            note="Your terminal's bright blue with three fixed shades of blue."),
+            note=N_("Your terminal's bright blue with three fixed shades of blue.")),
     Palette("iris", "Iris", "#A78BFA", "#C9B8FF", "#8F86B5", "#4B3F86", "#231B3F",
-            note="Violet; green, yellow and red stay free for states."),
+            note=N_("Violet; green, yellow and red stay free for states.")),
     Palette("lagoon", "Lagoon", "#2DD4BF", "#9FF2E4", "#6E9CA3", "#1E5C66", "#0E2A2E",
-            note="Teal; as cool as Quiet Blue, further from the blue of links."),
+            note=N_("Teal; as cool as Quiet Blue, further from the blue of links.")),
     Palette("ember", "Ember", "#FFB454", "#FFD9A0", "#A89378", "#6F4A2A", "#30220F", warn="#FF8A3D",
-            note="Warm amber; Auto turns orange so it never looks like the accent."),
+            note=N_("Warm amber; Auto turns orange so it never looks like the accent.")),
     Palette("mono", "Mono", "#F2F2F2", "#D9D9D9", "#8C8C8C", "#474747", "#262626",
-            note="No hue: weight carries the structure, states keep their colours."),
+            note=N_("No hue: weight carries the structure, states keep their colours.")),
     Palette("paper", "Paper", "#1F5FD6", "#2B4C8C", "#6B7A99", "#B9C6DC", "#DCE6F7",
             good="#1A7F37", warn="#9A6700", bad="#CF222E", light=True, page="#FAFAFA",
-            note="For light terminals: switch your terminal to a light colour scheme first."),
+            note=N_("For light terminals: switch your terminal to a light colour scheme first.")),
 )}
 DEFAULT_THEME = "citrinitas"
 DEFAULT_THEMES = {"athanor": "citrinitas", "simple": "quiet"}  # what choosing a design starts on
-FOCUS_STYLES = {"bar": "Cursor bar", "fill": "Filled row"}
-DENSITIES = {"comfortable": "Comfortable", "compact": "Compact"}
+FOCUS_STYLES = {"bar": N_("Cursor bar"), "fill": N_("Filled row")}
+DENSITIES = {"comfortable": N_("Comfortable"), "compact": N_("Compact")}
 
 
 def palettes(design: str) -> list[Palette]:
@@ -181,12 +185,12 @@ def _bind(palette: Palette) -> None:
     TEXT = palette.text                      # "" leaves body text to the terminal's foreground
     FRAME = palette.frame or palette.deep
     BAR_BG = palette.bar_bg
-    KEY = f"bold {ACCENT}"
+    KEY = f"bold {ACCENT}"  # i18n: ignore — Rich style syntax
     MUTED = STEEL
-    SECTION = f"bold {SKY}"     # uppercase section headers and table column headers
-    FOCUS = f"bold {ACCENT}"
-    BRAND = f"bold {ACCENT}"    # the app name in every header
-    SUBJECT = f"not bold {SKY}"  # what the screen is about: the query, torrent or provider after the name
+    SECTION = f"bold {SKY}"     # uppercase section headers and table column headers  # i18n: ignore — Rich style syntax
+    FOCUS = f"bold {ACCENT}"  # i18n: ignore — Rich style syntax
+    BRAND = f"bold {ACCENT}"    # the app name in every header  # i18n: ignore — Rich style syntax
+    SUBJECT = f"not bold {SKY}"  # what the screen is about: the query, torrent or provider after the name  # i18n: ignore — Rich style syntax
     RULE_STYLE = DEEP
     STYLES.clear()
     STYLES.update({
@@ -205,14 +209,14 @@ def _bind(palette: Palette) -> None:
         "info": MUTED,
         "success": GOOD,
         "warning": WARN,
-        "error": f"bold {BAD}",
+        "error": f"bold {BAD}",  # i18n: ignore — Rich style syntax
         "highlight": "bold",
         # A transient line that needs attention (the quit guard) and the update
         # banner. "not dim" keeps them bright inside dimmed footers; the banner's
         # headline is not bold because bold black reads as grey on many terminals.
-        "alert": f"not dim bold {WARN}",
-        "banner": f"not dim black on {WARN}",
-        "banner.action": f"not dim bold {WARN}",
+        "alert": f"not dim bold {WARN}",  # i18n: ignore — Rich style syntax
+        "banner": f"not dim black on {WARN}",  # i18n: ignore — Rich style syntax
+        "banner.action": f"not dim bold {WARN}",  # i18n: ignore — Rich style syntax
         # Rich's own spinners and progress bars follow the palette.
         "status.spinner": ACCENT,
         "bar.complete": ACCENT,
@@ -227,7 +231,7 @@ def _bind(palette: Palette) -> None:
         "on": GOOD,
         "auto": WARN,
         "off": MUTED,
-        "require": f"bold {ACCENT}",
+        "require": f"bold {ACCENT}",  # i18n: ignore — Rich style syntax
         "prefer": ACCENT,
     })
 
@@ -249,11 +253,11 @@ def apply(palette: "Palette | str | None" = None, *, focus: str | None = None,
         palette = THEMES[palette]
     if focus is not None:
         if focus not in FOCUS_STYLES:
-            raise ValueError(f"Unknown focus style {focus!r}")
+            raise ValueError(f"Unknown focus style {focus!r}")  # i18n: ignore — programmer error, not UI
         FILL_FOCUS = focus == "fill"
     if density is not None:
         if density not in DENSITIES:
-            raise ValueError(f"Unknown density {density!r}")
+            raise ValueError(f"Unknown density {density!r}")  # i18n: ignore — programmer error, not UI
         COMPACT = density == "compact"
     if palette is not None:
         _bind(palette)
@@ -370,7 +374,7 @@ def _title_text(title: str | Text) -> Text:
     if first >= 0:
         styled.stylize(SUBJECT, first + len(CRUMB))
         for match in re.finditer(re.escape(CRUMB), plain):
-            styled.stylize(f"not bold {MUTED}", match.start(), match.end())
+            styled.stylize(f"not bold {MUTED}", match.start(), match.end())  # i18n: ignore — Rich style syntax
     styled.spans.extend(crumb.spans)  # last wins: the title's own markup beats these defaults
     return styled
 
@@ -483,7 +487,7 @@ _ATOM = (
     r"|[\[\]/?,.;:<>+*-](?![A-Za-z0-9]))"
 )
 _KEY_SEGMENT = re.compile(
-    rf"^(?P<key>{_ATOM}(?:\s?/\s?{_ATOM})*)\s+(?P<action>[A-Za-z0-9(].*)$"
+    rf"^(?P<key>{_ATOM}(?:\s?/\s?{_ATOM})*)\s+(?P<action>(?:[^\W_]|\().*)$"
 )
 _SEPARATOR = re.compile(r"\s*•\s*|\s+\|\s+")
 
@@ -515,7 +519,7 @@ def is_key(text: str) -> bool:
     return bool(text) and bool(_KEY_ONLY.match(text.strip()))
 
 
-_LABEL = re.compile(r"(?:(?<=^)|(?<=· )|(?<=• ))([A-Z][A-Za-z ]{0,24}:)(?= )")
+_LABEL = re.compile(r"(?:(?<=^)|(?<=· )|(?<=• ))([^\W\d_](?:[^\W\d_]| ){0,24}:)(?= )")
 _SEPARATOR_MARK = re.compile(r" [·•] ")
 
 
@@ -527,7 +531,8 @@ def labelled(line: str, margin: str = "", wrap: bool = False) -> Text:
     text = Text(margin + line, no_wrap=not wrap, overflow="fold" if wrap else "ellipsis")
     offset = len(margin)
     for match in _LABEL.finditer(line):
-        text.stylize(MUTED, offset + match.start(1), offset + match.end(1))
+        if match.group(1)[0].isupper():
+            text.stylize(MUTED, offset + match.start(1), offset + match.end(1))
     for match in _SEPARATOR_MARK.finditer(line):
         text.stylize(MUTED, offset + match.start(), offset + match.end())
     return text
@@ -588,7 +593,7 @@ def with_help(segments: list[Text], width: int) -> list[Text]:
     """*segments* plus "? keys" when it fits on the lines the keys already take."""
     if has_key(segments, "?"):
         return segments
-    candidate = segments + [key_segment("?", "keys")]
+    candidate = segments + [key_segment("?", t("keys", ctx="key bar"))]
     return candidate if len(wrap_keys(candidate, width)) == len(wrap_keys(segments, width)) else segments
 
 
@@ -662,9 +667,14 @@ def report(title: str, body: str, tone: str = "") -> Text:
     return block
 
 
-def any_key(action: str = "continue") -> str:
+_CONTINUE = N_("continue")
+
+
+def any_key(action: str = _CONTINUE) -> str:
     """Markup for the pause line that ends a main-screen log."""
-    return f"[muted]Press [key]any key[/key] to {action}…[/muted]"
+    if action is _CONTINUE:
+        action = t(action)
+    return t("[muted]Press [key]any key[/key] to {action}…[/muted]", action=action)
 
 
 def section_label(label: str) -> str:

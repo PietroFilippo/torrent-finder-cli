@@ -12,8 +12,11 @@ from rich.console import Group
 from rich.text import Text
 
 from torrent_finder.constants import buffer_console, console
+from torrent_finder.i18n import N_, t
 from torrent_finder.ui import chrome as frames, display, theme
 from torrent_finder.ui.layout import ellipsize_cells, marquee_cells
+
+# i18n: converted
 
 
 # Marquee timing
@@ -105,8 +108,15 @@ def _hint_text(item: "SelectItem") -> Text:
 def _toggle_badge(item: "SelectItem") -> str:
     """The state shown before a multi-select label: a named state or a check mark."""
     if item.toggle_states:
-        return item.toggle_state
+        return _state_label(item.toggle_state, item.toggle_states)
     return theme.CHECK if item.toggled else theme.UNCHECKED
+
+
+def _state_label(state: str, states: tuple[str, ...]) -> str:
+    """Translate a badge with the shipped contexts; its stored state stays English."""
+    if "On" in states or "Auto" in states:  # i18n: ignore — engine state identities
+        return t(state, ctx="engine mode")
+    return t(state, ctx="preset state")
 
 
 def _is_section_header(item: "SelectItem") -> bool:
@@ -202,7 +212,7 @@ def _inline_hint(item: "SelectItem") -> bool:
 
 def _badge_width(items: list["SelectItem"]) -> int:
     """One width for every state badge in the list, so labels line up."""
-    widths = [cell_len(state) for item in items for state in item.toggle_states]
+    widths = [cell_len(_state_label(state, item.toggle_states)) for item in items for state in item.toggle_states]
     return max(widths, default=1)
 
 
@@ -294,8 +304,13 @@ def _clip_lines(blocks: list[Text], limit: int, width: int) -> Text:
 
 def _default_footer(multi: bool) -> str:
     if multi:
-        return "↑/↓ navigate  •  Enter toggle/select  •  Esc cancel"
-    return "↑/↓ navigate  •  Enter select  •  Esc cancel"
+        return t("↑/↓ navigate  •  Enter toggle/select  •  Esc cancel")
+    return t("↑/↓ navigate  •  Enter select  •  Esc cancel")
+
+
+def _position(start: int, end: int, total: int) -> str:
+    """The same position template for drawing and the header's row budget."""
+    return t("{start}–{end} of {total}", start=start, end=end, total=total)
 
 
 def _row(item: "SelectItem", index: int, is_cursor: bool, multi: bool, geometry: _Geometry, tick: int) -> Text:
@@ -306,7 +321,7 @@ def _row(item: "SelectItem", index: int, is_cursor: bool, multi: bool, geometry:
     if multi and not item.is_action:
         badge = _toggle_badge(item)
         if item.toggle_states:
-            badge_style = theme.state_style(badge)
+            badge_style = theme.state_style(item.toggle_state)
         else:
             badge_style = theme.GOOD if item.toggled else theme.MUTED
         row.append(badge, style=badge_style if item.enabled else theme.MUTED)
@@ -347,7 +362,7 @@ def _row(item: "SelectItem", index: int, is_cursor: bool, multi: bool, geometry:
         # Filled-row focus: tint from the cursor bar to the right margin.
         end = max(cell_len(row.plain), _screen_width() - len(theme.MARGIN))
         row.append(" " * (end - cell_len(row.plain)))
-        row.stylize(f"on {theme.FILL}", len(theme.MARGIN), len(row.plain))
+        row.stylize(f"on {theme.FILL}", len(theme.MARGIN), len(row.plain))  # i18n: ignore — Rich style syntax
     return row
 
 
@@ -542,7 +557,7 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     def windowed_keys() -> list[Text]:
         if theme.has_key(keys, "PgUp/PgDn"):
             return keys
-        return keys + [theme.key_segment("PgUp/PgDn", "page")]
+        return keys + [theme.key_segment("PgUp/PgDn", t("page", ctx="key bar"))]
 
     def plan() -> tuple[list[Text], int]:
         """Keys and chrome height for the current pinning, paging included."""
@@ -553,7 +568,7 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
         if main_len > height - total:
             segments = with_help(windowed_keys())
             # Measure the header with a position as wide as the real one will be.
-            widest_position = f"{main_len}–{main_len} of {main_len}"
+            widest_position = _position(main_len, main_len, main_len)
             header_count = len(theme.frame_header(title, header_status(widest_position), screen_width,
                                                   full_height))
             total = chrome_for(segments, item_lines + notice_lines)
@@ -620,7 +635,7 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     win_start_rel, win_end_rel = win_start - main_start, win_end - main_start
 
     position = (
-        f"{win_start_rel + 1}–{win_end_rel} of {main_len}" if main_len > max_visible else ""
+        _position(win_start_rel + 1, win_end_rel, main_len) if main_len > max_visible else ""
     )
     lines: list[Text] = theme.frame_header(title, header_status(position), screen_width, full_height)
     if not compact:
@@ -703,8 +718,9 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
 
 
 # Keys every selector understands, listed by show_keys after the screen's own.
-_STANDARD_KEYS = (("↑/↓", "move"), ("PgUp/PgDn", "page"), ("Home/End", "first / last"),
-                  ("Esc", "back"))
+_STANDARD_KEYS = (("↑/↓", N_("move", ctx="key bar")), ("PgUp/PgDn", N_("page", ctx="key bar")),
+                  ("Home/End", N_("first / last", ctx="key bar")), ("Esc", N_("back", ctx="key bar")))
+_SELECT = N_("Select")
 
 
 def key_pairs(footer: "str | Text", extra=()) -> list[tuple[str, str]]:
@@ -722,16 +738,18 @@ def key_pairs(footer: "str | Text", extra=()) -> list[tuple[str, str]]:
 
 def show_keys(title: "str | Text", footer: "str | Text", extra=_STANDARD_KEYS) -> None:
     """Every key of a screen in one list, including those a narrow key bar leaves out."""
+    if extra is _STANDARD_KEYS:
+        extra = [(key, t(action)) for key, action in extra]
     pairs = key_pairs(footer, extra)
     width = max((cell_len(key) for key, _ in pairs), default=1)
     items = []
     for key, action in pairs:
-        label = Text(key.ljust(width), style=theme.KEY)
+        label = Text(key + " " * (width - cell_len(key)), style=theme.KEY)
         label.append("  " + action, style="")
         items.append(SelectItem(label, value="__key__", passive=True))
-    items.append(SelectItem("Back", value=None, is_action=True))
+    items.append(SelectItem(t("Back"), value=None, is_action=True))
     screen = title.plain if isinstance(title, Text) else Text.from_markup(title).plain
-    arrow_select(items, title=Text("Keys" + theme.CRUMB + screen), footer="↑/↓ scroll • Esc back", help=False)
+    arrow_select(items, title=Text(t("Keys") + theme.CRUMB + screen), footer=t("↑/↓ scroll • Esc back"), help=False)
 
 
 def _next_enabled(items: list[SelectItem], current: int, direction: int) -> int:
@@ -792,7 +810,7 @@ def _resolve(val):
 
 def arrow_select(
     items: list[SelectItem],
-    title: str = "Select",
+    title: str = _SELECT,
     multi: bool = False,
     footer: str = "",
     start_index: int = 0,
@@ -848,6 +866,8 @@ def arrow_select(
     """
     import threading
 
+    if title is _SELECT:
+        title = lambda: t(_SELECT)
     if not items:
         return None
 

@@ -18,7 +18,16 @@ from dataclasses import dataclass, field
 from rich.cells import cell_len
 from rich.text import Text
 
+from torrent_finder.i18n import N_, t
 from torrent_finder.ui import theme
+
+# i18n: converted
+
+_DAYS = (N_("Mon", ctx="weekday"), N_("Tue", ctx="weekday"), N_("Wed", ctx="weekday"),
+         N_("Thu", ctx="weekday"), N_("Fri", ctx="weekday"), N_("Sat", ctx="weekday"), N_("Sun", ctx="weekday"))
+_MONTHS = (N_("Jan", ctx="month"), N_("Feb", ctx="month"), N_("Mar", ctx="month"), N_("Apr", ctx="month"),
+           N_("May", ctx="month"), N_("Jun", ctx="month"), N_("Jul", ctx="month"), N_("Aug", ctx="month"),
+           N_("Sep", ctx="month"), N_("Oct", ctx="month"), N_("Nov", ctx="month"), N_("Dec", ctx="month"))
 
 TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, HORIZONTAL, VERTICAL = "╔", "╗", "╚", "╝", "═", "║"
 
@@ -49,7 +58,7 @@ def take_message() -> str:
     if not _session.messages:
         return ""
     _session.shown = _session.messages.pop(0)
-    return _session.shown + (" [reverse]--More--[/reverse]" if _session.messages else "")
+    return _session.shown + (t(" [reverse]--More--[/reverse]") if _session.messages else "")
 
 
 def clear_messages() -> None:
@@ -122,11 +131,11 @@ def message_line(message: "str | Text", width: int) -> Text:
     text = theme._as_text(message) if message else Text()
     line = Text(" ", no_wrap=True, overflow="ellipsis")
     line.append_text(text)
-    line.stylize_before(f"bold {theme.TEXT}" if theme.TEXT else "bold")
+    line.stylize_before(f"bold {theme.TEXT}" if theme.TEXT else "bold")  # i18n: ignore — Rich style syntax
     line = _fit(line, width)
     line.append(" " * (width - cell_len(line.plain)))
     if theme.BAR_BG:
-        line.stylize_before(f"on {theme.BAR_BG}")
+        line.stylize_before(f"on {theme.BAR_BG}")  # i18n: ignore — Rich style syntax
     return line
 
 
@@ -146,10 +155,10 @@ def enlarge_notice(width: int, height: int) -> list[Text]:
     without scrolling; the view draws it again as the window grows.
     """
     width, height = max(1, width), max(1, height)
-    asked = (f"the scriptorium needs {MIN_WIDTH} columns by {MIN_HEIGHT} rows" if theme.FRAMED
-             else f"at least {MIN_WIDTH} columns by {MIN_HEIGHT} rows")
+    asked = (t("the scriptorium needs {columns} columns by {rows} rows", columns=MIN_WIDTH, rows=MIN_HEIGHT)
+             if theme.FRAMED else t("at least {columns} columns by {rows} rows", columns=MIN_WIDTH, rows=MIN_HEIGHT))
     lines: list[Text] = []
-    for text, style in (("Enlarge the window", f"bold {theme.TEXT}" if theme.TEXT else "bold"), (asked, theme.MUTED)):
+    for text, style in ((t("Enlarge the window"), f"bold {theme.TEXT}" if theme.TEXT else "bold"), (asked, theme.MUTED)):  # i18n: ignore — Rich style syntax
         if lines and height < 4:
             break
         row = ""
@@ -194,15 +203,16 @@ def _figures() -> list[tuple[str, str]]:
     try:
         from torrent_finder.stats import get_all_stats
         stats = get_all_stats()
-        figures += [("Searches", str(stats.get("searches_total", 0))), ("Picked", str(stats.get("picked_count", 0)))]
+        figures += [(t("Searches", ctx="status line"), str(stats.get("searches_total", 0))),
+                    (t("Picked", ctx="status line"), str(stats.get("picked_count", 0)))]
     except Exception:  # an unreadable store never stops a frame
         pass
     try:
         from torrent_finder import bookmarks
-        figures.append(("Bookmarks", str(bookmarks.count())))
+        figures.append((t("Bookmarks", ctx="status line"), str(bookmarks.count())))
     except Exception:
         pass
-    figures.append(("T", str(_session.turns)))
+    figures.append((t("T", ctx="status line"), str(_session.turns)))
     return figures
 
 
@@ -217,11 +227,13 @@ def status_line(width: int, now: "_dt.datetime | None" = None) -> Text:
         left.append(f"{label}:", style=theme.MUTED)
         left.append(value, style=theme.TEXT or "")
     now = now or _dt.datetime.now()
-    right = Text(f"{now:%a} {now.day} {now:%b}", style=theme.TEXT or "")
+    right = Text(t("{weekday} {day} {month}", weekday=t(_DAYS[now.weekday()]), day=now.day,
+                   month=t(_MONTHS[now.month - 1])), style=theme.TEXT or "")
     network = exposure()
     if network:
         right.append("  ")
-        right.append("VPN" if network == "vpn" else "IP visible", style=theme.GOOD if network == "vpn" else theme.WARN)
+        right.append(t("VPN") if network == "vpn" else t("IP visible"),
+                     style=theme.GOOD if network == "vpn" else theme.WARN)
     right.append(f"  v{__version__} ", style=theme.MUTED)
     if cell_len(left.plain) + cell_len(right.plain) + 2 > width:
         right = Text()  # a narrow window keeps the figures
@@ -230,7 +242,7 @@ def status_line(width: int, now: "_dt.datetime | None" = None) -> Text:
     line.append(" " * max(0, width - cell_len(line.plain) - cell_len(right.plain)))
     line.append_text(right)
     if theme.BAR_BG:
-        line.stylize_before(f"on {theme.BAR_BG}")
+        line.stylize_before(f"on {theme.BAR_BG}")  # i18n: ignore — Rich style syntax
     return line
 
 
@@ -285,7 +297,7 @@ def room(title: str, description: str, exits: list[tuple[str, str]]) -> list[Tex
     """A MUD-style room: a centred title, a description and the obvious exits."""
     heading = Text(f"~ {title} ~", style=f"bold {theme.ACCENT}", justify="center")
     words = Text(description)
-    paths = Text("Obvious exits: ", style=theme.MUTED)
+    paths = Text(t("Obvious exits: "), style=theme.MUTED)
     for index, (name, note) in enumerate(exits):
         if index:
             paths.append("  ")

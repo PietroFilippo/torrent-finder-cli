@@ -2,6 +2,8 @@
 
 from rich.cells import cell_len, chop_cells
 
+# i18n: converted
+
 
 def ellipsize_cells(value: object, width: int) -> str:
     """Crop *value* to a terminal-cell width, appending an ellipsis."""

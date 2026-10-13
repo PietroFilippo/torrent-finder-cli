@@ -24,6 +24,8 @@ import sys
 
 from rich.cells import cell_len
 
+# i18n: converted
+
 _ESCAPES = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
 _views: list[bool] = []  # per open view, outermost first: whether it shows the cursor
 

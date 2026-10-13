@@ -18,19 +18,22 @@ from rich.spinner import SPINNERS
 from rich.text import Text
 
 from torrent_finder.constants import buffer_console, console
+from torrent_finder.i18n import N_, t, tn
 from torrent_finder.ui import chrome as frames, display, theme
 from torrent_finder.ui.layout import ellipsize_cells
 
-KEYS = "Enter view results so far  •  Esc cancel"
+# i18n: converted
+
+KEYS = N_("Enter view results so far  •  Esc cancel")
 REDRAW_S = 0.1
 _LABEL_MAX = 20
 
 # What an engine's status reads as, here and on the diagnostics screen.
 STATUS_WORDS = {
-    "searching": "searching", "pending": "not finished", "auto": "auto, if needed", "skipped": "not needed",
-    "results": "results", "empty": "none", "filtered": "filtered out", "off": "off",
-    "timeout": "timed out", "interrupted": "stopped", "error": "failed", "blocked": "blocked",
-    "missing_login": "login needed", "rejected_login": "login rejected", "login_error": "login failed",
+    "searching": N_("searching"), "pending": N_("not finished"), "auto": N_("auto, if needed"), "skipped": N_("not needed"),
+    "results": N_("results"), "empty": N_("none"), "filtered": N_("filtered out"), "off": N_("off"),
+    "timeout": N_("timed out"), "interrupted": N_("stopped"), "error": N_("failed"), "blocked": N_("blocked"),
+    "missing_login": N_("login needed"), "rejected_login": N_("login rejected"), "login_error": N_("login failed"),
 }
 _STATUS_WORDS = STATUS_WORDS
 _WARN_STATUSES = {"timeout", "interrupted", "missing_login", "rejected_login", "login_error"}
@@ -61,13 +64,14 @@ def _engine_part(engine) -> Text:
     if engine.status == "results":
         part.append(str(engine.kept), style="default")
     elif engine.status in _WARN_STATUSES:
-        part.append(_STATUS_WORDS[engine.status], style=theme.WARN)
+        part.append(t(_STATUS_WORDS[engine.status]), style=theme.WARN)
     elif engine.status in _BAD_STATUSES:
-        part.append(_STATUS_WORDS[engine.status], style=theme.BAD)
+        part.append(t(_STATUS_WORDS[engine.status]), style=theme.BAD)
     elif engine.status == "searching":
-        part.append("searching", style="default")
+        part.append(t("searching"), style="default")
     else:
-        part.append(_STATUS_WORDS.get(engine.status, engine.status.replace("_", " ")), style=theme.MUTED)
+        word = _STATUS_WORDS.get(engine.status, engine.status.replace("_", " "))
+        part.append(t(word), style=theme.MUTED)
     return part
 
 
@@ -82,15 +86,15 @@ def provider_line(line, label_width: int, width: int, elapsed: float) -> Text:
     else:
         mark, mark_style = "–", theme.MUTED
     if line.results:
-        right = Text(f"{line.results} result{'s' if line.results != 1 else ''}")
+        right = Text(tn("{n} result", "{n} results", line.results))
     elif line.state == "running":
-        right = Text("waiting", style=theme.MUTED)
+        right = Text(t("waiting"), style=theme.MUTED)
     else:
-        right = Text("failed" if line.state == "failed" else "no results", style=theme.MUTED)
+        right = Text(t("failed") if line.state == "failed" else t("no results"), style=theme.MUTED)
     row = Text(theme.MARGIN, no_wrap=True, overflow="ellipsis")
     row.append(mark, style=mark_style)
     row.append(" ")
-    label = ellipsize_cells(line.label, label_width)
+    label = ellipsize_cells(t(line.label), label_width)
     row.append(label + " " * (label_width - cell_len(label)))
     engines = Text()
     for index, engine in enumerate(e for e in line.engines if e.status != "off"):
@@ -112,7 +116,7 @@ def _provider_lines(progress, width: int, elapsed: float) -> list[Text]:
     lines = tuple(getattr(progress, "providers", ()) or ()) if progress is not None else ()
     if not lines:
         return []
-    label_width = min(_LABEL_MAX, max(cell_len(line.label) for line in lines))
+    label_width = min(_LABEL_MAX, max(cell_len(t(line.label)) for line in lines))
     label_width = min(label_width, max(6, (width - 2 * len(theme.MARGIN)) // 3))
     return [provider_line(line, label_width, width, elapsed) for line in lines]
 
@@ -126,9 +130,10 @@ def _cut(rows: list[Text], room: int, progress) -> list[Text]:
     keep = room - 1
     rest = progress.providers[keep:]
     running = sum(line.state == "running" for line in rest)
-    summary = f"+{len(rest)} more provider{'s' if len(rest) != 1 else ''}"
+    summary = tn("+{n} more provider", "+{n} more providers", len(rest))
     if running:
-        summary += f" · {running} searching"
+        summary = tn("+{n} more provider · {running} searching", "+{n} more providers · {running} searching",
+                     len(rest), running=running)
     return rows[:keep] + [Text(theme.MARGIN + summary, style=theme.MUTED, no_wrap=True, overflow="ellipsis")]
 
 
@@ -137,13 +142,14 @@ def progress_message(progress, waiting_label: str) -> str:
     lines = tuple(getattr(progress, "providers", ()) or ()) if progress is not None else ()
     finished = [line for line in lines if line.state != "running"]
     if not finished:
-        return "You search the stacks…" if lines else waiting_label
+        return t("You search the stacks…") if lines else waiting_label
     last = finished[-1]
     if last.state == "failed":
-        return f"{last.label} falls silent."
+        return t("{provider} falls silent.", provider=t(last.label))
     if last.results:
-        return f"{last.label} answers: {last.results} result{'s' if last.results != 1 else ''}."
-    return f"{last.label} finds nothing."
+        return tn("{provider} answers: {n} result.", "{provider} answers: {n} results.", last.results,
+                  provider=t(last.label))
+    return t("{provider} finds nothing.", provider=t(last.label))
 
 
 def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: float,
@@ -156,6 +162,8 @@ def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: 
     of what is searched shortens last (ending in "…").
     """
     width, full_height = console.size.width, console.size.height
+    if frames.too_small(width, full_height):
+        return Group(*frames.enlarge_notice(width, full_height))
     height = theme.view_height(full_height, width)  # rows inside the Athanor chrome
     seconds = int(elapsed)
     top: list[Text] = theme.frame_header(title, f"{seconds}s", width, full_height)
@@ -169,16 +177,17 @@ def progress_frame(title: str, intro: str, notes: list[str], progress, elapsed: 
     if progress is None:
         status.append(waiting_label, style="bold")
     else:
-        status.append(f"{progress.completed}/{progress.total} providers finished · "
-                      f"{progress.results} results ready · {seconds}s", style="bold")
+        status.append(t("{completed}/{total} providers finished · {results} results ready · {seconds}s",
+                        completed=progress.completed, total=progress.total, results=progress.results, seconds=seconds),
+                      style="bold")
     rows = _provider_lines(progress, width, elapsed)
     waiting: list[Text] = []
     if not rows and progress is not None and progress.waiting:
         pending = ", ".join(progress.waiting[:2])
         if len(progress.waiting) > 2:
-            pending += f" +{len(progress.waiting) - 2} more"
-        waiting = theme.wrap_block(Text(f"Waiting: {pending}", style=theme.MUTED), width, console)
-    keys = theme.wrap_keys(theme.parse_footer(KEYS).keys, width)
+            pending = t("{names} +{count} more", names=pending, count=len(progress.waiting) - 2)
+        waiting = theme.wrap_block(Text(t("Waiting: {pending}", pending=pending), style=theme.MUTED), width, console)
+    keys = theme.wrap_keys(theme.parse_footer(t(KEYS)).keys, width)
     spaced = theme.roomy(height, 14)
 
     def assemble() -> list[Text]:

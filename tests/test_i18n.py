@@ -404,6 +404,8 @@ class EntryCheckTests(unittest.TestCase):
                                        "Pressione [key]qualquer tecla[/key] para continuar…"), [])
         self.assertEqual(self.problems("↑/↓ navigate  •  Enter select  •  Esc back",
                                        "↑/↓ navegar  •  Enter selecionar  •  Esc voltar"), [])
+        # The renderer accepts Unicode action initials after the layout hardening.
+        self.assertEqual(self.problems("Enter edit  •  Esc back", "Enter éditer  •  Esc voltar"), [])
         self.assertEqual(self.problems("{n} result", {"one": "um resultado", "other": "{n} resultados",
                                                       "zero": "Nenhum resultado"}, plural="{n} results"), [])
 
@@ -423,7 +425,7 @@ class EntryCheckTests(unittest.TestCase):
             ("protected", "Set TORRENT_FINDER_LANG first", "Defina o idioma primeiro"),
             ("protected", "Press F to filter", "Pressione G para filtrar"),
             ("keys", "Enter select  •  Esc back", "Esc voltar  •  Enter selecionar"),
-            ("keys", "Enter edit  •  Esc back", "Enter éditer  •  Esc voltar"),
+            ("keys", "Enter edit  •  Esc back", "Enter _éditer  •  Esc voltar"),
             ("nfc", "Back", "Voltar e\u0301"),
             ("empty", "Back", "  "),
             ("glossary", "Search again", "Pesquisar de novo"),
