@@ -129,6 +129,40 @@ def _compute_window(n: int, cursor: int, max_visible: int) -> tuple[int, int]:
     return start, end
 
 
+def _section_window(items: list["SelectItem"], main_start: int, main_end: int, start: int, end: int,
+                    cursor: int) -> tuple[int, int, "int | None"]:
+    """Adjust a window of list rows so section headings keep their rows.
+
+    A window never ends on a heading: the heading goes to the next page (the
+    window moves up a row, or loses its last row at the top of the list). A
+    window that starts inside a section repeats that section's heading as its
+    first row, in place of a row at an end the cursor is not on. Returns
+    ``(start, end, heading)``: *heading* is the index of the heading to repeat,
+    or None.
+    """
+    rows = end - start
+    if rows < 2 or rows >= main_end - main_start:  # the whole list shows, or there is no room to spare
+        return start, end, None
+    if _is_section_header(items[end - 1]) and end < main_end:
+        if start > main_start:
+            start, end = start - 1, end - 1
+        else:
+            end -= 1
+    heading = None
+    if rows >= 4 and not _is_section_header(items[start]):
+        heading = next((i for i in range(start - 1, main_start - 1, -1) if _is_section_header(items[i])), None)
+    if heading is not None:
+        if cursor != end - 1:
+            end -= 1
+            if _is_section_header(items[end - 1]) and end < main_end:
+                end -= 1  # the row before it was a heading: it goes to the next page too
+        else:
+            start += 1
+            if _is_section_header(items[start]):
+                heading = None  # the window now starts on its own heading
+    return start, end, heading
+
+
 # Rows below this height drop the spacer lines around the list.
 _COMPACT_HEIGHT = 20
 _GUTTER = 2  # cursor bar + space
@@ -469,7 +503,8 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     # Partition into leading actions, a windowed main list, and trailing actions.
     n = len(items)
     main_start = 0
-    while main_start < n and items[main_start].is_action:
+    # A heading that opens the list scrolls with its rows instead of being pinned above them.
+    while main_start < n and items[main_start].is_action and not _is_section_header(items[main_start]):
         main_start += 1
     main_end = n
     while main_end > main_start and items[main_end - 1].is_action:
@@ -578,8 +613,9 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     )
     if cursor < main_start or cursor >= main_end:
         win_start_rel, win_end_rel = _compute_window(main_len, 0, max_visible)
-    win_start = main_start + win_start_rel
-    win_end = main_start + win_end_rel
+    win_start, win_end, repeated = _section_window(items, main_start, main_end, main_start + win_start_rel,
+                                                   main_start + win_end_rel, cursor)
+    win_start_rel, win_end_rel = win_start - main_start, win_end - main_start
 
     position = (
         f"{win_start_rel + 1}–{win_end_rel} of {main_len}" if main_len > max_visible else ""
@@ -590,17 +626,22 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     body_start = len(lines)  # the list column starts here; the header spans the window
     lines.extend(intro_lines)
 
+    def heading(item: SelectItem) -> Text:
+        label = theme.section_label(item.label)
+        return Text(theme.MARGIN + ellipsize_cells(label, inner_width), style=theme.SECTION)
+
     for i, item in enumerate(items):
         in_main = main_start <= i < main_end
         if in_main and (i < win_start or i >= win_end):
             continue
+        if i == win_start and repeated is not None:
+            lines.append(heading(items[repeated]))  # the section this page starts inside
         if multi and has_actions and item.is_action and not _is_section_header(item):
             previous = items[i - 1] if i > 0 else None
             if previous and not previous.is_action:
                 lines.append(Text(""))
         if _is_section_header(item):
-            label = theme.section_label(item.label)
-            lines.append(Text(theme.MARGIN + ellipsize_cells(label, inner_width), style=theme.SECTION))
+            lines.append(heading(item))
             continue
         lines.append(_row(item, i, i == cursor, multi, geometry, tick))
 
