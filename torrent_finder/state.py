@@ -65,10 +65,40 @@ def _migrate_legacy_names(data: dict) -> bool:
     return changed
 
 
+# Knaben became On by default where it was Auto. A provider's saved choices
+# record every engine's mode, so a saved "auto" there was almost always the old
+# default: it turns On once, and an Auto chosen after that is kept. (Desktop and
+# Mobile were On already: an Auto saved there was chosen.)
+_KNABEN_ON = "knaben_on_by_default"
+_KNABEN_WAS_AUTO = frozenset({"movies", "games", "anime", "manga", "books"})
+
+
+def _knaben_on_by_default(data: dict) -> bool:
+    """Turn saved Knaben "auto" modes On, once. Returns True if anything changed."""
+    settings = data.get("settings")
+    if isinstance(settings, dict) and settings.get(_KNABEN_ON):
+        return False
+    changed = False
+    providers = data.get("providers")
+    for slug, pstate in providers.items() if isinstance(providers, dict) else ():
+        modes = pstate.get("engine_modes") if isinstance(pstate, dict) else None
+        if slug not in _KNABEN_WAS_AUTO or not isinstance(modes, dict) or modes.get("Knaben") != "auto":
+            continue
+        modes["Knaben"] = "on"
+        if isinstance(pstate.get("engines"), dict):
+            pstate["engines"]["Knaben"] = True
+        changed = True
+    if changed:
+        store.section(data, "settings")[_KNABEN_ON] = True
+    return changed
+
+
 def load_state(providers) -> None:
     """Apply saved engine/preset selections onto the given provider instances in place."""
     if _migrate_legacy_names(deepcopy(store.read())):
         store.update(_migrate_legacy_names)
+    if _knaben_on_by_default(deepcopy(store.read())):
+        store.update(_knaben_on_by_default)
     provider_states = store.read().get("providers", {})
     for provider in providers:
         pstate = provider_states.get(provider.slug)
@@ -145,6 +175,7 @@ def save_state(providers) -> None:
 
     def change(data):
         store.section(data, "providers").update(deepcopy(snapshots))
+        store.section(data, "settings")[_KNABEN_ON] = True  # these modes are chosen now: keep an Auto
     store.commit(change)
 
 

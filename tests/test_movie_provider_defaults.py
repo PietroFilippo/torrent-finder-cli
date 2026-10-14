@@ -40,11 +40,11 @@ class MovieProviderDefaultsTests(unittest.TestCase):
         provider.apibay_fallback_categories = ()
         return provider
 
-    def test_only_apibay_and_nyaa_are_enabled_by_default(self):
+    def test_apibay_nyaa_and_knaben_are_enabled_by_default(self):
         provider = MovieProvider()
 
         enabled = {engine.name for engine in provider.engines if engine.enabled}
-        self.assertEqual(enabled, {"Apibay", "Nyaa"})
+        self.assertEqual(enabled, {"Apibay", "Nyaa", "Knaben"})
         emergency = {
             engine.name for engine in provider.engines
             if engine.emergency_fallback

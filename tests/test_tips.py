@@ -15,7 +15,7 @@ class TipsCatalogTests(unittest.TestCase):
         matches = find_tips("Knaben", category="Filters & Selection")
         texts = [tip.text for _category, tip in matches]
 
-        self.assertTrue(any("starts on Auto" in text for text in texts))
+        self.assertTrue(any("Set it to Auto" in text for text in texts))
         self.assertTrue(any("Knaben tracker" in text for text in texts))
 
     def test_engine_mode_semantics_are_searchable(self):

@@ -62,12 +62,12 @@ class AnimeProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Nyaa on, category-scoped Knaben auto, other public engines off."""
+        """Nyaa and category-scoped Knaben on, other public engines off."""
         return [
             SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine(
                 "Knaben", "🧭", self._search_knaben,  # i18n: ignore — service/engine identity, including external category values
-                enabled=False, emergency_fallback=True,
+                enabled=True, emergency_fallback=True,
             ),
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=False),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine(

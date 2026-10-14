@@ -29,8 +29,8 @@ class BookProvider(BaseProvider):
     apibay_fallback_categories = (601, 102)
     knaben_categories = (9_000_000,)  # Books parent category
     solidtorrents_category = "eBook"
-    # Rank by how well a listing matches the requested work, and let Knaben (Auto)
-    # help when Libgen answers with other books only ("Tomorrow and Tomorrow").
+    # Rank by how well a listing matches the requested work. Knaben set to Auto
+    # helps when Libgen answers with other books only ("Tomorrow and Tomorrow").
     prefer_title_matches = True
     auto_needs_relevant_rows = True
     # Knaben is skipped only when a row is the requested book itself, not one
@@ -64,13 +64,13 @@ class BookProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Libgen + APIBay on, category-scoped Knaben auto, Solid manually off."""
+        """Libgen, APIBay and category-scoped Knaben on, Solid manually off."""
         return [
             SearchEngine("Libgen", "📖", self._search_libgen, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine(
                 "Knaben", "🧭", self._search_knaben,  # i18n: ignore — service/engine identity, including external category values
-                enabled=False, emergency_fallback=True,
+                enabled=True, emergency_fallback=True,
             ),
             SearchEngine(
                 "SolidTorrents", "🔗", self._search_solidtorrents,  # i18n: ignore — service/engine identity, including external category values

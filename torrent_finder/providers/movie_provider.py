@@ -132,12 +132,12 @@ class MovieProvider(BaseProvider):
         return queries[:_MAX_QUERY_EXPANSIONS]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """APIBay + Nyaa on, Knaben auto, noisier engines manually off."""
+        """APIBay, Nyaa and Knaben on, noisier engines manually off."""
         return [
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine(
                 "Knaben", "🧭", self._search_knaben,  # i18n: ignore — service/engine identity, including external category values
-                enabled=False, emergency_fallback=True,
+                enabled=True, emergency_fallback=True,
             ),
             SearchEngine("Nyaa", "🍙", self._search_nyaa, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine("YTS", "🎥", self._search_yts, enabled=False),

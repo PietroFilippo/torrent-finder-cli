@@ -43,14 +43,18 @@ class BookTitleScoreTests(unittest.TestCase):
 
 
 class BooksSearchTests(unittest.TestCase):
-    def search(self, provider_class, query, libgen=(), apibay=(), knaben=()):
+    def search(self, provider_class, query, libgen=(), apibay=(), knaben=(), knaben_mode="auto"):
+        # These cases check Knaben's Auto rules; it is On by default (None keeps the default).
         with patch.object(provider_class, "_search_apibay", return_value=list(apibay)), \
              patch.object(provider_class, "_search_knaben", return_value=list(knaben)), \
              patch.object(provider_class, "_search_solidtorrents", return_value=[]), \
              patch.object(MovieProvider, "_search_nyaa", return_value=[]), \
              patch.object(MovieProvider, "_search_yts", return_value=[]), \
              patch.object(BookProvider, "_search_libgen", return_value=list(libgen)):
-            return SearchSession([provider_class()], [query]).run()
+            provider = provider_class()  # inside the patches: its engines keep the fakes
+            if knaben_mode is not None:
+                next(e for e in provider.engines if e.name == "Knaben").set_mode(knaben_mode)
+            return SearchSession([provider], [query]).run()
 
     def test_requested_work_comes_first_and_libgen_leads_among_equals(self):
         results = self.search(BookProvider, "Pride and Prejudice",
@@ -79,6 +83,13 @@ class BooksSearchTests(unittest.TestCase):
         knaben = next(d for d in results.session.diagnostics if d.engine == "Knaben")
         self.assertEqual(knaben.status, "skipped")
         self.assertIn("matching the title", knaben.message)
+
+    def test_knaben_on_by_default_searches_even_when_the_book_was_found(self):
+        results = self.search(BookProvider, "Pride and Prejudice",
+                              libgen=[row("Pride and Prejudice — Austen, Jane [epub, English]", "Libgen", 1)],
+                              knaben=[row("Pride and Prejudice by Jane Austen.epub", "Knaben", 9)], knaben_mode=None)
+        knaben = next(d for d in results.session.diagnostics if d.engine == "Knaben")
+        self.assertEqual(knaben.status, "results")
 
     def test_a_book_merely_containing_the_title_does_not_stop_knaben(self):
         # The 2026-10-04 review: "1984" journal issues and another author's

@@ -72,7 +72,7 @@ class GameProvider(BaseProvider):
             SearchEngine("FitGirl", "🧚", self._search_fitgirl, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine(
                 "Knaben", "🧭", self._search_knaben,  # i18n: ignore — service/engine identity, including external category values
-                enabled=False, emergency_fallback=True,
+                enabled=True, emergency_fallback=True,
             ),
             SearchEngine(
                 "SolidTorrents", "🔗", self._search_solidtorrents,  # i18n: ignore — service/engine identity, including external category values

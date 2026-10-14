@@ -135,7 +135,7 @@ class BookProviderTests(unittest.TestCase):
     def test_default_engines_need_no_credentials(self):
         provider = BookProvider()
         enabled = {e.name for e in provider.engines if e.enabled}
-        self.assertEqual(enabled, {"Libgen", "Apibay"})
+        self.assertEqual(enabled, {"Libgen", "Apibay", "Knaben"})
         emergency = {e.name for e in provider.engines if e.emergency_fallback}
         self.assertEqual(emergency, {"Knaben"})
 
