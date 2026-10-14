@@ -94,8 +94,9 @@ and carry presentation-only cache provenance. See
 [ADR-0009](docs/adr/0009-apibay-last-known-good-and-emergency-engines.md)
 and [ADR-0010](docs/adr/0010-knaben-and-explicit-engine-modes.md).
 
-Knaben is the default Auto engine for Movies & Series, Games, Anime, Manga and
-Books, and On for Desktop and Mobile (where APIBay is Auto). Each provider
+Knaben is On by default for every public-tracker provider (Mobile's Auto
+engine is APIBay); where it used to be Auto, a saved Auto from before v0.10.1
+turns On once (`state._knaben_on_by_default`). Each provider
 maps to Knaben's normalized categories; the adapter makes one bounded v2 GET
 request (unsafe/XXX rows stay hidden by v2's defaults; zero-seed rows are kept
 with `dead`), accepts only valid 40-character info hashes, and

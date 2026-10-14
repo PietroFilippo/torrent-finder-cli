@@ -5,6 +5,10 @@ raw row is relevant enough (`auto_needs_relevant_rows`, `relevant_title_score`);
 Knaben is On by default for Desktop and Mobile (Mobile's Auto engine is APIBay);
 the client uses Knaben's v2 GET API with the `dead` flag; only 40-character
 hashes are accepted; Off engines run only when a preset requires them.
+Amended in v0.10.1: Knaben is On by default for every public-tracker provider;
+Auto stays available. Where Knaben was Auto by default, a saved Auto from earlier
+versions (almost always the old default, since every engine's mode is saved)
+turns On once.
 
 ## Context
 

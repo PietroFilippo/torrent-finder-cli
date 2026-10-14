@@ -7,7 +7,7 @@ to VLC with subtitles. Each category searches several sources at once and puts
 the title you asked for first. Torrent Finder is written in Python with
 [Rich](https://github.com/Textualize/rich).
 
-The latest release is **v0.10.0**: see its [release notes](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/releases/v0.10.0.md).
+The latest release is **v0.10.1**: see its [release notes](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/releases/v0.10.1.md).
 The [user guide](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/guide.md) explains every feature in detail.
 
 ## Install

@@ -136,17 +136,17 @@ not independent catalogs.
 
 | Provider | `-t` | Engines: On / Auto / Off by default | Account |
 |---|---|---|---|
-| Movies & Series | `movie` | APIBay, Nyaa live-action / Knaben / YTS, SolidTorrents | none |
-| Games › General | `game` | APIBay, Online-Fix, FitGirl / Knaben / SolidTorrents | none |
+| Movies & Series | `movie` | APIBay, Nyaa live-action, Knaben / – / YTS, SolidTorrents | none |
+| Games › General | `game` | APIBay, Online-Fix, FitGirl, Knaben / – / SolidTorrents | none |
 | Games › Online-Fix | `online-fix` | Online-Fix | none |
 | Games › FitGirl | `fitgirl` | FitGirl | none |
 | Software › Desktop | `software` | APIBay, Knaben / – / SolidTorrents | none |
 | Software › Mobile | `mobile` | Knaben / APIBay / SolidTorrents, F-Droid | none |
 | Software › RuTracker | `rutracker` | RuTracker | required |
-| Anime | `anime` | Nyaa / Knaben / APIBay, SolidTorrents | none |
-| Manga › General | `manga` | Nyaa (EN), APIBay Comics / Knaben / Nyaa (Raw), Nyaa (Non-English) | none |
+| Anime | `anime` | Nyaa, Knaben / – / APIBay, SolidTorrents | none |
+| Manga › General | `manga` | Nyaa (EN), APIBay Comics, Knaben / – / Nyaa (Raw), Nyaa (Non-English) | none |
 | Manga › Madokami | `madokami` | Madokami | required |
-| Books | `books` | Libgen, APIBay E-books and Audio books / Knaben / SolidTorrents | none |
+| Books | `books` | Libgen, APIBay E-books and Audio books, Knaben / – / SolidTorrents | none |
 
 `movies`, `games` and `book` work for `-t` too, and `-t all` is
 [search across providers](#searching-across-providers).
@@ -210,9 +210,10 @@ be down.
 used through its cacheable v2 searches as Knaben asks. One request per search
 asks for the provider's categories, at most 50 rows. Unsafe and adult rows stay
 hidden, zero-seed rows stay listed, rows need a valid info hash, and the
-focused row shows the tracker Knaben found it on. Desktop searches it On beside
-APIBay because, in the October 2026 audit, APIBay took 5.4 s on average and
-found 8 of 32 programs where Knaben took 0.8 s and found 26.
+focused row shows the tracker Knaben found it on. Every provider that searches
+public trackers runs it On; set it to **Auto** to ask it only when the On
+engines come back empty. In the October 2026 audit of Desktop, APIBay took
+5.4 s on average and found 8 of 32 programs where Knaben took 0.8 s and found 26.
 
 **APIBay** sometimes answers with a false "no results". Every APIBay search
 runs live first; a successful result is saved, and a later empty or failed

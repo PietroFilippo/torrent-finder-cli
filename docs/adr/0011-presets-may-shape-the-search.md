@@ -19,7 +19,7 @@ engines:
 - APIBay caps a response at roughly 100 seeder-ordered rows, so the low-seed
   tail where dubs live is cut off before any filter sees it.
 - The engines carrying Brazilian releases are the ones users leave Off.
-  Knaben (Auto by default) indexes the Pirate Bay's Portuguese corpus; only
+  Knaben (then Auto by default) indexes the Pirate Bay's Portuguese corpus; only
   SolidTorrents surfaces the Brazilian sites (LAPUMiA, BluDV, Comando,
   TorrentDosFilmes, BaixeDeTudo).
 
