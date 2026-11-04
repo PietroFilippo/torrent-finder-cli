@@ -7,7 +7,7 @@ to VLC with subtitles. Each category searches several sources at once and puts
 the title you asked for first. Torrent Finder is written in Python with
 [Rich](https://github.com/Textualize/rich).
 
-The latest release is **v0.10.2**: see its [release notes](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/releases/v0.10.2.md).
+The latest release is **v0.11.0**: see its [release notes](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/releases/v0.11.0.md).
 The [user guide](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/guide.md) explains every feature in detail.
 
 ## Install
@@ -125,8 +125,10 @@ open the download menu.
 - Two designs: **Athanor** (the default), a framed roguelike scriptorium with
   five colourways, and **Simple**, a quiet look with six themes including
   **Paper** for light terminals.
-- Public-domain engravings behind the app, through a **Windows Terminal
-  profile** with pixel fonts, or as a saved image for other terminals.
+- Twenty public-domain paintings behind the app, ten of them wide works that
+  fill the window, their edges dissolving into the page; through a **Windows
+  Terminal profile** with pixel fonts and a lantern icon, or as a saved image
+  for other terminals.
 - An inspector pane in wide windows, and layouts that adapt to narrow, short
   and tall windows.
 
