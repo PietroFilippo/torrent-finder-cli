@@ -883,10 +883,17 @@ your profile › Appearance › Color scheme), unless you use the profile below.
 ### Paintings
 
 Athanor has a **painting**, chosen apart from the colours, which recolour it:
-ten public-domain engravings, six by Gustave Doré, plus Dürer's *Melencolia I*,
+ten public-domain plates, six by Gustave Doré, plus Dürer's *Melencolia I*,
 the Flammarion engraving, Pamela Colman Smith's *Hermit* and an emblem from
-Maier's *Atalanta Fugiens*, or none. Terminals draw background pictures, not
-apps, so:
+Maier's *Atalanta Fugiens*; ten **wide paintings**, listed under their own
+heading from the oldest: Rembrandt's *Three Trees*, Friedrich's *Abbey in the
+Oakwood* and *Sea of Ice*, five by John Martin (*Satan presiding at the
+Infernal Council*, *The Deluge*, *The Fall of Nineveh*, *Pandemonium*, *The
+Opening of the Seventh Seal*), Doré's *Over London by Rail* and Böcklin's
+*Isle of the Dead*; or none. Each is a two-tone dither (a fine engraving line, film-like grain or a
+line screen), cropped to the picture: its edges toward the text dissolve into
+the page, dot by dot, so it has no frame. Terminals draw background pictures,
+not apps, so:
 
 - **On Windows**, **Add a torrent-finder profile** gives Windows Terminal a
   profile that opens the app on the theme's own page, with the painting behind
@@ -898,9 +905,12 @@ apps, so:
   restart. Athanor's profile has a **full look** (page, painting, pixel font) or
   a **plain look** (Windows Terminal's own page and font). Removing the profile
   deletes its folder; the fonts stay installed.
-- **Painting side** puts the painting on the right (the default, like the plate
-  facing a page of text), on the left (behind the menus) or on both sides (the
-  chosen plate on the right and a faded companion plate on the left).
+- **Painting side** puts a plate on the right (the default, like the plate
+  facing a page of text), on the left (behind the menus, in a fainter ink) or
+  on both sides (the chosen plate on the right and a faded companion plate on
+  the left). A wide work always fills the window behind the text, in a fainter
+  ink, so it has no side to choose.
+- The profile's tab shows a **lantern** icon in the colourway's colours.
 - **Open from other tabs** (off by default) makes the command, typed in another
   Windows Terminal tab, open the app in a torrent-finder tab of the same window,
   because a program cannot change the picture or font of the tab it runs in.

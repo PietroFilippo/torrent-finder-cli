@@ -47,9 +47,35 @@ class CatalogTests(unittest.TestCase):
                 self.assertTrue(entry.source.startswith("https://commons.wikimedia.org/"))
                 width, height, rows = paintings.bitmap(key)
                 self.assertEqual(height, 560)
-                self.assertLessEqual(width, 560)
+                self.assertLessEqual(width, 980 if entry.wide else 560)
+                self.assertEqual(entry.wide, width > height)  # wide works are landscape, plates are not
                 self.assertEqual(len(rows), height)
                 self.assertIn(entry.year, entry.credit)
+
+    def test_no_painting_keeps_a_band_of_paper_at_its_edges(self):
+        """Printed margins are cropped away at build time: a solid lit band at an
+        edge would survive the dissolve as a straight line (ADR-0031)."""
+        for key in paintings.catalog():
+            width, height, rows = paintings.bitmap(key)
+            bits = ["".join(f"{byte:08b}" for byte in row)[:width] for row in rows]
+            edges = {
+                "top": [bits[y].count("1") / width for y in range(4)],
+                "bottom": [bits[height - 1 - y].count("1") / width for y in range(4)],
+                "left": [sum(row[x] == "1" for row in bits) / height for x in range(4)],
+                "right": [sum(row[width - 1 - x] == "1" for row in bits) / height for x in range(4)],
+            }
+            for side, shares in edges.items():
+                with self.subTest(key=key, side=side):
+                    self.assertLess(sum(share > 0.7 for share in shares), 3)
+
+    def test_wide_works_always_fill_the_window(self):
+        wide = [key for key, entry in paintings.catalog().items() if entry.wide]
+        self.assertGreaterEqual(len(wide), 3)
+        for key in wide:
+            for placement in (*paintings.PLACEMENTS, "nonsense"):
+                self.assertEqual(paintings.placed(key, placement), paintings.ACROSS)
+        self.assertEqual(paintings.placed("dore-raven", "left"), "left")
+        self.assertEqual(paintings.placed("dore-raven", "nonsense"), paintings.DEFAULT_PLACEMENT)
 
     def test_keys_are_known_paintings_or_none(self):
         self.assertEqual(paintings.painting_key("dore-raven"), "dore-raven")
@@ -80,17 +106,29 @@ class PngTests(unittest.TestCase):
         width, height = struct.unpack(">II", found[b"IHDR"][:8])
         self.assertEqual((width, height), tuple(2 * n for n in paintings.bitmap("dore-raven")[:2]))
 
+    def test_a_plate_behind_the_text_keeps_less_ink(self):
+        palette = theme.THEMES["citrinitas"]
+        for placement, keep in (("left", paintings.FAINT), ("right", 1)):
+            found = chunks(paintings.render("dore-raven", palette.ink, palette.page, placement=placement))
+            self.assertEqual(found[b"PLTE"][3:].hex(), paintings.faint(palette.ink, palette.page, keep)[1:].lower())
+        found = chunks(paintings.render("martin-deluge", palette.ink, palette.page, placement="right"))
+        self.assertEqual(found[b"PLTE"][3:].hex(),
+                         paintings.faint(palette.ink, palette.page, paintings.ACROSS_INK)[1:].lower())
+
     def test_export_writes_a_named_png(self):
         with tempfile.TemporaryDirectory() as folder:
             path = paintings.export("smith-hermit", theme.THEMES["albedo"], Path(folder) / "out")
             self.assertEqual(path.name, "torrent-finder-smith-hermit-albedo.png")
+            versioned = paintings.export("smith-hermit", theme.THEMES["albedo"], Path(folder) / "out", version="v9")
+            self.assertEqual(versioned.name, "torrent-finder-smith-hermit-albedo-v9.png")
             self.assertTrue(path.read_bytes().startswith(b"\x89PNG"))
-            self.assertEqual(list(path.parent.iterdir()), [path])  # no temporary file left behind
+            self.assertFalse(list(path.parent.glob("*.tmp")))  # no temporary file left behind
 
     def test_a_spread_puts_the_faded_companion_left_and_the_plate_right(self):
         palette = theme.THEMES["citrinitas"]
         with patch.object(paintings, "bitmap", side_effect=lambda key: {
-                "a": (2, 2, [bytes([0b11000000])] * 2), "b": (1, 2, [bytes([0b10000000])] * 2)}[key]):
+                "a": (2, 2, [bytes([0b11000000])] * 2), "b": (1, 2, [bytes([0b10000000])] * 2)}[key]), \
+             patch.object(paintings, "dissolve", side_effect=lambda width, height, bits, *rest: bits):
             blob = paintings.spread("b", "a", palette.ink, palette.page, factor=1, aspect=3)
         found = chunks(blob)
         self.assertEqual(struct.unpack(">IIBB", found[b"IHDR"][:10]), (6, 2, 2, 3))  # 2-bit, palette, 3:1
@@ -109,20 +147,59 @@ class PngTests(unittest.TestCase):
             self.assertEqual(path.name, "torrent-finder-flammarion+smith-hermit-citrinitas.png")
             width, height = struct.unpack(">II", chunks(path.read_bytes())[b"IHDR"][:8])
             self.assertEqual(width, round(height * paintings.SPREAD_ASPECT))
-            # Left and right share one picture: only the terminal's alignment differs.
+            # Left and right fade toward different sides, so each has its own picture.
             self.assertEqual(paintings.export("flammarion", palette, folder, placement="left").name,
-                             "torrent-finder-flammarion-citrinitas.png")
+                             "torrent-finder-flammarion-left-citrinitas.png")
+            self.assertEqual(paintings.export("martin-council", palette, folder, placement="facing").name,
+                             "torrent-finder-martin-council-citrinitas.png")  # a wide work has no spread
 
     def test_placements_and_companions(self):
         self.assertEqual(list(paintings.PLACEMENTS), ["right", "left", "facing"])
         self.assertEqual(paintings.placement_key("left"), "left")
         self.assertIsNone(paintings.placement_key("middle"))
-        for key in paintings.catalog():
+        for key in (key for key in paintings.catalog() if not paintings.is_wide(key)):
             with self.subTest(key=key):
                 companion = paintings.facing(key)
                 self.assertIn(companion, paintings.catalog())
                 self.assertNotEqual(companion, key)
                 self.assertEqual(paintings.facing(companion), key)  # pairs face each other
+
+
+class DissolveTests(unittest.TestCase):
+    """The edges toward the text break up into the page; the edge at the window's side stays whole."""
+
+    @staticmethod
+    def lit(rows, x0, x1):
+        return sum(row[x0:x1].count("1") for row in rows)
+
+    def test_the_named_side_thins_out_and_the_others_stay(self):
+        full = ["1" * 100] * 40
+        faded = paintings.dissolve(100, 40, full, "l", side=0.4)
+        self.assertEqual(self.lit(faded, 0, 4), 0)  # at the edge: nothing left
+        self.assertLess(self.lit(faded, 10, 20), self.lit(faded, 30, 40))  # thicker inward
+        self.assertEqual(self.lit(faded, 40, 100), 60 * 40)  # past the fade: untouched
+        self.assertEqual(paintings.dissolve(100, 40, full, ""), full)
+        ends = paintings.dissolve(100, 40, full, "tb", end=0.1)
+        self.assertEqual(ends[0].count("1"), 0)
+        self.assertEqual(ends[20], "1" * 100)  # the middle row stays whole
+
+    def test_unlit_dots_stay_unlit_and_rows_keep_their_width(self):
+        rows = ["0101" * 25] * 16
+        faded = paintings.dissolve(100, 16, rows, "lrtb")
+        self.assertTrue(all(len(row) == 100 for row in faded))
+        self.assertTrue(all(old == "1" or new == "0" for before, after in zip(rows, faded)
+                            for old, new in zip(before, after)))
+
+    def test_a_plate_on_the_right_fades_on_its_left(self):
+        palette = theme.THEMES["citrinitas"]
+        width, height, _ = paintings.bitmap("dore-charon")
+        found = chunks(paintings.render("dore-charon", palette.ink, palette.page, factor=1))
+        raw = zlib.decompress(found[b"IDAT"])
+        stride = (width + 7) // 8 + 1
+        rows = ["".join(f"{byte:08b}" for byte in raw[y * stride + 1:(y + 1) * stride])[:width]
+                for y in range(height)]
+        middle = rows[height // 4:3 * height // 4]
+        self.assertLess(self.lit(middle, 0, width // 10), self.lit(middle, width - width // 10, width))
 
 
 class PaintingChoiceTests(unittest.TestCase):
@@ -156,9 +233,17 @@ class PaintingChoiceTests(unittest.TestCase):
         labels = [item.label for item in items]
         self.assertIn("─── Painting ───", labels)
         rows = [item for item in items if isinstance(item.value, tuple) and item.value[0] == "painting"]
-        self.assertEqual([row.value[1] for row in rows], [*paintings.catalog(), "none"])
-        self.assertEqual(rows[0].marker, "●")  # the default painting
-        self.assertIn("Paradise Lost", rows[0].description)
+        plates = [key for key, entry in paintings.catalog().items() if not entry.wide]
+        wide = [key for key, entry in paintings.catalog().items() if entry.wide]
+        self.assertEqual([row.value[1] for row in rows], ["none", *plates, *wide])
+        self.assertEqual(rows[1].marker, "●")  # the default painting, after None
+        self.assertIn("Paradise Lost", rows[1].description)
+        # The wide works sit under their own heading, oldest first.
+        heading = labels.index("─── Wide paintings ───")
+        self.assertEqual([item.value[1] for item in items[heading + 1:heading + 1 + len(wide)]], wide)
+        years = [int(paintings.catalog()[key].year) for key in wide]
+        self.assertEqual(years, sorted(years))
+        self.assertEqual((len(plates), len(wide)), (10, 10))
         self.assertIn(("export", None), [item.value for item in items])
         theme.apply("quiet")
         self.assertNotIn("─── Painting ───", [item.label for item in self.capture()])  # Simple has none
@@ -195,6 +280,9 @@ class PaintingChoiceTests(unittest.TestCase):
         self.assertEqual(appearance.saved()["placement"], "facing")
         appearance.save("rubedo", "bar", "comfortable")  # a colour change keeps the side
         self.assertEqual(appearance.saved()["placement"], "facing")
+        self.run_menu(self.downs_to(("painting", "martin-deluge")) + [K.ENTER, K.ESC])
+        self.assertNotIn("─── Painting side ───", [item.label for item in self.capture()])  # it fills the window
+        self.assertEqual(appearance.saved()["placement"], "facing")  # kept for the next plate
         self.run_menu(self.downs_to(("painting", "none")) + [K.ENTER, K.ESC])
         self.assertNotIn("─── Painting side ───", [item.label for item in self.capture()])  # no painting, no side
 

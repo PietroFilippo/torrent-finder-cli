@@ -70,6 +70,16 @@
     "file": "durer-melencolia.png"
   },
   {
+    "key": "maier-emblem",
+    "title": "Emblem XXI",
+    "artist": "Matthäus Merian, for Michael Maier",
+    "year": "1617",
+    "work": "Atalanta Fugiens",
+    "source": "https://commons.wikimedia.org/wiki/File:Michael_Maier_Atalanta_Fugiens_Emblem_21.jpeg",
+    "licence": "Public domain",
+    "file": "maier-emblem.png"
+  },
+  {
     "key": "flammarion",
     "title": "The Flammarion engraving",
     "artist": "Unknown artist",
@@ -87,16 +97,117 @@
     "work": "Rider–Waite tarot",
     "source": "https://commons.wikimedia.org/wiki/File:RWS1909_-_09_Hermit.jpeg",
     "licence": "Public domain",
-    "file": "smith-hermit.png"
+    "file": "smith-hermit.png",
+    "reach": 0.12
   },
   {
-    "key": "maier-emblem",
-    "title": "Emblem XXI",
-    "artist": "Matthäus Merian, for Michael Maier",
-    "year": "1617",
-    "work": "Atalanta Fugiens",
-    "source": "https://commons.wikimedia.org/wiki/File:Michael_Maier_Atalanta_Fugiens_Emblem_21.jpeg",
+    "key": "rembrandt-trees",
+    "title": "The Three Trees",
+    "artist": "Rembrandt van Rijn",
+    "year": "1643",
+    "work": "",
+    "source": "https://commons.wikimedia.org/wiki/File:Rembrandt_van_Rijn,_The_Three_Trees,_1643,_NGA_43418.jpg",
     "licence": "Public domain",
-    "file": "maier-emblem.png"
+    "file": "rembrandt-trees.png",
+    "wide": true
+  },
+  {
+    "key": "friedrich-abbey",
+    "title": "The Abbey in the Oakwood",
+    "artist": "Caspar David Friedrich",
+    "year": "1810",
+    "work": "",
+    "source": "https://commons.wikimedia.org/wiki/File:Caspar_David_Friedrich_-_Abtei_im_Eichwald_-_Google_Art_Project.jpg",
+    "licence": "Public domain",
+    "file": "friedrich-abbey.png",
+    "wide": true
+  },
+  {
+    "key": "friedrich-ice",
+    "title": "The Sea of Ice",
+    "artist": "Caspar David Friedrich",
+    "year": "1824",
+    "work": "",
+    "source": "https://commons.wikimedia.org/wiki/File:Caspar_David_Friedrich_-_Das_Eismeer_-_Hamburger_Kunsthalle.jpg",
+    "licence": "Public domain",
+    "file": "friedrich-ice.png",
+    "wide": true
+  },
+  {
+    "key": "martin-council",
+    "title": "Satan presiding at the Infernal Council",
+    "artist": "John Martin",
+    "year": "1824",
+    "work": "Paradise Lost",
+    "source": "https://commons.wikimedia.org/wiki/File:Martin,_John_-_Satan_presiding_at_the_Infernal_Council_-_1824.JPG",
+    "licence": "Public domain",
+    "file": "martin-council.png",
+    "wide": true
+  },
+  {
+    "key": "martin-deluge",
+    "title": "The Deluge",
+    "artist": "John Martin",
+    "year": "1828",
+    "work": "",
+    "source": "https://commons.wikimedia.org/wiki/File:John_Martin_-_The_Deluge_-_B1977.14.11938_-_Yale_Center_for_British_Art.jpg",
+    "licence": "Public domain",
+    "file": "martin-deluge.png",
+    "wide": true
+  },
+  {
+    "key": "martin-nineveh",
+    "title": "The Fall of Nineveh",
+    "artist": "John Martin",
+    "year": "1829",
+    "work": "",
+    "source": "https://commons.wikimedia.org/wiki/File:John_Martin_-_The_Fall_of_Ninevah_-_B1977.14.11939_-_Yale_Center_for_British_Art.jpg",
+    "licence": "Public domain",
+    "file": "martin-nineveh.png",
+    "wide": true
+  },
+  {
+    "key": "martin-pandemonium",
+    "title": "Pandemonium",
+    "artist": "John Martin",
+    "year": "1831",
+    "work": "Paradise Lost",
+    "source": "https://commons.wikimedia.org/wiki/File:John_Martin_-_Pandemonium_-_B1977.14.11944_-_Yale_Center_for_British_Art.jpg",
+    "licence": "Public domain",
+    "file": "martin-pandemonium.png",
+    "wide": true
+  },
+  {
+    "key": "martin-seal",
+    "title": "The Opening of the Seventh Seal",
+    "artist": "John Martin",
+    "year": "1837",
+    "work": "",
+    "source": "https://commons.wikimedia.org/wiki/File:John_Martin_-_The_Opening_of_the_Seventh_Seal_-_B1978.43.931_-_Yale_Center_for_British_Art.jpg",
+    "licence": "Public domain",
+    "file": "martin-seal.png",
+    "wide": true
+  },
+  {
+    "key": "dore-london",
+    "title": "Over London by Rail",
+    "artist": "Gustave Doré",
+    "year": "1872",
+    "work": "London: A Pilgrimage",
+    "source": "https://commons.wikimedia.org/wiki/File:YCBA_London_a_Pilgrimage_06_(cropped).jpg",
+    "licence": "Public domain",
+    "file": "dore-london.png",
+    "wide": true
+  },
+  {
+    "key": "bocklin-isle",
+    "title": "Isle of the Dead",
+    "artist": "Arnold Böcklin",
+    "year": "1880",
+    "work": "",
+    "source": "https://commons.wikimedia.org/wiki/File:B%C3%B6cklin_-_Die_Toteninsel_(Erste_Fassung),_GKS588,_Kunstmuseum_Basel.jpg",
+    "licence": "Public domain",
+    "file": "bocklin-isle.png",
+    "wide": true
   }
 ]

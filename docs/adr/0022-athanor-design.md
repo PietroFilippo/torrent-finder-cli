@@ -4,7 +4,9 @@ Status: accepted (2026-10-04). Amends ADR-0021: every palette now belongs to a
 design, the default is Athanor's Citrinitas, and a terminal profile may give
 the page the theme's colour and a painting. The profile is extended by
 [ADR-0026](0026-profile-fonts.md) (fonts and text sizes per design) and
-[ADR-0027](0027-profile-look-and-other-tabs.md) (a plain look, opening from other tabs).
+[ADR-0027](0027-profile-look-and-other-tabs.md) (a plain look, opening from other tabs). Its
+paintings are redrawn by [ADR-0031](0031-paintings-without-frames.md) (crops, dot
+screens, dissolving edges, wide works, a lantern icon).
 
 ## Context
 

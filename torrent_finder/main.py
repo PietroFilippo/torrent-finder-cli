@@ -1962,6 +1962,8 @@ def main() -> None:
         except (KeyboardInterrupt, EOFError):
             pass
         return
+    from torrent_finder.ui import appearance
+    appearance.refresh_stale_profile()  # before a hand-over, so the profile's tab opens with the new look
     if _opened_in_profile_tab():
         return
     record_session_start()

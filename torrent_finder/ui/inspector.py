@@ -261,8 +261,9 @@ def appearance_details() -> list[Text]:
     rows = [(t("Design"), f"{theme.DESIGNS[palette.design].name} · {palette.name}")]
     if palette.design == "athanor":
         shown = paintings.catalog().get(appearance.painting())
-        side = appearance.placement()
-        where = "" if side == "right" or not shown else f" · {t(paintings.PLACEMENTS[side]).lower()}"
+        side = paintings.placed(shown.key, appearance.placement()) if shown else "right"
+        where = ("" if side == "right" or not shown else f" · {t('across the window')}" if side == paintings.ACROSS
+                 else f" · {t(paintings.PLACEMENTS[side]).lower()}")
         rows.append((t("Painting"), (shown.title_label() if shown else t("none", ctx="painting")) + where))
     rows += [(t("Focus"), t(theme.FOCUS_STYLES[focus])), (t("Density"), t(theme.DENSITIES[density]))]
     if terminal_profile.supported():

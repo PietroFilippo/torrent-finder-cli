@@ -444,7 +444,13 @@ previews and saves. See [ADR-0021](docs/adr/0021-themes.md). Athanor's
 **painting** is a separate saved choice, recoloured by the colourway; the
 terminal shows it, through the Windows Terminal profile or an exported image.
 The saved painting side chooses right (default), left or both sides, the last
-with a faded companion plate (`paintings.FACING`).
+with a faded companion plate (`paintings.FACING`). A **wide** work always goes
+across the window (`paintings.placed`). Edges toward the text dissolve into the
+page (`paintings.dissolve`); paintings are cropped and screened at build time.
+The profile's tab icon is a lantern in the palette's colours; the look's
+version (`terminal_profile.LOOK_VERSION`) ends every picture name, and a stale
+profile is redrawn at start. See
+[ADR-0031](docs/adr/0031-paintings-without-frames.md).
 Each design also keeps the profile's **font** and **text size** (bundled pixel
 fonts for Athanor, Windows' own for Simple; `terminal_profile.FONTS`). The
 profile is a fragment Windows Terminal re-reads whenever its settings.json

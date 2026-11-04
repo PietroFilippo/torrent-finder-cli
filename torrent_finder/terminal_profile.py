@@ -128,6 +128,11 @@ def profile_guid(app: str, name: str) -> str:
 
 
 PROFILE_GUID = profile_guid(APP, NAME)
+# The version of the profile's look: it ends the names of its pictures (Windows
+# Terminal caches pictures by path) and its icon, so a version that draws them
+# differently gets new files, and a profile written before it is redrawn once
+# at start (``stale``).
+LOOK_VERSION = "v2"
 
 # Windows Terminal's default scheme, for the Simple palettes' named colours.
 CAMPBELL = {
@@ -306,18 +311,65 @@ def _number(value: float) -> "int | float":
 
 # How Windows Terminal places the picture for each painting placement (stretch mode, alignment).
 _PICTURE_PLACEMENT = {"right": ("uniform", "right"), "left": ("uniform", "left"),
-                      "facing": ("uniformToFill", "center")}
+                      "facing": ("uniformToFill", "center"), paintings.ACROSS: ("uniformToFill", "center")}
+
+# The profile's icon: a lantern (the Hermit's, the seeker's), drawn on a 16x16
+# grid: metal (m), the glass's glow (g) and the flame (f); the rest is clear.
+_LANTERN = (
+    "......mmmm......",
+    ".....m....m.....",
+    "......mmmm......",
+    ".......mm.......",
+    "....mmmmmmmm....",
+    "...mmmmmmmmmm...",
+    "....mggggggm....",
+    "....mggffggm....",
+    "....mggffggm....",
+    "....mgffffgm....",
+    "....mgffffgm....",
+    "....mggffggm....",
+    "....mggggggm....",
+    "...mmmmmmmmmm...",
+    "....mmmmmmmm....",
+    "................",
+)
+ICON_SCALE = 4  # 64 pixels square: Windows Terminal shrinks it to the tab row's size
+
+
+def icon(palette) -> bytes:
+    """The lantern as a PNG in *palette*'s colours on a clear ground: steel for the metal,
+    and of its accent and sky the brighter for the flame, the other for the glass's glow."""
+    metal = _hex(palette.steel, CAMPBELL["bright_black"])
+    glow, flame = sorted((_hex(palette.accent, CAMPBELL["bright_blue"]), _hex(palette.sky, CAMPBELL["bright_cyan"])),
+                         key=lambda colour: sum(paintings._rgb(colour)))
+    values = {".": "00", "m": "01", "g": "10", "f": "11"}
+    rows = []
+    for line in _LANTERN:
+        bits = "".join(values[cell] * ICON_SCALE for cell in line)
+        rows += [int(bits, 2).to_bytes(len(bits) // 8, "big")] * ICON_SCALE
+    size = len(_LANTERN) * ICON_SCALE
+    colours = ((0, 0, 0), *(paintings._rgb(colour) for colour in (metal, glow, flame)))
+    return paintings.write_png(size, size, rows, colours, depth=2, transparent=True)
+
+
+def _write_icon(palette, target: Path) -> Path:
+    path = target / f"{APP}-icon-{palette.key}-{LOOK_VERSION}.png"
+    temporary = path.with_suffix(".tmp")
+    temporary.write_bytes(icon(palette))
+    temporary.replace(path)
+    return path
 
 
 def fragment(palette, image: "Path | None", font: "Font | None", launch: list[str], starting: str,
              size: "float | None" = None, *, plain: bool = False,
-             placement: str = paintings.DEFAULT_PLACEMENT) -> dict:
+             placement: str = paintings.DEFAULT_PLACEMENT, icon_path: "Path | None" = None) -> dict:
     """The fragment: one profile and its colour scheme; *font* at *size* when Windows has it.
 
     A *plain* profile keeps Windows Terminal's own page and font: no scheme,
     picture or font, as the app looks in any other tab. *placement* says
     where the picture goes: fitted to the right or the left of the window, or
-    (a spread of two plates) covering it.
+    (a spread of two plates, or a wide work) covering it. *icon_path* names
+    the tab's icon, in either look.
     """
     colours = scheme(palette)
     profile = {
@@ -328,6 +380,8 @@ def fragment(palette, image: "Path | None", font: "Font | None", launch: list[st
         "colorScheme": colours["name"],
         "tabTitle": NAME,
     }
+    if icon_path:
+        profile["icon"] = icon_path.name  # a bare name, beside the fragment, like the picture
     if plain:
         del profile["colorScheme"]
         return {"profiles": [profile], "schemes": []}
@@ -425,22 +479,35 @@ def write(palette, painting: str, environ=None, *, font: "Font | None" = None, s
     font = font or default_font(palette.design)
     image = None
     if palette.design == "athanor" and painting in paintings.catalog() and not plain:
-        image = paintings.export(painting, palette, target, placement=placement)
+        placement = paintings.placed(painting, placement)
+        image = paintings.export(painting, palette, target, placement=placement, version=LOOK_VERSION)
+    lantern = _write_icon(palette, target)
     launch = command()
     starting = str(Path(__file__).resolve().parent.parent) if launch[1:2] == ["-m"] else "%USERPROFILE%"
     data = fragment(palette, image, font if font_installed(font) else None, launch, starting, size, plain=plain,
-                    placement=placement)
+                    placement=placement, icon_path=lantern)
     path = fragment_path(environ)
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     temporary.replace(path)
     _check_real(path, environ)
-    # Only now that the fragment names the new picture do the old ones go (Windows Terminal
+    # Only now that the fragment names the new pictures do the old ones go (Windows Terminal
     # caches pictures by path, so each look has its own file).
     for old in target.glob(f"{APP}-*.png"):
-        if old != image:
+        if old not in (image, lantern):
             old.unlink()
     return path
+
+
+def stale(environ=None) -> bool:
+    """Whether the installed profile was written before this version's look (its icon's
+    name carries the look's version), so it should be redrawn from the saved choices."""
+    try:
+        data = json.loads(fragment_path(environ).read_text(encoding="utf-8"))
+        name = data["profiles"][0].get("icon", "")
+    except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError):
+        return False
+    return not (isinstance(name, str) and name.endswith(f"-{LOOK_VERSION}.png"))
 
 
 # Windows Terminal's settings: the Store's stable, Preview and Canary builds keep

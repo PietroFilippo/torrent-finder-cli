@@ -186,6 +186,37 @@ def save(theme_name: str, focus: str, density: str, painting_name: str | None = 
     _session["source"] = "saved"
 
 
+def write_profile(value: dict, **options) -> None:
+    """Write the Windows Terminal profile for a saved appearance *value* (see ``normalize``)."""
+    palette = theme.THEMES[value["theme"]]
+    choice = _font_choice(palette.design, value["fonts"].get(palette.design))
+    terminal_profile.write(palette, value["painting"], font=terminal_profile.FONTS[choice["font"]],
+                           size=choice["size"], plain=palette.design == "athanor" and value["profile"]["look"] == "plain",
+                           placement=value["placement"], **options)
+
+
+def refresh_stale_profile() -> None:
+    """After an update that draws the profile differently, redraw an installed one once,
+    from the saved choices, so its painting and icon follow without a visit to Settings.
+    Failing quietly is fine: Settings › Appearance rewrites it on the next change.
+
+    Unreadable saved settings leave it alone: ``saved()`` would answer with the
+    defaults and overwrite the user's look, and the profile would then no
+    longer count as stale. It stays stale until the settings can be read.
+    """
+    try:
+        if not (terminal_profile.supported() and terminal_profile.installed() and terminal_profile.stale()):
+            return
+        from torrent_finder import store
+        from torrent_finder.state import load_setting
+        if store.problem() is not None:
+            return
+        write_profile(normalize(load_setting(SETTING, None)))
+        terminal_profile.refresh()
+    except Exception:
+        pass  # an optional redraw never stops the app from starting
+
+
 def _swatches(palette) -> Text:
     """The palette's four shades as blocks, then sample words in its own colours."""
     hint = Text()
@@ -324,15 +355,16 @@ _PLACEMENT_HINTS = {"right": N_("the plate facing the page; menus stay on plain 
 
 def _placement_help(key: str, painting_key: str) -> str:
     if key == "right":
-        return (t("The painting fills the right of the window, like the plate facing a page of text; "
-                "menus and lists keep the plain page."))
+        return (t("The painting fills the right of the window, like the plate facing a page of text, "
+                  "fading into the page toward the menus and lists."))
     if key == "left":
-        return (t("The painting fills the left of the window, behind the menus and lists. "
-                "Its ink is dark enough to read through."))
+        return (t("The painting fills the left of the window, behind the menus and lists, fading into the "
+                  "page toward the right. Its ink is dark enough to read through."))
     companion = paintings.catalog().get(paintings.facing(painting_key))
     name = companion.title_label() if companion else t("another plate")
-    return t("This painting on the right and its companion, {name}, faded on the left. The two cover the window "
-             "together, so windows of other proportions cut a little off each side.", name=name)
+    return t("This painting on the right and its companion, {name}, faded on the left, each fading into the "
+             "page between them. The two cover the window together, so windows of other proportions cut a "
+             "little off each side.", name=name)
 
 
 def _placement_rows(chosen: str, painting_key: str) -> list:
@@ -342,15 +374,24 @@ def _placement_rows(chosen: str, painting_key: str) -> list:
             for key, label in paintings.PLACEMENTS.items()]
 
 
+def _painting_row(key: str, entry, chosen: str, plain: bool):
+    across = (t(" A wide work: it fills the window behind the text, its edges fading into the page.")
+              if entry.wide else "")
+    return _choice(entry.title_label(), ("painting", key), key == chosen, entry.artist_credit_label(),
+                   t("{credit}; public domain. Recoloured in the colourway's ink.{across} {help}",
+                     credit=entry.credit_label(), across=across, help=_painting_help(plain)))
+
+
 def _painting_rows(chosen: str, plain: bool = False) -> list:
-    """The Painting section's rows: every engraving, then none."""
-    rows = []
-    for key, entry in paintings.catalog().items():
-        rows.append(_choice(entry.title_label(), ("painting", key), key == chosen, entry.artist_credit_label(),
-                            t("{credit}; public domain. Recoloured in the colourway's ink. {help}",
-                              credit=entry.credit_label(), help=_painting_help(plain))))
-    rows.append(_choice(t("None", ctx="painting"), ("painting", paintings.NONE), chosen == paintings.NONE, t("a plain page"),
-                        t("No painting behind the app.")))
+    """The Painting section's rows: none, the plates (beside the text), then the wide
+    works (across the window) under their own heading, oldest first."""
+    rows = [_choice(t("None", ctx="painting"), ("painting", paintings.NONE), chosen == paintings.NONE,
+                    t("a plain page"), t("No painting behind the app."))]
+    catalog = paintings.catalog()
+    rows += [_painting_row(key, entry, chosen, plain) for key, entry in catalog.items() if not entry.wide]
+    wide = [_painting_row(key, entry, chosen, plain) for key, entry in catalog.items() if entry.wide]
+    if wide:
+        rows += [_section(t("Wide paintings")), *wide]
     return rows
 
 
@@ -409,11 +450,13 @@ def appearance_menu() -> None:
             items.append(_section(t("Painting")))
             items += _painting_rows(chosen["painting"], plain(design))
             if chosen["painting"] != paintings.NONE:
+                if not paintings.is_wide(chosen["painting"]):  # a wide work always fills the window
+                    items.append(_section(t("Painting side")))
+                    items += _placement_rows(chosen["placement"], chosen["painting"])
+                items.append(_section(t("Painting image")))
                 items.append(SelectItem(t("Save the painting as an image"), ("export", None), is_action=True,
                                         hint=t("a PNG in the {colours} colours", colours=theme.THEMES[state['preview']].name),
                                         description=t("Into {folder}. {help}", folder=paintings.export_folder(), help=t(PAINTING_HELP))))
-                items.append(_section(t("Painting side")))
-                items += _placement_rows(chosen["placement"], chosen["painting"])
         # The app sets a font only through the Windows Terminal profile, and the plain look keeps its own.
         if terminal_profile.supported() and not plain(design):
             current, size = chosen_font(design)
@@ -470,9 +513,7 @@ def appearance_menu() -> None:
             return
         try:
             installed = terminal_profile.install_fonts() if kind == "font" else []
-            current, size = chosen_font(design_of(chosen["theme"]))
-            terminal_profile.write(theme.THEMES[chosen["theme"]], chosen["painting"], font=current, size=size,
-                                   plain=plain(design_of(chosen["theme"])), placement=chosen["placement"])
+            write_profile(chosen)
             state["notice"] = t(FOLLOWS_NOW) if terminal_profile.refresh() else t(FOLLOWS_LATER)
             if installed:
                 state["notice"] += " " + t(NEW_FONTS)
@@ -498,8 +539,7 @@ def appearance_menu() -> None:
         if not confirm_prompt(message, title=t("Windows Terminal profile")):
             return
         try:
-            terminal_profile.write(palette, chosen["painting"], font=current, size=size, add_font=True,
-                                   plain=plain(palette.design), placement=chosen["placement"])
+            write_profile(chosen, add_font=True)
             if terminal_profile.refresh():
                 state["notice"] = t("[good]Added[/good] the torrent-finder profile: open it from the ▾ menu next to the tabs.")
             else:
