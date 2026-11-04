@@ -1,5 +1,6 @@
 """Background downloads on screen: the figure, the Downloads screen, its keys and prompts, the quit and update guards."""
 
+import datetime
 import io
 import time
 import unittest
@@ -76,10 +77,11 @@ class DownloadsUITests(unittest.TestCase):
     def test_the_status_line_opens_with_the_downloads_figure(self):
         theme.apply("citrinitas", focus="bar", density="comfortable")
         install(self, FakeManager(sample_jobs()))
-        line = chrome.status_line(137).plain
+        october = datetime.datetime(2026, 10, 13, 12, 0)  # a fixed date: the line shows the month
+        line = chrome.status_line(137, now=october).plain
         self.assertTrue(line.startswith(" ↓ 2 · 43% · 3.1 MB/s  Searches:"), line)
         self.assertIn("Oct", line)
-        narrow = chrome.status_line(60).plain
+        narrow = chrome.status_line(60, now=october).plain
         self.assertIn("↓ 2 · 43% · 3.1 MB/s", narrow)
         self.assertNotIn("Oct", narrow)  # the date and version give way first
 
