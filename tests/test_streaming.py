@@ -204,6 +204,9 @@ class StreamOutcomeTests(unittest.TestCase):
                 self.assertIn("Error: listen EADDRINUSE", printed)
                 self.assertIn(self.log, printed)
                 self.assertEqual(run.call_args.kwargs["log_path"], self.log)
+                if adapter is downloader.stream_with_peerflix:  # served to this computer only
+                    cmd = run.call_args.args[0]
+                    self.assertEqual(cmd[cmd.index("--hostname") + 1], "127.0.0.1")
 
                 self.screen.file.truncate(0)
                 outcome, run = self.stream(adapter, [(1, "next"), (0, "none")])
@@ -337,6 +340,7 @@ class PeerflixCompletionTests(unittest.TestCase):
         seen = []
 
         def peerflix_finishes(cmd, quiet, status_msg, done_marker=None):
+            self.assertEqual(cmd[cmd.index("--hostname") + 1], "127.0.0.1")  # its server stays local
             hook = cmd[cmd.index("--on-downloaded") + 1]
             subprocess.run(hook, shell=True, check=True)  # what peerflix does with every piece in
             seen.append(os.path.exists(done_marker))

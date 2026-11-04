@@ -815,7 +815,9 @@ def download_with_peerflix(magnet_link: str, select_indexes: list[int] | None = 
             if len(targets) > 1:
                 console.print(t("[info]Session {n}/{count} — file index {idx}[/info]", n=n, count=len(targets), idx=idx))
             marker = os.path.join(markers, f"done-{n}")
-            cmd = [*pf_cmd, magnet_link, "--path", dl_dir, "--on-downloaded", _touch_command(marker)]
+            # Its built-in server serves this computer only, not the whole network.
+            cmd = [*pf_cmd, magnet_link, "--path", dl_dir, "--on-downloaded", _touch_command(marker),
+                   "--hostname", "127.0.0.1"]
             if idx is not None:
                 cmd.extend(["-i", str(idx - 1)])  # peerflix is 0-based
             rc = _run_download(
@@ -1311,7 +1313,8 @@ def stream_with_peerflix(session: "TorrentSession") -> str:
                 filesize_bytes=_file_info.size_bytes if _file_info else 0,
             )
 
-            cmd = [*pf_cmd, magnet_link, "--port", str(port)]
+            # Bind to this computer only: by default peerflix serves the stream to the whole network.
+            cmd = [*pf_cmd, magnet_link, "--port", str(port), "--hostname", "127.0.0.1"]
             if idx is not None:
                 cmd.extend(["-i", str(idx - 1)])
 

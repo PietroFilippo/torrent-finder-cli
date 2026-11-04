@@ -744,6 +744,11 @@ batch menus then offer **Send to qBittorrent WebUI**:
 **Stream with webtorrent** (the default) or **peerflix** (try it when
 webtorrent stalls). Both need VLC.
 
+- peerflix serves the stream to this computer only. webtorrent's own server
+  cannot be told so: it listens on every network the computer is on, so
+  others on your network could reach the file while it streams if your
+  firewall lets them. On a shared network, prefer peerflix.
+
 - Each stream opens its own VLC window, on Windows even when VLC allows only
   one instance. Close it and press **v** to reopen it without losing progress.
 - Next or previous episode, or **Ctrl+C**, closes only that window; other VLC
