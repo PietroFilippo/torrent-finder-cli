@@ -117,6 +117,12 @@ class SearchEngine:
     initial_page: int = 0
     # Advice shown when a whole search finds nothing and this engine had no rows.
     empty_hint: Callable[[str], str] | None = None
+    # Advice shown when a whole search finds nothing and this engine was not
+    # searched (Off, or unavailable): what it would have covered, how to add it.
+    off_hint: Callable[[], str] | None = None
+    # False while the engine cannot search (e.g. no login saved): it is then
+    # treated as Off for that search, quietly, instead of failing every time.
+    available: Callable[[], bool] | None = None
     # Shown in Filters & engines while this engine is highlighted.
     description: str = ""
 
@@ -213,6 +219,10 @@ class BaseProvider(ABC):
     # Optional one-line caveat shown when this provider is selected/searched
     # (e.g. Mobile noting it's Android-only). Empty = no note.
     search_note: str = ""
+    # When a search finds nothing: (provider slug, advice) pointing at a sibling
+    # provider that covers what this one lacks. Left out when that provider was
+    # part of the same search. The advice is marked with N_ and drawn with t().
+    empty_advice: tuple[tuple[str, str], ...] = ()
     
     def __init__(self):
         from torrent_finder.name_rules import NameRules
@@ -558,9 +568,11 @@ class BaseProvider(ABC):
 
     @property
     def effective_engines(self) -> list[SearchEngine]:
-        """Primary engines for the current presets, without changing saved modes."""
+        """Primary engines for the current presets, without changing saved modes.
+        An engine that cannot search now (no login saved) is left out."""
         required = self._required_engine_names()
-        return [e for e in self.engines if e.mode == "on" or e.name in required]
+        return [e for e in self.engines
+                if (e.mode == "on" or e.name in required) and (e.available is None or e.available())]
 
     def search(
         self, query: str, cli_filters: FilterConfig | None = None, *,

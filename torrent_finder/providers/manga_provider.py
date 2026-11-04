@@ -1,8 +1,10 @@
-"""Manga torrent provider — searches Nyaa Literature plus Apibay Comics."""
+"""Manga provider — Nyaa Literature, Apibay Comics and Knaben, plus Madokami with a saved login."""
 
 # i18n: converted
+from torrent_finder import madokami
+from torrent_finder.credentials import madokami_config
 from torrent_finder.filters import FilterConfig, FilterPreset
-from torrent_finder.i18n import N_
+from torrent_finder.i18n import N_, t
 from torrent_finder.language_tags import is_raw_release, manga_language_tag
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.search_result import SearchResult
@@ -39,7 +41,7 @@ class MangaProvider(BaseProvider):
     name = N_("General")
     slug = "manga"
     icon = "📚"
-    search_note = N_("Manga from public trackers (Nyaa Literature + Apibay Comics).")
+    search_note = N_("Manga from public trackers (Nyaa Literature + Apibay Comics), plus Madokami once its login is saved.")
     categories = [602]  # Apibay/TPB Comics
     # Nyaa Literature + Books / Comics.
     knaben_categories = (6_006_000, 9_002_000)
@@ -100,17 +102,43 @@ class MangaProvider(BaseProvider):
     ]
 
     def _init_engines(self) -> list[SearchEngine]:
-        """Nyaa EN, APIBay and category-scoped Knaben on, Raw Nyaa off."""
+        """Nyaa EN, APIBay, category-scoped Knaben and Madokami (with a login) on; Raw and Non-English Nyaa off."""
         return [
             SearchEngine("Nyaa (EN)", "🍙", self._search_nyaa, enabled=True),  # i18n: ignore — service/engine identity, including external category values
-            SearchEngine("Nyaa (Raw)", "🗾", self._search_nyaa_raw, enabled=False),  # i18n: ignore — service/engine identity, including external category values
-            SearchEngine("Nyaa (Non-English)", "🌐", self._search_nyaa_other, enabled=False),  # i18n: ignore — service/engine identity, including external category values
+            SearchEngine("Nyaa (Raw)", "🗾", self._search_nyaa_raw, enabled=False,  # i18n: ignore — service/engine identity, including external category values
+                         off_hint=lambda: t("Nyaa (Raw) is off, and Japanese raw scans are often only there. "
+                                            "Type raw after the title to include it once, or turn it on in Filters & engines.")),
+            SearchEngine("Nyaa (Non-English)", "🌐", self._search_nyaa_other, enabled=False,  # i18n: ignore — service/engine identity, including external category values
+                         off_hint=lambda: t("Nyaa (Non-English) is off: it holds translations into other languages. "
+                                            "Type the language after the title (português, español…) to include it once.")),
             SearchEngine("Apibay", "🏴‍☠️", self._search_apibay, enabled=True),  # i18n: ignore — service/engine identity, including external category values
             SearchEngine(
                 "Knaben", "🧭", self._search_knaben,  # i18n: ignore — service/engine identity, including external category values
                 enabled=True, emergency_fallback=True,
             ),
+            # The Madokami library, searched here too once a login is saved
+            # (like Games' Online-Fix and FitGirl); Manga · Madokami stays for a
+            # focused search. Picks are routed by source, so they download directly.
+            SearchEngine("Madokami", "📕", self._search_madokami, enabled=True,  # i18n: ignore — service/engine identity, including external category values
+                         available=lambda: madokami_config() is not None, off_hint=self._madokami_off_hint,
+                         description=N_(
+                             "The Madokami manga library (direct downloads), searched only while a Madokami "
+                             "login is saved in Credentials.")),
         ]
+
+    def _madokami_off_hint(self) -> str:
+        if madokami_config() is None:
+            return t("Madokami, a manga library with many scanlations, is searched here once you save "
+                     "a Madokami login in Credentials.")
+        return t("Madokami is off: turn it on in Filters & engines to search its library too.")
+
+    def _search_madokami(self, query: str) -> list[SearchResult]:
+        return madokami.search(query)
+
+    def title_relevance(self, row, query: str, authors: tuple = ()) -> int:
+        """Madokami rows are library paths: rank them as Manga · Madokami does."""
+        path = row.get("mdk_path") or ""
+        return madokami.title_relevance(path, query) if path else super().title_relevance(row, query, authors)
 
     def _search_nyaa_raw(self, query: str) -> list[SearchResult]:
         """Nyaa Literature - Raw, c=3_3. Off by default."""

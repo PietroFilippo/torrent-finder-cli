@@ -121,6 +121,14 @@ include request URLs, headers or credential values. Credential configuration
 status is labelled separately from verification, using the existing registry.
 See [ADR-0017](docs/adr/0017-resumable-search-and-title-identification.md).
 
+An engine whose `available` check fails (Manga › General's Madokami engine
+without a saved login) counts as Off for that search: not contacted, not a
+failure, and absent from `effective_engines`. When a whole search finds
+nothing, the notices add each engine's `empty_hint` (searched, no rows) and
+`off_hint` (not searched: what it covers, how to add it), plus each provider's
+`empty_advice` for a sibling provider that was not part of the search. See
+[ADR-0030](docs/adr/0030-empty-search-advice-and-credentialed-engines.md).
+
 ## Result
 
 What a search returns: a `SearchResult` (`search_result.py`) per row. Common

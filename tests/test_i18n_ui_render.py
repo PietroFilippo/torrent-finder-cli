@@ -92,7 +92,7 @@ class RenderLanguageTests(unittest.TestCase):
 
     def test_inspector_saved_presets_and_engine_modes_remain_english(self):
         preset = FilterPreset("With Subtitles", FilterConfig())
-        description = "Manga from public trackers (Nyaa Literature + Apibay Comics)."
+        description = "Manga from public trackers (Nyaa Literature + Apibay Comics), plus Madokami once its login is saved."
         engine = SearchEngine("Nyaa", "", lambda query: [], description=description)
         engine.set_mode("on")
         provider = SimpleNamespace(slug="anime", engines=[engine], active_presets=[preset], preferred_presets=[])

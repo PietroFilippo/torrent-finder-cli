@@ -39,7 +39,7 @@ from torrent_finder.direct_download import Cancelled, safe_filename, save_respon
 from torrent_finder.i18n import N_, t
 from torrent_finder.result_view import title_score
 from torrent_finder.search_result import SearchResult
-from torrent_finder.search_control import search_request
+from torrent_finder.search_control import SharedResults, search_request
 
 from torrent_finder.credentials import madokami_config
 
@@ -210,6 +210,11 @@ def _content_paths(html: str) -> list[tuple[str, str]]:
     return out
 
 
+# Manga · General searches Madokami too (with a saved login); a search across
+# both providers, or a quick repeat, sends Madokami one request set.
+_shared = SharedResults(30.0)
+
+
 def search(query: str) -> list[SearchResult]:
     """Search Madokami. Returns SearchResult rows whose placeholder ``info_hash`` is
     the library path (prefixed, so it can't collide with real hashes). Empty
@@ -223,6 +228,10 @@ def search(query: str) -> list[SearchResult]:
     if session is None:
         from torrent_finder.search_errors import login_required
         raise login_required("Madokami")  # i18n: ignore — provider identity; shared helper owns the message
+    return _shared.run(query, lambda text: _search(session, text))
+
+
+def _search(session, query: str) -> list[SearchResult]:
     paths = _search_paths(session, query)
     # The site's search misses names typed with punctuation: "Mahjong Hishoden:
     # Naki no Ryuu" finds nothing, the same name without ":" finds the series.

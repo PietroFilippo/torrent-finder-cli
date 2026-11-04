@@ -111,6 +111,8 @@ class SearchSession:
         self.alias_of = {}
         self.notes = []
         self._busy = threading.Lock()
+        # Engine -> whether it can search now (a saved login), asked once per session.
+        self._availability = {}
         # Interleave providers before queries so a slow first provider doesn't
         # own the entire queue. On engines always precede their Auto fallbacks.
         for query in self.queries:
@@ -124,12 +126,31 @@ class SearchSession:
         typed = provider.typed_preset(query)
         active = {e.name for e in provider.effective_engines} | set(typed.require_engines if typed else ())
         for engine in provider.engines:
-            status = "pending" if engine.name in active else "auto" if engine.mode == "auto" else "off"
+            if not self._is_available(engine):
+                status = "off"  # e.g. no login saved: not searched, and not a failure
+            else:
+                status = "pending" if engine.name in active else "auto" if engine.mode == "auto" else "off"
+            hint = ""
+            if status == "off" and engine.off_hint:
+                try:
+                    hint = engine.off_hint()
+                except Exception:
+                    hint = ""  # advice is optional
             for expanded in provider.expand_queries(query):
                 self.tasks.append(_Task(group, engine, expanded, engine.initial_page,
                                         Diagnostic(provider_label(provider), engine.name, expanded,
-                                                   engine.initial_page, status)))
+                                                   engine.initial_page, status, message=hint, hint=hint)))
         return group
+
+    def _is_available(self, engine) -> bool:
+        if engine.available is None:
+            return True
+        if id(engine) not in self._availability:
+            try:
+                self._availability[id(engine)] = bool(engine.available())
+            except Exception:
+                self._availability[id(engine)] = False
+        return self._availability[id(engine)]
 
     @property
     def diagnostics(self):
@@ -371,7 +392,10 @@ class SearchSession:
                                   count, filter=t(preset.name)) if count else
                                t("No result carries a {filter} tag; the title alone was searched too, so other releases are shown.", filter=t(preset.name)))
         if not ordered:  # source advice only when nothing at all was found
-            notices += list(dict.fromkeys(d.hint for d in self.diagnostics if d.hint))
+            searched = {p.slug for p in self.providers}
+            notices += list(dict.fromkeys(
+                [d.hint for d in self.diagnostics if d.hint]
+                + [t(advice) for p in self.providers for slug, advice in p.empty_advice if slug not in searched]))
         return SearchResults(ordered, notices, session=self)
 
     def provider_progress(self, results):

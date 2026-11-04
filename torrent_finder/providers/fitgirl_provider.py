@@ -21,6 +21,7 @@ class FitGirlProvider(BaseProvider):
     icon = "🧚"
     categories = []  # not Apibay-based; the engine talks to fitgirl-repacks.site directly
     search_note = N_("Repacks from the official fitgirl-repacks.site — no account needed; the magnet resolves from the post when you pick one.")
+    empty_advice = (("games", N_("Games · General searches public trackers, Online-Fix and FitGirl together.")),)
 
     # Game installers — none of the video-centric features apply.
     supports_subtitles = False

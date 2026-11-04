@@ -21,6 +21,7 @@ class MadokamiProvider(BaseProvider):
     icon = "📕"
     categories = []  # not Apibay-based; the engine talks to manga.madokami.al directly
     search_note = N_("Needs a Madokami login (Credentials menu). Picks download directly — no torrent client involved.")
+    empty_advice = (("manga", N_("Manga · General searches public trackers; type raw after the title for Japanese scans.")),)
 
     # Direct-download archives behind Basic auth — no swarm, no video, so none
     # of the magnet/streaming features apply.

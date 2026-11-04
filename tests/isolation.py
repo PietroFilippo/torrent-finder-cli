@@ -10,7 +10,8 @@ It also starts every test, under unittest or pytest alike, from one
 appearance: the Simple design with the default painting, the Windows
 Terminal profile out of reach, and no full-screen view left open after it.
 Every test also runs in English, whatever the machine's language or
-``TORRENT_FINDER_LANG`` say.
+``TORRENT_FINDER_LANG`` say, and starts with no Madokami rows shared from an
+earlier test's search.
 """
 
 import atexit
@@ -22,7 +23,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from torrent_finder import apibay_cache, constants, credentials, store
+from torrent_finder import apibay_cache, constants, credentials, madokami, store
+from torrent_finder.search_control import SharedResults
 
 _RUN_DIRECTORY = tempfile.mkdtemp(prefix="torrent-finder-tests-")
 atexit.register(shutil.rmtree, _RUN_DIRECTORY, ignore_errors=True)
@@ -102,7 +104,7 @@ def _run_from_baseline(self, result=None):
     with patch.object(terminal_profile, "supported", lambda environ=None: False), \
          patch.object(terminal_profile, "_package_family", lambda: ""), \
          patch.object(i18n, "system_language", _english_system), \
-         patch.object(i18n, "system_region", _english_system):
+         patch.object(i18n, "system_region", _english_system),          patch.object(madokami, "_shared", SharedResults(madokami._shared.seconds)):
         try:
             return _run(self, result)
         finally:

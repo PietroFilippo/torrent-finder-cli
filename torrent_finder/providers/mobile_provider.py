@@ -12,7 +12,7 @@ import re
 
 from torrent_finder import fdroid
 from torrent_finder.filters import FilterConfig, FilterPreset
-from torrent_finder.i18n import N_
+from torrent_finder.i18n import N_, t
 from torrent_finder.providers.base import BaseProvider, SearchEngine
 from torrent_finder.result_view import product_title_score
 from torrent_finder.search_result import SearchResult
@@ -89,7 +89,9 @@ class MobileProvider(BaseProvider):
                 "SolidTorrents", "🔗", self._search_solidtorrents,  # i18n: ignore — service/engine identity, including external category values
                 enabled=False,
             ),
-            SearchEngine("F-Droid", "🤖", self._search_fdroid, enabled=False, description=(
+            SearchEngine("F-Droid", "🤖", self._search_fdroid, enabled=False,  # i18n: ignore — service/engine identity, including external category values
+                         off_hint=lambda: t("F-Droid is off: free and open-source apps are there. "
+                                            "Turn it on in Filters & engines."), description=(
                 N_("F-Droid's official repository: free and open-source apps only (no commercial games). "
                 "A pick downloads the current APK from f-droid.org; Android checks its signature on install."))),
         ]

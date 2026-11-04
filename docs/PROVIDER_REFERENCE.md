@@ -466,6 +466,11 @@ no reason for a blanket expansion or a change of Anime's primary engine.
 | APIBay | On | 2 |
 | Knaben | Auto | 28 |
 
+Since 2026-11-04 the provider also has a **Madokami** engine, On by default but
+searched only while a Madokami login is saved (not part of this audit). A
+search that finds nothing names the Off Nyaa views and, without a login,
+Madokami (see ADR-0030).
+
 **What worked:** defaults supplied candidates for **28/31** queries. The three
 Nyaa categories provide complementary language/raw views. One Piece's first
 English result was a volume/chapter collection, and its first five checked

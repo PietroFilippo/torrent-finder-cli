@@ -20,6 +20,7 @@ class RuTrackerProvider(BaseProvider):
     icon = "🧲"
     categories = []  # not Apibay-based; the engine talks to rutracker.org directly
     search_note = N_("Needs a RuTracker login — add it under the credentials menu on the provider screen.")
+    empty_advice = (("software", N_("Software · Desktop searches public trackers, no login needed.")),)
 
     supports_subtitles = False
     supports_streaming = False

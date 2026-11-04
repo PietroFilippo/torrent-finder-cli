@@ -144,7 +144,7 @@ not independent catalogs.
 | Software › Mobile | `mobile` | Knaben / APIBay / SolidTorrents, F-Droid | none |
 | Software › RuTracker | `rutracker` | RuTracker | required |
 | Anime | `anime` | Nyaa, Knaben / – / APIBay, SolidTorrents | none |
-| Manga › General | `manga` | Nyaa (EN), APIBay Comics, Knaben / – / Nyaa (Raw), Nyaa (Non-English) | none |
+| Manga › General | `manga` | Nyaa (EN), APIBay Comics, Knaben, Madokami (with a saved login) / – / Nyaa (Raw), Nyaa (Non-English) | none (Madokami optional) |
 | Manga › Madokami | `madokami` | Madokami | required |
 | Books | `books` | Libgen, APIBay E-books and Audio books, Knaben / – / SolidTorrents | none |
 
@@ -182,7 +182,10 @@ not independent catalogs.
   and waits five minutes before trying again. The app does not get around the check.
 - **Anime** searches Nyaa's English-translated category by default
   ([other categories](#anime-and-manga-sources)).
-- **General Manga** searches Nyaa Literature and The Pirate Bay's Comics.
+- **General Manga** searches Nyaa Literature and The Pirate Bay's Comics, and
+  the Madokami library too once a Madokami login is saved (without one it is
+  left out quietly, not reported as a failure). Madokami picks still download
+  directly.
 - **Madokami** searches the private [manga.madokami.al](https://manga.madokami.al)
   library ([direct downloads](#direct-downloads), no torrent client).
 - **Books** searches Libgen (anonymous [direct downloads](#direct-downloads))
@@ -304,10 +307,18 @@ searched:
   post bodies or neighbouring links. When FitGirl finds nothing it tries the
   final number written the other way (`Civilization VI` → `Civilization 6`,
   `Grand Theft Auto 5` → `Grand Theft Auto V`). Both game providers share one
-  FitGirl search when they run the same query.
+  FitGirl search when they run the same query, and both manga providers share
+  one Madokami search.
 
 Titles are never translated: if the English title finds nothing, try the
 release title in the language you want (`Procurando Nemo`).
+
+**When nothing is found**, the search notices (**n**) name the sources that
+were left out and how to add them: General Manga's Nyaa (Raw) (type `raw`
+after the title) and Nyaa (Non-English) (type the language), its Madokami
+engine (off, or no login saved), and Mobile's F-Droid. Madokami, FitGirl,
+Online-Fix and RuTracker point to their category's General or Desktop
+search, unless that provider was part of the same search.
 
 **Language words after a title.** Typing a language after the title
 (`Berserk português`) applies that language preset to the search, also searches

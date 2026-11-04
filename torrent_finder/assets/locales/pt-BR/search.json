@@ -206,5 +206,14 @@
   },
   "not set": "não configurado",
   "set via environment": "configurado pelo ambiente",
-  "saved": "salvo"
+  "saved": "salvo",
+  "Games · General searches public trackers, Online-Fix and FitGirl together.": "Jogos · Geral busca em trackers públicos, Online-Fix e FitGirl juntos.",
+  "Manga · General searches public trackers; type raw after the title for Japanese scans.": "Mangá · Geral busca em trackers públicos; digite raw depois do título para scans em japonês.",
+  "Nyaa (Raw) is off, and Japanese raw scans are often only there. Type raw after the title to include it once, or turn it on in Filters & engines.": "Nyaa (Raw) está em Nunca, e scans japoneses sem tradução muitas vezes só estão lá. Digite raw depois do título para incluí-lo nesta busca, ou ative-o em Filtros e mecanismos.",
+  "Nyaa (Non-English) is off: it holds translations into other languages. Type the language after the title (português, español…) to include it once.": "Nyaa (Non-English) está em Nunca: ele tem traduções para outros idiomas. Digite o idioma depois do título (português, español…) para incluí-lo nesta busca.",
+  "The Madokami manga library (direct downloads), searched only while a Madokami login is saved in Credentials.": "A biblioteca de mangás Madokami (downloads diretos), buscada só enquanto houver um login Madokami salvo em Credenciais.",
+  "Madokami, a manga library with many scanlations, is searched here once you save a Madokami login in Credentials.": "Madokami, uma biblioteca de mangás com muitas scanlations, é buscada aqui depois que você salva um login Madokami em Credenciais.",
+  "Madokami is off: turn it on in Filters & engines to search its library too.": "Madokami está em Nunca: ative-o em Filtros e mecanismos para buscar na biblioteca também.",
+  "F-Droid is off: free and open-source apps are there. Turn it on in Filters & engines.": "F-Droid está em Nunca: apps livres e de código aberto estão lá. Ative-o em Filtros e mecanismos.",
+  "Software · Desktop searches public trackers, no login needed.": "Programas · Computador busca em trackers públicos, sem login."
 }

@@ -23,6 +23,7 @@ class OnlineFixProvider(BaseProvider):
     icon = "🔧"
     categories = []  # not Apibay-based; the engine talks to online-fix.me directly
     search_note = N_("Co-op / online game cracks from online-fix.me — no account needed; a pick downloads the .torrent and opens it in your torrent client.")
+    empty_advice = (("games", N_("Games · General searches public trackers, Online-Fix and FitGirl together.")),)
 
     # Games behind a private tracker — no public swarm, so none of the video/
     # magnet-centric features apply.
