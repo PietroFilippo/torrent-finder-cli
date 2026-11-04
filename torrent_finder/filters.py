@@ -77,6 +77,18 @@ def _compiled(pattern: str) -> "re.Pattern | None":
         return None
 
 
+# Sources whose rows carry no swarm statistics: direct downloads (Madokami,
+# Libgen, F-Droid) and site listings whose torrent is resolved on a pick
+# (FitGirl, Online-Fix). Their seeders read 0, so a seed minimum would drop
+# every one of them; it applies to every other source.
+NO_SWARM_SOURCES = frozenset({"Madokami", "Libgen", "F-Droid", "FitGirl", "Online-Fix"})  # i18n: ignore — service/engine identity
+
+
+def has_swarm(row) -> bool:
+    """Whether *row*'s seeders mean anything (see NO_SWARM_SOURCES)."""
+    return (row.get("source") or "") not in NO_SWARM_SOURCES
+
+
 def apply_filters(results: list, config: FilterConfig) -> list:
     """Filter a list of torrent results based on the given FilterConfig."""
     if not config:
@@ -99,7 +111,7 @@ def apply_filters(results: list, config: FilterConfig) -> list:
         haystack = f"{name} {r.get('source', '').lower()}"
         seeds = int(r.get("seeders", 0))
 
-        if config.min_seeds > 0 and seeds < config.min_seeds:
+        if config.min_seeds > 0 and seeds < config.min_seeds and has_swarm(r):
             continue
 
         if config.name_predicate and not config.name_predicate(name):

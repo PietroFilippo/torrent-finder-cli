@@ -339,10 +339,16 @@ def _table_caption(
     return caption
 
 
-def _note_preview(note: str) -> Text:
-    """Keep partial-search notices from crowding results out of short windows."""
-    count = len(note.splitlines())
-    if _rows() < 28 or count > 2:
+def _notes_compact(note: str) -> bool:
+    """Short windows or many notices: a count stands in for the notices themselves."""
+    return _rows() < 28 or len(note.splitlines()) > 2
+
+
+def _note_preview(note: str, count: int | None = None) -> Text:
+    """Keep partial-search notices from crowding results out of short windows.
+    *count* is how many notices *note* holds (one may span several lines)."""
+    count = len(note.splitlines()) if count is None else count
+    if _notes_compact(note):
         return Text(theme.MARGIN + tn("{n} search notice — n to read", "{n} search notices — n to read", count),
                     style=theme.WARN, no_wrap=True, overflow="ellipsis")
     preview = Text(style=theme.WARN, overflow="fold")
@@ -352,13 +358,22 @@ def _note_preview(note: str) -> Text:
     return preview
 
 
-def _show_search_notices(note: str) -> None:
+def _show_search_notices(notices) -> None:
+    """Each notice in a list; Enter opens one's whole text (a short window clips descriptions)."""
     from rich.markup import escape
+    from torrent_finder.ui.search_diagnostics import read_details
     from torrent_finder.ui.selector import SelectItem, arrow_select
-    items = [SelectItem(line.split(":", 1)[0], description=escape(line), passive=True)
-             for line in note.splitlines() if line.strip()]
+    notices = notices.splitlines() if isinstance(notices, str) else list(notices)
+    notices = [notice for notice in notices if notice.strip()]
+    items = [SelectItem(notice.splitlines()[0].split(":", 1)[0], value=notice, description=escape(notice))
+             for notice in notices]
     items.append(SelectItem(t("Back to results"), is_action=True))
-    arrow_select(items, title=t("Search notices"), footer=t("↑/↓ read notices • Esc back to results"))
+    while True:
+        idx = arrow_select(items, title=t("Search notices"),
+                           footer=t("↑/↓ read notices • Enter whole text • Esc back to results"))
+        if idx is None or items[idx].value is None:
+            return
+        read_details(items[idx].value, title=N_("Search notices"))
 
 
 def _note_line_count(note: str, width: int) -> int:
@@ -384,6 +399,7 @@ def _details_lines(rows: list[dict], layout: _TableLayout, show_from: bool, desc
 def _visible_count(
     total: int, height: int, width: int, note: str, show_from: bool, show_provider: bool = False,
     heading: str = "", rows: list[dict] | None = None, indexes=(), describe=None, announcement: str = "",
+    controls: bool = False,
 ) -> int:
     """Return rows that fit after the header, notices, details and key bar.
 
@@ -405,9 +421,12 @@ def _visible_count(
     compact = not theme.roomy(height, 20) or framed
     keys = len(theme.wrap_keys(theme.parse_footer(
         Text(_result_keys(2, frozenset(range(100))))).keys, width))
+    # A session's controls line carries the notice count when the notices go compact.
+    notes = 0 if controls and note and _notes_compact(note) else _note_line_count(note, width)
     chrome = (
         header + (0 if compact else 1)       # header lines, spacer
-        + 1 + _note_line_count(note, width)  # view status, notices
+        + 1 + notes                          # view status, notices
+        + (1 if controls else 0)             # a search session's diagnostics/retry/more line
         + 1                                  # table header row
         + (0 if tiny else 1) + details       # spacer, name and metadata
         + (0 if tiny else 1) + (0 if compact else 1) + keys  # cached note, spacer, keys
@@ -607,8 +626,10 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
 
     Navigate with arrows; Left/Right switch pages; type a number to jump.
     Space toggles a row's checkbox; ``a`` selects every result, ``c`` clears.
-    ``note`` is an optional line shown above the table (e.g. which multi-search
-    titles returned nothing). Returns:
+    ``note`` is the caller's own context shown above the table (a replay's
+    explanation); the search's notices (``results.notices``) and which of
+    several titles found nothing are added here, from the current results, each
+    time the table opens or a retry or load-more refreshes them. Returns:
       - ``("one", global_idx)`` — Enter with nothing checked (open that row), or
         Enter/``d`` with exactly one checked;
       - ``("many", [global_idx, ...])`` — Enter/``d`` with two or more checked
@@ -632,10 +653,19 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         if view_order == "relevance":
             return describe
         return lambda row: ("", describe(row)[1])
-    session = getattr(results, "session", None)
-    if session is not None:
-        # Reserve one compact line for diagnostics/actions even with zero rows.
-        note = note or t("Search diagnostics")
+    session = getattr(results, "session", None)  # its controls line is reserved in _fit_rows
+    context = note
+
+    def current_notices() -> list[str]:
+        """The caller's context, the missing titles and the search's notices, each notice once."""
+        from torrent_finder.result_view import missing_titles_note
+        chunks = [missing_titles_note(results), context, *getattr(results, "notices", ())]
+        return list(dict.fromkeys(chunk for chunk in chunks if chunk and chunk.strip()))
+
+    def current_note() -> str:
+        return "\n".join(current_notices())
+
+    note = current_note()
     view_indexes = result_indices(results, view_query, view_mode, view_order)
     all_results = [results[i] for i in view_indexes]
     view_revision = 0
@@ -676,7 +706,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
         return _visible_count(total, console.size.height, console.size.width, note, show_from,
                               show_provider, heading=heading, rows=page_items,
                               indexes=view_indexes[global_offset:global_offset + total], describe=notes(),
-                              announcement=simple_notice)
+                              announcement=simple_notice, controls=session is not None)
 
     # Reserve room for the header, notices, details and key bar.
     visible_count = _fit_rows()
@@ -740,9 +770,17 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
             if not results and not feedback:
                 view_status = Text(theme.MARGIN + t("No results • n explains the search"), style=theme.WARN,
                                    no_wrap=True, overflow="ellipsis")
+            if note and _notes_compact(note):  # no extra line: the count rides on the controls
+                count = len(current_notices())
+                controls.append(theme.KEY_GAP)
+                controls.append(tn("{n} search notice", "{n} search notices", count), style=theme.WARN)
+            elif note:
+                return frames.Framed(Group(*parts, view_status, controls, _note_preview(note, len(current_notices())), tbl),
+                                     title, status, announcement)
             return frames.Framed(Group(*parts, view_status, controls, tbl), title, status, announcement)
         if note:
-            return frames.Framed(Group(*parts, view_status, _note_preview(note), tbl), title, status, announcement)
+            return frames.Framed(Group(*parts, view_status, _note_preview(note, len(current_notices())), tbl),
+                                 title, status, announcement)
         return frames.Framed(Group(*parts, view_status, tbl), title, status, announcement)
 
     # screen=True renders into the terminal's alternate-screen buffer — a fixed
@@ -936,7 +974,8 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     ticker_thread.join(timeout=1)
                     live.stop()
                     try:
-                        action = diagnostics_menu(session) if key.lower() == "n" else "retry" if key.lower() == "r" else "more"
+                        action = (diagnostics_menu(session, current_notices())
+                                  if key.lower() == "n" else "retry" if key.lower() == "r" else "more")
                         if action:
                             available = session.can_retry if action == "retry" else session.can_load_more
                             if available:
@@ -945,6 +984,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                                     old_count = len(results)
                                     results[:] = updated
                                     results.notices = updated.notices
+                                    note = current_note()
                                     feedback = t("{added} added • {total} total • n: diagnostics",
                                                  added=len(results) - old_count, total=len(results))
                                     feedback_style = theme.GOOD
@@ -982,7 +1022,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                     ticker_thread.join(timeout=1)
                     live.stop()
                     try:
-                        _show_search_notices(note)
+                        _show_search_notices(current_notices())
                     except KeyboardInterrupt:
                         pass
                     visible_count = _fit_rows()

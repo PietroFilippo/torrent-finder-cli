@@ -1642,23 +1642,9 @@ def _search_and_browse(provider, queries: list[str],
         if q in found:
             record_search(provider.slug, q, active_preset_names)
 
-    # Note any searched titles that returned nothing (multi-title only). It
-    # rides above the results table (a pre-table print would be wiped by the
-    # table's own screen clear).
+    # The results table shows the search's notices and the titles that found
+    # nothing itself (result_view.missing_titles_note), refreshed with the results.
     note = ""
-    if len(queries) > 1:
-        found = {q for r in results for q in r.get("matched_queries", [r.get("from_work")])}
-        missing = [q for q in queries if q not in found]
-        if missing:
-            cap = 4
-            more = t(' +{count} more', count=len(missing) - cap) if len(missing) > cap else ""
-            note = t('No torrents for {missing} of {total} titles: {titles}{more}',
-                missing=len(missing),
-                total=len(queries),
-                titles=', '.join(missing[:cap]),
-                more=more)
-    if notices:
-        note = "\n".join(filter(None, [note, *notices]))
 
     # Results + download (shared with the by-creator flow). Esc on the
     # results table steps back to the keyword prompt; a completed download

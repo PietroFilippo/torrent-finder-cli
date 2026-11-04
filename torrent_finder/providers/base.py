@@ -211,6 +211,10 @@ class BaseProvider(ABC):
     # through Knaben's TV category). In a combined search, a release found by a
     # more specific provider too is credited to that one.
     broad: bool = False
+    # Slugs of providers that, in a search of both, take credit for a row both
+    # find: the owners of a site this provider also searches (Manga · General's
+    # Madokami engine). Unlike ``broad`` it changes no other overlap.
+    defers_to: tuple[str, ...] = ()
     # Words typed after a title that ask for one of this provider's presets for
     # that search ("Berserk português", "Photoshop mac"): preset name -> words,
     # lowercase and without accents. See typed_split.

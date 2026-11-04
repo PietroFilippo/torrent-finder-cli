@@ -19,6 +19,26 @@ SORT_ORDERS = {
 }
 
 
+def missing_titles_note(results) -> str:
+    """"No torrents for 1 of 2 titles: …" for a search of several typed titles, from
+    the current *results*; other spellings the search tried on its own are not titles."""
+    session = getattr(results, "session", None)
+    queries, alias_of = getattr(session, "queries", None), getattr(session, "alias_of", None)
+    if not isinstance(queries, (list, tuple)):
+        return ""
+    queries = [q for q in queries if not (isinstance(alias_of, dict) and q in alias_of)]
+    if len(queries) < 2:
+        return ""
+    found = {q for r in results for q in r.get("matched_queries", [r.get("from_work")])}
+    missing = [q for q in queries if q not in found]
+    if not missing:
+        return ""
+    cap = 4
+    more = t(' +{count} more', count=len(missing) - cap) if len(missing) > cap else ""
+    return t('No torrents for {missing} of {total} titles: {titles}{more}',
+             missing=len(missing), total=len(queries), titles=', '.join(missing[:cap]), more=more)
+
+
 def sort_label(order: str) -> str:
     """Display a saved sort identity without changing the settings vocabulary."""
     return t(SORT_ORDERS[order]) if order in SORT_ORDERS else order

@@ -26,6 +26,7 @@ the chosen files — never crawls.
 """
 
 # i18n: converted
+import hashlib
 import os
 import re
 import threading
@@ -228,7 +229,12 @@ def search(query: str) -> list[SearchResult]:
     if session is None:
         from torrent_finder.search_errors import login_required
         raise login_required("Madokami")  # i18n: ignore — provider identity; shared helper owns the message
-    return _shared.run(query, lambda text: _search(session, text))
+    # Results are shared per login: after a change of account (or a wrong
+    # password) the next search asks the site again instead of reusing rows.
+    auth = session.auth if isinstance(session.auth, tuple) else ()
+    login = hashlib.sha256(b"\0".join(part if isinstance(part, bytes) else str(part).encode()
+                                      for part in auth)).hexdigest()[:16]
+    return _shared.run(f"{login} {query}", lambda _key: _search(session, query))
 
 
 def _search(session, query: str) -> list[SearchResult]:

@@ -113,8 +113,10 @@ class SearchNavigationTests(unittest.TestCase):
         self.assertEqual([call.args[0] for call in self.history.call_args_list], queries)
         self.assertEqual([call.args[1] for call in self.record.call_args_list], ["one"])  # "two" found nothing
         self.assertIs(self.browse.call_args.args[1], rows)
-        self.assertIn("No torrents for 1 of 2 titles: two", self.browse.call_args.kwargs["note"])
-        self.assertIn("Fixture timed out", self.browse.call_args.kwargs["note"])
+        # The notices travel with the rows; the results table shows them, and which
+        # titles found nothing, from the current results (result_view.missing_titles_note).
+        self.assertEqual(self.browse.call_args.kwargs["note"], "")
+        self.assertEqual(rows.notices, ("Fixture timed out",))
 
     def test_empty_live_session_still_browses_and_completed_download_goes_next(self):
         class Rows(list):
@@ -124,7 +126,7 @@ class SearchNavigationTests(unittest.TestCase):
         self.search.return_value = rows
         self.browse.return_value = "next"
         self.assertEqual(main._search_and_browse(self.provider, ["one"], None), ("next", None))
-        self.browse.assert_called_once_with(self.provider, rows, note="Fixture is not logged in")
+        self.browse.assert_called_once_with(self.provider, rows, note="")  # the table reads rows.notices
         self.history.assert_called_once_with("one", "fixture", [])
 
 

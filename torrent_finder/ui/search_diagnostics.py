@@ -154,8 +154,17 @@ def _page_item(page, with_query: bool = False) -> SelectItem:
                       description=t("{status}\nEnter for full pagination status.", status=escape(status)))
 
 
-def diagnostics_menu(session):
+def _notice_label(notice: str) -> str:
+    """A notice's row: its first line, up to a colon that names its source."""
+    first = notice.splitlines()[0]
+    return first.split(":", 1)[0] if ":" in first[:40] else first
+
+
+def diagnostics_menu(session, notices=()):
+    """The search's diagnostics, its *notices* first (failures, and when nothing was
+    found, the sources it left out and how to add them)."""
     from torrent_finder.credential_registry import CREDENTIAL_REGISTRY
+    notices = [line for line in notices if line.strip()]
     while True:
         failed = _failed(session.diagnostics)
         pages = _pages(session)
@@ -174,6 +183,10 @@ def diagnostics_menu(session):
                        hint=" · ".join(session.queries),
                        description=t("Read the complete query list. Preset expansions appear on the individual source attempts.")),
         ]
+        if notices:
+            items[:0] = [_section(t("Search notices")),
+                         *(SelectItem(_notice_label(notice), value=("notice", notice), description=escape(notice))
+                           for notice in notices)]
         logins = [SelectItem(spec.name, passive=True, hint=t(_LOGIN_WORDS[login_status]) if login_status in _LOGIN_WORDS else login_status,
                              description=t("Configuration status only. Open Credentials to verify; search failures appear below."))
                   for spec in CREDENTIAL_REGISTRY for login_status in (spec.status(),)

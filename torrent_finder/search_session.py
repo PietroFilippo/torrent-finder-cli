@@ -316,8 +316,10 @@ class SearchSession:
         merged = {}
         provider_order = {p.slug: i for i, p in enumerate(self.providers)}
         # Specific providers first: a release a broad one found too is credited to them.
+        deferred_to = {slug for p in self.providers for slug in p.defers_to}
         groups = sorted(enumerate(self.groups),
-                        key=lambda item: (item[1][0].broad, provider_order[item[1][0].slug], item[0]))
+                        key=lambda item: (item[1][0].broad, item[1][0].slug not in deferred_to,
+                                          provider_order[item[1][0].slug], item[0]))
         for group, (provider, query) in groups:
             # Rows found under another spelling belong to the title that was typed.
             origin = self.alias_of.get(query, query)

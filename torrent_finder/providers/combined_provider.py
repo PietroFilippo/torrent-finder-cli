@@ -8,7 +8,7 @@ Each invocation gets its own provider copies, request budget and notices.
 from dataclasses import dataclass, replace
 import re
 
-from torrent_finder.filters import FilterConfig, apply_filters
+from torrent_finder.filters import FilterConfig, apply_filters, has_swarm
 from torrent_finder.i18n import N_, t, tn
 from torrent_finder.providers.base import BaseProvider
 from torrent_finder.result_view import SORT_ORDERS
@@ -24,7 +24,6 @@ _LABELS = {
     "mobile": N_("Software · Mobile"), "rutracker": N_("Software · RuTracker"),
     "manga": N_("Manga · General"), "madokami": N_("Manga · Madokami"),
 }
-_SEED_SOURCES = {"Apibay", "Nyaa", "Knaben", "SolidTorrents", "YTS", "RuTracker"}  # i18n: ignore — service/engine identity, including external category values
 
 def provider_label(provider) -> str:
     return _LABELS.get(provider.slug, provider.name)
@@ -226,7 +225,8 @@ class CombinedProvider(BaseProvider):
             for config in (session.shared_filters, cli_filters):
                 if config is None:
                     continue
-                effective = config if row.source in _SEED_SOURCES else replace(config, min_seeds=0)
+                # Shared rules read names only; a seed minimum only rows with a swarm.
+                effective = config if has_swarm(row) else replace(config, min_seeds=0)
                 if not apply_filters([{"name": row.name, "seeders": row.seeders}], effective):
                     return False
             return True

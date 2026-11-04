@@ -1,6 +1,19 @@
 # ADR-0030: Empty-search advice and credentialed engines
 
-Status: accepted (2026-11-04).
+Status: accepted (2026-11-04). Amended after review, the same day: the
+notices reach the screen. The results table composes them itself each time
+it opens or a retry or load-more refreshes it: the caller's own context, which
+of several typed titles found nothing (`result_view.missing_titles_note`) and
+the search's `results.notices`; diagnostics (**n**) list them first. Callers no
+longer pass notices in `note`, so creator, discovery and saved searches show
+them too and a stale copy never returns. A seed minimum skips rows without
+swarm statistics in solo searches too (`filters.NO_SWARM_SOURCES`, shared with
+combined search), so it no longer removes Madokami rows from Manga › General.
+Manga › General `defers_to` Madokami: a row both manga providers find is
+credited to Madokami, and no other overlap changes (`broad` would also have
+moved Manga behind Books). Madokami folders are ranked by the title without a
+language typed after it. Shared Madokami results are kept per login, read
+from the session that made the request.
 
 ## Context
 

@@ -247,9 +247,17 @@ class BaseProviderSearchContractTests(unittest.TestCase):
                     "source": "FitGirl",
                 },
                 {
-                    "name": "Clean Low Seeds",
+                    "name": "Clean Low Seeds [FitGirl Repack]",
                     "info_hash": "low",
                     "seeders": "3",
+                    "leechers": "0",
+                    "size": "100",
+                    "source": "Apibay",
+                },
+                {
+                    "name": "Clean Listing",
+                    "info_hash": "listing",
+                    "seeders": "0",  # a FitGirl listing has no swarm: the seed minimum skips it
                     "leechers": "0",
                     "size": "100",
                     "source": "FitGirl",
@@ -284,7 +292,7 @@ class BaseProviderSearchContractTests(unittest.TestCase):
         )
 
         self.assertTrue(all(isinstance(r, SearchResult) for r in results))
-        self.assertEqual([r.info_hash for r in results], ["good"])
+        self.assertEqual([r.info_hash for r in results], ["good", "listing"])
 
 
 class CreatorFanOutContractTests(unittest.TestCase):

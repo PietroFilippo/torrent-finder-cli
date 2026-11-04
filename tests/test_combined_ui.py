@@ -117,7 +117,8 @@ class CombinedUITests(unittest.TestCase):
              patch.object(main, "_goodbye"):
             main._main_loop()
         self.assertEqual(search.call_args.args[0], ["Saki"])
-        self.assertEqual(browse.call_args.kwargs["note"], "Madokami: not logged in")
+        self.assertEqual(browse.call_args.kwargs["note"], "")  # the table reads the results' notices
+        self.assertEqual(list(browse.call_args.args[1].notices), ["Madokami: not logged in"])
         self.assertEqual(history.call_args.kwargs["search_profile"], provider.snapshot())
         output = "\n".join(str(call.args[0]) for call in console.print.call_args_list)
         output += Text.from_ansi(frames.getvalue()).plain  # the progress screen's frames
@@ -152,4 +153,4 @@ class CombinedUITests(unittest.TestCase):
              patch.object(table, "_show_search_notices") as show, \
              patch.object(table.readchar, "readkey", side_effect=[readchar.key.DOWN, "n", readchar.key.ENTER]):
             self.assertEqual(table.interactive_select(rows, note), ("one", 1))
-        show.assert_called_once_with(note)
+        show.assert_called_once_with([note])  # the notices, each whole

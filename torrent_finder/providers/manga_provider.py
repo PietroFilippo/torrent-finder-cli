@@ -50,6 +50,9 @@ class MangaProvider(BaseProvider):
     supports_subtitles = False
     supports_episode_picker = True  # volume/chapter batches → aria2 file-selection
     supports_streaming = False  # manga isn't video — hide the Stream to VLC section
+    # Its Madokami engine searches Madokami's provider's site: in a search of
+    # both, a row both find is credited to Manga · Madokami (see defers_to).
+    defers_to = ("madokami",)
 
     presets = [
         FilterPreset(N_("Complete / Full"), FilterConfig(include_keywords=["complete", "full series"])),  # i18n: ignore — literal service or release-name match data
@@ -136,9 +139,12 @@ class MangaProvider(BaseProvider):
         return madokami.search(query)
 
     def title_relevance(self, row, query: str, authors: tuple = ()) -> int:
-        """Madokami rows are library paths: rank them as Manga · Madokami does."""
+        """Madokami rows are library paths: rank them as Manga · Madokami does, by the
+        title alone (a language typed after it is a preset, not part of the name)."""
         path = row.get("mdk_path") or ""
-        return madokami.title_relevance(path, query) if path else super().title_relevance(row, query, authors)
+        if path:
+            return madokami.title_relevance(path, self.typed_split(query)[0])
+        return super().title_relevance(row, query, authors)
 
     def _search_nyaa_raw(self, query: str) -> list[SearchResult]:
         """Nyaa Literature - Raw, c=3_3. Off by default."""
