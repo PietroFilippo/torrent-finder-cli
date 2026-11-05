@@ -237,7 +237,8 @@ class BackgroundDownloadsTests(unittest.TestCase):
     def test_unpack_uses_exact_selected_rpc_paths_after_result_removed(self):
         job = self.enqueue()
 
-        def run(paths, *, status):
+        def run(paths, *, status, expect_pages):
+            self.assertFalse(expect_pages)  # torrents: only comic archives are page archives
             self.assertIn(("remove_result", job.gid), self.rpc.calls)
             self.assertEqual(paths, ("exact.cbz",))
             self.assertEqual(self.job(job.id).state, "unpacking")

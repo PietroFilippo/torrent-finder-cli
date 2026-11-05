@@ -63,6 +63,11 @@ rich.console.detect_legacy_windows = lambda: False
 # or of the Windows Terminal profile opt in themselves.
 from torrent_finder import i18n, paintings, terminal_profile  # noqa: E402
 from torrent_finder.ui import appearance, display, theme  # noqa: E402
+from torrent_finder.ui import downloads as downloads_ui  # noqa: E402
+
+# The app's own default, kept for the test that checks it; the baseline below
+# turns background downloads off for the suite.
+SHIPPED_BACKGROUND_DEFAULT = downloads_ui.DEFAULT_ENABLED
 
 BASELINE = ("quiet", "bar", "comfortable")
 # The real language probes, for the tests of the probes themselves; every test sees English ones.
@@ -80,6 +85,9 @@ def restore_baseline() -> None:
     appearance._session["painting"] = paintings.DEFAULT
     appearance._session["placement"] = paintings.DEFAULT_PLACEMENT
     appearance._session["companion"] = ""
+    # Most tests describe downloads that hold the screen (the default before
+    # v0.12); tests of background downloads turn the setting on themselves.
+    downloads_ui.DEFAULT_ENABLED = False
     appearance._session["fonts"] = appearance.DEFAULT_FONTS
     appearance._session["profile"] = appearance.DEFAULT_PROFILE
     # The suite asserts English text, also on a Portuguese machine or with the variable set.

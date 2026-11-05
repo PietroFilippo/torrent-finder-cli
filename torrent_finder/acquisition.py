@@ -20,6 +20,10 @@ Interface:
   results table).
 - ``batch_item(result, ...)`` — one item of a batch handoff. Returns a
   ``BatchItemOutcome`` the batch loop aggregates into its summary panel.
+- ``background_fetch(result, folder)`` — direct-download styles only: a
+  ``BackgroundFetch`` the Downloads jobs run (``downloads.enqueue_direct``)
+  when "Downloads run: in background" is on, or None when the result needs a
+  choice first (a Madokami folder). A pick then queues it and returns at once.
 """
 
 # i18n: converted
@@ -45,6 +49,91 @@ def _unpack_saved(paths) -> list[str]:
         report = unpack.unpack_all(paths, expect_pages=True,
                                    status=lambda text: status.update(f"[accent]{escape(text)}[/accent]"))
     return unpack.summary_lines(report)
+
+
+class BackgroundFetch:
+    """One direct download for a background job: its row title, identity *key*,
+    folder, the ``fetch(cancel_event, progress, note)`` that saves it, and
+    whether its files are page archives."""
+
+    def __init__(self, title: str, key: str, folder: str, fetch, *, expect_pages: bool = False):
+        self.title, self.key, self.folder, self.fetch, self.expect_pages = title, key, folder, fetch, expect_pages
+
+
+_DEFAULT_SLUG = {"Madokami": "madokami", "Libgen": "books", "F-Droid": "mobile"}  # i18n: ignore — source identities
+
+
+class QueueFailure(Exception):
+    """Queuing stopped part-way: *queued* and *running* (already downloading) were
+    taken care of before *error*; the rest were not queued."""
+
+    def __init__(self, queued: list, running: list, error: Exception):
+        super().__init__(str(error))
+        self.queued, self.running, self.error = queued, running, error
+
+
+def queue_background(fetches: list, source: str, provider_slug: str = "") -> tuple[list, list]:
+    """Queue *fetches* as background jobs (one group when several).
+
+    Returns (queued, already running): a file already downloading to the same
+    folder is said on the message line and not queued twice. Any other error
+    stops the queuing and raises ``QueueFailure`` holding what was taken care
+    of, so a caller never downloads those again.
+    """
+    import uuid
+    from torrent_finder import downloads
+    from torrent_finder.ui import chrome as frames
+    group = uuid.uuid4().hex if len(fetches) > 1 else None
+    queued: list = []
+    running: list = []
+    try:
+        manager = downloads.manager()
+        with manager.batch():
+            for item in fetches:
+                try:
+                    manager.enqueue_direct(item.title, item.fetch, key=item.key, source=source,
+                                           provider_slug=provider_slug or _DEFAULT_SLUG.get(source, ""),
+                                           folder=item.folder, group=group, expect_pages=item.expect_pages)
+                    queued.append(item)
+                except downloads.DuplicateDownloadError as error:
+                    frames.announce(f"[warn]{escape(str(error))}[/warn]")
+                    running.append(item)
+    except Exception as error:
+        raise QueueFailure(queued, running, error) from error
+    return queued, running
+
+
+def _background_pick(name: str, fetches: list, source: str, result) -> "PickOutcome":
+    """Queue a pick's direct downloads in the background and confirm: what's next, or back."""
+    from torrent_finder import downloads
+    from torrent_finder.ui import chrome as frames
+    from torrent_finder.ui.downloads import background_started_prompt
+    ahead = len(downloads.manager().active())
+    try:
+        queued, _running = queue_background(fetches, source, result.get("provider_slug") or "")
+    except QueueFailure as failure:  # the folder is unusable, or the manager closed
+        frames.announce(t("[warn]Could not start the background download: {error}[/warn]",
+                          error=escape(str(failure.error))))
+        queued = failure.queued
+    if not queued:
+        return PickOutcome("back")
+    facts = [tn("{n} file", "{n} files", len(queued))] if len(queued) > 1 else []
+    choice = background_started_prompt(name, fetches[0].folder, size_bytes=int(result.get("size", 0) or 0),
+                                       ahead=ahead, facts=facts, back_to_results=True)
+    return PickOutcome("next" if choice == "next" else "back")
+
+
+def _background_on() -> bool:
+    from torrent_finder.ui.downloads import enabled
+    return enabled()
+
+
+def _background_tip() -> None:
+    """In the foreground, say once per download that it could run while you search."""
+    from torrent_finder.ui.downloads import background_tip
+    tip = background_tip()
+    if tip:
+        console.print(tip)
 
 
 class PickOutcome:
@@ -340,15 +429,19 @@ class MadokamiAcquisition:
         if not download_dir_ready():
             return PickOutcome("back")
 
+        # Two or more files from one library folder are saved together in a
+        # folder named after it ("Naki no Ryuu/"), not loose among other downloads.
+        folders = madokami.download_folders(dl_paths, get_download_dir())
+        if _background_on():
+            return _background_pick(name, [self._fetch(p, folders[p]) for p in dl_paths], "Madokami", result)  # i18n: ignore — source identity
+        _background_tip()
+
         from urllib.parse import unquote
         from rich.progress import (
             BarColumn, DownloadColumn, Progress, TextColumn, TimeRemainingColumn,
             TransferSpeedColumn,
         )
 
-        # Two or more files from one library folder are saved together in a
-        # folder named after it ("Naki no Ryuu/"), not loose among other downloads.
-        folders = madokami.download_folders(dl_paths, get_download_dir())
         saved: list[str] = []
         failed: list[str] = []
         cancel_event = threading.Event()
@@ -419,6 +512,25 @@ class MadokamiAcquisition:
         console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
         readchar.readkey()
         return PickOutcome("next" if saved else "back")
+
+    @staticmethod
+    def _fetch(path: str, folder: str) -> BackgroundFetch:
+        from urllib.parse import unquote
+        from torrent_finder import madokami
+        from torrent_finder.downloads import DirectDownloadError
+
+        def fetch(cancel_event, progress, note):
+            dest = madokami.download_file(path, folder, cancel_event=cancel_event, progress_cb=progress)
+            if dest or cancel_event.is_set():
+                return [dest] if dest else []
+            raise DirectDownloadError(t("Madokami did not send the file. Grab it manually: {url}",
+                                        url=madokami._BASE + path))
+        return BackgroundFetch(unquote(path.rsplit("/", 1)[-1]), path, folder, fetch, expect_pages=True)
+
+    def background_fetch(self, result, folder: str) -> "BackgroundFetch | None":
+        from torrent_finder import madokami
+        path = result.get("mdk_path") or ""
+        return self._fetch(path, folder) if madokami.is_file_path(path) else None  # a folder needs its picker
 
     def _choose_files(self, path) -> list[str]:
         """Browse from a picked folder to the files to download; [] when the user
@@ -569,6 +681,9 @@ class LibgenAcquisition:
         from torrent_finder.ui.prompts import download_dir_ready
         if not download_dir_ready():
             return PickOutcome("back")
+        if _background_on():  # the link is resolved in the job too: nothing to wait for here
+            return _background_pick(name, [self.background_fetch(result, get_download_dir())], "Libgen", result)  # i18n: ignore — source identity
+        _background_tip()
 
         url, cancelled = _wait_with_esc(t("Resolving the download link from Libgen…"), libgen.resolve_download_url, md5)
         if cancelled:
@@ -619,6 +734,26 @@ class LibgenAcquisition:
         console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
         readchar.readkey()
         return PickOutcome("next" if dest else "back")
+
+    def background_fetch(self, result, folder: str) -> BackgroundFetch:
+        from torrent_finder import libgen
+        from torrent_finder.downloads import DirectDownloadError
+        md5 = result.get("lg_md5") or ""
+        page_url = result.get("page_url") or ""
+        fallback = f"libgen-{md5[:8]}.{result.get('lg_ext') or 'bin'}"
+
+        def fetch(cancel_event, progress, note):
+            url = libgen.resolve_download_url(md5, cancel_event=cancel_event)
+            if cancel_event.is_set():
+                return []
+            if not url:
+                raise DirectDownloadError(t("Couldn't resolve the download link (mirrors unreachable or page "
+                                            "layout changed). Grab it manually: {url}", url=page_url))
+            dest = libgen.download_file(url, folder, fallback, cancel_event=cancel_event, progress_cb=progress)
+            if dest or cancel_event.is_set():
+                return [dest] if dest else []
+            raise DirectDownloadError(t("Download failed. Grab it manually: {url}", url=page_url))
+        return BackgroundFetch(result.get("name") or fallback, md5 or page_url, folder, fetch)
 
     def batch_item(self, result, *, download_dir, cancel_event, set_status) -> BatchItemOutcome:
         # Direct download, not a client handoff (mirrors Madokami's batch path).
@@ -674,6 +809,9 @@ class FDroidAcquisition:
         from torrent_finder.ui.prompts import download_dir_ready
         if not download_dir_ready():
             return PickOutcome("back")
+        if _background_on():  # the version is found in the job too
+            return _background_pick(name, [self.background_fetch(result, get_download_dir())], "F-Droid", result)  # i18n: ignore — source identity
+        _background_tip()
 
         apk, cancelled = _wait_with_esc(t("Finding the current version on F-Droid…"), fdroid.suggested_apk, package)
         if cancelled:
@@ -721,6 +859,30 @@ class FDroidAcquisition:
         console.print("[muted]" + t("Press [key]any key[/key] to continue…") + "[/muted]")
         readchar.readkey()
         return PickOutcome("next" if dest else "back")
+
+    def background_fetch(self, result, folder: str) -> BackgroundFetch:
+        from torrent_finder import fdroid
+        from torrent_finder.downloads import DirectDownloadError
+        package = result.get("fd_package") or ""
+        page_url = result.get("page_url") or ""
+
+        def fetch(cancel_event, progress, note):
+            apk = fdroid.suggested_apk(package)
+            if cancel_event.is_set():
+                return []
+            if not apk:
+                raise DirectDownloadError(t("Couldn't find a version to download (F-Droid unreachable or no "
+                                            "suggested version). Open the package page instead: {url}", url=page_url))
+            url, version, builds = apk
+            note(t("Package {package}, version {version}, from f-droid.org.", package=package, version=version or "?"))
+            if builds > 1:
+                note(t("This version has {builds} builds, usually one per CPU type; this is the one F-Droid "
+                       "suggests (most phones). For another device type: {url}", builds=builds, url=page_url))
+            dest = fdroid.download_apk(url, folder, cancel_event=cancel_event, progress_cb=progress)
+            if dest or cancel_event.is_set():
+                return [dest] if dest else []
+            raise DirectDownloadError(t("Download failed. Get it from the package page: {url}", url=page_url))
+        return BackgroundFetch(result.get("name") or package, package, folder, fetch)
 
     def batch_item(self, result, *, download_dir, cancel_event, set_status) -> BatchItemOutcome:
         from torrent_finder import fdroid

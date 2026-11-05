@@ -83,6 +83,12 @@ class FakeManager:
     def active(self) -> tuple:
         return tuple(job for job in self.snapshot() if job.state in ACTIVE_STATES)
 
+    def unfinished(self) -> tuple:  # nothing runs here, so nothing is left stopping
+        return self.active()
+
+    def stopping(self, job_id: str) -> bool:
+        return False
+
     def summary(self) -> Summary:
         jobs = [job for job in self._jobs.values() if job.state in ACTIVE_STATES]
         progress = [job.progress for job in jobs if job.progress is not None]

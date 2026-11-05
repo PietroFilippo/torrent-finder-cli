@@ -313,6 +313,9 @@ class PaintingChoiceTests(unittest.TestCase):
         self.assertEqual(appearance.saved()["companion"], "flammarion")
         self.assertIn("The Flammarion engraving", next(
             item for item in self.capture() if item.value == ("placement", "facing")).description)
+        appearance.save("citrinitas", "bar", "comfortable", "flammarion", placement_name="facing")
+        rows = [item for item in self.capture() if isinstance(item.value, tuple) and item.value[0] == "companion"]
+        self.assertEqual(rows[0].marker, "●")  # the companion is the painting itself: its usual pair stands in
         appearance.save("citrinitas", "bar", "comfortable", "dore-satan", placement_name="right")
         self.assertNotIn("─── Left painting ───", [item.label for item in self.capture()])  # Both sides only
         self.assertEqual(appearance.saved()["companion"], "flammarion")  # kept for next time

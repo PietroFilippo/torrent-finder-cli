@@ -1283,6 +1283,20 @@ def download_dir_ready() -> bool:
             return False
         download_dir_prompt()
 
+def _aria_hint(aria_available: bool, has_selection: bool) -> str:
+    """The aria2c row's hint: what it downloads, and whether it holds this screen."""
+    if not aria_available:
+        return _install_hint("aria2c", False)
+    what = t("picked files only") if has_selection else t("resumes · no seeding")
+    where = t("keeps going while you search") if _background_enabled() else t("holds this screen")
+    return f"{what} · {where}"
+
+
+def _background_enabled() -> bool:
+    from torrent_finder.ui import downloads as downloads_ui
+    return downloads_ui.enabled()
+
+
 def _unpack_label(on: bool) -> str:
     return t("Unpack page archives: ON") if on else t("Unpack page archives: OFF")
 
@@ -1309,6 +1323,7 @@ def download_dir_prompt() -> None:
     from torrent_finder.constants import DOWNLOADS_DIR
     from torrent_finder.state import load_setting, save_setting
 
+    from torrent_finder.ui import downloads as downloads_ui
     from torrent_finder.unpack import SETTING as UNPACK_SETTING
 
     home_downloads = os.path.expanduser("~/Downloads")
@@ -1337,14 +1352,23 @@ def download_dir_prompt() -> None:
             is_action=True,
             description=t(_UNPACK_DESCRIPTION),
         ),
+        SelectItem(
+            label=downloads_ui.setting_label(),
+            value="__background__",
+            is_action=True,
+            description=t(downloads_ui.SETTING_HELP),
+        ),
         SelectItem(label=t("Back"), value="back", is_action=True),
     ]
 
     def toggle(idx, items):
+        if items[idx].value == "__background__":
+            downloads_ui.toggle_setting(items[idx])
+            return True
         if items[idx].value != "__unpack__":
             return False
         _toggle_unpack(items[idx])
-        return True  # stay: it is a setting beside the folder choice
+        return True  # stay: they are settings beside the folder choice
 
     # Start cursor on the current selection when possible.
     start = 0
@@ -1786,11 +1810,7 @@ def download_method_prompt(
         label=_tool_label(t("Download with aria2c"), aria_available),
         value="aria",
         passive=not aria_available,
-        hint=(
-            _install_hint("aria2c", False) if not aria_available
-            else t("fastest · picked files only") if has_selection
-            else t("fastest · resumes · no seeding")
-        ),
+        hint=_aria_hint(aria_available, has_selection),
         description=t("Best downloader — native multi-file, resumes, fastest for batches")
                     + ("" if aria_available else t('\nInstall: {ARIA2_INSTALL_URL}', ARIA2_INSTALL_URL=_ARIA2_INSTALL_URL)),
     ))
@@ -1942,6 +1962,9 @@ def download_method_prompt(
             return True
         if items[idx].value == "toggle_background":
             downloads_ui.toggle_setting(items[idx])
+            for item in items:  # the aria2c row says where it runs
+                if item.value == "aria":
+                    item.hint = _aria_hint(aria_available, has_selection)
             return True
         if items[idx].value == "toggle_quiet":
             from torrent_finder.state import load_setting, save_setting
@@ -2019,6 +2042,8 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
             description=(
                 t("Hand every selected torrent to your desktop client at once — it "
                 "queues and downloads them in parallel. Press Esc mid-run to stop.")
+                + ("\n" + t("Direct downloads (Madokami, Libgen, F-Droid) among them run in the background "
+                            "instead: Downloads follows them.") if _background_enabled() else "")
             ),
         ),
         SelectItem(
@@ -2027,7 +2052,8 @@ def batch_download_menu(count: int, copyable: int) -> "str | None":
             is_action=True,
             enabled=(aria_ok and copyable > 0),
             hint=(
-                "" if (aria_ok and copyable > 0)
+                (t("keeps going while you search") if _background_enabled() else t("holds this screen"))
+                if (aria_ok and copyable > 0)
                 else t('aria2c not installed — {ARIA2_INSTALL_URL}', ARIA2_INSTALL_URL=_ARIA2_INSTALL_URL) if not aria_ok
                 else t("no magnet links in this selection")
             ),

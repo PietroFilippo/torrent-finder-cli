@@ -42,8 +42,14 @@
   "Clear preset filters": "Limpar filtros",
   "{count} on": "{count} sempre",
   "{count} auto": "{count} auto",
-  "{n} required": {"one": "{n} exigido", "other": "{n} exigidos"},
-  "{n} preferred": {"one": "{n} preferido", "other": "{n} preferidos"},
+  "{n} required": {
+    "one": "{n} exigido",
+    "other": "{n} exigidos"
+  },
+  "{n} preferred": {
+    "one": "{n} preferido",
+    "other": "{n} preferidos"
+  },
   "[good]On[/good] searches every time · [warn]Auto[/warn] only when On finds nothing · [muted]Off[/muted] is skipped": "[good]Sempre[/good] busca toda vez · [warn]Auto[/warn] só quando Sempre não encontra nada · [muted]Nunca[/muted] não busca",
   "Filters › {label}": "Filtros › {label}",
   "↑/↓ nav • Space/Enter cycle • a all • i invert • c clear • v/V range • w save • Esc cancel": "↑/↓ navegar • Space/Enter alternar • a todos • i inverter • c limpar • v/V intervalo • w salvar • Esc cancelar",
@@ -53,7 +59,10 @@
   "[warning] No files in torrent.[/warning]": "[warning] Nenhum arquivo no torrent.[/warning]",
   "Ep {episode}": "Ep {episode}",
   "Select Episodes": "Selecionar episódios",
-  "{n} file": {"one": "{n} arquivo", "other": "{n} arquivos"},
+  "{n} file": {
+    "one": "{n} arquivo",
+    "other": "{n} arquivos"
+  },
   "↑/↓ nav  •  Space/Enter toggle  •  v anchor  •  Shift+V range  •  a all  •  i invert  •  c clear  •  w save  •  Esc cancel": "↑/↓ navegar  •  Space/Enter alternar  •  v ancorar  •  Shift+V intervalo  •  a todos  •  i inverter  •  c limpar  •  w salvar  •  Esc cancelar",
   "Auto-detect from torrent": "Detectar no torrent",
   "Scan the torrent for .srt/.ass files alongside each video and attach them automatically.": "Buscar arquivos .srt/.ass junto a cada vídeo no torrent e carregar automaticamente.",
@@ -104,13 +113,19 @@
   "install: npm i -g peerflix": "instalar: npm i -g peerflix",
   "{seeds} seeds": "{seeds} seeds",
   "{leeches} leeches": "{leeches} leechers",
-  "{n} picked": {"one": "{n} selecionado", "other": "{n} selecionados"},
+  "{n} picked": {
+    "one": "{n} selecionado",
+    "other": "{n} selecionados"
+  },
   "subtitle mode::auto": "auto",
   "subtitle mode::off": "não",
   "subs {subtitles}": "legendas {subtitles}",
   "{first}–{last} of {total}": "{first}–{last} de {total}",
   "Torrent & files": "Torrent e arquivos",
-  "Change selection ({n} picked)": {"one": "Alterar seleção ({n} selecionado)", "other": "Alterar seleção ({n} selecionados)"},
+  "Change selection ({n} picked)": {
+    "one": "Alterar seleção ({n} selecionado)",
+    "other": "Alterar seleção ({n} selecionados)"
+  },
   "Browse torrent files…": "Explorar arquivos do torrent…",
   "pick episodes or files": "selecionar episódios ou arquivos",
   "Browse every file in the torrent and pick any subset. Downloads grab exactly what you pick; streams auto-skip non-video files.": "Explore os arquivos do torrent e selecione os que quiser. Downloads baixam só a seleção; ao assistir, arquivos sem vídeo são ignorados.",
@@ -128,7 +143,10 @@
   "Find a matching .srt via OpenSubtitles and save it next to the video": "Encontrar um .srt compatível no OpenSubtitles e salvar junto ao vídeo",
   "Stream to VLC": "Assistir no VLC",
   "Stream with webtorrent": "Assistir com webtorrent",
-  "plays {n} episode in order": {"one": "reproduz {n} episódio em ordem", "other": "reproduz {n} episódios em ordem"},
+  "plays {n} episode in order": {
+    "one": "reproduz {n} episódio em ordem",
+    "other": "reproduz {n} episódios em ordem"
+  },
   "needs VLC": "exige VLC",
   "Stream via webtorrent — good streaming default": "Assistir via webtorrent — boa opção inicial",
   "\nInstall: {WEBTORRENT_INSTALL_URL}": "\nInstalar: {WEBTORRENT_INSTALL_URL}",
@@ -144,8 +162,6 @@
   "Send to qBittorrent WebUI": "Enviar ao qBittorrent WebUI",
   "Choose client folder/category and view real progress. Adds the full torrent; manage file selection in qBittorrent.": "Escolha pasta/categoria no cliente e veja o progresso real. Adiciona o torrent inteiro; selecione arquivos no qBittorrent.",
   "Download with aria2c": "Baixar com aria2c",
-  "fastest · picked files only": "mais rápido · só arquivos selecionados",
-  "fastest · resumes · no seeding": "mais rápido · retoma · sem semear",
   "Best downloader — native multi-file, resumes, fastest for batches": "Melhor para baixar — vários arquivos, retoma downloads, mais rápido em lote",
   "\nInstall: {ARIA2_INSTALL_URL}": "\nInstalar: {ARIA2_INSTALL_URL}",
   "Download with webtorrent": "Baixar com webtorrent",
@@ -188,7 +204,10 @@
   "Send selection to qBittorrent WebUI": "Enviar seleção ao qBittorrent WebUI",
   "Magnets and Online-Fix torrent files. Direct downloads are skipped.": "Links magnet e arquivos torrent do Online-Fix. Downloads diretos são ignorados.",
   "Batch download": "Download em lote",
-  "{n} torrent": {"one": "{n} torrent", "other": "{n} torrents"},
+  "{n} torrent": {
+    "one": "{n} torrent",
+    "other": "{n} torrents"
+  },
   "↑/↓ navigate  •  Enter select  •  F filters  •  Esc back": "↑/↓ navegar  •  Enter selecionar  •  F filtros  •  Esc voltar",
   "─── Search ───": "─── Busca ───",
   "Keyword search": "Busca por palavras-chave",
@@ -198,12 +217,21 @@
   "By {facets}": "Por {facets}",
   "By {facet}": "Por {facet}",
   "Search options › {provider}": "Opções de busca › {provider}",
-  "{n} provider": {"one": "{n} categoria", "other": "{n} categorias"},
+  "{n} provider": {
+    "one": "{n} categoria",
+    "other": "{n} categorias"
+  },
   "no providers selected": "nenhuma categoria selecionada",
   " · profile {profile}": " · perfil {profile}",
   "no engines On": "nenhum mecanismo em Sempre",
-  "{n} of {total} set": {"one": "{n} de {total} configurado", "other": "{n} de {total} configurados"},
-  " · {n} name": {"one": " · {n} nome", "other": " · {n} nomes"},
+  "{n} of {total} set": {
+    "one": "{n} de {total} configurado",
+    "other": "{n} de {total} configurados"
+  },
+  " · {n} name": {
+    "one": " · {n} nome",
+    "other": " · {n} nomes"
+  },
   "Runs this search again with its saved names and settings.": "Repete esta busca com os nomes e configurações salvos.",
   "Opens the search field with this search; Enter runs it, or edit it first.": "Abre esta busca no campo; Enter executa, ou você pode editar antes.",
   "Appearance": "Aparência",
@@ -219,7 +247,10 @@
   "Network exposure info": "Informações de exposição na rede",
   "Check which IP address peers see before downloading.": "Veja qual IP os peers enxergam antes de baixar.",
   "continue": "continuar",
-  "{n} shelf": {"one": "{n} estante", "other": "{n} estantes"},
+  "{n} shelf": {
+    "one": "{n} estante",
+    "other": "{n} estantes"
+  },
   "tools": "ferramentas",
   "credentials, settings": "credenciais, configurações",
   "~ The Index ~": "~ O Índice ~",
@@ -248,5 +279,10 @@
   "Exit": "Sair",
   "↑/↓ navigate • Enter select • R/P/M/Tab/H/S/T/C/Q jump • Esc request exit": "↑/↓ navegar • Enter selecionar • R/P/M/Tab/H/S/T/C/Q ir direto • Esc pedir saída",
   "↑/↓ move • Enter select • Esc exit\nR/P/M/Tab/H/S/T/C/Q jump": "↑/↓ mover • Enter selecionar • Esc sair\nR/P/M/Tab/H/S/T/C/Q ir direto",
-  "What's Next?": "E agora?"
+  "What's Next?": "E agora?",
+  "holds this screen": "ocupa esta tela",
+  "keeps going while you search": "continua enquanto você busca",
+  "picked files only": "só os arquivos escolhidos",
+  "resumes · no seeding": "retoma · não semeia",
+  "Direct downloads (Madokami, Libgen, F-Droid) among them run in the background instead: Downloads follows them.": "Downloads diretos (Madokami, Libgen, F-Droid) entre eles rodam em segundo plano: Downloads acompanha todos."
 }

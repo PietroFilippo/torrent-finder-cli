@@ -205,8 +205,12 @@ workers. `busy()` stays true until a stopped finisher returns as well.
 The current unpack may finish, but no further archives or stats run
 after cancellation. `ui/downloads.py` owns the status figure, Downloads screen,
 completion notices and quit prompt; `main.py` queues single and batch jobs.
-The saved `settings.background_downloads` switch is off by default and affects
-aria2c only. Jobs do not persist after exit.
+Direct downloads (Madokami, Libgen, F-Droid) run as direct jobs
+(`enqueue_direct`: a `fetch` on two workers, the same finisher, no aria2c),
+from each adapter's `background_fetch`. The saved
+`settings.background_downloads` switch is on by default (`ui/downloads.DEFAULT_ENABLED`;
+the test baseline turns it off) and covers aria2c and direct downloads. Jobs
+do not persist after exit.
 See [ADR-0029](docs/adr/0029-background-downloads.md).
 
 ## Session

@@ -28,7 +28,10 @@ from torrent_finder.ui import chrome as frames, theme
 from torrent_finder.ui.selector import SelectItem, arrow_select
 from torrent_finder.utils import format_size
 
-SETTING = "background_downloads"  # settings.background_downloads: True runs aria2c jobs in the background
+# settings.background_downloads: aria2c torrents and direct downloads run as background jobs. On unless
+# the user turned it off: a download should not hold the app.
+SETTING = "background_downloads"
+DEFAULT_ENABLED = True
 _RUNNING = frozenset({"metadata", "running", "paused", "unpacking"})
 _LOG_LINES = 40
 _INSPECT_LINES = 6  # the main menu's inspector lists this many jobs
@@ -42,9 +45,17 @@ def current():
 
 
 def enabled() -> bool:
-    """The saved setting: True when aria2c downloads run in the background."""
+    """The saved setting: True (the default) when aria2c torrents and direct downloads run in the background."""
     from torrent_finder.state import load_setting
-    return bool(load_setting(SETTING, False))
+    return bool(load_setting(SETTING, DEFAULT_ENABLED))
+
+
+def background_tip() -> str:
+    """A muted line for a download about to hold the screen, when it could run in the background instead."""
+    if enabled():
+        return ""
+    return t("[muted]Tip: with Downloads run: in background (the download options, or Settings › Download "
+             "folder), this keeps going while you search.[/muted]")
 
 
 def revision() -> int:
@@ -59,9 +70,10 @@ def _jobs() -> tuple:
 
 def _counts(jobs) -> tuple[int, int, int]:
     """(running, queued, finished): running counts metadata, paused and unpacking jobs too."""
-    running = sum(job.state in _RUNNING for job in jobs)
+    stopping = {job.id for job in jobs if _stopping(job)}  # its file is still closing: under way
+    running = sum(job.state in _RUNNING or job.id in stopping for job in jobs)
     queued = sum(job.state == "queued" for job in jobs)
-    finished = sum(job.state in downloads.FINISHED_STATES for job in jobs)
+    finished = sum(job.state in downloads.FINISHED_STATES and job.id not in stopping for job in jobs)
     return running, queued, finished
 
 
@@ -133,7 +145,7 @@ def _figure_parts() -> "tuple[list[str], int]":
     if manager is None:
         return [], 0
     jobs = manager.snapshot()
-    running = [job for job in jobs if job.state in _RUNNING]
+    running = [job for job in jobs if job.state in _RUNNING or manager.stopping(job.id)]
     unseen = manager.summary().unseen_completions
     if not running:
         return [], unseen
@@ -208,7 +220,7 @@ def menu_inspect() -> list[Text]:
         return []
     jobs = manager.snapshot()
     lines = [Text.assemble((job.title, ""), ("  ", ""), _state_hint(job)) for job in jobs
-             if job.state in downloads.ACTIVE_STATES]
+             if job.state in downloads.ACTIVE_STATES or manager.stopping(job.id)]
     for job in jobs:
         if job.state == "done":
             lines.append(Text.assemble(("✓ ", theme.GOOD), (job.title, ""),
@@ -254,9 +266,17 @@ def _percent(job) -> str:
     return _percent_of(job.progress)
 
 
+def _stopping(job) -> bool:
+    """Stopped, but its file is still being written or finished: not done with yet."""
+    manager = current()
+    return manager is not None and manager.stopping(job.id)
+
+
 def _state_hint(job) -> Text:
     """The hint beside a row, with its own colours: progress, a state word, or the result."""
     muted = theme.MUTED
+    if _stopping(job):
+        return Text.assemble((t("stopping", ctx="download state"), theme.WARN))  # a span: the row's style can't cover it
     if job.state == "running":
         percent = _percent(job)
         if not percent:
@@ -302,10 +322,16 @@ def _log_note(job) -> str:
 def _description(job) -> str:
     """The lines under the list (or in the inspector) for the focused row, as markup."""
     folder = escape(job.target_dir)
+    if _stopping(job):
+        return t("Stopping · waiting for its file to close in {folder}", folder=folder) + "\n" + \
+            t("Retry and Remove come back once it has stopped.")
     if job.state in ("running", "paused", "unpacking"):
-        swarm = tn("{n} peer", "{n} peers", job.peers) + " · " + tn("{n} seed", "{n} seeds", job.seeds)
         sizes = (t("{done} of {total}", done=format_size(job.done_bytes), total=format_size(job.total_bytes))
                  if job.total_bytes else job.state_label)
+        if job.backend == "direct":  # a file from a library: no swarm
+            return t("Saving to {folder}", folder=folder) + "\n" + sizes + " · " + t("direct download from {source}",
+                                                                                     source=escape(job.source))
+        swarm = tn("{n} peer", "{n} peers", job.peers) + " · " + tn("{n} seed", "{n} seeds", job.seeds)
         return t("Saving to {folder}", folder=folder) + "\n" + sizes + " · " + swarm
     if job.state == "metadata":
         return t("Saving to {folder}", folder=folder) + "\n" + t("Waiting for the swarm to describe the files.")
@@ -321,6 +347,11 @@ def _description(job) -> str:
         return escape(job.error or job.state_label) + ("\n" + escape(" ".join(tail[-2:])) if tail else "")
     percent = _percent(job)
     stopped = (t("Stopped at {percent}", percent=percent) if percent else t("Stopped")) + " · "
+    if job.backend == "direct" and job.files:  # stopped while unpacking: the download itself was complete
+        return (t("Stopped while unpacking") + " · " + t("the downloaded file stays in {folder}", folder=folder)
+                + "\n" + t("Enter downloads it again."))
+    if job.backend == "direct":  # the unfinished file is removed, so it starts over
+        return stopped + t("the unfinished file was removed") + "\n" + t("Enter downloads it again.")
     return stopped + t("the partial files stay in {folder}", folder=folder) + "\n" + t("Enter resumes it.")
 
 
@@ -382,8 +413,8 @@ def _section(label: str) -> SelectItem:
 
 def _rows(jobs) -> list[SelectItem]:
     """ACTIVE then FINISHED, each heading only when it has rows; Back last."""
-    active = [job for job in jobs if job.state in downloads.ACTIVE_STATES]
-    finished = [job for job in jobs if job.state in downloads.FINISHED_STATES]
+    active = [job for job in jobs if job.state in downloads.ACTIVE_STATES or _stopping(job)]
+    finished = [job for job in jobs if job.state in downloads.FINISHED_STATES and job not in active]
     items: list[SelectItem] = []
     if active:
         items.append(_section(t("Active")))
@@ -470,8 +501,13 @@ def _again(manager, job) -> None:
     """Retry a failed download or resume a stopped one: the same magnet, folder and files."""
     try:
         # Its own folder, even after the download folder setting changed: aria2c continues the partial files there.
-        manager.enqueue_aria2(job.title, job.magnet, job.select, source=job.source,
-                              provider_slug=job.provider_slug, method=job.method, folder=job.target_dir)
+        if job.backend == "direct":
+            manager.enqueue_direct(job.title, job.fetch, key=job.magnet, source=job.source,
+                                   provider_slug=job.provider_slug, method=job.method, folder=job.target_dir,
+                                   expect_pages=job.expect_pages)
+        else:
+            manager.enqueue_aria2(job.title, job.magnet, job.select, source=job.source,
+                                  provider_slug=job.provider_slug, method=job.method, folder=job.target_dir)
     except downloads.DuplicateDownloadError as error:
         _say(f"[warn]{escape(str(error))}[/warn]")
         return
@@ -497,20 +533,28 @@ def _show_log(job) -> None:
 def _actions(manager, job) -> None:
     """Enter on a row: what can be done with this download, by its state."""
     items: list[SelectItem] = []
-    if job.state in downloads.ACTIVE_STATES:
-        items.append(SelectItem(t("Stop"), "stop", description=t("aria2c keeps the partial files; Resume picks them up later.")))
+    direct = job.backend == "direct"
+    if _stopping(job):  # its file is still closing: nothing to retry or remove yet
+        pass
+    elif job.state in downloads.ACTIVE_STATES:
+        items.append(SelectItem(t("Stop"), "stop", description=(
+            t("Stops it and removes the unfinished file.") if direct
+            else t("aria2c keeps the partial files; Resume picks them up later."))))
+    elif job.state == "stopped" and direct:
+        items.append(SelectItem(t("Download again"), "again", description=t("Starts the file again, into the same folder.")))
     elif job.state == "stopped":
         items.append(SelectItem(t("Resume"), "again", description=t("Downloads the same files to the same folder; aria2c continues from the partial files.")))
     else:
         items.append(SelectItem(t("Retry"), "again", description=t("Starts the download again with the same files and folder.")))
     items.append(SelectItem(t("Open folder"), "open", hint=_folder_of(job)))
-    if job.state in downloads.FINISHED_STATES:
+    if job.state in downloads.FINISHED_STATES and not _stopping(job):
         items.append(SelectItem(t("Remove from the list"), "remove", description=t("Forgets this row; the files stay where they are.")))
     if job.log_path:
         items.append(SelectItem(t("Show log"), "log", description=t("The last lines aria2c wrote.")))
     items.append(SelectItem(t("Back"), None, is_action=True))
     index = arrow_select(items, title=t("Downloads › {title}", title=escape(job.title)),
-                         intro=Text.assemble((job.state_label, theme.MUTED)),
+                         intro=Text.assemble((t("stopping", ctx="download state") if _stopping(job)
+                                              else job.state_label, theme.MUTED)),
                          footer=t("↑/↓ navigate  •  Enter select  •  Esc back"))
     choice = items[index].value if index is not None else None
     if choice == "stop":
@@ -580,9 +624,9 @@ def downloads_screen(focus: "str | None" = None) -> None:
             if not jobs:
                 lines = [Text(t("Nothing is downloading in the background."))]
                 if not enabled():
-                    lines.append(Text(t("Turn on \"Downloads run: in background\" under Settings in a torrent's "
-                                        "download menu; aria2c downloads then keep going while you search."),
-                                      style=theme.MUTED))
+                    lines.append(Text(t("Turn on \"Downloads run: in background\" (a torrent's download options, "
+                                        "or Settings › Download folder): downloads then keep going while you "
+                                        "search."), style=theme.MUTED))
                 return lines
             if not theme.FRAMED or theme.view_height(console.size.height, console.size.width) < 30:
                 return ""
@@ -603,6 +647,8 @@ def downloads_screen(focus: "str | None" = None) -> None:
         if job is not None and manager is not None:
             _actions(manager, job)
         start = index
+        if job is not None:  # the rows may have moved (Active → Finished): stay on the same download
+            start = next((i for i, item in enumerate(_rows(_jobs())) if item.value == job.id), index)
 
 
 # --- after queuing a download: the confirmation ----------------------------------------------
@@ -617,19 +663,24 @@ def _ahead_line(size_bytes: int, ahead: int, folder: str, extra: list[str] = ())
 
 
 def background_started_prompt(name: str, folder: str, *, size_bytes: int = 0, ahead: int = 0,
-                              facts: list[str] = ()) -> str:
-    """Continue, go back to the download options, or open Downloads; returns "next" or "back".
+                              facts: list[str] = (), back_to_results: bool = False) -> str:
+    """Continue, go back (to the download options, or the results), or open Downloads; "next" or "back".
 
     *ahead* is how many jobs were active before this one: two run at a time,
     so a third queues. *facts* are extra words for the line under the name
-    (a batch's counts).
+    (a batch's counts). A direct download has no download options:
+    *back_to_results* offers the results instead.
     """
+    back = (SelectItem(t("Back to results"), value="back",
+                       description=t("Pick something else; the download keeps going."))
+            if back_to_results else
+            SelectItem(t("Back to download options"), value="back",
+                       description=t("Keep this torrent's options open. The download keeps going.")))
     items = [
         SelectItem(t("Continue to What's Next"), value="next",
                    description=t("The download keeps going. Downloads (D on the main menu) follows it, "
                                  "and a message says when it is done.")),
-        SelectItem(t("Back to download options"), value="back",
-                   description=t("Keep this torrent's options open. The download keeps going.")),
+        back,
         SelectItem(t("Open Downloads"), value="downloads", hint="D",
                    description=t("Every download: follow it, stop it or open its folder.")),
     ]
@@ -637,7 +688,9 @@ def background_started_prompt(name: str, folder: str, *, size_bytes: int = 0, ah
     start = 0
     while True:
         picked = arrow_select(items, title=t("Downloading in the background"), intro=intro, start_index=start,
-                              footer=t("↑/↓ select  •  Enter confirm  •  D downloads  •  Esc back to download options"),
+                              footer=(t("↑/↓ select  •  Enter confirm  •  D downloads  •  Esc back to results")
+                                      if back_to_results else
+                                      t("↑/↓ select  •  Enter confirm  •  D downloads  •  Esc back to download options")),
                               hotkeys={"D": "downloads", "d": "downloads"})
         if picked is None:
             return "back"
@@ -652,20 +705,35 @@ def background_started_prompt(name: str, folder: str, *, size_bytes: int = 0, ah
 
 # --- quitting with downloads running --------------------------------------------------------
 
+def _stop_consequences(jobs) -> str:
+    """What stopping *jobs* loses: torrents keep their partial files, direct downloads do not."""
+    direct = any(job.backend == "direct" for job in jobs)
+    torrents = any(job.backend != "direct" for job in jobs)
+    if direct and torrents:
+        return t("Torrents keep their partial files: downloading the same torrent to the same folder later resumes "
+                 "them. Unfinished direct downloads are removed and start over.")
+    if direct:
+        return t("Unfinished direct downloads are removed; downloading them again starts over.")
+    return t("aria2c keeps the partial files; downloading the same torrent to the same folder later resumes them.")
+
+
 def quit_prompt() -> bool:
     """Keep Torrent Finder open (the default; Esc and Ctrl+C too) or stop every download and quit."""
-    jobs = [job for job in _jobs() if job.state in downloads.ACTIVE_STATES]
+    manager = current()
+    # Also the stopped ones still writing a file: the app waits for them too.
+    jobs = list(manager.unfinished()) if manager is not None else []
     count = len(jobs)
     items = [
         SelectItem(t("Keep Torrent Finder open"), value="stay", hint="Esc",
                    description=t("The downloads carry on. Downloads (D on the main menu) follows them.")),
         SelectItem(tn("Stop {n} download and quit", "Stop {n} downloads and quit", count), value="quit",
-                   description=t("aria2c keeps the partial files; downloading the same torrent to the same folder "
-                                 "later resumes them.")),
+                   description=_stop_consequences(jobs)),
     ]
     intro = [Text(tn("{n} download is running:", "{n} downloads are running:", count), style=theme.MUTED)]
     for job in jobs[:3]:
-        intro.append(Text.assemble((job.title, ""), ("  ", ""), _state_hint(job)))
+        hint = (Text(t("stopping", ctx="download state"), style=theme.MUTED)
+                if manager is not None and manager.stopping(job.id) else _state_hint(job))
+        intro.append(Text.assemble((job.title, ""), ("  ", ""), hint))
     if count > 3:
         intro.append(Text(tn("… and {n} more", "… and {n} more", count - 3), style=theme.MUTED))
     picked = arrow_select(items, title=t("Exit"), intro=intro,
@@ -685,8 +753,9 @@ def setting_label() -> str:
     return t("Downloads run: in background") if enabled() else t("Downloads run: in this screen")
 
 
-SETTING_HELP = N_("aria2c downloads keep going while you search; Downloads (D on the main menu) follows them. "
-                  "'In this screen' watches each download here, as before.")
+SETTING_HELP = N_("Downloads keep going while you search: aria2c torrents and direct downloads (Madokami, "
+                  "Libgen, F-Droid). Downloads (D on the main menu) follows them. 'In this screen' watches each "
+                  "download here instead.")
 
 
 def toggle_setting(item: SelectItem) -> None:

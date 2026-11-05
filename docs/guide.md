@@ -612,13 +612,19 @@ selection).
 - A failed or missing tool, or **Ctrl+C**, brings you back to this menu with
   your search kept. Failed downloads keep their error output until you
   acknowledge it.
-- **Downloads run: in background** (saved, off by default) makes aria2c
-  downloads, single and batch, keep going while you search: a hidden aria2c
-  takes them two at a time, and the menu confirms with Continue, Back to
-  download options or Open Downloads. The status line (Simple: the header)
-  counts them, `↓ 2 · 43% · 3.1 MB/s`, and reads `↓ ✓1 new` once one has
-  finished; a finished or failed download also says so on the message line.
-  webtorrent, peerflix and streaming stay in the foreground.
+- **Downloads run: in background** (saved, **on** by default) lets
+  downloads keep going while you search: aria2c torrents, single and batch,
+  and direct downloads from Madokami, Libgen and F-Droid. They run two at a
+  time, and the screen confirms with Continue, Back (to the download options,
+  or to the results for a direct download) or Open Downloads. The status line
+  (Simple: the header) counts them, `↓ 2 · 43% · 3.1 MB/s`, and reads
+  `↓ ✓1 new` once one has finished; a finished or failed download also says
+  so on the message line. The switch is in a torrent's download options and
+  on the Download Folder screen (Settings). When it is off, a download that
+  holds the screen reminds you of it. webtorrent, peerflix and streaming stay
+  in the foreground; your torrent client and qBittorrent download on their own.
+- In a batch, **Open all** hands the torrents to your client and, with the
+  switch on, queues the direct downloads among them in Downloads.
 
 ### The Downloads screen
 
@@ -629,10 +635,12 @@ left, or its result; the focused row's folder, size, peers and seeds, files,
 time taken, unpack notes and, for a failure, the last lines of aria2c's log.
 Keys: **X** stops the focused download, **O** opens its folder, **C** clears
 the finished rows, and **Enter** lists its actions: Stop, Resume or Retry,
-Open folder, Remove from the list, Show log. A stopped download keeps its
+Open folder, Remove from the list, Show log. A stopped torrent keeps its
 partial files. Resume continues them in the download's own folder, even if
 the download folder setting changed since; downloading the same torrent to
-that folder later continues from them too.
+that folder later continues from them too. A stopped direct download
+(Madokami, Libgen, F-Droid) removes its unfinished file: **Download again**
+starts it over, and the quit prompt says so.
 
 Quitting while downloads run asks first: **Keep Torrent Finder open** (the
 default; Esc and Ctrl+C choose it too) or **Stop N downloads and quit**. An

@@ -1,5 +1,10 @@
 """In-memory background jobs. Workers never draw, print, or read keys.
 
+Two kinds: aria2c jobs (torrents, followed over aria2's RPC) and direct jobs
+(a library file streamed over HTTP: Madokami, Libgen, F-Droid), each run by
+its ``fetch`` on a small worker pool. Both finish through the same finisher
+(unpacking, statistics) and show in the same Downloads screen.
+
 Hooks receive no arguments, run outside the job lock on the changing thread,
 and should only signal the UI to redraw. Returned jobs are independent copies.
 """
@@ -66,6 +71,9 @@ class Job:
     started_at: float | None = None
     finished_at: float | None = None
     gid: str | None = None
+    # A direct job: what it downloads, run again by Retry; whether its files are page archives.
+    fetch: object = field(default=None, repr=False, compare=False)
+    expect_pages: bool = False
     cancel_event: threading.Event = field(default_factory=threading.Event, repr=False, compare=False)
     proc: object = field(default=None, repr=False, compare=False)
 
@@ -90,6 +98,13 @@ class Summary:
 
 class DuplicateDownloadError(ValueError):
     """The same info hash, folder and file selection is already active."""
+
+
+class DirectDownloadError(Exception):
+    """A direct job's fetch failed; the message says why and where to get the file by hand."""
+
+
+DIRECT_WORKERS = 2  # direct downloads at a time, like aria2c's
 
 
 def _identity(magnet: str, folder: str, select: tuple[int, ...] | None) -> tuple:
@@ -132,6 +147,14 @@ class JobManager:
         self._poll_failures = 0
         self._poller: threading.Thread | None = None
         self._finisher: threading.Thread | None = None
+        self._direct_queue: queue.Queue = queue.Queue()
+        self._direct_workers: list[threading.Thread] = []
+        # Set by each direct worker as it really returns: an interrupted join()
+        # can report a thread finished while its target still runs (CPython 3.11).
+        self._direct_done: list[threading.Event] = []
+        # Direct jobs whose fetch has not returned yet, even after Stop marked
+        # them: their file may still be open. Busy, not removable, not repeatable.
+        self._fetching: set[str] = set()
         self.on_change: list[Callable[[], None]] = []
 
     @property
@@ -199,12 +222,147 @@ class JobManager:
         return result
 
     def _start_workers(self) -> None:
+        self._start_finisher()
         if self._poller is not None:
             return
         self._poller = threading.Thread(target=self._poll_loop, name="aria2-poller", daemon=True)
-        self._finisher = threading.Thread(target=self._finish_loop, name="download-finisher", daemon=True)
-        self._finisher.start()
         self._poller.start()
+
+    def _start_finisher(self) -> None:
+        if self._finisher is None:
+            self._finisher = threading.Thread(target=self._finish_loop, name="download-finisher", daemon=True)
+            self._finisher.start()
+
+    def enqueue_direct(self, title: str, fetch, *, key: str, source: str, provider_slug: str,
+                       method: str = "direct", folder: str | None = None, group: str | None = None,
+                       expect_pages: bool = False) -> Job:
+        """Queue a direct download into *folder* (by default the download folder setting).
+
+        ``fetch(cancel_event, progress, note)`` runs on a worker and returns the
+        saved paths: ``progress(done, total)`` reports bytes, ``note(text)`` adds
+        a line to the job, and *cancel_event* is set by Stop. It raises
+        ``DirectDownloadError`` with what to tell the user. *key* identifies the
+        file (a library path, a hash): the same key into the same folder is
+        refused while it runs. *expect_pages*: page archives, as from Madokami.
+        """
+        with self._operations:
+            with self._lock:
+                if self._closed:
+                    raise RuntimeError(t("The background download manager is closed."))
+            try:
+                folder = os.path.abspath(prepare_download_dir(folder))
+            except OSError as error:
+                raise OSError(t("Could not prepare the download folder: {error}", error=error)) from error
+            identity = ("direct", source, key, os.path.normcase(os.path.realpath(folder)))
+            with self._lock:
+                if any(self._identities[j.id] == identity
+                       for j in self._jobs.values() if j.state in ACTIVE_STATES or j.id in self._fetching):
+                    raise DuplicateDownloadError(t("This file is already downloading to this folder."))
+                # *group* only keeps a batch's rows together: direct jobs count no
+                # download method, so they keep no group bookkeeping (_group_states).
+                job = Job(uuid.uuid4().hex, title, source, provider_slug, method, folder, key,
+                          group=group, backend="direct", fetch=fetch, expect_pages=expect_pages)
+                self._jobs[job.id] = job
+                self._identities[job.id] = identity
+                self._bump()
+                result = _copy(job)
+            self._start_finisher()
+            while len(self._direct_workers) < DIRECT_WORKERS:
+                done = threading.Event()
+                worker = threading.Thread(target=self._direct_loop, args=(done,), daemon=True,
+                                          name=f"direct-download-{len(self._direct_workers) + 1}")
+                self._direct_workers.append(worker)
+                self._direct_done.append(done)
+                worker.start()
+            self._direct_queue.put(job.id)
+        self._notify()
+        return result
+
+    def _direct_loop(self, done: threading.Event) -> None:
+        try:
+            while True:
+                job_id = self._direct_queue.get()
+                if job_id is None:
+                    return
+                try:
+                    self._run_direct(job_id)
+                except Exception:
+                    pass  # _run_direct records failures on the job; never lose the worker
+        finally:
+            done.set()
+
+    def has_direct(self, source: str, key: str, folder: str) -> bool:
+        """Whether this file is downloading (or still being written) to this folder."""
+        identity = ("direct", source, key, os.path.normcase(os.path.realpath(os.path.abspath(folder))))
+        with self._lock:
+            return any(self._identities.get(j.id) == identity
+                       for j in self._jobs.values() if j.state in ACTIVE_STATES or j.id in self._fetching)
+
+    def _run_direct(self, job_id: str) -> None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None or job.cancel_event.is_set() or job.state != "queued":
+                return
+            job.state = "running"
+            job.started_at = job.updated_at = time.time()
+            self._fetching.add(job_id)
+            self._bump()
+        self._notify()
+        try:
+            self._fetch_direct(job_id, job)
+        finally:
+            with self._lock:
+                self._fetching.discard(job_id)
+                self._bump()
+            self._notify()
+
+    def _fetch_direct(self, job_id: str, job: Job) -> None:
+        sample = [time.monotonic(), 0]
+
+        def progress(done: int, total: "int | None") -> None:
+            with self._lock:
+                if job.cancel_event.is_set():
+                    return
+                now = time.monotonic()
+                job.done_bytes, job.total_bytes = int(done), int(total or 0)
+                if now - sample[0] >= 1:
+                    job.speed_bps = max(0, int((done - sample[1]) / (now - sample[0])))
+                    sample[:] = [now, done]
+                job.eta_s = (max(0, job.total_bytes - job.done_bytes) // job.speed_bps
+                             if job.speed_bps and job.total_bytes else None)
+                job.updated_at = time.time()
+                changed = self._bump(progress=True)
+            if changed:
+                self._notify()
+
+        error = ""
+        try:
+            paths = [path for path in (job.fetch(job.cancel_event, progress,
+                                                 lambda text: self._note(job_id, text)) or ()) if path]
+        except DirectDownloadError as failure:
+            paths, error = [], str(failure)
+        except Exception as failure:
+            paths, error = [], t("Download failed: {error}", error=failure)
+        with self._lock:
+            if job.cancel_event.is_set():
+                if paths:  # Stop came after the file was saved: it is a finished download, not an unfinished one
+                    job.files = tuple(paths)
+                    job.total_bytes = max(job.total_bytes, job.done_bytes)
+                    job.state, job.error = "done", ""
+                    job.notes += (t("It finished before it could stop."),)
+                    job.updated_at = job.finished_at = time.time()
+                    self._bump()
+                return  # otherwise Stop has already marked it
+            if not paths:
+                self._terminal(job, "failed", error or t("Download failed."))
+            else:
+                job.files = tuple(paths)
+                job.total_bytes = max(job.total_bytes, job.done_bytes)
+                job.speed_bps, job.eta_s = 0, None
+                self._finishing.add(job_id)
+                self._bump()
+                self._finish_queue.put(job_id)
+        self._notify()
 
     @contextmanager
     def batch(self):
@@ -223,6 +381,19 @@ class JobManager:
 
     def active(self) -> tuple[Job, ...]:
         return tuple(j for j in self.snapshot() if j.state in ACTIVE_STATES)
+
+    def unfinished(self) -> tuple[Job, ...]:
+        """What ``is_busy`` waits for: active jobs, and stopped ones still writing or finishing a file."""
+        with self._lock:
+            return tuple(_copy(j) for j in self._jobs.values()
+                         if j.state in ACTIVE_STATES or j.id in self._fetching or j.id in self._finishing)
+
+    def stopping(self, job_id: str) -> bool:
+        """A stopped job whose file is still being written or finished."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            return (job is not None and job.state not in ACTIVE_STATES
+                    and (job_id in self._fetching or job_id in self._finishing))
 
     def summary(self) -> Summary:
         with self._lock:
@@ -245,8 +416,9 @@ class JobManager:
         job.state, job.error = state, error
         job.speed_bps, job.eta_s = 0, None
         job.updated_at = job.finished_at = time.time()
-        if job.group is not None:
-            self._group_states[(job.group, job.method)][job.id] = state
+        members = self._group_states.get((job.group, job.method)) if job.group is not None else None
+        if members is not None:
+            members[job.id] = state
         self._bump()
 
     def stop(self, job_id: str) -> None:
@@ -268,7 +440,7 @@ class JobManager:
     def remove(self, job_id: str) -> None:
         with self._lock:
             job = self._jobs[job_id]
-            if job.state in ACTIVE_STATES or job_id in self._finishing:
+            if job.state in ACTIVE_STATES or job_id in self._finishing or job_id in self._fetching:
                 raise ValueError(t("Stop the download before removing it."))
             del self._jobs[job_id]
             self._identities.pop(job_id, None)
@@ -280,7 +452,7 @@ class JobManager:
     def clear_finished(self) -> None:
         with self._lock:
             ids = [j.id for j in self._jobs.values()
-                   if j.state in FINISHED_STATES and j.id not in self._finishing]
+                   if j.state in FINISHED_STATES and j.id not in self._finishing and j.id not in self._fetching]
             for job_id in ids:
                 del self._jobs[job_id]
                 self._identities.pop(job_id, None)
@@ -470,7 +642,7 @@ class JobManager:
                     if job.cancel_event.is_set():
                         return
                     try:
-                        report = unpack.unpack_all(paths, status=status)
+                        report = unpack.unpack_all(paths, expect_pages=job.expect_pages, status=status)
                         break
                     except PermissionError:
                         if delay is None:
@@ -486,11 +658,13 @@ class JobManager:
                 if job.cancel_event.is_set():
                     return
                 self._terminal(job, "done")
-                record = job.group is None
-                if job.group is not None:
+                # A direct download counts no download method, as in the foreground.
+                record = job.backend != "direct" and job.group is None
+                if job.group is not None and job.backend != "direct":
                     key = (job.group, job.method)
                     members = self._group_states[key].values()
-                    record = key not in self._counted_groups and all(state == "done" for state in members)
+                    record = (job.backend != "direct" and key not in self._counted_groups
+                              and all(state == "done" for state in members))
                     if record:
                         self._counted_groups.add(key)
             if record:
@@ -510,9 +684,10 @@ class JobManager:
             self._notify()
 
     def is_busy(self) -> bool:
-        """True while a job is unfinished, or a stopped finisher has not returned yet."""
+        """True while a job is unfinished, or a stopped finisher or direct fetch has not returned yet."""
         with self._lock:
-            return bool(self._finishing) or any(j.state in ACTIVE_STATES for j in self._jobs.values())
+            return (bool(self._finishing) or bool(self._fetching)
+                    or any(j.state in ACTIVE_STATES for j in self._jobs.values()))
 
     def shutdown(self, graceful: bool = True) -> None:
         """Stop jobs, save partials via aria2 shutdown, and join both workers.
@@ -534,6 +709,22 @@ class JobManager:
                 self._engine.shutdown(graceful)
             finally:
                 self._finish_queue.put(None)
+                for _ in self._direct_workers:
+                    self._direct_queue.put(None)
+        # A direct worker checks Stop at every chunk; one stuck in a request
+        # gives up at its timeout, and it is a daemon thread: wait only a while.
+        deadline = time.monotonic() + 10
+        for worker, done in zip(self._direct_workers, self._direct_done):
+            if worker is threading.current_thread():
+                continue
+            while not done.is_set():  # the worker's own word, not is_alive(): see _direct_done
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    break
+                try:
+                    done.wait(min(0.2, left))
+                except KeyboardInterrupt:
+                    continue  # a second Ctrl+C must not leave a file half-written
         for worker in (self._poller, self._finisher):
             if worker is not None and worker is not threading.current_thread():
                 while worker.is_alive():

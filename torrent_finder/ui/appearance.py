@@ -411,6 +411,7 @@ def _painting_rows(chosen: str, plain: bool = False) -> list:
 def _companion_rows(painting_key: str, chosen: str) -> list:
     """The Left painting section's rows (Both sides only): the usual companion, then every other plate."""
     usual = paintings.catalog()[paintings.facing(painting_key)]
+    chosen = chosen if chosen and chosen != painting_key else ""  # itself: the usual companion stands in
     rows = [_choice(t("Its companion: {name}", name=usual.title_label()), ("companion", ""), not chosen,
                     usual.artist_credit_label(),
                     t("The plate paired with this painting: the same book or the same mood."))]

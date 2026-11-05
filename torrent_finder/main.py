@@ -178,13 +178,91 @@ def _batch_handoff(provider, results: list, idxs: list[int]) -> str:
     again, and only those.
     """
     pending = list(idxs)
+    queued_lines: list[str] = []
+    if _background_on():
+        pending, queued_lines = _batch_queue_direct(provider, results, pending)
+        if queued_lines is None:
+            return "back"
+        if not pending and not queued_lines:  # all already downloading: nothing new started
+            return "results"
+        if not pending:  # every item was a direct download: they run in the background
+            from torrent_finder.ui.downloads import background_started_prompt
+            from torrent_finder.constants import get_download_dir
+            choice = background_started_prompt(t("Downloads in the background"), get_download_dir(),
+                                               facts=queued_lines, back_to_results=True)
+            return "next" if choice == "next" else "results"
+    elif any(hasattr(acquisition.for_result(results[gi]), "background_fetch")
+             for gi in pending if 0 <= gi < len(results)):
+        _print_background_tip()  # direct downloads are about to hold the screen
     while True:
-        outcome, pending = _batch_handoff_run(provider, results, pending)
+        outcome, pending = _batch_handoff_run(provider, results, pending, extra_lines=queued_lines)
+        queued_lines = []
         if outcome != "retry" or not pending:
             return outcome
 
 
-def _batch_handoff_run(provider, results: list, idxs: list[int]) -> tuple[str, list[int]]:
+def _batch_queue_direct(provider, results: list, idxs: list[int]):
+    """Queue the selection's direct downloads (Madokami files, Libgen, F-Droid) as background jobs.
+
+    Returns the indexes left for the client handoff and lines saying how many
+    were queued; ``(idxs, None)`` when the download folder is unusable.
+    """
+    from torrent_finder.constants import get_download_dir
+    from torrent_finder.ui.prompts import download_dir_ready
+    from rich.markup import escape
+    direct = []
+    for gi in idxs:
+        if 0 <= gi < len(results) and hasattr(acquisition.for_result(results[gi]), "background_fetch"):
+            direct.append(gi)
+    if not direct:
+        return idxs, []
+    if not download_dir_ready():
+        clear_screen()
+        return idxs, None
+    selection = [results[gi] for gi in idxs if 0 <= gi < len(results)]
+    by_source: dict = {}
+    index_of: dict = {}
+    for gi in direct:
+        result = results[gi]
+        fetch = acquisition.for_result(result).background_fetch(
+            result, acquisition.batch_download_dir(result, selection, get_download_dir()))
+        if fetch is not None:  # a Madokami folder needs its picker: the handoff lists it for a manual grab
+            by_source.setdefault(result.get("source") or "", []).append(fetch)
+            index_of[id(fetch)] = gi
+    queued: list = []
+    running: list = []
+    for source, fetches in by_source.items():
+        try:
+            done, already = acquisition.queue_background(
+                fetches, source, provider_for_result(results[index_of[id(fetches[0])]], provider).slug)
+        except acquisition.QueueFailure as failure:
+            # What was queued before the failure stays queued; the rest go to the handoff.
+            from torrent_finder.ui import chrome as frames
+            frames.announce(t("[warn]Could not start the background download: {error}[/warn]",
+                              error=escape(str(failure.error))))
+            queued += failure.queued
+            running += failure.running
+            break
+        queued += done
+        running += already
+    for fetch in queued:
+        gi = index_of[id(fetch)]
+        record_torrent_picked(provider_for_result(results[gi], provider).slug, int(results[gi].get("seeders", 0) or 0))
+    # A file already downloading in the background is never downloaded again
+    # here, also one the queuing above did not reach after a failure.
+    from torrent_finder import downloads
+    manager = downloads.current()
+    if manager is not None:
+        handled = {id(fetch) for fetch in queued + running}
+        running += [fetch for source, fetches in by_source.items() for fetch in fetches
+                    if id(fetch) not in handled and manager.has_direct(source, fetch.key, fetch.folder)]
+    taken = {index_of[id(fetch)] for fetch in queued + running}  # never downloaded again here
+    lines = ([tn("{n} direct download queued in Downloads", "{n} direct downloads queued in Downloads", len(queued))]
+             if queued else [])
+    return [gi for gi in idxs if gi not in taken], lines
+
+
+def _batch_handoff_run(provider, results: list, idxs: list[int], extra_lines=()) -> tuple[str, list[int]]:
     """One pass of ``_batch_handoff``: the prompt's outcome and the indexes that failed or were left."""
     from torrent_finder.constants import get_download_dir
     from torrent_finder.ui.prompts import download_dir_ready
@@ -283,6 +361,7 @@ def _batch_handoff_run(provider, results: list, idxs: list[int]) -> tuple[str, l
             sent,
             sent=sent,
             total=n)]
+    lines += [f"[success]✓ {escape(line)}[/success]" for line in extra_lines]  # the background part
     if ofix_pw:
         lines.append(t('[muted]Online-Fix archive password:[/muted] {password}', password=escape(ofix_pw)))
     lines += [f"[warning]{escape(note)}[/warning]" for note in notes[:4]]
@@ -395,6 +474,7 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
     if _background_on():
         return _batch_background(provider, picked, magnets, skipped)
 
+    _print_background_tip()
     ok = download_many_with_aria2(magnets)
     if ok:
         record_method_complete("aria")
@@ -414,6 +494,13 @@ def _batch_aria2(provider, results: list, idxs: list[int]) -> str:
         paths = [path for magnet in magnets for path in unpack.torrent_files(get_download_dir(), magnet=magnet)]
         summary = "\n".join(filter(None, (summary, _unpack_downloaded(paths))))
     return download_complete_prompt(t('Batch download finished'), summary=summary)
+
+
+def _print_background_tip() -> None:
+    from torrent_finder.ui.downloads import background_tip
+    tip = background_tip()
+    if tip:
+        console.print(tip)
 
 
 def _background_on() -> bool:
@@ -526,8 +613,12 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
                 ):
                     clear_screen()
                     continue
-            if _batch_handoff(provider, results, idxs) == "next":
+            outcome = _batch_handoff(provider, results, idxs)
+            if outcome == "next":
                 return "next"
+            if outcome == "results":  # the background prompt's "Back to results"
+                clear_screen()
+                return "back"
             continue
         if action == "aria":
             if _batch_aria2(provider, results, idxs) == "next":
@@ -823,6 +914,7 @@ def _browse_results(provider, results, note: str = "") -> str:
                 continue
             elif method == "aria":
                 clear_screen()
+                _print_background_tip()
                 ok = download_with_aria2(session.magnet, session.download_indexes)
                 if ok:
                     record_method_complete("aria")
