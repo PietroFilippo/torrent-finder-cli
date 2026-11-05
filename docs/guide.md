@@ -907,9 +907,10 @@ not apps, so:
   deletes its folder; the fonts stay installed.
 - **Painting side** puts a plate on the right (the default, like the plate
   facing a page of text), on the left (behind the menus, in a fainter ink) or
-  on both sides (the chosen plate on the right and a faded companion plate on
-  the left). A wide work always fills the window behind the text, in a fainter
-  ink, so it has no side to choose.
+  on both sides (the chosen plate on the right and a faded plate on the left).
+  With both sides, **Left painting** picks the left plate: its usual companion
+  (the same book or mood) or any other plate. A wide work always fills the
+  window behind the text, in a fainter ink, so it has no side to choose.
 - The profile's tab shows a **lantern** icon in the colourway's colours.
 - **Open from other tabs** (off by default) makes the command, typed in another
   Windows Terminal tab, open the app in a torrent-finder tab of the same window,

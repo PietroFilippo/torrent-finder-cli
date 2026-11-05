@@ -144,6 +144,21 @@ def placed(key: str, placement: str) -> str:
     return placement if placement in PLACEMENTS else DEFAULT_PLACEMENT
 
 
+def companion_key(name: object) -> str | None:
+    """A plate that may stand on the left of "both sides", ``""`` for its usual pair, or None."""
+    if name == "":
+        return ""
+    return name if isinstance(name, str) and name in catalog() and not is_wide(name) else None
+
+
+def left_plate(key: str, chosen: str = "") -> str:
+    """The plate on the left of *key* with "both sides": *chosen* when it is another
+    plate, else *key*'s usual companion (``facing``)."""
+    if chosen and chosen != key and companion_key(chosen):
+        return chosen
+    return facing(key)
+
+
 def facing(key: str) -> str:
     """The companion plate shown faded beside *key* with the "both sides" placement."""
     companion = FACING.get(key)
@@ -279,7 +294,8 @@ def _faded(key: str, sides: str, side: float = 0.0, end: float = END_FADE) -> tu
     return width, height, _pack(dissolve(width, height, _bit_rows(width, rows), sides, side, end))
 
 
-def render(key: str, ink: str, page: str, factor: int = 2, placement: str = DEFAULT_PLACEMENT) -> bytes:
+def render(key: str, ink: str, page: str, factor: int = 2, placement: str = DEFAULT_PLACEMENT,
+           companion: str = "") -> bytes:
     """The painting as a PNG in *ink* on *page*, each dot *factor* pixels square.
 
     The edges facing the text dissolve into the page (``dissolve``), so the
@@ -290,7 +306,7 @@ def render(key: str, ink: str, page: str, factor: int = 2, placement: str = DEFA
     """
     placement = placed(key, placement)
     if placement == "facing":
-        return spread(key, facing(key), ink, page, factor)
+        return spread(key, left_plate(key, companion), ink, page, factor)
     side, end = (ACROSS_FADE, ACROSS_FADE) if placement == ACROSS else (0.0, END_FADE)
     width, height, rows = scale(*_faded(key, _FADES[placement], side, end), factor)
     if placement != "right":
@@ -344,7 +360,7 @@ def export_folder() -> Path:
 
 
 def export(key: str, palette, folder: "str | Path", factor: int = 2, placement: str = DEFAULT_PLACEMENT,
-           version: str = "") -> Path:
+           version: str = "", companion: str = "") -> Path:
     """Save the painting in *palette*'s page and ink colours as a PNG in *folder*; returns its path.
 
     Each placement draws a different picture (its edges dissolve toward the
@@ -355,9 +371,9 @@ def export(key: str, palette, folder: "str | Path", factor: int = 2, placement: 
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     placement = placed(key, placement)
-    look = {"facing": f"{key}+{facing(key)}", "left": f"{key}-left"}.get(placement, key)
+    look = {"facing": f"{key}+{left_plate(key, companion)}", "left": f"{key}-left"}.get(placement, key)
     path = folder / f"torrent-finder-{look}-{palette.key}{'-' + version if version else ''}.png"
     temporary = path.with_suffix(".tmp")
-    temporary.write_bytes(render(key, palette.ink or palette.steel, palette.page, factor, placement))
+    temporary.write_bytes(render(key, palette.ink or palette.steel, palette.page, factor, placement, companion))
     temporary.replace(path)
     return path

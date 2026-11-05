@@ -153,6 +153,18 @@ class PngTests(unittest.TestCase):
             self.assertEqual(paintings.export("martin-council", palette, folder, placement="facing").name,
                              "torrent-finder-martin-council-citrinitas.png")  # a wide work has no spread
 
+    def test_the_left_plate_can_be_chosen(self):
+        self.assertEqual(paintings.left_plate("dore-satan"), "dore-despair")  # its usual companion
+        self.assertEqual(paintings.left_plate("dore-satan", "flammarion"), "flammarion")
+        for unusable in ("dore-satan", "martin-deluge", "mona-lisa"):  # itself, a wide work, unknown
+            self.assertEqual(paintings.left_plate("dore-satan", unusable), "dore-despair")
+        self.assertEqual(paintings.companion_key(""), "")
+        self.assertIsNone(paintings.companion_key("martin-deluge"))
+        palette = theme.THEMES["citrinitas"]
+        with tempfile.TemporaryDirectory() as folder:
+            path = paintings.export("dore-satan", palette, folder, placement="facing", companion="flammarion")
+            self.assertEqual(path.name, "torrent-finder-dore-satan+flammarion-citrinitas.png")
+
     def test_placements_and_companions(self):
         self.assertEqual(list(paintings.PLACEMENTS), ["right", "left", "facing"])
         self.assertEqual(paintings.placement_key("left"), "left")
@@ -286,11 +298,35 @@ class PaintingChoiceTests(unittest.TestCase):
         self.run_menu(self.downs_to(("painting", "none")) + [K.ENTER, K.ESC])
         self.assertNotIn("─── Painting side ───", [item.label for item in self.capture()])  # no painting, no side
 
+    def test_both_sides_lets_the_left_painting_be_chosen(self):
+        appearance.save("citrinitas", "bar", "comfortable", "dore-satan", placement_name="facing")
+        items = self.capture()
+        labels = [item.label for item in items]
+        self.assertIn("─── Left painting ───", labels)
+        rows = [item for item in items if isinstance(item.value, tuple) and item.value[0] == "companion"]
+        self.assertEqual(rows[0].label, "Its companion: Satan's despair")
+        self.assertEqual(rows[0].marker, "●")  # the usual pair until another is chosen
+        self.assertNotIn(("companion", "dore-satan"), [row.value for row in rows])  # not itself
+        self.assertFalse(any(paintings.is_wide(row.value[1]) for row in rows if row.value[1]))  # plates only
+        self.run_menu(self.downs_to(("companion", "flammarion")) + [K.ENTER, K.ESC])
+        self.assertEqual(appearance.companion(), "flammarion")
+        self.assertEqual(appearance.saved()["companion"], "flammarion")
+        self.assertIn("The Flammarion engraving", next(
+            item for item in self.capture() if item.value == ("placement", "facing")).description)
+        appearance.save("citrinitas", "bar", "comfortable", "dore-satan", placement_name="right")
+        self.assertNotIn("─── Left painting ───", [item.label for item in self.capture()])  # Both sides only
+        self.assertEqual(appearance.saved()["companion"], "flammarion")  # kept for next time
+
     def test_settings_validate_and_back_up_the_painting(self):
         self.assertEqual(appearance.normalize({"painting": "none"})["painting"], "none")
         self.assertEqual(appearance.normalize({"painting": "mona-lisa"})["painting"], paintings.DEFAULT)
         self.assertEqual(appearance.normalize({"placement": "left"})["placement"], "left")
         self.assertEqual(appearance.normalize({"placement": "top"})["placement"], "right")
+        self.assertEqual(appearance.normalize({"companion": "flammarion"})["companion"], "flammarion")
+        self.assertEqual(appearance.normalize({"companion": "martin-deluge"})["companion"], "")  # wide: no
+        settings_backup.validate_payload({"settings": {"appearance": {"companion": "flammarion"}}})
+        with self.assertRaises(ValueError):
+            settings_backup.validate_payload({"settings": {"appearance": {"companion": 3}}})
         settings_backup.validate_payload({"settings": {"appearance": {"theme": "rubedo", "painting": "flammarion",
                                                                       "placement": "facing"}}})
         with self.assertRaises(ValueError):

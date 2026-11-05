@@ -154,7 +154,7 @@ def dither(image: Image.Image, gamma: float, *, crop=(0, 0, 0, 0), screen="diffu
     return grey.convert("1", dither=Image.FLOYDSTEINBERG)
 
 
-def _grain(grey: Image.Image, seed: int = 7, spread: float = 0.85) -> Image.Image:
+def _grain(grey: Image.Image, seed: int = 7, spread: float = 0.35) -> Image.Image:
     """A stochastic screen: each dot meets a random threshold and half of its error
     passes on (Floyd–Steinberg weights), so shapes hold and the grain stays visible."""
     noise = random.Random(seed)

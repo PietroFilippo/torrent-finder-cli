@@ -79,6 +79,7 @@ def restore_baseline() -> None:
         theme.apply(BASELINE[0], focus=BASELINE[1], density=BASELINE[2])
     appearance._session["painting"] = paintings.DEFAULT
     appearance._session["placement"] = paintings.DEFAULT_PLACEMENT
+    appearance._session["companion"] = ""
     appearance._session["fonts"] = appearance.DEFAULT_FONTS
     appearance._session["profile"] = appearance.DEFAULT_PROFILE
     # The suite asserts English text, also on a Portuguese machine or with the variable set.

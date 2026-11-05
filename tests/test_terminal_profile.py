@@ -78,8 +78,8 @@ class FragmentTests(ProfileCase):
         self.assertEqual(profile["guid"], terminal_profile.PROFILE_GUID)
         self.assertEqual(profile["colorScheme"], scheme["name"])
         self.assertEqual((scheme["background"], scheme["foreground"]), (palette.page, palette.text))
-        self.assertEqual(profile["backgroundImage"], "torrent-finder-dore-raven-rubedo-v2.png")  # beside the fragment
-        self.assertEqual(self.pictures(), ["torrent-finder-dore-raven-rubedo-v2.png"])
+        self.assertEqual(profile["backgroundImage"], "torrent-finder-dore-raven-rubedo-v3.png")  # beside the fragment
+        self.assertEqual(self.pictures(), ["torrent-finder-dore-raven-rubedo-v3.png"])
         self.assertEqual(profile["font"]["face"], "PxPlus IBM VGA 8x16")
         self.assertEqual(profile["intenseTextStyle"], "bright")  # no smeared made-up bold
         self.assertIn("torrent_finder", profile["commandline"] + profile.get("startingDirectory", ""))
@@ -94,25 +94,29 @@ class FragmentTests(ProfileCase):
                 profile = self.fragment()["profiles"][0]
                 self.assertEqual((profile["backgroundImageStretchMode"], profile["backgroundImageAlignment"]),
                                  (stretch, alignment))
-        self.assertEqual(self.pictures(), ["torrent-finder-flammarion+smith-hermit-citrinitas-v2.png"])  # the spread
+        self.assertEqual(self.pictures(), ["torrent-finder-flammarion+smith-hermit-citrinitas-v3.png"])  # the spread
         terminal_profile.write(palette, "flammarion", placement="left")
-        self.assertEqual(self.pictures(), ["torrent-finder-flammarion-left-citrinitas-v2.png"])
+        self.assertEqual(self.pictures(), ["torrent-finder-flammarion-left-citrinitas-v3.png"])
+
+    def test_both_sides_draws_the_chosen_left_plate(self):
+        terminal_profile.write(theme.THEMES["citrinitas"], "dore-satan", placement="facing", companion="flammarion")
+        self.assertEqual(self.pictures(), ["torrent-finder-dore-satan+flammarion-citrinitas-v3.png"])
 
     def test_a_wide_work_covers_the_window_whatever_the_side(self):
         terminal_profile.write(theme.THEMES["citrinitas"], "martin-deluge", placement="left")
         profile = self.fragment()["profiles"][0]
         self.assertEqual((profile["backgroundImageStretchMode"], profile["backgroundImageAlignment"]),
                          ("uniformToFill", "center"))
-        self.assertEqual(self.pictures(), ["torrent-finder-martin-deluge-citrinitas-v2.png"])
+        self.assertEqual(self.pictures(), ["torrent-finder-martin-deluge-citrinitas-v3.png"])
 
     def test_the_profile_has_a_lantern_icon_in_the_colourway(self):
         terminal_profile.write(theme.THEMES["rubedo"], "dore-raven")
-        self.assertEqual(self.fragment()["profiles"][0]["icon"], "torrent-finder-icon-rubedo-v2.png")
-        self.assertEqual(self.icons(), ["torrent-finder-icon-rubedo-v2.png"])
+        self.assertEqual(self.fragment()["profiles"][0]["icon"], "torrent-finder-icon-rubedo-v3.png")
+        self.assertEqual(self.icons(), ["torrent-finder-icon-rubedo-v3.png"])
         terminal_profile.write(theme.THEMES["paper"], "dore-raven")  # Simple: no picture, still an icon
-        self.assertEqual(self.icons(), ["torrent-finder-icon-paper-v2.png"])
+        self.assertEqual(self.icons(), ["torrent-finder-icon-paper-v3.png"])
         terminal_profile.write(theme.THEMES["citrinitas"], "dore-raven", plain=True)  # the plain look keeps it
-        self.assertEqual(self.fragment()["profiles"][0]["icon"], "torrent-finder-icon-citrinitas-v2.png")
+        self.assertEqual(self.fragment()["profiles"][0]["icon"], "torrent-finder-icon-citrinitas-v3.png")
         blob = terminal_profile.icon(theme.THEMES["citrinitas"])
         self.assertIn(b"tRNS", blob)  # a clear ground on the tab row
         width, height = struct.unpack(">II", blob[16:24])
@@ -140,7 +144,7 @@ class FragmentTests(ProfileCase):
     def test_rewriting_replaces_the_picture_and_simple_has_none(self):
         terminal_profile.write(theme.THEMES["citrinitas"], "dore-satan")
         terminal_profile.write(theme.THEMES["citrinitas"], "flammarion")
-        self.assertEqual(self.pictures(), ["torrent-finder-flammarion-citrinitas-v2.png"])
+        self.assertEqual(self.pictures(), ["torrent-finder-flammarion-citrinitas-v3.png"])
         terminal_profile.write(theme.THEMES["paper"], "flammarion")  # paintings belong to Athanor
         self.assertEqual(self.pictures(), [])
         self.assertNotIn("backgroundImage", self.fragment()["profiles"][0])
@@ -206,8 +210,8 @@ class RefreshTests(ProfileCase):
         refresh = self.patch(terminal_profile, "refresh", return_value=True)
         appearance.refresh_stale_profile()
         profile = self.fragment()["profiles"][0]
-        self.assertEqual(profile["icon"], "torrent-finder-icon-rubedo-v2.png")
-        self.assertEqual(self.pictures(), ["torrent-finder-martin-council-rubedo-v2.png"])
+        self.assertEqual(profile["icon"], "torrent-finder-icon-rubedo-v3.png")
+        self.assertEqual(self.pictures(), ["torrent-finder-martin-council-rubedo-v3.png"])
         refresh.assert_called_once()
         appearance.refresh_stale_profile()  # now current: left alone
         refresh.assert_called_once()
@@ -449,11 +453,11 @@ class AppearanceRowTests(ProfileCase):
         self.run_menu(("theme", "viriditas"))
         self.assertEqual(self.fragment()["schemes"][0]["name"], "torrent-finder Viriditas")
         self.run_menu(("painting", "smith-hermit"))
-        self.assertEqual(self.pictures(), ["torrent-finder-smith-hermit-viriditas-v2.png"])
+        self.assertEqual(self.pictures(), ["torrent-finder-smith-hermit-viriditas-v3.png"])
         self.run_menu(("placement", "left"))
         self.assertEqual(self.fragment()["profiles"][0]["backgroundImageAlignment"], "left")
         self.run_menu(("placement", "facing"))
-        self.assertEqual(self.pictures(), ["torrent-finder-smith-hermit+flammarion-viriditas-v2.png"])
+        self.assertEqual(self.pictures(), ["torrent-finder-smith-hermit+flammarion-viriditas-v3.png"])
 
         self.run_menu(("profile", "remove"))
         self.assertFalse(terminal_profile.installed())

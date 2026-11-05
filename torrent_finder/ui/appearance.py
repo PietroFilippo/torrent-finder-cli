@@ -33,7 +33,8 @@ DEFAULT_FONTS = {design: {"font": terminal_profile.default_font(design).key,
 LOOKS = ("full", "plain")
 DEFAULT_PROFILE = {"look": "full", "open_from_tabs": False}
 DEFAULTS = {"theme": theme.DEFAULT_THEME, "focus": "fill", "density": "comfortable", "painting": paintings.DEFAULT,
-            "placement": paintings.DEFAULT_PLACEMENT, "fonts": DEFAULT_FONTS, "profile": DEFAULT_PROFILE}
+            "placement": paintings.DEFAULT_PLACEMENT, "companion": "", "fonts": DEFAULT_FONTS,
+            "profile": DEFAULT_PROFILE}
 
 
 def theme_key(name: object) -> str | None:
@@ -68,6 +69,8 @@ def normalize(value: object) -> dict:
         "density": value.get("density") if value.get("density") in theme.DENSITIES else DEFAULTS["density"],
         "painting": paintings.painting_key(value.get("painting")) or DEFAULTS["painting"],
         "placement": paintings.placement_key(value.get("placement")) or DEFAULTS["placement"],
+        # The plate on the left of "both sides"; "" is the painting's usual companion.
+        "companion": paintings.companion_key(value.get("companion")) or "",
         "fonts": {design: _font_choice(design, fonts.get(design)) for design in theme.DESIGNS},
         "profile": {"look": profile.get("look") if profile.get("look") in LOOKS else DEFAULT_PROFILE["look"],
                     "open_from_tabs": profile.get("open_from_tabs") is True},
@@ -114,7 +117,7 @@ def resolve(cli_theme: str | None = None, environ=None, base: dict | None = None
 
 
 _session = {"source": "saved", "painting": DEFAULTS["painting"], "placement": DEFAULTS["placement"],
-            "fonts": DEFAULT_FONTS, "profile": DEFAULT_PROFILE}
+            "companion": "", "fonts": DEFAULT_FONTS, "profile": DEFAULT_PROFILE}
 
 
 def apply_startup(cli_theme: str | None = None, environ=None, saved_settings: bool = True) -> str:
@@ -127,6 +130,7 @@ def apply_startup(cli_theme: str | None = None, environ=None, saved_settings: bo
     _session["source"] = source
     _session["painting"] = appearance["painting"]
     _session["placement"] = appearance["placement"]
+    _session["companion"] = appearance["companion"]
     _session["fonts"] = appearance["fonts"]
     _session["profile"] = appearance["profile"]
     theme.apply(appearance["theme"], focus=appearance["focus"], density=appearance["density"])
@@ -148,6 +152,11 @@ def placement() -> str:
     return _session["placement"]
 
 
+def companion() -> str:
+    """The chosen plate on the left of "both sides"; ``""`` for the painting's usual companion."""
+    return _session["companion"]
+
+
 def font(design: str | None = None) -> tuple["terminal_profile.Font", float]:
     """The Windows Terminal profile's font for *design* (the current one by default) and its size."""
     design = design or theme.PALETTE.design
@@ -167,7 +176,8 @@ def open_from_tabs() -> bool:
 
 
 def save(theme_name: str, focus: str, density: str, painting_name: str | None = None,
-         fonts: dict | None = None, profile: dict | None = None, placement_name: str | None = None) -> None:
+         fonts: dict | None = None, profile: dict | None = None, placement_name: str | None = None,
+         companion_name: str | None = None) -> None:
     """Save an explicit appearance choice now; raises ``ValueError``/``OSError`` when that fails.
 
     Without *painting_name* the current painting is kept, without *placement_name*,
@@ -176,10 +186,13 @@ def save(theme_name: str, focus: str, density: str, painting_name: str | None = 
     from torrent_finder.state import commit_setting
     value = normalize({"theme": theme_name, "focus": focus, "density": density,
                        "painting": painting_name or _session["painting"],
-                       "placement": placement_name or _session["placement"], "fonts": fonts or _session["fonts"],
+                       "placement": placement_name or _session["placement"],
+                       "companion": _session["companion"] if companion_name is None else companion_name,
+                       "fonts": fonts or _session["fonts"],
                        "profile": profile or _session["profile"]})
     _session["painting"] = value["painting"]  # in use this session even if saving fails
     _session["placement"] = value["placement"]
+    _session["companion"] = value["companion"]
     _session["fonts"] = value["fonts"]
     _session["profile"] = value["profile"]
     commit_setting(SETTING, value)
@@ -192,7 +205,7 @@ def write_profile(value: dict, **options) -> None:
     choice = _font_choice(palette.design, value["fonts"].get(palette.design))
     terminal_profile.write(palette, value["painting"], font=terminal_profile.FONTS[choice["font"]],
                            size=choice["size"], plain=palette.design == "athanor" and value["profile"]["look"] == "plain",
-                           placement=value["placement"], **options)
+                           placement=value["placement"], companion=value.get("companion", ""), **options)
 
 
 def refresh_stale_profile() -> None:
@@ -353,24 +366,24 @@ _PLACEMENT_HINTS = {"right": N_("the plate facing the page; menus stay on plain 
                     "left": N_("behind the menus"), "facing": N_("a faded companion plate on the left")}
 
 
-def _placement_help(key: str, painting_key: str) -> str:
+def _placement_help(key: str, painting_key: str, chosen_companion: str = "") -> str:
     if key == "right":
         return (t("The painting fills the right of the window, like the plate facing a page of text, "
                   "fading into the page toward the menus and lists."))
     if key == "left":
         return (t("The painting fills the left of the window, behind the menus and lists, fading into the "
                   "page toward the right. Its ink is dark enough to read through."))
-    companion = paintings.catalog().get(paintings.facing(painting_key))
-    name = companion.title_label() if companion else t("another plate")
+    left = paintings.catalog().get(paintings.left_plate(painting_key, chosen_companion))
+    name = left.title_label() if left else t("another plate")
     return t("This painting on the right and its companion, {name}, faded on the left, each fading into the "
              "page between them. The two cover the window together, so windows of other proportions cut a "
              "little off each side.", name=name)
 
 
-def _placement_rows(chosen: str, painting_key: str) -> list:
+def _placement_rows(chosen: str, painting_key: str, chosen_companion: str = "") -> list:
     """The Painting side section's rows: right, left, both sides."""
     return [_choice(t(label), ("placement", key), key == chosen, t(_PLACEMENT_HINTS[key]),
-                    _placement_help(key, painting_key))
+                    _placement_help(key, painting_key, chosen_companion))
             for key, label in paintings.PLACEMENTS.items()]
 
 
@@ -392,6 +405,21 @@ def _painting_rows(chosen: str, plain: bool = False) -> list:
     wide = [_painting_row(key, entry, chosen, plain) for key, entry in catalog.items() if entry.wide]
     if wide:
         rows += [_section(t("Wide paintings")), *wide]
+    return rows
+
+
+def _companion_rows(painting_key: str, chosen: str) -> list:
+    """The Left painting section's rows (Both sides only): the usual companion, then every other plate."""
+    usual = paintings.catalog()[paintings.facing(painting_key)]
+    rows = [_choice(t("Its companion: {name}", name=usual.title_label()), ("companion", ""), not chosen,
+                    usual.artist_credit_label(),
+                    t("The plate paired with this painting: the same book or the same mood."))]
+    for key, entry in paintings.catalog().items():
+        if key == painting_key or entry.wide:
+            continue
+        rows.append(_choice(entry.title_label(), ("companion", key), chosen == key, entry.artist_credit_label(),
+                            t("{title} on the left, faded, and this painting on the right.",
+                              title=entry.title_label())))
     return rows
 
 
@@ -421,7 +449,7 @@ def appearance_menu() -> None:
 
     palette, focus, density = theme.current()
     chosen = {"theme": palette.key, "focus": focus, "density": density, "painting": painting(),
-              "placement": placement(),
+              "placement": placement(), "companion": companion(),
               "fonts": {design: dict(choice) for design, choice in _session["fonts"].items()},
               "profile": dict(_session["profile"])}
     state = {"preview": palette.key, "notice": ""}
@@ -452,7 +480,11 @@ def appearance_menu() -> None:
             if chosen["painting"] != paintings.NONE:
                 if not paintings.is_wide(chosen["painting"]):  # a wide work always fills the window
                     items.append(_section(t("Painting side")))
-                    items += _placement_rows(chosen["placement"], chosen["painting"])
+                    items += _placement_rows(chosen["placement"], chosen["painting"], chosen["companion"])
+                    if chosen["placement"] == "facing":
+                        items.append(_section(t("Left painting")))
+                        items += _companion_rows(chosen["painting"],
+                                                 paintings.companion_key(chosen["companion"]) or "")
                 items.append(_section(t("Painting image")))
                 items.append(SelectItem(t("Save the painting as an image"), ("export", None), is_action=True,
                                         hint=t("a PNG in the {colours} colours", colours=theme.THEMES[state['preview']].name),
@@ -501,12 +533,12 @@ def appearance_menu() -> None:
     def persist(kind: str) -> None:
         try:
             save(chosen["theme"], chosen["focus"], chosen["density"], chosen["painting"], chosen["fonts"],
-                 chosen["profile"], chosen["placement"])
+                 chosen["profile"], chosen["placement"], chosen["companion"])
             state["notice"] = ""
         except (OSError, ValueError) as error:
             state["notice"] = t("[error]Applied for this session, but not saved:[/error] {error}", error=escape(str(error)))
             return
-        if kind not in ("design", "theme", "painting", "placement", "font", "size", "look"):
+        if kind not in ("design", "theme", "painting", "placement", "companion", "font", "size", "look"):
             return
         if not terminal_profile.installed():
             state["notice"] = t(FONT_SAVED) if kind in ("font", "size") else ""
@@ -603,7 +635,7 @@ def appearance_menu() -> None:
         """Save the chosen painting in the colours on screen."""
         try:
             path = paintings.export(chosen["painting"], theme.THEMES[state["preview"]], paintings.export_folder(),
-                                    placement=chosen["placement"])
+                                    placement=chosen["placement"], companion=chosen["companion"])
             state["notice"] = t("[good]Saved[/good] {name} in {folder}", name=escape(path.name), folder=escape(str(path.parent)))
         except (OSError, ValueError, KeyError) as error:
             state["notice"] = t("[error]The painting was not saved:[/error] {error}", error=escape(str(error)))

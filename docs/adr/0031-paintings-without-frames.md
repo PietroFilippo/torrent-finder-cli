@@ -22,7 +22,8 @@ window cuts more than half of a tall Doré plate. That still holds for plates.
 **At build time** (`scripts/build_paintings.py`) each painting is cropped to
 the picture (its margins, captions and borders removed) and reduced to two
 tones with the dot screen that suits it: error diffusion for fine engraving
-lines, **grain** (a random threshold carrying half the diffusion error) for
+lines, **grain** (a threshold varied at random by up to 35% of the range,
+carrying half the diffusion error: enough grain to read as film, not noise) for
 soft tonal plates (Doré, *The Deluge*), or a horizontal **line screen** for a light
 subject (*The windmills*). An outline drawing on pale paper (the Hermit) is
 **inverted** first, so its lines glow on the page instead of lighting a solid
@@ -69,6 +70,17 @@ because Windows Terminal caches pictures by path. At start, an installed
 profile whose icon lacks the current version (`stale`) is rewritten once from
 the saved appearance (`appearance.refresh_stale_profile`), so an update shows
 the new look without a visit to Settings.
+
+**Both sides.** The left plate is the painting's usual companion unless the
+user chooses another plate under Left painting (`appearance.companion`, saved,
+validated by backups; `paintings.left_plate` falls back to the companion when
+the choice is the painting itself, a wide work or unknown). The spread's
+picture name names both plates.
+
+*Amended after release, 2026-11-04 (look v3):* the grain was softened (its
+random spread from 85% to 35%) because it read as too granular, and the left
+plate became a choice. `LOOK_VERSION` went to `v3`, so profiles drawn by
+v0.11.0 are redrawn once at start.
 
 ## Rejected
 

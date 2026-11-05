@@ -161,5 +161,9 @@
   " A wide work: it fills the window behind the text, its edges fading into the page.": " Uma obra larga: ocupa a janela atrás do texto, com as bordas se dissolvendo no fundo.",
   "across the window": "na janela inteira",
   "Wide paintings": "Pinturas largas",
-  "Painting image": "Imagem da pintura"
+  "Painting image": "Imagem da pintura",
+  "Left painting": "Pintura à esquerda",
+  "Its companion: {name}": "Sua companheira: {name}",
+  "The plate paired with this painting: the same book or the same mood.": "A gravura que acompanha esta pintura: o mesmo livro ou o mesmo clima.",
+  "{title} on the left, faded, and this painting on the right.": "{title} à esquerda, suave, e esta pintura à direita."
 }

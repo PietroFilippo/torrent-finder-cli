@@ -132,7 +132,7 @@ PROFILE_GUID = profile_guid(APP, NAME)
 # Terminal caches pictures by path) and its icon, so a version that draws them
 # differently gets new files, and a profile written before it is redrawn once
 # at start (``stale``).
-LOOK_VERSION = "v2"
+LOOK_VERSION = "v3"
 
 # Windows Terminal's default scheme, for the Simple palettes' named colours.
 CAMPBELL = {
@@ -463,7 +463,8 @@ def install_fonts(environ=None) -> list[Font]:
 
 
 def write(palette, painting: str, environ=None, *, font: "Font | None" = None, size: "float | None" = None,
-          add_font: bool = False, plain: bool = False, placement: str = paintings.DEFAULT_PLACEMENT) -> Path:
+          add_font: bool = False, plain: bool = False, placement: str = paintings.DEFAULT_PLACEMENT,
+          companion: str = "") -> Path:
     """Write (or rewrite) the profile for *palette*, *painting* and *font* at *size*; returns the fragment's path.
 
     The painting shows only with an Athanor colourway, at *placement* (see
@@ -480,7 +481,8 @@ def write(palette, painting: str, environ=None, *, font: "Font | None" = None, s
     image = None
     if palette.design == "athanor" and painting in paintings.catalog() and not plain:
         placement = paintings.placed(painting, placement)
-        image = paintings.export(painting, palette, target, placement=placement, version=LOOK_VERSION)
+        image = paintings.export(painting, palette, target, placement=placement, version=LOOK_VERSION,
+                                 companion=companion)
     lantern = _write_icon(palette, target)
     launch = command()
     starting = str(Path(__file__).resolve().parent.parent) if launch[1:2] == ["-m"] else "%USERPROFILE%"
