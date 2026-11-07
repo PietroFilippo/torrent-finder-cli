@@ -705,10 +705,13 @@ def downloads_screen(focus: "str | None" = None) -> None:
 
         def footer() -> str:
             """The keys that do something now: X for the focused download while it runs, A for several."""
-            if not jobs:
-                return t("↑/↓ navigate  •  Enter turn on  •  Esc back") if not enabled() else t("Esc back")
-            running, queued, finished = _counts(jobs)
             from torrent_finder.ui.selector import focused
+            if not jobs:  # Enter names what the focused row does: the switch, or Back
+                if enabled():
+                    return t("Esc back")
+                return (t("↑/↓ navigate  •  Enter turn on  •  Esc back") if focused() == "__setting__"
+                        else t("↑/↓ navigate  •  Enter back  •  Esc back"))
+            running, queued, finished = _counts(jobs)
             job = next((job for job in jobs if job.id == focused()), None)
             keys = [t("↑/↓ navigate")]
             if job is not None:

@@ -205,5 +205,6 @@
   },
   "↑/↓ navigate  •  Enter turn on  •  Esc back": "↑/↓ navegar  •  Enter ligar  •  Esc voltar",
   "Enter: retry, folder or log.": "Enter: tentar de novo, pasta ou log.",
-  "Enter: retry or folder.": "Enter: tentar de novo ou pasta."
+  "Enter: retry or folder.": "Enter: tentar de novo ou pasta.",
+  "↑/↓ navigate  •  Enter back  •  Esc back": "↑/↓ navegar  •  Enter voltar  •  Esc voltar"
 }

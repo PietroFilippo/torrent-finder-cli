@@ -244,7 +244,12 @@ class DownloadsUITests(unittest.TestCase):
         # The switch itself, right here: the screen stays empty until downloads run in the background.
         self.assertEqual([plain(item.label) for item in seen["items"]], ["Downloads run: in this screen", "Back"])
         self.assertTrue(seen["items"][0].description.startswith("Background downloads are off. Enter turns them on"))
-        self.assertIn("Enter turn on", seen["kwargs"]["footer"]())
+        from torrent_finder.ui import selector
+        with patch.dict(selector._focus, {"value": "__setting__"}):
+            self.assertIn("Enter turn on", seen["kwargs"]["footer"]())
+        with patch.dict(selector._focus, {"value": None}):  # Back: Enter leaves, it turns nothing on
+            self.assertIn("Enter back", seen["kwargs"]["footer"]())
+            self.assertNotIn("turn on", seen["kwargs"]["footer"]())
         self.assertEqual(seen["kwargs"]["intro"]().plain, "Nothing is downloading in the background.")
 
     # --- entry points and keys ------------------------------------------------------------------
