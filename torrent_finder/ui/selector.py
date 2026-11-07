@@ -152,6 +152,13 @@ def _section_window(items: list["SelectItem"], main_start: int, main_end: int, s
     rows = end - start
     if rows < 2 or rows >= main_end - main_start:  # the whole list shows, or there is no room to spare
         return start, end, None
+    # The focused row's own heading is in view: start there, so its section's rows
+    # follow it instead of the end of the section before.
+    own = next((i for i in range(cursor - 1, start, -1) if _is_section_header(items[i])), None)
+    if own is not None:
+        start, end = own, min(main_end, own + rows)
+        if end - start < rows:  # the list's end: earlier rows fill the window again
+            start = max(main_start, end - rows)
     if _is_section_header(items[end - 1]) and end < main_end:
         if start > main_start:
             start, end = start - 1, end - 1
@@ -616,11 +623,16 @@ def _pane(item: "SelectItem | None", width: int) -> list[Text]:
     def prose(text: Text) -> list[Text]:
         return list(text.wrap(console, max(1, width), overflow="fold"))
 
-    lines = [_fit(Text(_plain(item.label), style=theme.FOCUS), width)]
+    label = _plain(item.label)
+    description = Text.from_markup(item.description).plain if item.description else ""
+    # A description that opens with the row's whole sentence-long name (a tip and its subject) shows it once.
+    opening = label.rstrip("…").rstrip()
+    repeats = len(opening.split()) >= 4 and description.startswith(opening)
+    lines = [] if repeats else [_fit(Text(label, style=theme.FOCUS), width)]
     if _plain(item.hint) and not _inline_hint(item):  # a hint the row shows in full is not repeated
         lines += prose(_hint_text(item))
     if item.description:
-        lines += [Text("")] + prose(Text.from_markup(item.description))
+        lines += ([Text("")] if lines else []) + prose(Text.from_markup(item.description))
     details = item.details()
     if details:
         lines.append(Text(""))
@@ -787,6 +799,10 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
         shown_keys, chrome = plan()
     # A small window: shorten the focused row's help (e.g. a long folder path)
     # so three selectable rows (or every row, when fewer) and the key bar still fit.
+    if always_visible_rows and height - chrome < _rows_for_choices(items, main_start, main_end, cursor, 3):
+        main_start, main_end, main_len = 0, n, n  # the pinned actions scroll with the list: choices first
+        always_visible_rows = 0
+        shown_keys, chrome = plan()
     want = _rows_for_choices(items, main_start, main_end, cursor, 3)
     missing = chrome + want - height
     if missing > 0 and item_lines > 1:

@@ -198,5 +198,12 @@
   "Progress of the downloads running in the background.": "O progresso dos downloads em segundo plano.",
   "D downloads": "D downloads",
   "Enter: retry it or open its folder.": "Enter: tentar de novo ou abrir a pasta.",
-  "Enter: retry it, open its folder or show the log.": "Enter: tentar de novo, abrir a pasta ou mostrar o log."
+  "Enter: retry it, open its folder or show the log.": "Enter: tentar de novo, abrir a pasta ou mostrar o log.",
+  "Background downloads are off. Enter turns them on: aria2c torrents and direct downloads then keep going while you search, and show up here.": "Os downloads em segundo plano estão desligados. Enter liga: torrents do aria2c e downloads diretos continuam enquanto você busca e aparecem aqui.",
+  "Unpacked": "Extraído",
+  "{n} folder in {parent}": {
+    "one": "{n} pasta em {parent}",
+    "other": "{n} pastas em {parent}"
+  },
+  "↑/↓ navigate  •  Enter turn on  •  Esc back": "↑/↓ navegar  •  Enter ligar  •  Esc voltar"
 }

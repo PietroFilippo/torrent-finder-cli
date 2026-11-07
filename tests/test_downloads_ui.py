@@ -243,7 +243,8 @@ class DownloadsUITests(unittest.TestCase):
         seen = capture(None, downloads_ui, downloads_ui.downloads_screen)
         # The switch itself, right here: the screen stays empty until downloads run in the background.
         self.assertEqual([plain(item.label) for item in seen["items"]], ["Downloads run: in this screen", "Back"])
-        self.assertIn("Downloads keep going while you search", seen["items"][0].description)
+        self.assertTrue(seen["items"][0].description.startswith("Background downloads are off. Enter turns them on"))
+        self.assertIn("Enter turn on", seen["kwargs"]["footer"]())
         self.assertEqual(seen["kwargs"]["intro"]().plain, "Nothing is downloading in the background.")
 
     # --- entry points and keys ------------------------------------------------------------------

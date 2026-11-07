@@ -356,11 +356,16 @@ def _table_caption(
         caption.append_text(theme.rule(width))
         caption.append("\n")
     segments = theme.parse_footer(Text(_result_keys(total_pages, picked, expanded, empty=not results))).keys
-    segments = theme.with_help(segments, width)
-    if theme.small_window(width, console.size.height):  # two rows of keys; ? lists the rest
-        segments = theme.budget_keys(segments, width)
-    caption.append_text(Text("\n").join(theme.wrap_keys(segments, width)))
+    caption.append_text(Text("\n").join(theme.wrap_keys(_shown_keys(segments, width, console.size.height), width)))
     return caption
+
+
+def _shown_keys(segments: list, width: int, height: int) -> list:
+    """The key bar as drawn, "? keys" included: two rows in a small window. The row budget measures the same."""
+    segments = theme.with_help(segments, width)
+    if theme.small_window(width, height):  # two rows of keys; ? lists the rest
+        segments = theme.budget_keys(segments, width)
+    return segments
 
 
 def _notes_compact(note: str) -> bool:
@@ -443,8 +448,8 @@ def _visible_count(
     header = 0 if framed else 1 if tiny else len(theme.header_lines(
         heading or t("Results"), results_status(887, 1, 888, 87, 88, frozenset(range(888))), width))
     compact = not theme.roomy(height, 20) or framed
-    keys = len(theme.wrap_keys(theme.parse_footer(
-        Text(_result_keys(2, frozenset(range(100))))).keys, width))
+    keys = len(theme.wrap_keys(_shown_keys(theme.parse_footer(
+        Text(_result_keys(2, frozenset(range(100))))).keys, width, height), width))
     # A session's controls line carries the notice count when the notices go compact.
     notes = 0 if controls and note and _notes_compact(note) else _note_line_count(note, width)
     chrome = (

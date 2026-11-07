@@ -314,6 +314,14 @@ def _log_prefixes() -> tuple[str, ...]:
     return tuple(dict.fromkeys((t(_LOG_PREFIX), _LOG_PREFIX)))
 
 
+def _unpacked_folder(note: str) -> str:
+    """The folder of an "Unpacked into …" note, in this language or English; else ""."""
+    for prefix in dict.fromkeys((t("Unpacked into {folder}", folder=""), "Unpacked into ")):  # i18n: ignore — older notes
+        if note.startswith(prefix):
+            return note[len(prefix):]
+    return ""
+
+
 def _log_note(job) -> str:
     """The aria2c log lines the engine kept with a failed job, if any."""
     for note in job.notes:
@@ -423,9 +431,21 @@ def _inspect(job) -> list[Text]:
         lines.append(_pair(t("Tried"), tried))
     if job.state == "stopped" and job.finished_at:
         lines.append(_pair(t("Stopped"), _clock(job.finished_at)))
-    if job.state in ("failed", "interrupted") and job.error:
+    if job.state in ("failed", "interrupted") and job.error and not _log_note(job):
         lines.append(_pair(t("Error"), _URI.sub("", job.error)))  # the engine's own words, without the magnet
+    unpacked = [note for note in job.notes if _unpacked_folder(note)]
+    if unpacked:
+        folders = [_unpacked_folder(note) for note in unpacked]
+        parent = os.path.dirname(folders[0])
+        names = [os.path.basename(folder) for folder in folders]
+        where = (tn("{n} folder in {parent}", "{n} folders in {parent}", len(folders), parent=parent)
+                 if all(os.path.dirname(folder) == parent for folder in folders) else "")
+        lines.append(_pair(t("Unpacked"), where or ", ".join(names)))
+        if where:
+            lines.append(Text("  " + ", ".join(names), style=theme.MUTED))
     for note in job.notes:
+        if note in unpacked:
+            continue
         prefix = next((p for p in _log_prefixes() if note.startswith(p)), None)
         if prefix is not None:
             lines += [Text(_URI.sub("", line), style=theme.MUTED) for line in note[len(prefix):].splitlines()]
@@ -457,7 +477,9 @@ def _rows(jobs) -> list[SelectItem]:
         items.append(_section(t("Finished")))
         items += [_row(job) for job in finished]
     if not jobs and not enabled():  # nothing to show, and nothing will come here: the switch, right here
-        items.append(SelectItem(setting_label(), "__setting__", description=t(SETTING_HELP)))
+        items.append(SelectItem(setting_label(), "__setting__", description=t(
+            "Background downloads are off. Enter turns them on: aria2c torrents and direct downloads then "
+            "keep going while you search, and show up here.")))
     items.append(SelectItem(t("Back"), None, is_action=True))
     return items
 
@@ -685,7 +707,7 @@ def downloads_screen(focus: "str | None" = None) -> None:
         def footer() -> str:
             """The keys that do something now: X for the focused download while it runs, A for several."""
             if not jobs:
-                return t("Esc back")
+                return t("↑/↓ navigate  •  Enter turn on  •  Esc back") if not enabled() else t("Esc back")
             running, queued, finished = _counts(jobs)
             from torrent_finder.ui.selector import focused
             job = next((job for job in jobs if job.id == focused()), None)
