@@ -707,6 +707,11 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
     if message and not bar_message and theme.FRAMED:
         # No message line in this window (compact, or short): the announcement goes under the keys.
         alert_lines += theme.wrap_block(theme._as_text(message), work, console)
+    if len(alert_lines) > 1 and _small_window(screen_width, full_height):
+        # A small window: one line of announcement, so it never takes the list's choices.
+        alert_lines = alert_lines[:1]
+        alert_lines[0].truncate(max(1, work - 1))
+        alert_lines[0].append("…")
     # Simple has no message line: the announcement is a notice above the key bar.
     notice = [frames.notice_line(message, work)] if message and not theme.FRAMED else []
     # The summary over the list (a torrent's name and facts) may run wider than the block, like the tip.

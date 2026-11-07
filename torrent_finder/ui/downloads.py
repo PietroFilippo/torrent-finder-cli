@@ -384,8 +384,7 @@ def _description(job) -> str:
                 if job.started_at and job.finished_at else "")
         return t("Saved to {folder}", folder=folder) + "\n" + when + took
     if job.state in ("failed", "interrupted"):
-        again = (t("Enter: retry it, open its folder or show the log.") if job.log_path
-                 else t("Enter: retry it or open its folder."))
+        again = t("Enter: retry, folder or log.") if job.log_path else t("Enter: retry or folder.")
         return escape(_failure(job)) + "\n" + again
     percent = _percent(job)
     stopped = (t("Stopped at {percent}", percent=percent) if percent else t("Stopped")) + " · "

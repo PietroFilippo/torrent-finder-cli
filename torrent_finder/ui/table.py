@@ -517,7 +517,8 @@ def build_table(
         table.show_header = False  # column names over no rows say nothing
 
     if layout.mode == "minimal":
-        table.add_column(t("Result"), no_wrap=not expanded, overflow="fold" if expanded else "ellipsis")
+        table.add_column("  " + t("Result"), no_wrap=not expanded,  # over the rows, past their cursor
+                         overflow="fold" if expanded else "ellipsis")
     else:
         table.add_column("#", justify="right", width=_lead_width(digits), no_wrap=True)
         if layout.source:

@@ -225,7 +225,7 @@ class ResponsiveTableTests(unittest.TestCase):
         )
         self.assertEqual(
             [column.header for column in self._table(40).columns],
-            ["Result"],
+            ["  Result"],  # indented past the rows' cursor
         )
 
     def test_age_column_appears_only_when_rows_have_upload_dates(self):
