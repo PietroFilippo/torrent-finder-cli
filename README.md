@@ -7,7 +7,7 @@ to VLC with subtitles. Each category searches several sources at once and puts
 the title you asked for first. Torrent Finder is written in Python with
 [Rich](https://github.com/Textualize/rich).
 
-The latest release is **v0.11.0**: see its [release notes](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/releases/v0.11.0.md).
+The latest release is **v0.12.0**: see its [release notes](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/releases/v0.12.0.md).
 The [user guide](https://github.com/PietroFilippo/torrent-finder-cli/blob/main/docs/guide.md) explains every feature in detail.
 
 ## Install
@@ -110,9 +110,9 @@ open the download menu.
   with real progress, or download in the terminal with **aria2c**, webtorrent or
   peerflix.
 - **Batch**: tick several results and open, download or copy them all at once.
-- **Background downloads** (optional): aria2c keeps downloading while you
-  search; the status line counts them and a Downloads screen follows,
-  stops or resumes each one.
+- **Background downloads** (on by default): aria2c torrents and direct
+  downloads keep going while you search; the status line counts them and a
+  Downloads screen follows, stops or resumes each one, or stops them all.
 - **Pick files** inside a torrent, such as single episodes or manga volumes.
 - **Direct downloads** from Libgen, Madokami and F-Droid, never overwriting a file.
 - **Stream to VLC** with next and previous episode keys, and subtitles found
@@ -129,8 +129,9 @@ open the download menu.
   fill the window, their edges dissolving into the page; through a **Windows
   Terminal profile** with pixel fonts and a lantern icon, or as a saved image
   for other terminals.
-- An inspector pane in wide windows, and layouts that adapt to narrow, short
-  and tall windows.
+- Screens that keep each menu and its keys together, leaving the rest of the
+  window to the painting; an inspector pane beside the list from 120 columns;
+  layouts that adapt to narrow, short and tall windows.
 
 ### Settings and data
 
