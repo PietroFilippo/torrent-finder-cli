@@ -85,6 +85,10 @@ def top_edge(title: "str | Text", status: "str | Text", width: int) -> Text:
     """``╔═ torrent-finder » Screen › subject ════════ status ═╗``."""
     left = theme._header_left(title)
     left = left[len(theme.MARGIN):]  # the frame corner takes the margin
+    status_cells = cell_len(theme._as_text(status).plain) + 3 if status else 0
+    if title and cell_len(left.plain) + status_cells + 6 > width:
+        # A narrow window: the screen's name matters more than the app's.
+        left = theme._title_text(theme._as_text(title))
     right = theme._as_text(status) if status else Text()
     if right.plain:
         right.stylize_before(theme.MUTED)
@@ -205,7 +209,7 @@ def notice_line(message: "str | Text", width: int) -> Text:
 
 
 def _figures() -> list[tuple[str, str]]:
-    """``Searches 128``, ``Picked 37``, ``Bookmarks 3``, ``T 842``: what the status line counts."""
+    """``Searches 128``, ``Picked 37``, ``Bookmarks 3``: what the status line counts."""
     figures = []
     try:
         from torrent_finder.stats import get_all_stats
@@ -219,7 +223,6 @@ def _figures() -> list[tuple[str, str]]:
         figures.append((t("Bookmarks", ctx="status line"), str(bookmarks.count())))
     except Exception:
         pass
-    figures.append((t("T", ctx="status line"), str(_session.turns)))
     return figures
 
 
@@ -230,7 +233,7 @@ def status_line(width: int, now: "_dt.datetime | None" = None) -> Text:
     from torrent_finder.ui.downloads import figure as downloads_figure
     left = Text(" ")
     downloading = downloads_figure()
-    if downloading is not None:  # ``↓ 2 · 43% · 3.1 MB/s`` first, like a roguelike's hit points
+    if downloading is not None:  # ``↓ 2 running · 3.1 MB/s`` first, like a roguelike's hit points
         left.append("↓ ", style=theme.MUTED)
         left.append_text(downloading)
         left.append("  ")

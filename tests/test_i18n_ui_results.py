@@ -102,12 +102,13 @@ class ResultsLanguageTests(unittest.TestCase):
             for index, category in enumerate(tips_page.TIP_CATEGORIES, 1):
                 self.assertEqual(tips_page._active_category(index), category.name)
                 items = tips_page._build_items("", index)
-                self.assertEqual(items[0].label, f"--- {i18n.t(category.name)} ---")
+                self.assertEqual(items[0].label, i18n.t(category.name))
                 rows = [item for item in items if isinstance(item.value, tuple)]
                 self.assertEqual(len(rows), len(category.tips))
                 for item in rows:
                     self.assertEqual(item.value[1], category.name)
-                    self.assertEqual(item.label, item.value[2].display_text())
+                    self.assertTrue(item.value[2].display_text().startswith(item.label.rstrip("…")))
+                    self.assertEqual(item.description, tips_page.escape(item.value[2].display_text()))
                 tip = category.tips[0]
                 self.assertEqual(tips_page._matching_by_category(tip.text, index)[0][0], category)
                 self.assertEqual(tips_page._matching_by_category(tip.display_text(), index)[0][0], category)

@@ -79,10 +79,10 @@ class DownloadsUITests(unittest.TestCase):
         install(self, FakeManager(sample_jobs()))
         october = datetime.datetime(2026, 10, 13, 12, 0)  # a fixed date: the line shows the month
         line = chrome.status_line(137, now=october).plain
-        self.assertTrue(line.startswith(" ↓ 2 · 43% · 3.1 MB/s  Searches:"), line)
+        self.assertTrue(line.startswith(" ↓ 2 running · 1 queued · 3.1 MB/s  Searches:"), line)
         self.assertIn("Oct", line)
         narrow = chrome.status_line(60, now=october).plain
-        self.assertIn("↓ 2 · 43% · 3.1 MB/s", narrow)
+        self.assertIn("↓ 2 running · 1 queued · 3.1 MB/s", narrow)
         self.assertNotIn("Oct", narrow)  # the date and version give way first
 
     def test_an_unseen_completion_reads_new_and_opening_downloads_clears_it(self):
@@ -104,7 +104,7 @@ class DownloadsUITests(unittest.TestCase):
 
     def test_simples_header_carries_the_badge(self):
         install(self, FakeManager(sample_jobs()))
-        self.assertTrue(prompts.home_status().startswith("↓ 2 · 43% · 3.1 MB/s · v"), prompts.home_status())
+        self.assertTrue(prompts.home_status().startswith("↓ 2 running · 1 queued · 3.1 MB/s · v"), prompts.home_status())
         manager = install(self, FakeManager([job for job in sample_jobs() if job.state == "done"][:1]))
         self.assertTrue(prompts.home_status().startswith("↓ [good]✓[/good]1 new · v"))
         manager.mark_seen()
@@ -130,8 +130,13 @@ class DownloadsUITests(unittest.TestCase):
         self.assertIn("14 peers · 3 seeds", focused.description)
         self.assertIn("Started  14:02 · 4 min left", [line.plain for line in focused.details()])
         failed = next(item for item in items if plain(item.label) == "Blue Giant 2023 1080p")
-        self.assertIn("no peers for 10 minutes", failed.description)
-        self.assertTrue(any(line.plain.startswith("Log  ") for line in failed.details()))
+        # The cause, in words, once; the engine's message and log lines in the details, without the magnet.
+        self.assertTrue(failed.description.startswith("No peers answered for a long time."), failed.description)
+        self.assertNotIn("magnet:", failed.description)
+        details = [line.plain for line in failed.details()]
+        self.assertTrue(any(line.startswith("Log  ") for line in details))
+        self.assertTrue(any("no peers for 10 minutes" in line for line in details))
+        self.assertFalse(any("magnet:" in line for line in details))
 
     def test_failed_and_stopped_keep_their_state_colours_under_a_muted_row(self):
         # The selector draws hints on a muted base: a Text's own base style would be covered.

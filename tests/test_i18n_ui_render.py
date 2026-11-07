@@ -62,7 +62,7 @@ class RenderLanguageTests(unittest.TestCase):
         theme.apply("citrinitas")
         with patch("torrent_finder.security.exposure", return_value="exposed"):
             line = chrome.status_line(200, dt.datetime(2026, 10, 4)).plain
-        self.assertIn("Buscas:0  Escolhas:0  Favoritos:0  T:", line)
+        self.assertIn("Buscas:0  Escolhas:0  Favoritos:0 ", line)
         self.assertIn("dom 4 out", line)
         self.assertIn("IP visível", line)
         self.assertEqual(cell_len(line), 200)

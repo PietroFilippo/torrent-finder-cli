@@ -13,6 +13,9 @@ and make the menus busier.
 
 ## Decision
 
+*Amended by [ADR-0032](0032-work-blocks.md):* the pane now shows from 120
+columns, 40 to 56 cells wide, right beside a list as wide as its rows.
+
 From 150 columns, a selector whose rows carry help (a description or
 `SelectItem.inspect`) shows an **inspector pane** on the right
 (`theme.inspector_width`: 40% of the window, 56 to 90 cells):

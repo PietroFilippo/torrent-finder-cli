@@ -103,10 +103,10 @@ def _bar_width(note_width: int, count_width: int) -> int:
 
 
 def _bar_hint(value: int, largest: int, width: int, count_width: int, note: str = "") -> Text:
-    """``▇▇▇▇▇▇      64  note``: a deep-shade bar, the count in text colour, an optional steel note."""
+    """``▇▇▇▇▇▇      64  note``: a steel bar (readable over a painting), the count in text colour, a note."""
     hint = Text()
     cells = theme.bar(value, largest, width)
-    hint.append(cells, style=theme.DEEP)
+    hint.append(cells, style=theme.STEEL)
     hint.append(" " * (width - cell_len(cells) + 2))
     hint.append(str(value).rjust(count_width), style="default")
     if note:
@@ -231,7 +231,7 @@ def stats_page() -> None:
             if val == "reset":
                 if confirm_prompt(
                     t("[error]Reset all stats?[/error]\n\n"
-                      "This will delete all usage counters permanently.")
+                      "This will delete all usage counters permanently."), action=t("reset")
                 ):
                     try:
                         reset_stats()

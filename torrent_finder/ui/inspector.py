@@ -189,9 +189,14 @@ def continue_search(entry: dict) -> list[Text]:
     before = _recent(skip=1, limit=_RECENT)
     if before:
         lines += ([Text("")] if lines else []) + [heading(t("Recent searches"))]
-        for item in before:
-            line = Text("  " + _column(_one_line(item["query"]), 24))
-            line.append(_column(_one_line(display_name_for(str(item.get("provider", "")))), 26), style=theme.MUTED)
+        # Columns as wide as their longest entries, so a narrow pane keeps the time.
+        names = [_one_line(item["query"]) for item in before]
+        places = [_one_line(display_name_for(str(item.get("provider", "")))) for item in before]
+        name_width = min(22, max(cell_len(name) for name in names) + 2)
+        place_width = min(20, max(cell_len(place) for place in places) + 2)
+        for item, name, place in zip(before, names, places):
+            line = Text("  " + _column(name, name_width))
+            line.append(_column(place, place_width), style=theme.MUTED)
             line.append(_when(item), style=theme.MUTED)
             lines.append(line)
         hint = Text.from_markup(t("[key]H[/key] opens the whole history"), style=theme.MUTED)

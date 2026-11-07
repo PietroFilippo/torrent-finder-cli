@@ -40,14 +40,22 @@ class PaneLayoutTests(unittest.TestCase):
         self.assertLessEqual(len(lines), 40)
         self.assertTrue(all(cell_len(line) <= 200 for line in lines))
         divider = lines[2].index("│")
-        self.assertGreater(divider, 100)
+        # Right beside the list, not at the window's far side: the rest is the painting's.
+        self.assertEqual(divider, selector._LIST_MIN)
         right = [line[divider + 1:].strip() for line in lines if len(line) > divider and line[divider] == "│"]
-        self.assertEqual(right[:6], ["Anime", "Nyaa", "", "Anime from Nyaa.", "", "ENGINES"])
+        # The row shows its hint in full, so the pane does not repeat it.
+        self.assertEqual(right[:5], ["Anime", "", "Anime from Nyaa.", "", "ENGINES"])
+        self.assertTrue(all(cell_len(line.rstrip()) <= divider + selector._PANE_GAP + selector.pane_width(200)
+                            for line in lines[2:]))  # under the Simple header's full-width rule
+        # The divider ends with the pane's lines, above the key bar.
+        keys = next(i for i, line in enumerate(lines) if "Enter select" in line)
+        self.assertNotIn("│", lines[keys])
         self.assertNotIn("Anime from Nyaa.", "\n".join(line[:divider] for line in lines))  # moved, not repeated
         self.assertIn("Books from Libgen.", "\n".join(frame(menu(), 2, 200, 40)))
 
     def test_narrow_windows_and_rows_without_help_keep_one_column(self):
-        self.assertFalse(any("│" in line for line in frame(menu(), 1, 149, 40)))
+        self.assertTrue(any("│" in line for line in frame(menu(), 1, 144, 36)))   # a laptop window has room
+        self.assertFalse(any("│" in line for line in frame(menu(), 1, 119, 40)))
         plain = [SelectItem("One"), SelectItem("Two")]
         self.assertFalse(any("│" in line for line in frame(plain, 0, 200, 40)))
 
@@ -70,10 +78,13 @@ class PaneLayoutTests(unittest.TestCase):
         lines = frame(long, 0, 200, 30)
         self.assertEqual(len(lines), 30)
         self.assertTrue(any(line.rstrip().endswith("…") for line in lines))
-        tip = "[accent]Tip[/accent]  " + "word " * 50
+        tip = "[accent]Tip[/accent]  " + "word " * 30
         lines = frame(menu(), 1, 200, 40, tip=tip)
-        self.assertTrue(lines[-1].strip().startswith("word") or lines[-2].strip().startswith("Tip"))
-        self.assertNotIn("│", lines[-1])
+        start = next(i for i, line in enumerate(lines) if line.strip().startswith("Tip"))
+        self.assertGreater(start, next(i for i, line in enumerate(lines) if "Enter select" in line))
+        self.assertNotIn("│", lines[start])  # under the keys, not beside the list
+        self.assertFalse(any("Tip" in line for line in frame(menu(), 1, 200, 40, tip="[accent]Tip[/accent]  "
+                                                               + "word " * 90)))  # three lines: not shown
 
     def test_the_athanor_frame_holds_the_pane(self):
         theme.apply("citrinitas", focus="fill", density="comfortable")

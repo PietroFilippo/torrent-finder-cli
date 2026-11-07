@@ -14,6 +14,7 @@ from __future__ import annotations
 
 # i18n: converted
 import os
+import re
 import platform
 import subprocess
 import time
@@ -135,11 +136,12 @@ def _percent_of(progress: "float | None") -> str:
 
 
 def _figure_parts() -> "tuple[list[str], int]":
-    """(the running figure's words, unseen completions): ``["2", "43%", "3.1 MB/s"]``.
+    """(the running figure's words, unseen completions): ``["2 running", "1 queued", "3.1 MB/s"]``.
 
-    The count is the downloads under way (fetching metadata, downloading,
-    unpacking), what the Downloads row calls running; a queued one waits
-    for a slot and is not counted. The percentage is the furthest along.
+    Running is the downloads under way (fetching metadata, downloading,
+    unpacking), as the Downloads row counts them; queued ones wait for a
+    slot. A percentage shows only for a single running download: with
+    several, one number could not say whose it is. The speed is their sum.
     """
     manager = current()
     if manager is None:
@@ -149,10 +151,12 @@ def _figure_parts() -> "tuple[list[str], int]":
     unseen = manager.summary().unseen_completions
     if not running:
         return [], unseen
-    parts = [str(len(running))]
-    progress = [job.progress for job in running if job.progress is not None]
-    if progress:
-        parts.append(_percent_of(max(progress)))
+    parts = [tn("{n} running", "{n} running", len(running))]
+    if len(running) == 1 and running[0].progress is not None:
+        parts.append(_percent_of(running[0].progress))
+    queued = sum(job.state == "queued" for job in jobs)
+    if queued:
+        parts.append(tn("{n} queued", "{n} queued", queued))
     speed = sum(job.speed_bps for job in running)
     if speed:
         parts.append(_rate(speed))
@@ -160,7 +164,7 @@ def _figure_parts() -> "tuple[list[str], int]":
 
 
 def figure() -> "Text | None":
-    """``2 · 43% · 3.1 MB/s`` while jobs run, ``✓1 new`` after an unseen completion, else None."""
+    """``2 running · 1 queued · 3.1 MB/s`` while jobs run, ``✓1 new`` after an unseen completion, else None."""
     parts, unseen = _figure_parts()
     text_style = theme.TEXT or ""
     if parts:
@@ -177,7 +181,7 @@ def figure() -> "Text | None":
 
 
 def badge() -> str:
-    """The figure as markup for Simple's header: ``↓ 2 · 43% · 3.1 MB/s``; empty when there is none."""
+    """The figure as markup for Simple's header: ``↓ 2 running · 3.1 MB/s``; empty when there is none."""
     parts, unseen = _figure_parts()
     if parts:
         return "↓ " + " · ".join(parts)
@@ -319,6 +323,35 @@ def _log_note(job) -> str:
     return ""
 
 
+# aria2c's exit codes, in words (https://aria2.github.io/manual/en/html/aria2c.html#exit-status).
+_ARIA2_CAUSES = {
+    "2": N_("The connection timed out."),
+    "3": N_("The file was not found at its source."),
+    "6": N_("A network problem stopped it."),
+    "9": N_("There is not enough disk space."),
+    "13": N_("The file already exists in the folder."),
+    "19": N_("The server's name could not be found."),
+    "24": N_("The source refused the login."),
+    "29": N_("The source was busy or had no peers."),
+}
+_URI = re.compile(r"\s*URI=\S+")
+
+
+def _failure(job) -> str:
+    """Why a download failed, in one plain sentence; the raw message and log stay in the details."""
+    text = " ".join([job.error or ""] + [_log_note(job)])
+    if re.search(r"no peers", text, re.IGNORECASE):
+        return t("No peers answered for a long time.")
+    code = re.search(r"errorCode=(\d+)", text)
+    if code and code.group(1) in _ARIA2_CAUSES:
+        return t(_ARIA2_CAUSES[code.group(1)])
+    plain = _URI.sub("", job.error or "")
+    for prefix in (t("aria2c download failed: {error}", error=""), "aria2c download failed: "):  # i18n: ignore — the English prefix of older saved jobs
+        if plain.startswith(prefix):
+            plain = plain[len(prefix):]
+    return plain.strip() or job.state_label
+
+
 def _description(job) -> str:
     """The lines under the list (or in the inspector) for the focused row, as markup."""
     folder = escape(job.target_dir)
@@ -343,8 +376,8 @@ def _description(job) -> str:
                 if job.started_at and job.finished_at else "")
         return t("Saved to {folder}", folder=folder) + "\n" + when + took
     if job.state in ("failed", "interrupted"):
-        tail = _log_note(job).splitlines()
-        return escape(job.error or job.state_label) + ("\n" + escape(" ".join(tail[-2:])) if tail else "")
+        again = t("Enter retries it or shows the log.") if job.log_path else t("Enter retries it.")
+        return escape(_failure(job)) + "\n" + again
     percent = _percent(job)
     stopped = (t("Stopped at {percent}", percent=percent) if percent else t("Stopped")) + " · "
     if job.backend == "direct" and job.files:  # stopped while unpacking: the download itself was complete
@@ -379,11 +412,9 @@ def _inspect(job) -> list[Text]:
     elif job.state == "queued":
         lines.append(_pair(t("Queued"), _clock(job.created_at)))
     if job.state == "done" and job.started_at and job.finished_at:
-        took = _span(job.finished_at - job.started_at)
         seconds = job.finished_at - job.started_at
-        if job.total_bytes and seconds >= 1:
-            took += " · " + t("{rate} on average", rate=_rate(int(job.total_bytes / seconds)))
-        lines.append(_pair(t("Took"), took))
+        if job.total_bytes and seconds >= 1:  # the time it took is in the description already
+            lines.append(_pair(t("Speed"), t("{rate} on average", rate=_rate(int(job.total_bytes / seconds)))))
     if job.state in ("failed", "interrupted") and job.started_at:
         tried = _clock(job.started_at)
         if job.finished_at:
@@ -391,10 +422,12 @@ def _inspect(job) -> list[Text]:
         lines.append(_pair(t("Tried"), tried))
     if job.state == "stopped" and job.finished_at:
         lines.append(_pair(t("Stopped"), _clock(job.finished_at)))
+    if job.state in ("failed", "interrupted") and job.error:
+        lines.append(_pair(t("Error"), _URI.sub("", job.error)))  # the engine's own words, without the magnet
     for note in job.notes:
         prefix = next((p for p in _log_prefixes() if note.startswith(p)), None)
         if prefix is not None:
-            lines += [Text(line, style=theme.MUTED) for line in note[len(prefix):].splitlines()]
+            lines += [Text(_URI.sub("", line), style=theme.MUTED) for line in note[len(prefix):].splitlines()]
         else:
             lines.append(Text(note))
     if job.log_path:
@@ -464,7 +497,7 @@ def _confirm_stop_all(manager) -> bool:
         _say(t("Nothing is running."))
         return False
     return confirm_prompt(tn("Stop {n} download?", "Stop all {n} downloads?", len(jobs)) + "\n\n"
-                          + _stop_consequences(jobs), title=t("Stop all"))
+                          + _stop_consequences(jobs), title=t("Stop all"), action=t("stop all"))
 
 
 def _open_folder(path: str) -> bool:
@@ -652,11 +685,24 @@ def downloads_screen(focus: "str | None" = None) -> None:
             return Text(_flavour(jobs), style=theme.MUTED)
 
         def footer() -> str:
-            return t(_FOOTER) if jobs else t("Esc back")
+            """The keys that do something now: stopping needs a running download, clearing a finished one."""
+            if not jobs:
+                return t("Esc back")
+            running, queued, finished = _counts(jobs)
+            keys = [t("↑/↓ navigate"), t("Enter actions")]
+            if running or queued:
+                keys.append(t("X stop"))
+            if running + queued > 1:
+                keys.append(t("A stop all"))
+            keys.append(t("O open folder"))
+            if finished:
+                keys.append(t("C clear finished"))
+            keys.append(t("Esc back"))
+            return "  •  ".join(keys)
 
         index = arrow_select(
             items, title=t("Downloads"), status=lambda: _status(jobs), intro=intro,
-            footer=footer, start_index=min(start, len(items) - 1), refresh=refresh,
+            footer=footer, help_footer=lambda: t(_FOOTER), start_index=min(start, len(items) - 1), refresh=refresh,
             key_actions={"X": stop_focused, "x": stop_focused, "O": open_focused, "o": open_focused,
                          "C": clear_finished, "c": clear_finished, "A": stop_everything, "a": stop_everything},
         )

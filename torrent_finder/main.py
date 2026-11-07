@@ -609,7 +609,7 @@ def _batch_flow(provider, results: list, idxs: list[int]) -> str:
                 from torrent_finder.ui.prompts import confirm_prompt
                 if not confirm_prompt(
                     tn('Open {n} torrents in your client at once?', 'Open {n} torrents in your client at once?', len(idxs)),
-                    title=t('Batch download'),
+                    title=t('Batch download'), action=t('open them'),
                 ):
                     clear_screen()
                     continue
@@ -1245,7 +1245,7 @@ def _handle_whats_next(current_provider, cli_filters=None, on_update=None):
     """
     current_provider = getattr(current_provider, "_history_original", current_provider)
     while True:
-        choice = search_again_prompt()
+        choice = search_again_prompt(current_provider)
         if choice in (None, "exit"):
             if _confirm_quit():
                 return "EXIT"
@@ -1287,7 +1287,7 @@ def _confirm_quit(guarded: bool = False) -> bool:
             return False
         stop_all()
         return True
-    return guarded or confirm_prompt(t('Quit torrent-finder?'), title=t('Quit'))
+    return guarded or confirm_prompt(t('Quit torrent-finder?'), title=t('Quit'), action=t('quit', ctx='key bar'))
 
 
 def _stay_for_downloads() -> bool:

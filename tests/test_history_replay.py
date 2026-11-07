@@ -175,8 +175,8 @@ class HistoryKeysTests(unittest.TestCase):
             with self.subTest(key=key):
                 def select(items, **kwargs):
                     pairs = dict(key_pairs(kwargs["footer"]()))
-                    self.assertEqual(pairs["Enter"], "filters from then")
-                    self.assertEqual(pairs["C"], "current filters")
+                    self.assertEqual(pairs["Enter"], "run again")
+                    self.assertEqual(pairs["C"], "run with current filters")
                     if key:
                         self.assertIs(kwargs["key_actions"][key](len(items) - 1, items), True)
                         return kwargs["key_actions"][key](0, items)

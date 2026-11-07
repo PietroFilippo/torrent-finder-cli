@@ -105,9 +105,10 @@ When a download or handoff finishes, choose **Continue to What's Next** or
 file and subtitle choices, or batch selection, and never repeats the download
 or handoff.
 
-What's Next has a key for every row: **R** search again, **P** change provider,
-**M** main menu, **Tab** quick actions, **H** history, **S** stats, **T** tips,
-**C** credentials, **D** downloads (once started), **Q** exit. Lowercase
+What's Next has a key for every row, shown beside it: **R** search again (in
+the provider you just searched), **P** choose provider (the main menu; **M**
+works too), **D** downloads (once started), **Tab** quick actions, **H**
+history, **S** stats, **T** tips, **C** credentials, **Q** exit. Lowercase
 letters work too. Exit, **Q**, **Esc** or **Ctrl+C** ask for confirmation;
 declining returns to the menu.
 
@@ -122,8 +123,8 @@ open or stop them and quit; keeping it open is selected by default.
 
 ### Tips
 
-A random tip sits at the bottom of the main menu and What's Next when the screen
-has empty rows there, so it never pushes choices off screen. The tips browser
+A short random tip sits under the keys of the main menu and What's Next when
+the window has rows to spare, so it never pushes choices off screen. The tips browser
 (**T** on the main menu or What's Next, **Tab → T** at a search prompt) has
 **/** to search categories, text and tags, **C** to cycle categories, **X** to
 clear the search and **Esc** to go back.
@@ -617,7 +618,8 @@ selection).
   and direct downloads from Madokami, Libgen and F-Droid. They run two at a
   time, and the screen confirms with Continue, Back (to the download options,
   or to the results for a direct download) or Open Downloads. The status line
-  (Simple: the header) counts them, `↓ 2 · 43% · 3.1 MB/s`, and reads
+  (Simple: the header) counts them, `↓ 2 running · 1 queued · 3.1 MB/s` (with
+  one running, its percentage too), and reads
   `↓ ✓1 new` once one has finished; a finished or failed download also says
   so on the message line. The switch is in a torrent's download options and
   on the Download Folder screen (Settings). When it is off, a download that
@@ -930,17 +932,21 @@ not apps, so:
 
 ### Window sizes
 
-- **Wide windows** (150 columns, such as a maximised window) show an inspector
-  beside menus: on the main menu, a provider's engines and modes, its presets,
-  your recent searches there and how often you searched and picked from it;
-  Continue's earlier searches; which logins are set; the download folder's free
-  space; the appearance in use. Other menus show the row's help there.
-- **Tall windows** put those details under the list: the row's help and
-  details follow the list, and the key bar sits on the bottom rows, in the
-  same place on every screen.
+- **Every screen is one block**: the list, the focused row's help, the rule
+  and the keys stay together from the first row, and the rest of the window is
+  left to the painting. A long list fills the window.
+- **Wide windows** (120 columns and up) show an inspector right beside menus:
+  on the main menu, a provider's engines and modes, its presets, your recent
+  searches there and how often you searched and picked from it; Continue's
+  earlier searches; which logins are set; the download folder's free space;
+  the appearance in use. Other menus show the row's help there; What's Next
+  shows the provider you just searched.
+- **Tall windows** without room for the inspector put those details under the
+  row's help.
 - **Narrow or short windows** wrap hints without changing row height, drop
-  spacer lines, continue long screen names on a second header line, and scroll
-  long names when focused. Windows smaller than 30×8 show one *Enlarge the
+  spacer lines, show two rows of keys (**?** lists the rest), drop the app name
+  from the top edge before the screen's name, and scroll long names when
+  focused. Windows smaller than 30×8 show one *Enlarge the
   window* line and redraw when the window grows.
 
 ## Settings and startup checks

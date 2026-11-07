@@ -78,7 +78,6 @@
   "n: read search notices": "n: ler avisos da busca",
   "Search notices": "Avisos da busca",
   "Results": "Resultados",
-  "No matching results — f to refine": "Nenhum resultado — f para filtrar",
   "Result": "Resultado",
   "Name": "Nome",
   "Details {start}-{end}/{total} ({scroll})": "Detalhes {start}-{end}/{total} ({scroll})",
@@ -117,5 +116,13 @@
     "one": "{n} aviso da busca",
     "other": "{n} avisos da busca"
   },
-  "↑/↓ read notices • Enter whole text • Esc back to results": "↑/↓ ler avisos • Enter texto inteiro • Esc voltar aos resultados"
+  "↑/↓ read notices • Enter whole text • Esc back to results": "↑/↓ ler avisos • Enter texto inteiro • Esc voltar aos resultados",
+  "Keeps the results whose names contain every word you type.": "Mantém os resultados cujo nome contém todas as palavras digitadas.",
+  "Keeps the results whose title is exactly what you type, whatever the tags.": "Mantém os resultados cujo título é exatamente o digitado, quaisquer que sejam as tags.",
+  "Keeps the results whose whole name is exactly what you type.": "Mantém os resultados cujo nome inteiro é exatamente o digitado.",
+  "Name matching": "Nome",
+  "Nothing to show: the refinement hides every result. f changes it.": "Nada para mostrar: o refinamento esconde todos os resultados. f muda isso.",
+  "Order": "Ordem",
+  "Shows every fetched result again.": "Mostra de novo todos os resultados obtidos.",
+  "f refine/sort • Esc back to the search": "f refinar/ordenar • Esc voltar à busca"
 }

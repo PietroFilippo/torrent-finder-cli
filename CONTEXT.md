@@ -391,10 +391,11 @@ Main and What's Next menus expose general quick actions, which contain bookmarks
 choose a scope only when it is absent. A provider-bound entry keeps that scope.
 `_bookmarks_flow` shares reopening, saved searches, comparison and refresh across
 these entry points. Expanded result rows retain the normal background and use
-the cursor bar and bold for focus. Random tips (`arrow_select(tip=...)`) take
-the bottom rows only when the screen leaves them empty, so they never cost list
-rows. What's Next has unique case-insensitive letter shortcuts
-and Tab for quick actions; its footer responds to viewport changes.
+the cursor bar and bold for focus. Random tips (`arrow_select(tip=...)`, at
+most 180 characters) sit under the keys only when the window has rows to spare,
+so they never cost list rows. What's Next has unique case-insensitive letter
+shortcuts (M stays an alias of P, choose provider) and Tab for quick actions;
+its key bar names only what its rows do not show.
 
 `ui.prompts.download_complete_prompt` offers Continue or Back after actions from
 the download menu. Back (including Esc/Ctrl+C) returns to the same `TorrentSession`
@@ -470,15 +471,18 @@ command started in another Windows Terminal tab hand over to a profile tab
 [ADR-0027](docs/adr/0027-profile-look-and-other-tabs.md).
 
 Rows may carry styled labels and hints; an `intro` summary sits under a
-header; `?` lists a screen's keys. From 150 columns a selector whose rows have
-help shows an **inspector pane** for the focused row (its help, then
-`SelectItem.inspect` lines; the main menu's come from `ui/inspector.py`), beside
-a list column laid out at that narrower width. See
-[ADR-0023](docs/adr/0023-inspector-pane.md). In roomy windows a selector's
-row help and details follow the list, while notices, the rule and the key bar
-sit on the bottom rows above the tip; when the pane does not fit beside the
-list the focused row's `inspect` lines fill rows the list leaves empty, above
-the keys, never costing list rows. See [ADR-0025](docs/adr/0025-tall-windows.md). The main menu groups CONTINUE (the newest
+header; `?` lists a screen's keys. A selector is a **work block**
+(`selector.columns`): a list column as wide as its rows, from the first row,
+with its help, notices, rule and keys right under it; the rest of the window
+is left to the painting. From 120 columns a selector whose rows have help
+shows an **inspector pane** for the focused row (its help, then
+`SelectItem.inspect` lines; the main menu's come from `ui/inspector.py`) right
+beside the list. Rows kept for the longest help keep the keys steady while the
+focus moves. When the pane does not fit, the focused row's `inspect` lines
+follow its help, never costing list rows. See
+[ADR-0032](docs/adr/0032-work-blocks.md), which amends
+[ADR-0023](docs/adr/0023-inspector-pane.md) and
+[ADR-0025](docs/adr/0025-tall-windows.md). The main menu groups CONTINUE (the newest
 search; a plain keyword search reopens the field with its query), SEARCH and
 TOOLS, with hints saying what each row will search, and a header status for
 the version, a pending update and this session's network verdict. Search

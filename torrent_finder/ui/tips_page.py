@@ -16,20 +16,48 @@ _CATEGORY_OPTIONS = (N_("All"),) + tuple(category.name for category in TIP_CATEG
 def _header(label: str) -> SelectItem:
     """Section header: scrolls with content, skipped by navigation."""
     return SelectItem(
-        label=f"--- {label} ---",
+        label=label,
         value="section_header",
         enabled=False,
     )
 
 
+_SUBJECT_MAX = 56
+# Where a clause may end, and how long it must be first: a comma after a short
+# opening ("For best results,") does not end the subject.
+_BREAKS = (("? ", 12), (": ", 16), ("; ", 16), (". ", 16), (" — ", 16), (", ", 32))
+
+
+def subject(text: str) -> str:
+    """A tip's first clause, as its row label: the whole tip reads below the list or beside it.
+
+    ``Downloads keep going while you search: aria2c torrents…`` becomes
+    ``Downloads keep going while you search``. A tip without a clause break
+    in reach is cut at a word, with "…".
+    """
+    text = " ".join(text.split())
+    if len(text) <= _SUBJECT_MAX:
+        return text.rstrip(".")
+    cuts = [text.find(mark, least) + (1 if mark == "? " else 0) for mark, least in _BREAKS]  # a question keeps its mark
+    cuts = [cut for cut in cuts if 0 < cut <= _SUBJECT_MAX]
+    if cuts:
+        return text[:min(cuts)]
+    words = text[:_SUBJECT_MAX].rsplit(" ", 1)[0]
+    return words.rstrip(",;:") + "…"
+
+
 def _tip_item(category: TipCategory, tip: Tip) -> SelectItem:
-    """Read-only tip row: navigable for scrolling, Enter is a no-op."""
+    """Read-only tip row: its subject, the whole tip as the row's help; Enter is a no-op.
+
+    The tags are searched (``/``) but not shown: they are keywords, not prose.
+    """
+    text = tip.display_text()
     return SelectItem(
-        label=tip.display_text(),
+        label=subject(text),
         value=("tip", category.name, tip),
         enabled=True,
         passive=True,
-        hint=", ".join(tip.tags),  # i18n: ignore — English search keywords
+        description=escape(text),
     )
 
 

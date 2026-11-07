@@ -326,7 +326,7 @@ def _manage_credentials(meta: CredentialSpec) -> None:
             _view_credentials(meta)
         elif action == "edit":
             _edit_credentials(meta)
-        elif action == "clear" and confirm_prompt(t("Clear stored {name} credentials?", name=meta.display_name())):
+        elif action == "clear" and confirm_prompt(t("Clear stored {name} credentials?", name=meta.display_name()), action=t("clear")):
             try:
                 meta.clear_saved()
             except (OSError, ValueError):

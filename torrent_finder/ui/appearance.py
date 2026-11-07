@@ -583,7 +583,7 @@ def appearance_menu() -> None:
         listed = parts[0] if len(parts) == 1 else t("{items} and {last}", items=', '.join(parts[:-1]), last=parts[-1])
         message = t("Add a [bold]torrent-finder[/bold] profile to Windows Terminal?\n\n"
                     "It opens the app with {listed}, from the ▾ menu next to the tabs.", listed=listed)
-        if not confirm_prompt(message, title=t("Windows Terminal profile")):
+        if not confirm_prompt(message, title=t("Windows Terminal profile"), action=t("add it")):
             return
         try:
             write_profile(chosen, add_font=True)

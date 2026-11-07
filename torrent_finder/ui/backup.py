@@ -40,7 +40,7 @@ def backup_menu():
         try:
             if action.startswith("export"):
                 if action == "export_credentials":
-                    if not confirm_prompt(t("Write saved passwords/API keys to a separate plaintext file?"), title=t("Export credentials")):
+                    if not confirm_prompt(t("Write saved passwords/API keys to a separate plaintext file?"), title=t("Export credentials"), action=t("write it")):
                         continue
                     backup.export_credentials(path)
                 else:

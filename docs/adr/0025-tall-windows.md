@@ -1,6 +1,8 @@
 # ADR-0025: Tall windows keep the key bar at the bottom and fill rows with details
 
-Status: accepted (2026-10-05). Extends ADR-0020's layout and ADR-0023's
+Status: accepted (2026-10-05), superseded in part by
+[ADR-0032](0032-work-blocks.md): the key bar now follows a short list instead
+of sitting on the bottom rows. Extends ADR-0020's layout and ADR-0023's
 inspector pane.
 
 ## Context

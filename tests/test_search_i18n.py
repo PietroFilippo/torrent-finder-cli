@@ -47,7 +47,8 @@ class SearchLanguageTests(unittest.TestCase):
         self.assertEqual(items[3].hint, "ativo")
 
     def test_refinement_returns_matching_codes_and_original_query(self):
-        with patch.object(result_filters, "arrow_select", side_effect=[1, 9]), \
+        done = 6 + len(result_filters.SORT_ORDERS)  # headings for name matching and order, then Apply
+        with patch.object(result_filters, "arrow_select", side_effect=[2, done]), \
                 patch("torrent_finder.ui.prompts.get_query_with_shortcut", return_value="Dune"):
             self.assertEqual(result_filters.refine_results("Dune", "contains", "seeds"),
                              ("Dune", "title", "seeds"))

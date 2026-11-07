@@ -24,7 +24,7 @@ class GlobalActionsTests(unittest.TestCase):
             self.assertEqual(prompts.provider_select_prompt(), "__actions__")
 
     def test_whats_next_exposes_requested_destinations(self):
-        for action in ("main", "actions"):
+        for action in ("provider", "actions"):
             def select(items, **kwargs):
                 self.assertNotIn("bookmarks", [item.value for item in items])
                 return next(i for i, item in enumerate(items) if item.value == action)
@@ -32,7 +32,7 @@ class GlobalActionsTests(unittest.TestCase):
                 self.assertEqual(prompts.search_again_prompt(), action)
 
     def test_whats_next_hotkeys_route_through_the_real_selector(self):
-        for key, action in (("r", "search"), ("p", "provider"), ("m", "main"),
+        for key, action in (("r", "search"), ("p", "provider"), ("m", "provider"),  # M: the main menu, as before
                             ("\t", "actions"), ("q", "exit")):
             for pressed in {key, key.upper()}:
                 with self.subTest(key=pressed), \
@@ -70,7 +70,7 @@ class GlobalActionsTests(unittest.TestCase):
         def resize_and_render(items, **kwargs):
             terminal.width, terminal.height = 40, 16
             terminal.print(selector._build_panel(items, 0, kwargs["title"], False,
-                                                 footer=kwargs["footer"](), tip=kwargs["tip"]))
+                                                 footer=kwargs["footer"], tip=kwargs["tip"]))
             return None
 
         with patch.object(prompts, "console", terminal), patch.object(selector, "console", terminal), \

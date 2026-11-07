@@ -289,7 +289,7 @@ class DirectJobTests(unittest.TestCase):
         with patch.object(downloads_ui, "current", return_value=self.manager), \
              patch.object(downloads_ui, "arrow_select", side_effect=choose), \
              patch("torrent_finder.ui.prompts.confirm_prompt",
-                   side_effect=lambda message, title: asked.append(message) or True):
+                   side_effect=lambda message, title, action: asked.append(message) or True):
             downloads_ui.downloads_screen()
         release.set()
         self.assertIn("Stop all 2 downloads?", asked[0])

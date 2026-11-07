@@ -104,12 +104,12 @@ def _colourway(key, name, accent, sky, steel, deep, fill, good, warn, bad, *, pa
 # yellow and red. Hex shades degrade to the nearest named colour without true
 # colour. Athanor colourways are named for the stages of the alchemical work.
 THEMES: dict[str, Palette] = {palette.key: palette for palette in (
-    _colourway("citrinitas", "Citrinitas", "#D49A3A", "#E3C27A", "#83745E", "#5C4C39", "#2B2117",
-               "#8F9A5A", "#C8742E", "#C2452D", page="#16120E", text="#CFC1A3", ink="#5E4E3E",
+    _colourway("citrinitas", "Citrinitas", "#D49A3A", "#E3C27A", "#8F7F67", "#5C4C39", "#2B2117",
+               "#8F9A5A", "#C8742E", "#D45B44", page="#16120E", text="#CFC1A3", ink="#5E4E3E",
                frame="#AC7D31", bar_bg="#0D0B08",
                note=N_("Lamplight amber on parchment: the scriptorium as first seen.")),
-    _colourway("rubedo", "Rubedo", "#D86A45", "#EBA987", "#8D6F65", "#5A3A33", "#2C1714",
-               "#8F9A5A", "#D9A441", "#C23A3A", page="#150E0D", text="#D9C6B8", ink="#5F3A33",
+    _colourway("rubedo", "Rubedo", "#D86A45", "#EBA987", "#97786D", "#5A3A33", "#2C1714",
+               "#8F9A5A", "#D9A441", "#CE5A5A", page="#150E0D", text="#D9C6B8", ink="#5F3A33",
                frame="#A8472F", bar_bg="#0C0807",
                note=N_("Vermilion and rust: the reddening, the work's last stage.")),
     _colourway("albedo", "Albedo", "#E6E1D6", "#B9C6D2", "#7C8088", "#43474E", "#24272C",
@@ -120,8 +120,8 @@ THEMES: dict[str, Palette] = {palette.key: palette for palette in (
                "#A3C25E", "#D9A441", "#CF5D4B", page="#0F1412", text="#C6D1C3", ink="#3D5448",
                frame="#4E8F7F", bar_bg="#090C0B",
                note=N_("Verdigris on copper: the greening of old metal.")),
-    _colourway("nigredo", "Nigredo", "#C8643C", "#D8CFC3", "#6E6A64", "#3A3835", "#1E1C1B",
-               "#8F9A5A", "#D9A441", "#B83A3A", page="#0E0E0E", text="#BDB6AD", ink="#484442",
+    _colourway("nigredo", "Nigredo", "#C8643C", "#D8CFC3", "#827D76", "#3A3835", "#1E1C1B",
+               "#8F9A5A", "#D9A441", "#CB5A5A", page="#0E0E0E", text="#BDB6AD", ink="#484442",
                frame="#6E6A64", bar_bg="#080808",
                note=N_("Ash and a single ember: the blackening.")),
     Palette("quiet", "Quiet Blue", "bright_blue", "#7DAEFF", "#6A86B3", "#3A5A8C", "#16233D",
@@ -134,7 +134,7 @@ THEMES: dict[str, Palette] = {palette.key: palette for palette in (
             note=N_("Warm amber; Auto turns orange so it never looks like the accent.")),
     Palette("mono", "Mono", "#F2F2F2", "#D9D9D9", "#8C8C8C", "#474747", "#262626",
             note=N_("No hue: weight carries the structure, states keep their colours.")),
-    Palette("paper", "Paper", "#1F5FD6", "#2B4C8C", "#6B7A99", "#B9C6DC", "#DCE6F7",
+    Palette("paper", "Paper", "#1F5FD6", "#2B4C8C", "#62708E", "#B9C6DC", "#DCE6F7",
             good="#1A7F37", warn="#9A6700", bad="#CF222E", light=True, page="#FAFAFA",
             note=N_("For light terminals: switch your terminal to a light colour scheme first.")),
 )}

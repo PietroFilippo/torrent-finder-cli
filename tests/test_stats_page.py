@@ -40,7 +40,7 @@ class StatsPageTests(unittest.TestCase):
         self.assertEqual(bars["Books"], 1)  # never an empty bar for a count above zero
         hint = next(item.hint for item in items if item.label == "Anime")
         self.assertEqual(str(next(s.style for s in hint.spans if hint.plain[s.start:s.end].startswith(theme.BAR))),
-                         theme.DEEP)
+                         theme.STEEL)  # readable over a painting, unlike the deep shade
 
     def test_rows_with_bars_stay_inline_at_eighty_columns(self):
         items = self.items({"method_picks": {"aria": 600}, "method_completed": {"aria": 599},

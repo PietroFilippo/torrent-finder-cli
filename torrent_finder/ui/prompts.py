@@ -808,7 +808,8 @@ def quick_actions_menu(update_available: bool = False, provider=None) -> "str | 
         title=t("Quick actions › {provider}", provider=provider.label) if provider else t("Quick actions"),
         intro=lambda: "" if provider or console.size.height < 20 else t("Search actions ask for a provider first."),
         banner=_make_banner_panel(),
-        footer=t('↑/↓ select  •  Enter select  •  {jump} jump  •  Esc back', jump=jump),
+        footer=t("↑/↓ navigate  •  Enter select  •  Esc back"),  # each row shows its letter
+        help_footer=t('↑/↓ select  •  Enter select  •  {jump} jump  •  Esc back', jump=jump),
         key_actions=key_actions,
     )
     if idx is None:
@@ -1416,33 +1417,40 @@ def download_dir_prompt() -> None:
         return
     save_setting("download_dir", path)
 
-def confirm_prompt(message: str, title: str = N_("Confirm")) -> bool:
-    """Confirm with Y/yes in every language, or S/sim in Brazilian Portuguese."""
+_CONFIRM_WIDTH = 76  # a question reads as one short block, not a line across the window
+
+
+def confirm_prompt(message: str, title: str = N_("Confirm"), action: str = "") -> bool:
+    """Confirm with Y/yes in every language, or S/sim in Brazilian Portuguese; any other key cancels.
+
+    *action* names what Y does ("quit", "delete"), so the key bar reads
+    ``Y quit  Esc cancel`` rather than a bare "confirm".
+    """
     from rich.console import Group
 
     from torrent_finder.ui.selector import _render
     if title == "Confirm":
         title = t("Confirm")
     width, height = console.size.width, console.size.height
+    block = min(width, _CONFIRM_WIDTH)
     rows = theme.view_height(height, width)
     roomy = theme.roomy(rows, 12)
     head = list(theme.frame_header(title, "", width, height)) + (theme.frame_rule(width, height) if roomy else [])
-    footer = t("S confirm  •  Esc cancel") if current() == "pt-BR" else t("Y confirm  •  Esc cancel")
-    keys = theme.wrap_keys(theme.parse_footer(footer).keys, width)
-    body = theme.wrap_block(Text.from_markup(message), width, console)
-    rule = [theme.rule(width)] if roomy else []
-    extra = [Text("")] + theme.wrap_block(Text(t("Any other key cancels too."), style=theme.MUTED), width, console)
+    action = action or t("confirm", ctx="key bar")
+    footer = (t("S {action}  •  Esc cancel", action=action) if current() == "pt-BR"
+              else t("Y {action}  •  Esc cancel", action=action))
+    keys = theme.wrap_keys(theme.parse_footer(footer).keys, block)
+    body = theme.wrap_block(Text.from_markup(message), block, console)
+    rule = [theme.rule(block)] if roomy else []
     room = rows - len(head) - len(keys)
-    # A small window keeps the keys: the cancel note and the rule go first, then the message's end.
-    if len(body) + len(extra) + len(rule) > room:
-        extra = []
+    # A small window keeps the keys: the rule goes first, then the message's end.
     if len(body) + len(rule) > room:
         rule = []
     if len(body) > room:
         body = body[:max(1, room)]
-        body[-1].truncate(max(1, width - 1))
+        body[-1].truncate(max(1, block - 1))
         body[-1].append("…")
-    lines = head + body + extra + rule + keys
+    lines = head + body + rule + keys
     if frames.too_small(width, height):
         lines = frames.enlarge_notice(width, height)
     display.enter_screen()
@@ -2494,23 +2502,18 @@ def provider_select_prompt(
         except (OSError, ValueError):
             history = []
         continue_item = _continue_item(history[0]) if history else None
-        room_exits = ([(t("continue"), continue_item.label)] if continue_item else []) + [
-            (t("search"), tn('{n} shelf', '{n} shelves', len(PROVIDER_MENU))), (t("tools"), t("credentials, settings"))]
 
-        def room(exits=room_exits):
-            """The Athanor main menu's room description, in windows tall enough to keep every row."""
+        def room():
+            """The Athanor main menu's room: its name and one line, in windows tall enough to keep every row.
+
+            The rows below are the exits, so the room does not list them again.
+            """
             if not theme.FRAMED or theme.view_height(console.size.height, console.size.width) < 30:
                 return ""
-            heading = Text(t("~ The Index ~"), style=f"bold {theme.ACCENT}", justify="center")
-            words = Text(t("Lamplight pools over shelves of catalogued torrents. A terminal hums here."))
-            paths = Text(t("Obvious exits: "), style=theme.MUTED)
-            for index, (name, note) in enumerate(exits):
-                if index:
-                    paths.append("  ")
-                paths.append(name)
-                if note:
-                    paths.append(f" ({note})", style=theme.MUTED)
-            return [heading, words, paths]
+            heading = Text(t("~ The Index ~"), style=f"bold {theme.ACCENT}")
+            words = Text(t("Lamplight pools over shelves of catalogued torrents. A terminal hums here."),
+                         style=theme.MUTED)
+            return [heading, words]
         items: list[SelectItem] = []
         if continue_item is not None:
             items += [_section_row(t("Continue")), continue_item]
@@ -2711,34 +2714,46 @@ def download_complete_prompt(message: str = N_("Download action finished"), *, s
     return "back" if index is None else items[index].value
 
 
-def search_again_prompt() -> str | tuple | None:
+def search_again_prompt(provider=None) -> str | tuple | None:
     """Prompt the user for what to do next after a download.
+
+    *provider* is the one just searched: Search again names it, and in a wide
+    window the inspector shows its engines, filters and recent searches.
 
     Returns:
         - ``'search'`` to search again with the same provider.
-        - ``'provider'`` to change provider.
+        - ``'provider'`` to choose another provider on the main menu (P, or M).
         - ``("history", entry)`` when the user picks a history entry (raw entry dict).
         - ``'exit'`` when the Exit row is chosen.
         - ``None`` when Esc or Ctrl+C cancels the menu.
     """
     from torrent_finder.ui import downloads as downloads_ui
+    name = getattr(provider, "label", "") or getattr(provider, "name", "")
+    again = (t("A new search in {provider}, with its filters as they are.", provider=name) if name
+             else t("A new search with the same provider and filters."))
     choices = [
-        (t("Search again"), "search", "R"),
-        (t("Change provider"), "provider", "P"),
-        (t("Main menu"), "main", "M"),
-        (t("Quick actions"), "actions", "Tab"),
-        (t("Search history"), "history", "H"),
-        (t("Usage stats"), "stats", "S"),
-        (t("Tips & shortcuts"), "tips", "T"),
-        (t("Credentials"), "credentials", "C"),
+        (t("Search again"), "search", "R", again),
+        (t("Choose provider"), "provider", "P", t("The main menu: every provider, your tools and settings.")),
     ]
     with_downloads = downloads_ui.current() is not None  # once a background download was started
     if with_downloads:
-        choices.append((t("Downloads"), "downloads", "D"))
-    choices.append((t("Exit"), "exit", "Q"))
-    items = [SelectItem(label=label, value=value, hint=key) for label, value, key in choices]
-    hotkeys = {}
-    for _label, value, key in choices:
+        choices.append((t("Downloads"), "downloads", "D", t("Progress of the downloads running in the background.")))
+    choices += [
+        (t("Quick actions"), "actions", "Tab", t("Bookmarks, alternate titles, topic discovery, backup and more.")),
+        (t("Search history"), "history", "H", t("Every search you ran; Enter runs one again.")),
+        (t("Usage stats"), "stats", "S", t("What you searched and picked, by provider.")),
+        (t("Tips & shortcuts"), "tips", "T", t("Every tip and key, with a search.")),
+        (t("Credentials"), "credentials", "C", t("Logins for subtitles, search providers and creator search.")),
+        (t("Exit"), "exit", "Q", t("Quit torrent-finder; it asks first.")),
+    ]
+    inspect = None
+    if provider is not None and hasattr(provider, "engines"):
+        inspect = lambda: inspector.provider(provider)  # noqa: E731 — its engines, filters and recent searches
+    items = [SelectItem(label=label, value=value, hint=key, description=description,
+                        inspect=inspect if value == "search" else None)
+             for label, value, key, description in choices]
+    hotkeys = {"M": "provider", "m": "provider"}  # M, for main menu, as before
+    for _label, value, key, _description in choices:
         if key == "Tab":
             hotkeys["\t"] = value
         else:
@@ -2752,14 +2767,12 @@ def search_again_prompt() -> str | tuple | None:
         # bottom rows when the screen leaves them empty.
         tip_line = random_tip()
 
-        def footer():
-            if with_downloads:
-                full = t("↑/↓ navigate • Enter select • R/P/M/Tab/H/S/T/C/D/Q jump • Esc request exit")
-                compact = t("↑/↓ move • Enter select • Esc exit\nR/P/M/Tab/H/S/T/C/D/Q jump")
-            else:
-                full = t("↑/↓ navigate • Enter select • R/P/M/Tab/H/S/T/C/Q jump • Esc request exit")
-                compact = t("↑/↓ move • Enter select • Esc exit\nR/P/M/Tab/H/S/T/C/Q jump")
-            return compact if console.size.height < 24 or _keybar_wraps(full, console.size.width, items) else full
+        # Each row shows its letter, so the key bar lists only what is not on a row.
+        full = t("↑/↓ navigate • Enter select • Esc quit")
+        complete = t("↑/↓ navigate • Enter select • R search again • P/M choose provider • Tab quick actions"
+                     " • H history • S stats • T tips • C credentials • Q quit • Esc quit")
+        if with_downloads:
+            complete += " • " + t("D downloads")
 
         idx = arrow_select(
             items,
@@ -2767,7 +2780,8 @@ def search_again_prompt() -> str | tuple | None:
             banner=_make_banner_panel(),
             start_index=start,
             hotkeys=hotkeys,
-            footer=footer,
+            footer=full,
+            help_footer=complete,
             tip=tip_line,
         )
 

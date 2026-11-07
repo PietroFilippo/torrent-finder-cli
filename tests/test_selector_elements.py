@@ -79,12 +79,14 @@ class FilledFocusTests(unittest.TestCase):
     def setUp(self):
         self.addCleanup(theme.apply, focus="bar")
 
-    def test_filled_focus_tints_the_focused_row_to_the_right_margin(self):
+    def test_filled_focus_tints_the_focused_row_to_the_end_of_the_list_column(self):
         theme.apply(focus="fill")
         frame, _ = frame_lines([SelectItem("Open in qBittorrent", hint="recommended"), SelectItem("aria2c")])
         focused, other = row_of(frame, "Open in qBittorrent"), row_of(frame, "aria2c")
         width = Console(file=io.StringIO(), width=80, height=24).size.width  # 79 off a Windows terminal
-        self.assertEqual(cell_len(focused.plain), width - len(theme.MARGIN))
+        column = selector.columns([SelectItem("Open in qBittorrent", hint="recommended"), SelectItem("aria2c")],
+                                  False, width)[0]
+        self.assertEqual(cell_len(focused.plain), column - len(theme.MARGIN))  # where the rule and keys end too
         fill = [span for span in focused.spans if f"on {theme.FILL}" in str(span.style)]
         self.assertEqual((fill[0].start, fill[0].end), (len(theme.MARGIN), len(focused.plain)))
         self.assertFalse(any("on " in str(span.style) for span in other.spans))

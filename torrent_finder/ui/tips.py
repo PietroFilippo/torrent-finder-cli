@@ -320,7 +320,15 @@ TIPS: list[str] = [tip.text for tip in iter_tips(rotating_only=True)]
 _ROTATING = iter_tips(rotating_only=True)
 
 
-def random_tip() -> str:
-    """Return a randomly-picked tip rendered as Rich markup, in the interface language."""
-    tip = random.choice(_ROTATING)
+TIP_CHARS = 180  # a rotating tip fits two lines under a screen's keys; longer ones live on the tips page
+
+
+def random_tip(limit: int = TIP_CHARS) -> str:
+    """Return a randomly-picked tip rendered as Rich markup, in the interface language.
+
+    Only tips up to *limit* characters (in that language) rotate under the
+    keys, so a tip never needs more than two lines.
+    """
+    short = [tip for tip in _ROTATING if len(tip.display_text()) <= limit] or _ROTATING
+    tip = random.choice(short)
     return t("[accent]Tip[/accent]  {text}", text=escape(tip.display_text()))

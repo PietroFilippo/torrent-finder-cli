@@ -95,7 +95,8 @@ class SmallWindowTests(unittest.TestCase):
         theme.apply("citrinitas", focus="bar", density="comfortable")
         message = ("Add a [bold]torrent-finder[/bold] profile to Windows Terminal?\n\nIt opens the app with the "
                    "Citrinitas colours, Satan in profile behind the text and the PxPlus IBM VGA 8x16 font, "
-                   "installed for your account. It appears when Windows Terminal restarts.")
+                   "installed for your account. It appears when Windows Terminal restarts. Your other "
+                   "profiles and settings stay as they are.")
         out = io.StringIO()
         screen = Console(file=io.StringIO(), width=40, height=12, color_system=None)
         with patch.object(prompts, "console", screen), patch.object(prompts.sys, "stdout", out), \

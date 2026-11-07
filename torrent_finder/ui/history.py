@@ -204,8 +204,8 @@ def history_select_prompt() -> dict | None:
     def _footer():
         prov_filter, date_filter, sort_order, type_filter = _current_filters()
         search = t("Search: {query}\n", query=escape(fstate["search"])) if fstate["search"] else ""
-        keys = (t("↑/↓ navigate  •  Enter filters from then  •  C current filters  •  / search  •  X remove  •  U undo  •  Esc back")
-                if removed else t("↑/↓ navigate  •  Enter filters from then  •  C current filters  •  / search  •  X remove  •  Esc back"))
+        keys = (t("↑/↓ navigate  •  Enter run again  •  C run with current filters  •  / search  •  X remove  •  U undo  •  Esc back")
+                if removed else t("↑/↓ navigate  •  Enter run again  •  C run with current filters  •  / search  •  X remove  •  Esc back"))
         return (
             (notice + "\n" if notice else "")
             + search
@@ -296,7 +296,7 @@ def history_select_prompt() -> dict | None:
         if items_list[idx].value == "clear":
             if not confirm_prompt(
                 t("[error]Clear all search history?[/error]\n\n"
-                  "This will delete every saved search permanently.")
+                  "This will delete every saved search permanently."), action=t("clear all")
             ):
                 return True  # stay
             try:

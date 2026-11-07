@@ -205,17 +205,19 @@ class PromptLanguageTests(unittest.TestCase):
         self.assertIn("English.mkv", text)
         self.assertEqual(info.title, "Back")
 
-    def test_menu_bar_compacts_when_portuguese_wraps_at_same_width(self):
+    def test_whats_next_keys_name_only_what_rows_do_not_show(self):
         screen = Console(file=io.StringIO(), width=80, height=36)
-        footers = []
+        seen = []
         for language in ("en", "pt-BR"):
             i18n.use(language)
             with patch.object(prompts, "console", screen), \
-                 patch.object(prompts, "arrow_select", side_effect=lambda items, **kw: footers.append(kw["footer"]())):
+                 patch.object(prompts, "arrow_select", side_effect=lambda items, **kw: seen.append(kw)):
                 prompts.search_again_prompt()
-        self.assertNotIn("\n", footers[0])
-        self.assertIn("\n", footers[1])
-        self.assertIn("R/P/M/Tab/H/S/T/C/Q", footers[1])
+        for kwargs in seen:
+            self.assertNotIn("\n", kwargs["footer"])         # one short line: each row shows its letter
+            self.assertNotIn("R/P/M", kwargs["footer"])
+            self.assertIn("P/M", kwargs["help_footer"])       # ? still lists every key
+        self.assertIn("escolher categoria", seen[1]["help_footer"])
 
     def test_main_menu_measures_the_list_column_beside_the_inspector(self):
         i18n.use("qps")
@@ -253,11 +255,9 @@ class PromptLanguageTests(unittest.TestCase):
              patch("torrent_finder.state.load_history", return_value=history), \
              patch.object(prompts, "arrow_select", side_effect=lambda items, **kw: rooms.append(kw["intro"]())):
             prompts.provider_select_prompt()
-        heading, words, paths = rooms[0]
+        heading, words = rooms[0]  # the rows below are the exits: the room does not list them again
         self.assertEqual(heading.plain, "~ O Índice ~")
         self.assertIn("lampião", words.plain)
-        self.assertTrue(paths.plain.startswith("Saídas óbvias: "))
-        self.assertIn("continuar (Back)", paths.plain)
 
 
 if __name__ == "__main__":

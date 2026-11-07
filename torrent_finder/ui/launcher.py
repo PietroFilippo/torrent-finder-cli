@@ -102,7 +102,7 @@ def terminal_command_prompt() -> None:
                 t("[bold]Add the launcher folder to your Windows user PATH?[/bold]\n\n"
                   "{directory}\n\n"
                   "This affects new terminals only and does not require administrator access.",
-                  directory=escape(directory))
+                  directory=escape(directory)), action=t("add it")
             )
             if add_path and ensure_launcher_dir_on_path(directory):
                 notice = (

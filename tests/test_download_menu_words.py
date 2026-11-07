@@ -85,10 +85,11 @@ class NarrowWindowNameTests(unittest.TestCase):
         self.assertNotIn(SHORT["name"], lines[0])  # the edge has room for "Down…" only
         self.assertTrue(any(SHORT["name"] in line for line in lines[1:]), "\n".join(lines))
 
-    def test_a_long_name_appears_under_the_edge_at_80_columns_and_once_at_137(self):
+    def test_a_long_name_takes_the_edge_from_the_app_name_and_shows_once(self):
         theme.apply("citrinitas", focus="bar", density="comfortable")
         lines = menu_frame(80, 24, LONG)
-        self.assertNotIn(LONG["name"], lines[1])  # the top edge (the message line is row 0)
+        self.assertNotIn("torrent-finder", lines[1])  # the top edge (the message line is row 0): the app name gave way
+        self.assertNotIn(LONG["name"], lines[1])      # and still the whole name does not fit
         self.assertTrue(any(LONG["name"] in line for line in lines[2:]))
         lines = menu_frame(137, 36, LONG)
         self.assertEqual(sum(LONG["name"] in line for line in lines), 1)  # the edge alone
@@ -102,11 +103,11 @@ class NarrowWindowNameTests(unittest.TestCase):
                 self.assertEqual(sum(SHORT["name"] in line for line in lines), 1)
 
     def test_athanor_at_80_columns_keeps_the_name_readable_at_every_scroll_position(self):
-        # The edge loses the name's end once the list's position ("10–23 of 23") takes its room, so
-        # the name line shows whatever the position is.
+        # The list's position ("10–23 of 23") takes room in the edge; the app name gives way first,
+        # so the name stays in the edge and is not repeated under it.
         theme.apply("citrinitas", focus="bar", density="comfortable")
         lines = menu_frame(80, 24, SHORT)
-        self.assertEqual(sum(SHORT["name"] in line for line in lines), 2)
+        self.assertEqual(sum(SHORT["name"] in line for line in lines), 1)
 
     def test_simple_adds_the_name_when_its_second_header_line_is_cut(self):
         theme.apply("quiet", focus="bar", density="comfortable")
@@ -120,7 +121,8 @@ class NarrowWindowNameTests(unittest.TestCase):
         title = f"Download › {SHORT['name']}"
         self.assertTrue(prompts.header_shows(SHORT["name"], title, 80, 24))
         self.assertFalse(prompts.header_shows(SHORT["name"], title, 40, 12))
-        self.assertFalse(prompts.header_shows(SHORT["name"], title, 74, 24, rows=17))  # a position takes room
+        self.assertTrue(prompts.header_shows(SHORT["name"], title, 74, 24, rows=17))  # the app name gives way
+        self.assertFalse(prompts.header_shows(SHORT["name"], title, 50, 24, rows=17))  # a position takes room
 
 
 if __name__ == "__main__":

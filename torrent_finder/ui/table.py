@@ -94,9 +94,17 @@ def _index_digits(indexes) -> int:
     return len(str(max(indexes))) if indexes else 1
 
 
+_NAME_MIN = 60  # a name column no narrower than this, however short the page's names
+
+
 def _table_layout(width: int, show_from: bool, show_provider: bool = False,
-                  show_age: bool = False, digits: int = 2) -> _TableLayout:
-    """Choose progressively smaller result columns for the terminal width."""
+                  show_age: bool = False, digits: int = 2, longest: int = 0) -> _TableLayout:
+    """Choose progressively smaller result columns for the terminal width.
+
+    With the page's *longest* name, a wide window's name column is only as
+    wide as that name needs, so size and seeds stay next to the names
+    instead of across the window.
+    """
     lead = _lead_width(digits)
     widths = _column_widths()
     full = [lead, widths["Source"], widths["Size"], widths["Seeds"], widths["Leeches"]]
@@ -107,9 +115,10 @@ def _table_layout(width: int, show_from: bool, show_provider: bool = False,
     if show_age:
         full.append(widths["Age"])
     if width - _fixed(*full) >= 36:
-        return _TableLayout(
-            "full", width - _fixed(*full), True, show_from, True, True, True, show_provider, show_age
-        )
+        name = width - _fixed(*full)
+        if longest:
+            name = min(name, max(_NAME_MIN, longest + 2))
+        return _TableLayout("full", name, True, show_from, True, True, True, show_provider, show_age)
     medium = _fixed(lead, widths["Source"], widths["Size"], widths["Seeds"])
     if width - medium >= 29:
         return _TableLayout("medium", width - medium, True, False, True, True, False)
@@ -126,8 +135,10 @@ def _page_layout(rows: list[dict], width: int, show_from: bool, indexes=()) -> _
 
     *indexes* are the row numbers the page shows; they set the number column's width.
     """
+    longest = max((cell_len(_result_name(r)) + (cell_len(t(r["provider_label"])) + 3 if r.get("provider_label") else 0)
+                   for r in rows), default=0)
     return _table_layout(width, show_from, any(r.get("provider_slug") for r in rows),
-                         any(timestamp(r.get("uploaded_at")) for r in rows), _index_digits(indexes))
+                         any(timestamp(r.get("uploaded_at")) for r in rows), _index_digits(indexes), longest)
 
 
 def _pack(parts: list[str], width: int) -> list[str]:
@@ -271,8 +282,14 @@ def _detail_count():
     return max(2, min(8, _rows() // 4) - 1)
 
 
-def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = False, *, full: bool = False) -> str:
-    """The results key bar as plain text (it contains "[/]"), most frequent keys first."""
+def _result_keys(total_pages: int, picked: "frozenset[int]", expanded: bool = False, *, full: bool = False,
+                 empty: bool = False) -> str:
+    """The results key bar as plain text (it contains "[/]"), most frequent keys first.
+
+    An *empty* table names only what still works: refining, and going back.
+    """
+    if empty and not full:
+        return t("f refine/sort • Esc back to the search")
     if expanded:
         return t("i close • {scroll} scroll details • b bookmark • Esc back", scroll="[/]")
     enter = tn("Enter download {n} selected", "Enter download {n} selected", len(picked)) if picked else t("Enter open")
@@ -334,7 +351,7 @@ def _table_caption(
     if theme.roomy(_rows(), 20):  # short windows keep the row for results
         caption.append_text(theme.rule(width))
         caption.append("\n")
-    segments = theme.parse_footer(Text(_result_keys(total_pages, picked, expanded))).keys
+    segments = theme.parse_footer(Text(_result_keys(total_pages, picked, expanded, empty=not results))).keys
     caption.append_text(Text("\n").join(theme.wrap_keys(theme.with_help(segments, width), width)))
     return caption
 
@@ -478,9 +495,11 @@ def build_table(
         caption_justify="left",
     )
     if not total:
-        notice = Text("\n" + theme.MARGIN + t("No matching results — f to refine") + "\n", style=theme.WARN)
+        notice = Text("\n" + theme.MARGIN + t("Nothing to show: the refinement hides every result. f changes it.")
+                      + "\n", style=theme.WARN)
         notice.append_text(table.caption)
         table.caption = notice
+        table.show_header = False  # column names over no rows say nothing
 
     if layout.mode == "minimal":
         table.add_column(t("Result"), no_wrap=not expanded, overflow="fold" if expanded else "ellipsis")

@@ -43,7 +43,7 @@ import readchar  # noqa: E402
 from torrent_finder.constants import console  # noqa: E402
 from torrent_finder.i18n import t, tn  # noqa: E402
 
-SIZES = [(40, 12), (50, 16), (80, 24), (120, 40), (200, 50)]  # the last one shows the inspector pane
+SIZES = [(40, 12), (50, 16), (80, 24), (120, 40), (144, 36), (200, 50), (236, 58)]  # 144x36 and 236x58: a laptop window and a maximised 1080p one
 OUT = Path(tempfile.gettempdir()) / "tf-ui-snapshots"
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[=>78]")
 HOME = re.compile(r"\x1b\[H|\x1b\[1;1H")

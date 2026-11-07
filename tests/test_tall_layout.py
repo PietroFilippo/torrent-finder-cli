@@ -1,4 +1,4 @@
-"""Tall windows: the key bar sits at the bottom, and the focused row's details fill rows the list leaves empty."""
+"""Tall windows: a short screen keeps its keys under its rows, and the focused row's details follow its help."""
 
 import io
 import unittest
@@ -37,26 +37,31 @@ def row_of(lines: list[str], text: str) -> int:
 
 
 class FooterTests(unittest.TestCase):
-    def test_a_short_list_keeps_its_place_and_the_keys_go_to_the_bottom(self):
+    def test_a_short_list_keeps_its_keys_with_it_and_leaves_the_rest_open(self):
         for design in ("quiet", "citrinitas"):
             with self.subTest(design=design):
                 theme.apply(design, focus="bar", density="comfortable")
                 lines = frame(menu(), 0, 100, 40)
                 self.assertLessEqual(row_of(lines, "Appearance"), 3)
                 keys = row_of(lines, "Enter select")
-                self.assertGreaterEqual(keys, 33)  # the last rows, above the Athanor frame's bottom lines
-                # The focused row's help stays under the list; the empty rows come before the rule and keys.
+                # The focused row's help under the list, then the rule and the keys right after it.
                 self.assertEqual(row_of(lines, "Theme colours and spacing."), row_of(lines, "Back") + 2)
                 rule = lines[keys - 1].strip("║ ")
                 self.assertEqual(rule, theme.RULE * len(rule))
-                self.assertTrue(all(not line.strip("║ ") for line in lines[row_of(lines, "Back") + 3:keys - 1]))
+                self.assertLessEqual(keys, row_of(lines, "Back") + 6)
+                # The rows below the block are left to the window (and the painting).
+                self.assertTrue(all(not line.strip("║ ") for line in lines[keys + 1:keys + 20]))
 
-    def test_the_tip_stays_on_the_last_rows_below_the_keys(self):
+    def test_moving_the_focus_does_not_move_the_keys(self):
+        theme.apply("quiet", focus="bar", density="comfortable")
+        items = menu() + [SelectItem("Long", "long", description="A description long enough to wrap. " * 4)]
+        rows = {row_of(frame(items, cursor, 100, 40), "Enter select") for cursor in range(len(items))}
+        self.assertEqual(len(rows), 1)
+
+    def test_the_tip_sits_under_the_keys(self):
         theme.apply("quiet", focus="bar", density="comfortable")
         lines = frame(menu(), 0, 100, 40, tip="[muted]Tip[/muted]  Press S for stats.")
-        self.assertEqual(row_of(lines, "Press S for stats."), len(lines) - 1)
-        self.assertLess(row_of(lines, "Enter select"), len(lines) - 2)
-        self.assertGreater(row_of(lines, "Enter select"), 30)
+        self.assertEqual(row_of(lines, "Press S for stats."), row_of(lines, "Enter select") + 2)
 
     def test_compact_density_and_short_windows_keep_the_keys_under_the_list(self):
         theme.apply("quiet", focus="bar", density="compact")
@@ -66,13 +71,13 @@ class FooterTests(unittest.TestCase):
         lines = frame(menu(), 0, 100, 12)  # under the roomy threshold
         self.assertLess(row_of(lines, "Enter select"), 10)
 
-    def test_a_wide_window_puts_the_keys_under_the_list_column(self):
+    def test_a_wide_window_puts_the_keys_under_the_list_and_its_pane(self):
         theme.apply("quiet", focus="bar", density="comfortable")
         lines = frame(menu(), 0, 200, 40)
         keys = row_of(lines, "Enter select")
-        self.assertGreaterEqual(keys, 37)
-        divider = lines[keys].index("│")
-        self.assertLess(lines[keys].index("Enter select"), divider)  # the left column's bottom
+        self.assertLess(keys, 12)
+        self.assertNotIn("│", lines[keys])  # under both columns: the divider ends above the keys
+        self.assertIn("│", lines[row_of(lines, "Appearance")])
 
 
 class DetailsBelowTests(unittest.TestCase):
@@ -84,7 +89,7 @@ class DetailsBelowTests(unittest.TestCase):
     def test_a_tall_narrow_window_shows_the_details_under_the_help(self):
         lines = frame(menu(self.DETAILS), 0, 100, 40)
         self.assertEqual(row_of(lines, "APPEARANCE"), row_of(lines, "Theme colours") + 2)
-        self.assertLess(row_of(lines, "Focus       Cursor bar"), row_of(lines, "Enter select") - 5)
+        self.assertLess(row_of(lines, "Focus       Cursor bar"), row_of(lines, "Enter select"))
         self.assertTrue(lines[row_of(lines, "APPEARANCE")].startswith(theme.MARGIN + "APPEARANCE"))
 
     def test_details_never_cost_list_rows(self):
@@ -96,8 +101,8 @@ class DetailsBelowTests(unittest.TestCase):
         lines = frame(menu([f"detail {n}" for n in range(40)]), 0, 100, 40)
         self.assertIn("detail 0", "\n".join(lines))
         keys = row_of(lines, "Enter select")
-        self.assertEqual(lines[keys - 3].strip(), "…")  # cut short; one empty row stays above the rule and keys
-        self.assertEqual(lines[keys - 2].strip(), "")
+        self.assertEqual(lines[keys - 2].strip(), "…")  # cut short, just above the rule and keys
+        self.assertEqual(keys, len(lines) - 1)        # the details took the rows the list left
 
     def test_wide_windows_keep_them_in_the_pane_and_short_ones_leave_them_out(self):
         wide = frame(menu(self.DETAILS), 0, 200, 40)

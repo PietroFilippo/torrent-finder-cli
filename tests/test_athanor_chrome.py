@@ -88,7 +88,8 @@ class MessageTests(AthanorCase):
         security._exposure["state"] = "exposed"
         self.addCleanup(security._exposure.update, state=None)
         line = chrome.status_line(80, now=dt.datetime(2026, 10, 4, 9, 41)).plain
-        self.assertRegex(line, r"Searches:\d+ +Picked:\d+ +Bookmarks:\d+ +T:\d+")
+        self.assertRegex(line, r"Searches:\d+ +Picked:\d+ +Bookmarks:\d+ ")
+        self.assertNotIn("T:", line)  # the turn counter is not a figure anyone reads
         self.assertIn("Sun 4 Oct", line)
         self.assertIn("IP visible", line)
         self.assertEqual(cell_len(line), 80)
@@ -124,8 +125,10 @@ class FramedScreenTests(AthanorCase):
                                                tip="[accent]Tip[/accent]  Press T for every tip."))
         out = screen.file.getvalue().rstrip("\n").split("\n")
         self.assertEqual(len(out), 24)
-        self.assertIn("Tip  Press T for every tip.", out[-3])  # above the bottom edge and the status line
-        self.assertTrue(out[-4].strip("║ ") == "")             # with room above it
+        keys = next(i for i, line in enumerate(out) if "Enter select" in line)
+        self.assertEqual(out[keys + 1].strip("║ "), "")                 # a row apart from the keys
+        self.assertIn("Tip  Press T for every tip.", out[keys + 2])  # right under them, not at the bottom
+        self.assertEqual(out[-3].strip("║ "), "")                       # the rest of the window stays open
 
     def test_the_text_field_cursor_lands_on_the_field(self):
         render = prompts.input_screen("Profile name", "Use a unique name.")
@@ -166,7 +169,7 @@ class FramedScreenTests(AthanorCase):
                 room = captured["intro"]()
             self.assertEqual(bool(room), shown)
         self.assertEqual(room[0].plain, "~ The Index ~")
-        self.assertIn("Obvious exits: continue (dune)", room[2].plain)
+        self.assertEqual(len(room), 2)  # its name and one line: the rows below are the exits
 
     def test_simple_design_frames_are_unchanged(self):
         theme.apply("quiet")

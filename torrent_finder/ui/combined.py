@@ -139,7 +139,7 @@ def _manage_profiles(draft, library):
         else:
             library.rename(library.current["id"], name)
     elif action == "delete":
-        if not confirm_prompt(t("Delete profile '{profile}'?", profile=escape(profile_label(library.current))), title=t("Delete profile")):
+        if not confirm_prompt(t("Delete profile '{profile}'?", profile=escape(profile_label(library.current))), title=t("Delete profile"), action=t("delete")):
             return
         library.delete(library.current["id"])
     else:
