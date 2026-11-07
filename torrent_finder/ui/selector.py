@@ -203,7 +203,7 @@ def _inline_hint(item: "SelectItem") -> bool:
     marker = cell_len(item.marker) + 1 if item.marker else 0
     badge = 1 + max((cell_len(_state_label(state, item.toggle_states)) for state in item.toggle_states), default=-1)
     row = _GUTTER + badge + marker + cell_len(_plain(item.label)) + 2 + cell_len(hint)
-    return row <= inner and cell_len(hint) + 2 <= inner * 2 // 3
+    return row <= inner  # label and hint both whole
 
 
 def _badge_width(items: list["SelectItem"]) -> int:
@@ -321,6 +321,8 @@ def columns(items: list["SelectItem"], multi: bool, screen_width: int) -> tuple[
         listed = min(listed, screen_width - pane - _PANE_GAP)
         if listed >= _LIST_MIN:
             return listed, pane, listed + _PANE_GAP + pane
+    if screen_width < _PANE_SCREEN_MIN:  # little painting beside it: the list's help wraps less
+        return screen_width, 0, screen_width
     listed = min(screen_width, max(listed, _KEYS_MIN))
     return listed, 0, listed
 
@@ -381,6 +383,27 @@ def _measure_layout(items: list["SelectItem"], cursor: int, multi: bool, size,
         _layout.width = previous_width
 
 
+def _first_seen(items: list["SelectItem"], measurement: "_MeasuredLayout") -> dict:
+    """Rows the tallest pane or details on a short list need, so the first frame keeps them already.
+
+    The keys then stay put from the first frame, not only after a taller row
+    was visited. Longer lists fill the window, so their keys do not move.
+    """
+    if len(items) > 40:
+        return {}
+    previous = getattr(_layout, "width", None)
+    _layout.width = measurement.width
+    try:
+        if measurement.pane_width:
+            heights = [len(lines) for lines in (_pane(item, measurement.pane_width) for item in items)
+                       if len(lines) > 1]
+            return {"pane": max(heights, default=0)}
+        tallest = max((len(item.details()) for item in items if not _is_section_header(item)), default=0)
+        return {"details": tallest + 1 if tallest else 0}  # with the blank row above them
+    finally:
+        _layout.width = previous
+
+
 class _LayoutCache:
     """One menu's measurements; in-place edits invalidate through actions/refresh."""
 
@@ -407,7 +430,7 @@ class _LayoutCache:
             self.key = key
             seen_key = (id(items), size, multi, theme.current(), theme.FRAMED, current_language())
             if seen_key != self.seen_key:
-                self.seen_key, self.seen = seen_key, {}
+                self.seen_key, self.seen = seen_key, _first_seen(items, self.measurement)
             self.measurement.seen = self.seen
         return self.measurement
 
@@ -427,30 +450,28 @@ def _clip_lines(blocks: list[Text], limit: int, width: int) -> Text:
     return Text("\n").join(kept)
 
 
-_ESSENTIAL_KEYS = ("↑/↓", "Enter", "Esc", "?")
-_SMALL_KEY_ROWS = 2  # a small window's key bar; the rest are one ? away
-
-
 def _small_window(width: int, height: int) -> bool:
-    return width < 60 or height < 18
+    return theme.small_window(width, height)
 
 
-def budget_keys(segments: list[Text], width: int, rows: int = _SMALL_KEY_ROWS) -> list[Text]:
-    """*segments* cut to *rows* key-bar lines: moving, Enter, Esc and ? first, then the rest in order.
+budget_keys = theme.budget_keys
 
-    Used where ``?`` lists every key, so a dropped key stays one press away.
-    """
-    if len(theme.wrap_keys(segments, width)) <= rows:
-        return segments
-    key = lambda segment: segment.plain.split(" ", 1)[0]  # noqa: E731
-    kept = {index for index, segment in enumerate(segments) if key(segment) in _ESSENTIAL_KEYS}
-    for index in range(len(segments)):
-        if index in kept:
-            continue
-        trial = kept | {index}
-        if len(theme.wrap_keys([segments[i] for i in sorted(trial)], width)) <= rows:
-            kept = trial
-    return [segments[i] for i in sorted(kept)]
+
+def _rows_for_choices(items: list["SelectItem"], start: int, end: int, cursor: int, wanted: int) -> int:
+    """Rows that show *wanted* selectable rows around *cursor*, with the headings among them."""
+    rows, seen, index = 0, 0, max(start, min(cursor, end - 1))
+    above = int(index > start and _is_section_header(items[index - 1]))
+    rows += above  # the focused row's section heading sits above it
+    while index < end and seen < wanted:
+        rows += 1
+        seen += not _is_section_header(items[index])
+        index += 1
+    index = max(start, min(cursor, end - 1)) - 1 - above
+    while index >= start and seen < wanted:
+        rows += 1
+        seen += not _is_section_header(items[index])
+        index -= 1
+    return max(1, rows)
 
 
 def _default_footer(multi: bool) -> str:
@@ -607,8 +628,10 @@ def _pane(item: "SelectItem | None", width: int) -> list[Text]:
     return lines
 
 
-def _beside(left: "Text | None", right: "Text | None", width: int) -> Text:
+def _beside(left: "Text | None", right: "Text | None", width: int, divider: bool = True) -> Text:
     """A list-column line padded to *width*, the pane's divider, then the pane's line.
+
+    Without *divider* (rows below the pane's last line) the cells stay blank.
 
     The left part is appended, not copied: a section heading's whole-line
     style must not spill onto the pane's text.
@@ -618,6 +641,8 @@ def _beside(left: "Text | None", right: "Text | None", width: int) -> Text:
         line.append_text(left)
     if cell_len(line.plain) > width:
         line.truncate(width)
+    if not divider and right is None:
+        return line
     line.append(" " * (width - cell_len(line.plain)))
     line.append("│", style=theme.RULE_STYLE)
     line.append("  ")
@@ -679,10 +704,6 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
         text = (block.copy() if isinstance(block, Text) else Text.from_markup(block)) if block else Text()
         if text.plain.strip():
             intro_lines += theme.wrap_block(text, intro_width, console)
-    if compact and len(intro_lines) > 1:  # a short window keeps one line of summary, ending in "…"
-        intro_lines = intro_lines[:1]
-        intro_lines[0].truncate(max(1, min(cell_len(intro_lines[0].plain), intro_width - len(theme.MARGIN)) - 1))
-        intro_lines[0].append("…")
     # Rows kept for the longest help on this screen, so the keys do not move with the focus.
     pad_lines = 0 if compact else max(0, min(context_budget, 2 if _small_window(screen_width, full_height) else context_budget) - item_lines)
 
@@ -753,10 +774,9 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
         return segments, total
 
     shown_keys, chrome = plan()
-    if pad_lines and chrome + 1 > height:
-        # The kept rows go first in a window too short for them.
-        drop = min(pad_lines, chrome + 1 - height)
-        pad_lines -= drop
+    if pad_lines and main_len > height - chrome:
+        # A list that scrolls keeps its rows: the kept help rows go first.
+        pad_lines = 0
         shown_keys, chrome = plan()
     if always_visible_rows and chrome >= height:
         # Long help and many pinned actions can leave no room for a selectable
@@ -767,22 +787,23 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
         shown_keys, chrome = plan()
     # A small window: shorten the focused row's help (e.g. a long folder path)
     # so three selectable rows (or every row, when fewer) and the key bar still fit.
-    missing = chrome + min(3, max(1, main_len)) - height
+    want = _rows_for_choices(items, main_start, main_end, cursor, 3)
+    missing = chrome + want - height
     if missing > 0 and item_lines > 1:
         keep = max(1, item_lines - missing)
         item_blocks = [_clip_lines(item_blocks, keep, inner_work)]
         chrome -= item_lines - keep
         item_lines = keep
     # Still too tall: footer prose (notices, a long search text) shortens too.
-    missing = chrome + 1 - height
+    missing = chrome + want - height
     context = parsed.context
     if missing > 0 and notice_lines > 1:
         keep = max(1, notice_lines - missing)
         context = [_clip_lines(parsed.context, keep, inner_work)]
         chrome -= notice_lines - keep
         notice_lines = keep
-    # Then the intro under the header, down to nothing in a tiny window.
-    missing = chrome + 1 - height
+    # Then the intro under the header, down to nothing in a tiny window: the choices come first.
+    missing = chrome + want - height
     if missing > 0 and intro_lines:
         keep = max(0, len(intro_lines) - missing)
         chrome -= len(intro_lines) - keep
@@ -791,6 +812,8 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
             last = intro_lines[-1]
             last.truncate(max(1, min(cell_len(last.plain), intro_width - len(theme.MARGIN)) - 1))
             last.append("…")
+    if main_len <= height - chrome and theme.has_key(shown_keys, "PgUp/PgDn") and not theme.has_key(keys, "PgUp/PgDn"):
+        shown_keys, chrome = plan()  # the shortened prose made room: the whole list shows, no paging keys
     max_visible = max(1, height - chrome)
 
     # A tall window with no room beside the list shows the inspector's detail
@@ -871,11 +894,15 @@ def _panel(items, cursor, title, multi, footer, tick, status, alert, intro, help
         # its divider ends with them.
         room = max(len(listed), height - len(head) - len(intro_lines) - len(below))
         pane = _pane(current_item, pane_width)
+        if len(pane) <= 1:
+            pane = []  # the row's name alone says nothing the row does not: no pane, no divider
         rows = max(len(listed), min(len(pane), room), min(seen.get("pane", 0), room))
         seen["pane"] = max(seen.get("pane", 0), min(len(pane), room))
         if len(pane) > rows:
             pane = pane[:max(0, rows - 1)] + [Text("…", style=theme.MUTED)]
-        listed = [_beside(listed[i] if i < len(listed) else None, pane[i] if i < len(pane) else None, width)
+        # The divider runs as far as the pane's lines; the list column keeps its width below them.
+        listed = [_beside(listed[i] if i < len(listed) else None, pane[i] if i < len(pane) else None, width,
+                          divider=i < len(pane))
                   for i in range(rows)]
     block = intro_lines + listed + below
 
@@ -936,6 +963,14 @@ def _next_enabled(items: list[SelectItem], current: int, direction: int) -> int:
         if items[pos].enabled:
             return pos
     return current  # All disabled — stay put
+
+
+_focus: dict = {"value": None}
+
+
+def focused() -> object:
+    """The value of the row the selector being drawn has focused: a footer callable may follow it."""
+    return _focus["value"]
 
 
 def _focused_value(items: list[SelectItem], cursor: int):
@@ -1129,6 +1164,8 @@ def arrow_select(
             if state["paused"] or state["holding"]:
                 return False  # another view owns the screen, or a key is acting on the list as it was
             refresh_content()
+            cursor_now = state["cursor"]
+            _focus["value"] = items[cursor_now].value if 0 <= cursor_now < len(items) else None
             for _ in range(3):
                 frame_size = console.size
                 panel = _build_panel(

@@ -60,6 +60,9 @@ class _TableLayout:
     leeches: bool
     provider: bool = False
     age: bool = False
+    # Cells a narrowed name column gives back: an empty last column keeps the
+    # table (and so its caption: the rule, notices and keys) the window's width.
+    filler: int = 0
 
 
 # Borderless columns: widths in cells. Rich pads every cell by one, so
@@ -115,10 +118,11 @@ def _table_layout(width: int, show_from: bool, show_provider: bool = False,
     if show_age:
         full.append(widths["Age"])
     if width - _fixed(*full) >= 36:
-        name = width - _fixed(*full)
-        if longest:
-            name = min(name, max(_NAME_MIN, longest + 2))
-        return _TableLayout("full", name, True, show_from, True, True, True, show_provider, show_age)
+        room = width - _fixed(*full)
+        name = min(room, max(_NAME_MIN, longest + 2)) if longest else room
+        filler = room - name if room - name >= 3 else 0
+        name = room - filler
+        return _TableLayout("full", name, True, show_from, True, True, True, show_provider, show_age, filler)
     medium = _fixed(lead, widths["Source"], widths["Size"], widths["Seeds"])
     if width - medium >= 29:
         return _TableLayout("medium", width - medium, True, False, True, True, False)
@@ -352,7 +356,10 @@ def _table_caption(
         caption.append_text(theme.rule(width))
         caption.append("\n")
     segments = theme.parse_footer(Text(_result_keys(total_pages, picked, expanded, empty=not results))).keys
-    caption.append_text(Text("\n").join(theme.wrap_keys(theme.with_help(segments, width), width)))
+    segments = theme.with_help(segments, width)
+    if theme.small_window(width, console.size.height):  # two rows of keys; ? lists the rest
+        segments = theme.budget_keys(segments, width)
+    caption.append_text(Text("\n").join(theme.wrap_keys(segments, width)))
     return caption
 
 
@@ -470,6 +477,7 @@ def build_table(
     detail_offset: int = 0,
     describe=None,
     announcement: str = "",
+    received: int = 0,
 ) -> Table:
     """Build a borderless result table whose columns collapse by width."""
     width = console.size.width
@@ -495,8 +503,10 @@ def build_table(
         caption_justify="left",
     )
     if not total:
-        notice = Text("\n" + theme.MARGIN + t("Nothing to show: the refinement hides every result. f changes it.")
-                      + "\n", style=theme.WARN)
+        # *received* results that the refinement hides, or none came back at all.
+        why = (t("Nothing to show: the refinement hides every result. f changes it.") if received
+               else t("No results came back for this search. Esc goes back to edit it."))
+        notice = Text("\n" + theme.MARGIN + why + "\n", style=theme.WARN)
         notice.append_text(table.caption)
         table.caption = notice
         table.show_header = False  # column names over no rows say nothing
@@ -520,6 +530,8 @@ def build_table(
             table.add_column(t("Leeches"), justify="right", width=widths["Leeches"], no_wrap=True)
         if layout.age:
             table.add_column(t("Age"), justify="right", style=theme.MUTED, width=widths["Age"], no_wrap=True)
+        if layout.filler:
+            table.add_column("", width=layout.filler - 2, no_wrap=True)  # its padding takes the other two
 
     now = time.time()
     for visible_idx, item in enumerate(results[scroll_offset:end_idx]):
@@ -585,6 +597,8 @@ def build_table(
             cells.append(leech_text)
         if layout.age:
             cells.append(ellipsize_cells(_age(timestamp(item.get("uploaded_at")), now), widths["Age"]))
+        if layout.filler:
+            cells.append("")
         table.add_row(*cells, style=row_style)
 
     return table
@@ -813,7 +827,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
             current_page, total_pages, global_offset, tick=0,
             picked=frozenset(picked), show_from=show_from,
             original_indices=view_indexes[global_offset:global_offset + total],
-            expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice,
+            expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice, received=len(results),
         )),
         console=console,
         refresh_per_second=15,
@@ -883,7 +897,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         current_page, total_pages, global_offset, tick=new_tick,
                         picked=frozenset(picked), show_from=show_from,
                         original_indices=view_indexes[global_offset:global_offset + total],
-                        expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice,
+                        expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice, received=len(results),
                     )), refresh=True
                 )
 
@@ -1157,7 +1171,7 @@ def interactive_select(results: list[dict], note: str = "", *, initial_order: st
                         tick=marquee_state["tick"],
                         picked=frozenset(picked), show_from=show_from,
                         original_indices=view_indexes[global_offset:global_offset + total],
-                        expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice,
+                        expanded=expanded, detail_offset=detail_offset, describe=notes(), announcement=simple_notice, received=len(results),
                     )), refresh=True
                 )
         finally:

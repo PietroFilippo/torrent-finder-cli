@@ -104,24 +104,24 @@ def _colourway(key, name, accent, sky, steel, deep, fill, good, warn, bad, *, pa
 # yellow and red. Hex shades degrade to the nearest named colour without true
 # colour. Athanor colourways are named for the stages of the alchemical work.
 THEMES: dict[str, Palette] = {palette.key: palette for palette in (
-    _colourway("citrinitas", "Citrinitas", "#D49A3A", "#E3C27A", "#8F7F67", "#5C4C39", "#2B2117",
-               "#8F9A5A", "#C8742E", "#D45B44", page="#16120E", text="#CFC1A3", ink="#5E4E3E",
+    _colourway("citrinitas", "Citrinitas", "#D49A3A", "#E3C27A", "#A89A86", "#5C4C39", "#2B2117",
+               "#96A260", "#D68B4C", "#DE8371", page="#16120E", text="#CFC1A3", ink="#5E4E3E",
                frame="#AC7D31", bar_bg="#0D0B08",
                note=N_("Lamplight amber on parchment: the scriptorium as first seen.")),
-    _colourway("rubedo", "Rubedo", "#D86A45", "#EBA987", "#97786D", "#5A3A33", "#2C1714",
-               "#8F9A5A", "#D9A441", "#CE5A5A", page="#150E0D", text="#D9C6B8", ink="#5F3A33",
+    _colourway("rubedo", "Rubedo", "#DB7655", "#EBA987", "#A88D84", "#5A3A33", "#2C1714",
+               "#8F9A5A", "#D9A441", "#D67777", page="#150E0D", text="#D9C6B8", ink="#5F3A33",
                frame="#A8472F", bar_bg="#0C0807",
                note=N_("Vermilion and rust: the reddening, the work's last stage.")),
-    _colourway("albedo", "Albedo", "#E6E1D6", "#B9C6D2", "#7C8088", "#43474E", "#24272C",
-               "#8FA68A", "#D3A955", "#C9675A", page="#121315", text="#D2CEC6", ink="#4A5159",
+    _colourway("albedo", "Albedo", "#E6E1D6", "#B9C6D2", "#989CA2", "#43474E", "#24272C",
+               "#8FA68A", "#D3A955", "#D5877E", page="#121315", text="#D2CEC6", ink="#4A5159",
                frame="#9AA0A8", bar_bg="#0B0C0E",
                note=N_("Bone and silver: the whitening, cool and quiet.")),
-    _colourway("viriditas", "Viriditas", "#5FB3A1", "#A7D8C8", "#6E8577", "#3A4D42", "#16241F",
-               "#A3C25E", "#D9A441", "#CF5D4B", page="#0F1412", text="#C6D1C3", ink="#3D5448",
+    _colourway("viriditas", "Viriditas", "#5FB3A1", "#A7D8C8", "#8B9F93", "#3A4D42", "#16241F",
+               "#A3C25E", "#D9A441", "#DA8376", page="#0F1412", text="#C6D1C3", ink="#3D5448",
                frame="#4E8F7F", bar_bg="#090C0B",
                note=N_("Verdigris on copper: the greening of old metal.")),
-    _colourway("nigredo", "Nigredo", "#C8643C", "#D8CFC3", "#827D76", "#3A3835", "#1E1C1B",
-               "#8F9A5A", "#D9A441", "#CB5A5A", page="#0E0E0E", text="#BDB6AD", ink="#484442",
+    _colourway("nigredo", "Nigredo", "#D07D5B", "#D8CFC3", "#96928B", "#3A3835", "#1E1C1B",
+               "#8F9A5A", "#D9A441", "#D57878", page="#0E0E0E", text="#BDB6AD", ink="#484442",
                frame="#6E6A64", bar_bg="#080808",
                note=N_("Ash and a single ember: the blackening.")),
     Palette("quiet", "Quiet Blue", "bright_blue", "#7DAEFF", "#6A86B3", "#3A5A8C", "#16233D",
@@ -588,12 +588,66 @@ def has_key(segments: list[Text], key: str) -> bool:
     return any(segment.plain.split(" ", 1)[0] == key for segment in segments)
 
 
+ESSENTIAL_KEYS = ("↑/↓", "Enter", "Esc", "?")
+SMALL_KEY_ROWS = 2  # a small window's key bar; the rest are one ? away
+
+
+def small_window(width: int, height: int) -> bool:
+    """Under 60 columns or 18 rows: two rows of keys, help that gives way to the list."""
+    return width < 60 or height < 18
+
+
+def _segment_key(segment: Text) -> str:
+    return segment.plain.split(" ", 1)[0]
+
+
+def _first_word(segment: Text) -> Text:
+    """``Esc back to download options`` → ``Esc back``, keeping the key's style."""
+    key, _, action = segment.plain.partition(" ")
+    words = action.split(" ")
+    return segment if len(words) <= 1 else segment[:len(key) + 1 + len(words[0])]
+
+
+def budget_keys(segments: list[Text], width: int, rows: int = SMALL_KEY_ROWS) -> list[Text]:
+    """*segments* cut to *rows* key-bar lines: moving, Enter, Esc and ? first, then the rest in order.
+
+    Used where ``?`` lists every key, so a dropped key stays one press away.
+    """
+    if len(wrap_keys(segments, width)) <= rows:
+        return segments
+    kept = {index for index, segment in enumerate(segments) if _segment_key(segment) in ESSENTIAL_KEYS}
+    if len(wrap_keys([segments[i] for i in sorted(kept)], width)) > rows:
+        # Even the essentials need more rows: each keeps its key and the first word of what it does.
+        segments = [_first_word(segment) if index in kept else segment for index, segment in enumerate(segments)]
+    for index in range(len(segments)):
+        if index in kept:
+            continue
+        trial = kept | {index}
+        if len(wrap_keys([segments[i] for i in sorted(trial)], width)) <= rows:
+            kept = trial
+    return [segments[i] for i in sorted(kept)]
+
+
 def with_help(segments: list[Text], width: int) -> list[Text]:
-    """*segments* plus "? keys" when it fits on the lines the keys already take."""
+    """*segments* with "? keys" on the lines the keys already take.
+
+    When it does not fit, the last secondary keys give it their place: ``?``
+    lists them, so help is always one press away and named.
+    """
     if has_key(segments, "?"):
         return segments
-    candidate = segments + [key_segment("?", t("keys", ctx="key bar"))]
-    return candidate if len(wrap_keys(candidate, width)) == len(wrap_keys(segments, width)) else segments
+    help_key = key_segment("?", t("keys", ctx="key bar"))
+    lines = len(wrap_keys(segments, width))
+    trimmed = list(segments)
+    while True:
+        candidate = trimmed + [help_key]
+        if len(wrap_keys(candidate, width)) <= lines:
+            return candidate
+        drop = next((i for i in range(len(trimmed) - 1, -1, -1)
+                     if _segment_key(trimmed[i]) not in ESSENTIAL_KEYS), None)
+        if drop is None:
+            return segments + [help_key]  # nothing left to give way: one more line for help
+        del trimmed[drop]
 
 
 def wrap_keys(segments: list[Text], width: int, margin: str = MARGIN) -> list[Text]:

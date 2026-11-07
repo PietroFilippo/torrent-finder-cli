@@ -241,10 +241,10 @@ class DownloadsUITests(unittest.TestCase):
     def test_an_empty_screen_says_how_to_start(self):
         install(self, None)
         seen = capture(None, downloads_ui, downloads_ui.downloads_screen)
-        self.assertEqual([plain(item.label) for item in seen["items"]], ["Back"])
-        intro = " ".join(line.plain for line in seen["kwargs"]["intro"]())
-        self.assertIn("Nothing is downloading in the background.", intro)
-        self.assertIn("Downloads run: in background", intro)
+        # The switch itself, right here: the screen stays empty until downloads run in the background.
+        self.assertEqual([plain(item.label) for item in seen["items"]], ["Downloads run: in this screen", "Back"])
+        self.assertIn("Downloads keep going while you search", seen["items"][0].description)
+        self.assertEqual(seen["kwargs"]["intro"]().plain, "Nothing is downloading in the background.")
 
     # --- entry points and keys ------------------------------------------------------------------
 

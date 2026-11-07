@@ -154,7 +154,6 @@
   "Stops it and removes the unfinished file.": "Para o download e apaga o arquivo incompleto.",
   "This file is already downloading to this folder.": "Este arquivo já está sendo baixado nesta pasta.",
   "This version has {builds} builds, usually one per CPU type; this is the one F-Droid suggests (most phones). For another device type: {url}": "Esta versão tem {builds} builds, em geral uma por tipo de CPU; esta é a que o F-Droid sugere (a maioria dos celulares). Para outro tipo de aparelho: {url}",
-  "Turn on \"Downloads run: in background\" (a torrent's download options, or Settings › Download folder): downloads then keep going while you search.": "Ative \"Downloads rodam: em segundo plano\" (nas opções de download de um torrent, ou em Configurações › Pasta de downloads): os downloads continuam enquanto você busca.",
   "[muted]Tip: with Downloads run: in background (the download options, or Settings › Download folder), this keeps going while you search.[/muted]": "[muted]Dica: com Downloads rodam: em segundo plano (nas opções de download, ou em Configurações › Pasta de downloads), isto continua enquanto você busca.[/muted]",
   "direct download from {source}": "download direto de {source}",
   "the unfinished file was removed": "o arquivo incompleto foi apagado",
@@ -183,8 +182,6 @@
   "A stop all": "A parar tudo",
   "C clear finished": "C limpar concluídos",
   "Enter actions": "Enter ações",
-  "Enter retries it or shows the log.": "Enter tenta de novo ou mostra o log.",
-  "Enter retries it.": "Enter tenta de novo.",
   "Error": "Erro",
   "No peers answered for a long time.": "Nenhum par respondeu por muito tempo.",
   "O open folder": "O abrir pasta",
@@ -199,5 +196,7 @@
   "X stop": "X parar",
   "stop all": "parar tudo",
   "Progress of the downloads running in the background.": "O progresso dos downloads em segundo plano.",
-  "D downloads": "D downloads"
+  "D downloads": "D downloads",
+  "Enter: retry it or open its folder.": "Enter: tentar de novo ou abrir a pasta.",
+  "Enter: retry it, open its folder or show the log.": "Enter: tentar de novo, abrir a pasta ou mostrar o log."
 }

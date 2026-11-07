@@ -47,7 +47,7 @@ def subject(text: str) -> str:
 
 
 def _tip_item(category: TipCategory, tip: Tip) -> SelectItem:
-    """Read-only tip row: its subject, the whole tip as the row's help; Enter is a no-op.
+    """A tip row: its subject, the whole tip as the row's help; Enter reads it on its own screen.
 
     The tags are searched (``/``) but not shown: they are keywords, not prose.
     """
@@ -56,7 +56,6 @@ def _tip_item(category: TipCategory, tip: Tip) -> SelectItem:
         label=subject(text),
         value=("tip", category.name, tip),
         enabled=True,
-        passive=True,
         description=escape(text),
     )
 
@@ -161,7 +160,7 @@ def tips_page() -> None:
     def _footer() -> str:
         category = _CATEGORY_OPTIONS[state["category_idx"]]
         search = t("Search: {query}\n", query=escape(state["query"])) if state["query"] else ""
-        return search + t("↑/↓ scroll  •  / search  •  C category: {category}  •  X clear  •  Esc back",
+        return search + t("↑/↓ scroll  •  Enter read  •  / search  •  C category: {category}  •  X clear  •  Esc back",
                           category=escape(t(category)))
 
     def _cycle_category(cursor: int, items_list: list[SelectItem]):
@@ -208,6 +207,12 @@ def tips_page() -> None:
 
         state["start"] = result if isinstance(result, int) else 0
         action = items[result].value
+
+        if isinstance(action, tuple) and action[0] == "tip":
+            # The whole tip, scrollable: a small window shows only the start of a long one.
+            from torrent_finder.ui.search_diagnostics import read_details
+            read_details(action[2].display_text(), title=N_("Tips & shortcuts"))
+            continue
 
         if action == "search":
             from torrent_finder.ui.prompts import PROMPT, get_query_with_shortcut, input_screen

@@ -110,7 +110,6 @@
   "Reset the search text and category filter.": "Limpe o texto da busca e o filtro de categoria.",
   "Tips & shortcuts": "Dicas e atalhos",
   "{count} shown": "{count} na tela",
-  "↑/↓ scroll  •  / search  •  C category: {category}  •  X clear  •  Esc back": "↑/↓ rolar  •  / buscar  •  C categoria: {category}  •  X limpar  •  Esc voltar",
   "Matches categories, tip text and tags; empty clears the search.": "Busca nas categorias, dicas e tags; vazio limpa a busca.",
   "{n} search notice": {
     "one": "{n} aviso da busca",
@@ -124,5 +123,7 @@
   "Nothing to show: the refinement hides every result. f changes it.": "Nada para mostrar: o refinamento esconde todos os resultados. f muda isso.",
   "Order": "Ordem",
   "Shows every fetched result again.": "Mostra de novo todos os resultados obtidos.",
-  "f refine/sort • Esc back to the search": "f refinar/ordenar • Esc voltar à busca"
+  "f refine/sort • Esc back to the search": "f refinar/ordenar • Esc voltar à busca",
+  "No results came back for this search. Esc goes back to edit it.": "A busca não trouxe resultados. Esc volta para editá-la.",
+  "↑/↓ scroll  •  Enter read  •  / search  •  C category: {category}  •  X clear  •  Esc back": "↑/↓ rolar  •  Enter ler  •  / buscar  •  C categoria: {category}  •  X limpar  •  Esc voltar"
 }

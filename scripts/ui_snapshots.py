@@ -215,7 +215,7 @@ def _scenarios():
         ("episode-picker", lambda: prompts.episode_select_prompt(files, [1, 2, 3])),
         ("subtitle-source", lambda: prompts.subtitle_source_prompt()),
         ("download-folder", lambda: prompts.download_dir_prompt()),
-        ("confirm", lambda: prompts.confirm_prompt("Exit Torrent Finder?", title="Exit")),
+        ("confirm", lambda: prompts.confirm_prompt("Quit torrent-finder?", title="Quit", action="quit")),
         ("download-method", lambda: prompts.download_method_prompt(
             magnet="magnet:?xt=urn:btih:" + "ab" * 20, show_subtitles=True, show_episode_picker=True,
             selected_indexes=None, show_streaming=True, page_url="https://nyaa.si/view/1", info_source="Nyaa",
@@ -230,7 +230,7 @@ def _scenarios():
         ("batch-menu", lambda: prompts.batch_download_menu(3, 3)),
         ("credentials", lambda: prompts.credentials_menu()),
         ("download-complete", lambda: prompts.download_complete_prompt("Download finished", summary="Saved to /tmp/x")),
-        ("whats-next", lambda: prompts.search_again_prompt()),
+        ("whats-next", lambda: prompts.search_again_prompt(movie)),
         ("torrent-info", info_screen),
         ("search-editor", search_editor(movie)),
         ("search-editor-notice", search_editor(movie, notice="[warning] No results found.[/warning]")),
@@ -362,7 +362,7 @@ def _scenarios():
         ("downloads-empty", downloads_screen()),
         ("provider-menu-downloads", with_downloads(lambda: prompts.provider_select_prompt())),
         ("provider-menu-download-done", with_downloads(lambda: prompts.provider_select_prompt(), "done")),
-        ("whats-next-downloads", with_downloads(lambda: prompts.search_again_prompt())),
+        ("whats-next-downloads", with_downloads(lambda: prompts.search_again_prompt(movie))),
         ("background-started", with_downloads(background_started)),
         ("quit-with-downloads", with_downloads(quit_with_downloads)),
     ]

@@ -30,23 +30,39 @@ together. The rest of the window is left open, where the painting shows.
   fills the window, and its keys end up on the last rows.
 - **The list column is as wide as its rows** (48 to 108 cells, margins
   included), wide enough to line hints up in one column. A list without a pane
-  is at least 64 cells, so its key bar fits on one line.
+  is at least 64 cells, so its key bar fits on one line; under 120 columns,
+  where little painting shows, it takes the window's width so its help wraps
+  less.
 - **The inspector sits right beside the list**, 40 to 56 cells (30% of the
   window), from 120 columns, so a 144-column window has one. Its divider ends
   with its lines; the key bar runs under the list and the pane. A row whose
-  hint shows in full is not repeated in the pane.
-- **The keys do not move with the focus.** The block keeps rows for the
-  longest help a row has (up to four), and the pane and detail lines keep the
-  rows they needed for another row on the same screen.
+  hint shows in full is not repeated in the pane, and a pane that would show
+  only the row's name is not drawn.
+- **The keys do not move with the focus.** When the whole list fits, the
+  block keeps rows for the longest help a row has (up to four); a list that
+  scrolls keeps its rows instead. On a list of up to 40 rows the pane and
+  detail lines are measured for every row before the first frame.
 - **The tip is short and sits under the keys**, a row apart: only tips of up to
   180 characters rotate, and a tip that would take more than two lines is not
   shown. The intro and the tip may run 100 cells wide, past a narrow block.
+- **`?` always has a place in the key bar**: when it does not fit, the last
+  secondary keys give it theirs (`?` lists them).
 - **Small windows** (under 60 columns or 18 rows) show two rows of keys:
-  moving, Enter, Esc and `?` first, then the others while they fit; `?` lists
-  the rest. The focused row's help gives way until three rows of the list show.
-  The frame's top edge drops the app name before it cuts the screen's name.
+  moving, Enter, Esc and `?` first, then the others while they fit, and only
+  the first word of each when even those need more; `?` lists the rest. The
+  focused row's help, the notices and the intro give way until three choices
+  show (headings between them do not count). The frame's top edge drops the
+  app name before it cuts the screen's name. The results table follows the
+  same key budget.
 - Confirmations follow the same rule: a 76-cell block of question, rule and
   keys, with Y named for what it does (`Y quit`, `Y delete`).
+
+Text over the painting is measured, not assumed: in a 144x36 window every
+Athanor text role (body, muted, accent, sky, good, warn, bad) reaches 4.5:1
+against the brightest tenth of the text-cell-sized patches of the painting
+behind the pane, over the three densest plates (`tests/test_painted_contrast.py`).
+Muted text stays under 70% of body text's contrast, so it still reads as
+secondary.
 
 ## Consequences
 

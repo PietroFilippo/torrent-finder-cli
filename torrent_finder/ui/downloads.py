@@ -376,7 +376,8 @@ def _description(job) -> str:
                 if job.started_at and job.finished_at else "")
         return t("Saved to {folder}", folder=folder) + "\n" + when + took
     if job.state in ("failed", "interrupted"):
-        again = t("Enter retries it or shows the log.") if job.log_path else t("Enter retries it.")
+        again = (t("Enter: retry it, open its folder or show the log.") if job.log_path
+                 else t("Enter: retry it or open its folder."))
         return escape(_failure(job)) + "\n" + again
     percent = _percent(job)
     stopped = (t("Stopped at {percent}", percent=percent) if percent else t("Stopped")) + " · "
@@ -455,6 +456,8 @@ def _rows(jobs) -> list[SelectItem]:
     if finished:
         items.append(_section(t("Finished")))
         items += [_row(job) for job in finished]
+    if not jobs and not enabled():  # nothing to show, and nothing will come here: the switch, right here
+        items.append(SelectItem(setting_label(), "__setting__", description=t(SETTING_HELP)))
     items.append(SelectItem(t("Back"), None, is_action=True))
     return items
 
@@ -674,27 +677,27 @@ def downloads_screen(focus: "str | None" = None) -> None:
 
         def intro():
             if not jobs:
-                lines = [Text(t("Nothing is downloading in the background."))]
-                if not enabled():
-                    lines.append(Text(t("Turn on \"Downloads run: in background\" (a torrent's download options, "
-                                        "or Settings › Download folder): downloads then keep going while you "
-                                        "search."), style=theme.MUTED))
-                return lines
+                return Text(t("Nothing is downloading in the background."))
             if not theme.FRAMED or theme.view_height(console.size.height, console.size.width) < 30:
                 return ""
             return Text(_flavour(jobs), style=theme.MUTED)
 
         def footer() -> str:
-            """The keys that do something now: stopping needs a running download, clearing a finished one."""
+            """The keys that do something now: X for the focused download while it runs, A for several."""
             if not jobs:
                 return t("Esc back")
             running, queued, finished = _counts(jobs)
-            keys = [t("↑/↓ navigate"), t("Enter actions")]
-            if running or queued:
-                keys.append(t("X stop"))
+            from torrent_finder.ui.selector import focused
+            job = next((job for job in jobs if job.id == focused()), None)
+            keys = [t("↑/↓ navigate")]
+            if job is not None:
+                keys.append(t("Enter actions"))
+                if job.state in downloads.ACTIVE_STATES and not _stopping(job):
+                    keys.append(t("X stop"))
             if running + queued > 1:
                 keys.append(t("A stop all"))
-            keys.append(t("O open folder"))
+            if job is not None:
+                keys.append(t("O open folder"))
             if finished:
                 keys.append(t("C clear finished"))
             keys.append(t("Esc back"))
@@ -708,6 +711,10 @@ def downloads_screen(focus: "str | None" = None) -> None:
         )
         if index is None or items[index].value is None:
             return
+        if items[index].value == "__setting__":
+            toggle_setting(items[index])
+            start = index
+            continue
         job = find(index, items)
         if job is not None and manager is not None:
             _actions(manager, job)

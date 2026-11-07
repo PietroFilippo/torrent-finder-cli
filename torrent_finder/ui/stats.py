@@ -96,9 +96,18 @@ FACET_NAMES = {
 _BAR_MAX = 20
 
 
+def _list_width() -> int:
+    """The selector's list column in this window: the inspector, when shown, takes the rest."""
+    from torrent_finder.ui import selector
+    width = console.size.width
+    if width >= selector._PANE_SCREEN_MIN:
+        width = min(selector._LIST_MAX, width - selector.pane_width(width) - selector._PANE_GAP)
+    return width
+
+
 def _bar_width(note_width: int, count_width: int) -> int:
-    """Bar cells that keep a bar, its count and note inline beside the label (half the content width)."""
-    room = theme.inner_width(console.size.width) // 2 - 2 - count_width - 2 - (note_width + 2 if note_width else 0)
+    """Bar cells that keep a bar, its count and note inline beside the label (half the list column)."""
+    room = theme.inner_width(_list_width()) // 2 - 2 - count_width - 2 - (note_width + 2 if note_width else 0)
     return max(4, min(_BAR_MAX, room))
 
 

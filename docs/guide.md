@@ -125,9 +125,10 @@ open or stop them and quit; keeping it open is selected by default.
 
 A short random tip sits under the keys of the main menu and What's Next when
 the window has rows to spare, so it never pushes choices off screen. The tips browser
-(**T** on the main menu or What's Next, **Tab → T** at a search prompt) has
-**/** to search categories, text and tags, **C** to cycle categories, **X** to
-clear the search and **Esc** to go back.
+(**T** on the main menu or What's Next, **Tab → T** at a search prompt) lists
+each tip by its first words, with the whole tip under the list (or beside it).
+**Enter** reads a tip on its own page, **/** searches categories, text and
+tags, **C** cycles categories, **X** clears the search and **Esc** goes back.
 
 ## Providers and sources
 

@@ -210,9 +210,10 @@ class ResponsiveTableTests(unittest.TestCase):
             )
 
     def test_table_uses_progressive_columns(self):
+        # A wide window's short names leave an empty, headerless last column: the table keeps the window's width.
         self.assertEqual(
             [column.header for column in self._table(140).columns],
-            ["#", "Source", "From", "Name", "Size", "Seeds", "Leeches"],
+            ["#", "Source", "From", "Name", "Size", "Seeds", "Leeches", ""],
         )
         self.assertEqual(
             [column.header for column in self._table(90).columns],
@@ -232,7 +233,7 @@ class ResponsiveTableTests(unittest.TestCase):
         sized_console = Console(width=140, height=30, color_system=None)
         with patch.object(table, "console", sized_console):
             with_dates = table.build_table(dated, 0, 0, 1, 1, show_from=True)
-        self.assertEqual([c.header for c in with_dates.columns][-1], "Age")
+        self.assertEqual([c.header for c in with_dates.columns if c.header][-1], "Age")
         self.assertNotIn("Age", [c.header for c in self._table(140).columns])
 
     def test_narrow_table_preserves_hidden_selected_metadata(self):
