@@ -7,7 +7,6 @@ painting behind the pane in a 144x36 window (8x16 pixel cells), and requires
 4.5:1 against the brightest tenth of them.
 """
 
-import io
 import unittest
 import warnings
 
@@ -15,8 +14,6 @@ warnings.filterwarnings("ignore", module=".*requests.*")
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 
 import isolation  # noqa: F401  # redirects saved settings before anything reads them
-from PIL import Image
-
 from torrent_finder import paintings
 from torrent_finder.ui import theme
 
@@ -41,22 +38,36 @@ def _rgb(colour: str) -> tuple:
     return tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))
 
 
+def _cell_colours(key: str, ink: tuple, page: tuple) -> list:
+    """Each text cell's mean colour where the plate lies behind the work block.
+
+    Read from the dissolved bitmap the PNG is written from: the plate is
+    scaled to the window's height and right-aligned, as the profile shows it,
+    and a cell's colour is the page mixed with the ink by its share of inked dots.
+    """
+    width, height, rows = paintings._faded(key, paintings._FADES["right"], 0.0, paintings.END_FADE)
+    bits = ["".join(f"{byte:08b}" for byte in row)[:width] for row in rows]
+    scale = HEIGHT / height
+    left = WIDTH - round(width * scale)
+    colours = []
+    for x in range(max(0, left), WORK - CELL_W + 1, CELL_W):
+        x0, x1 = int((x - left) / scale), max(int((x - left) / scale) + 1, int((x + CELL_W - left) / scale))
+        for y in range(0, HEIGHT - CELL_H + 1, CELL_H):
+            y0, y1 = int(y / scale), max(int(y / scale) + 1, int((y + CELL_H) / scale))
+            dots = [row[x0:x1] for row in bits[y0:y1]]
+            share = sum(part.count("1") for part in dots) / max(1, sum(len(part) for part in dots))
+            colours.append(tuple(page[i] + (ink[i] - page[i]) * share for i in range(3)))
+    return colours
+
+
 def _behind_the_pane(palette) -> tuple:
     """The 90th-percentile brightest cell of the painting under the work block, over the given plates."""
     brightest = None
+    ink = _rgb(paintings.faint(palette.ink, palette.page, paintings.PLATE_INK))
     for key in PAINTINGS:
-        picture = Image.open(io.BytesIO(paintings.render(key, palette.ink, palette.page, 1, "right"))).convert("RGB")
-        scale = HEIGHT / picture.height
-        picture = picture.resize((round(picture.width * scale), HEIGHT), Image.BILINEAR)
-        overlap = WORK - (WIDTH - picture.width)
-        if overlap <= 0:
+        cells = sorted(_cell_colours(key, ink, _rgb(palette.page)), key=_luminance)
+        if not cells:
             continue
-        cells = []
-        for x in range(0, overlap - CELL_W + 1, CELL_W):
-            for y in range(0, HEIGHT - CELL_H + 1, CELL_H):
-                pixels = list(picture.crop((x, y, x + CELL_W, y + CELL_H)).getdata())
-                cells.append(tuple(sum(p[i] for p in pixels) / len(pixels) for i in range(3)))
-        cells.sort(key=_luminance)
         cell = cells[int(len(cells) * 0.9)]
         if brightest is None or _luminance(cell) > _luminance(brightest):
             brightest = cell
