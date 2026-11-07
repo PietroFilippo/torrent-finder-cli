@@ -453,7 +453,18 @@ def _flavour(jobs) -> str:
 
 # --- the Downloads screen -------------------------------------------------------------------
 
-_FOOTER = N_("↑/↓ navigate  •  Enter actions  •  X stop  •  O open folder  •  C clear finished  •  Esc back")
+_FOOTER = N_("↑/↓ navigate  •  Enter actions  •  X stop  •  A stop all  •  O open folder  •  C clear finished  •  Esc back")
+
+
+def _confirm_stop_all(manager) -> bool:
+    """Ask before stopping every running download, saying what that loses."""
+    from torrent_finder.ui.prompts import confirm_prompt
+    jobs = manager.active()
+    if not jobs:
+        _say(t("Nothing is running."))
+        return False
+    return confirm_prompt(tn("Stop {n} download?", "Stop all {n} downloads?", len(jobs)) + "\n\n"
+                          + _stop_consequences(jobs), title=t("Stop all"))
 
 
 def _open_folder(path: str) -> bool:
@@ -620,6 +631,14 @@ def downloads_screen(focus: "str | None" = None) -> None:
                 refresh()
             return True
 
+        def stop_everything(cursor: int, items_now: list) -> bool:
+            if manager is not None and _confirm_stop_all(manager):
+                errors = manager.stop_all_active()
+                if errors:
+                    _say(t("[warn]Some downloads could not be stopped: {error}[/warn]", error=escape(errors[0])))
+                refresh()
+            return True
+
         def intro():
             if not jobs:
                 lines = [Text(t("Nothing is downloading in the background."))]
@@ -639,7 +658,7 @@ def downloads_screen(focus: "str | None" = None) -> None:
             items, title=t("Downloads"), status=lambda: _status(jobs), intro=intro,
             footer=footer, start_index=min(start, len(items) - 1), refresh=refresh,
             key_actions={"X": stop_focused, "x": stop_focused, "O": open_focused, "o": open_focused,
-                         "C": clear_finished, "c": clear_finished},
+                         "C": clear_finished, "c": clear_finished, "A": stop_everything, "a": stop_everything},
         )
         if index is None or items[index].value is None:
             return

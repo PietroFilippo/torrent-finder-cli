@@ -46,8 +46,8 @@ class CatalogTests(unittest.TestCase):
                 self.assertEqual(entry.licence, "Public domain")
                 self.assertTrue(entry.source.startswith("https://commons.wikimedia.org/"))
                 width, height, rows = paintings.bitmap(key)
-                self.assertEqual(height, 560)
-                self.assertLessEqual(width, 980 if entry.wide else 560)
+                self.assertEqual(height, 1080)  # about a window's height: drawn one dot per pixel
+                self.assertLessEqual(width, 1890 if entry.wide else 1080)
                 self.assertEqual(entry.wide, width > height)  # wide works are landscape, plates are not
                 self.assertEqual(len(rows), height)
                 self.assertIn(entry.year, entry.credit)
@@ -66,7 +66,8 @@ class CatalogTests(unittest.TestCase):
             }
             for side, shares in edges.items():
                 with self.subTest(key=key, side=side):
-                    self.assertLess(sum(share > 0.7 for share in shares), 3)
+                    # Paper is near solid (96-100% lit); a pale sky (the Sea of Ice: ~71%) is not paper.
+                    self.assertLess(sum(share > 0.9 for share in shares), 3)
 
     def test_wide_works_always_fill_the_window(self):
         wide = [key for key, entry in paintings.catalog().items() if entry.wide]
@@ -102,13 +103,14 @@ class PngTests(unittest.TestCase):
     def test_a_painting_is_recoloured_in_the_colourway(self):
         palette = theme.THEMES["rubedo"]
         found = chunks(paintings.render("dore-raven", palette.ink, palette.page, factor=2))
-        self.assertEqual(found[b"PLTE"].hex(), palette.page[1:].lower() + palette.ink[1:].lower())
+        plate = paintings.faint(palette.ink, palette.page, paintings.PLATE_INK)
+        self.assertEqual(found[b"PLTE"].hex(), palette.page[1:].lower() + plate[1:].lower())
         width, height = struct.unpack(">II", found[b"IHDR"][:8])
         self.assertEqual((width, height), tuple(2 * n for n in paintings.bitmap("dore-raven")[:2]))
 
     def test_a_plate_behind_the_text_keeps_less_ink(self):
         palette = theme.THEMES["citrinitas"]
-        for placement, keep in (("left", paintings.FAINT), ("right", 1)):
+        for placement, keep in (("left", paintings.FAINT), ("right", paintings.PLATE_INK)):
             found = chunks(paintings.render("dore-raven", palette.ink, palette.page, placement=placement))
             self.assertEqual(found[b"PLTE"][3:].hex(), paintings.faint(palette.ink, palette.page, keep)[1:].lower())
         found = chunks(paintings.render("martin-deluge", palette.ink, palette.page, placement="right"))
@@ -133,7 +135,8 @@ class PngTests(unittest.TestCase):
         found = chunks(blob)
         self.assertEqual(struct.unpack(">IIBB", found[b"IHDR"][:10]), (6, 2, 2, 3))  # 2-bit, palette, 3:1
         faint = paintings.faint(palette.ink, palette.page)
-        self.assertEqual(found[b"PLTE"].hex(), (palette.page[1:] + palette.ink[1:] + faint[1:]).lower())
+        plate = paintings.faint(palette.ink, palette.page, paintings.PLATE_INK)
+        self.assertEqual(found[b"PLTE"].hex(), (palette.page[1:] + plate[1:] + faint[1:]).lower())
         rows = zlib.decompress(found[b"IDAT"])
         # Each row: a filter byte, then 6 pixels of 2 bits: companion (2) twice, page (0) three times, plate (1).
         self.assertEqual(rows, bytes([0, 0b10100000, 0b00010000]) * 2)
@@ -298,27 +301,40 @@ class PaintingChoiceTests(unittest.TestCase):
         self.run_menu(self.downs_to(("painting", "none")) + [K.ENTER, K.ESC])
         self.assertNotIn("─── Painting side ───", [item.label for item in self.capture()])  # no painting, no side
 
-    def test_both_sides_lets_the_left_painting_be_chosen(self):
+    def painting_rows(self):
+        return {item.value[1]: item for item in self.capture()
+                if isinstance(item.value, tuple) and item.value[0] == "painting"}
+
+    def test_both_sides_chooses_the_left_painting_in_the_same_list(self):
         appearance.save("citrinitas", "bar", "comfortable", "dore-satan", placement_name="facing")
         items = self.capture()
-        labels = [item.label for item in items]
-        self.assertIn("─── Left painting ───", labels)
-        rows = [item for item in items if isinstance(item.value, tuple) and item.value[0] == "companion"]
-        self.assertEqual(rows[0].label, "Its companion: Satan's despair")
-        self.assertEqual(rows[0].marker, "●")  # the usual pair until another is chosen
-        self.assertNotIn(("companion", "dore-satan"), [row.value for row in rows])  # not itself
-        self.assertFalse(any(paintings.is_wide(row.value[1]) for row in rows if row.value[1]))  # plates only
-        self.run_menu(self.downs_to(("companion", "flammarion")) + [K.ENTER, K.ESC])
-        self.assertEqual(appearance.companion(), "flammarion")
+        self.assertNotIn("─── Left painting ───", [item.label for item in items])  # no second list
+        rows = self.painting_rows()
+        self.assertEqual((rows["dore-satan"].marker, rows["dore-despair"].marker), ("●", "◐"))  # its usual pair
+        self.assertTrue(rows["dore-satan"].hint.startswith("right side"))
+        self.assertTrue(rows["dore-despair"].hint.startswith("left side"))
+        self.assertIn("L on the left", rows["flammarion"].description)
+        # L on Flammarion puts it on the left; Enter elsewhere still picks the right painting.
+        self.run_menu(self.downs_to(("painting", "flammarion")) + ["L", K.ESC])
+        self.assertEqual((appearance.painting(), appearance.companion()), ("dore-satan", "flammarion"))
         self.assertEqual(appearance.saved()["companion"], "flammarion")
+        rows = self.painting_rows()
+        self.assertEqual((rows["flammarion"].marker, rows["dore-despair"].marker), ("◐", "○"))
         self.assertIn("The Flammarion engraving", next(
             item for item in self.capture() if item.value == ("placement", "facing")).description)
+        # L on the right painting itself, or on a wide work, changes nothing.
+        self.run_menu(self.downs_to(("painting", "dore-satan")) + ["L", K.ESC])
+        self.run_menu(self.downs_to(("painting", "martin-deluge")) + ["L", K.ESC])
+        self.assertEqual(appearance.companion(), "flammarion")
+        # Making the left painting the right one: its usual pair stands in on the left.
         appearance.save("citrinitas", "bar", "comfortable", "flammarion", placement_name="facing")
-        rows = [item for item in self.capture() if isinstance(item.value, tuple) and item.value[0] == "companion"]
-        self.assertEqual(rows[0].marker, "●")  # the companion is the painting itself: its usual pair stands in
+        rows = self.painting_rows()
+        self.assertEqual((rows["flammarion"].marker, rows["smith-hermit"].marker), ("●", "◐"))
+        # Another side: no left markers, L does nothing, the choice is kept for next time.
         appearance.save("citrinitas", "bar", "comfortable", "dore-satan", placement_name="right")
-        self.assertNotIn("─── Left painting ───", [item.label for item in self.capture()])  # Both sides only
-        self.assertEqual(appearance.saved()["companion"], "flammarion")  # kept for next time
+        self.assertNotIn("◐", [row.marker for row in self.painting_rows().values()])
+        self.run_menu(self.downs_to(("painting", "dore-raven")) + ["L", K.ESC])
+        self.assertEqual(appearance.saved()["companion"], "flammarion")
 
     def test_settings_validate_and_back_up_the_painting(self):
         self.assertEqual(appearance.normalize({"painting": "none"})["painting"], "none")

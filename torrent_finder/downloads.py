@@ -437,6 +437,20 @@ class JobManager:
                 self._terminal(job, "stopped")
         self._notify()
 
+    def stop_all_active(self) -> list[str]:
+        """Stop every queued or running job, as Stop does one at a time; the
+        manager stays open for new downloads. Returns errors, one per job that
+        could not be stopped."""
+        with self._lock:
+            ids = [j.id for j in self._jobs.values() if j.state in ACTIVE_STATES]
+        errors = []
+        for job_id in ids:
+            try:
+                self.stop(job_id)
+            except Exception as error:  # e.g. aria2c refused; the next poll can still resolve it
+                errors.append(str(error))
+        return errors
+
     def remove(self, job_id: str) -> None:
         with self._lock:
             job = self._jobs[job_id]

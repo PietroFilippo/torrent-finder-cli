@@ -633,7 +633,8 @@ started), or **Background downloads** (**G**) under quick actions, opens
 it: ACTIVE and FINISHED rows with each download's progress, speed and time
 left, or its result; the focused row's folder, size, peers and seeds, files,
 time taken, unpack notes and, for a failure, the last lines of aria2c's log.
-Keys: **X** stops the focused download, **O** opens its folder, **C** clears
+Keys: **X** stops the focused download, **A** stops all of them (after
+asking, and saying what stopping loses), **O** opens its folder, **C** clears
 the finished rows, and **Enter** lists its actions: Stop, Resume or Retry,
 Open folder, Remove from the list, Show log. A stopped torrent keeps its
 partial files. Resume continues them in the download's own folder, even if
@@ -916,8 +917,9 @@ not apps, so:
 - **Painting side** puts a plate on the right (the default, like the plate
   facing a page of text), on the left (behind the menus, in a fainter ink) or
   on both sides (the chosen plate on the right and a faded plate on the left).
-  With both sides, **Left painting** picks the left plate: its usual companion
-  (the same book or mood) or any other plate. A wide work always fills the
+  With both sides, the painting list chooses both plates: **Enter** puts a
+  plate on the right, **L** on the left (marked ◐). Until you choose, the left
+  plate is the painting's usual companion (the same book or mood). A wide work always fills the
   window behind the text, in a fainter ink, so it has no side to choose.
 - The profile's tab shows a **lantern** icon in the colourway's colours.
 - **Open from other tabs** (off by default) makes the command, typed in another

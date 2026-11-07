@@ -162,8 +162,9 @@
   "across the window": "na janela inteira",
   "Wide paintings": "Pinturas largas",
   "Painting image": "Imagem da pintura",
-  "Left painting": "Pintura à esquerda",
-  "Its companion: {name}": "Sua companheira: {name}",
-  "The plate paired with this painting: the same book or the same mood.": "A gravura que acompanha esta pintura: o mesmo livro ou o mesmo clima.",
-  "{title} on the left, faded, and this painting on the right.": "{title} à esquerda, suave, e esta pintura à direita."
+  "Enter puts it on the right, L on the left.": "Enter a coloca à direita, L à esquerda.",
+  "right side": "lado direito",
+  "left side": "lado esquerdo",
+  "Choose another plate for the left: this one is on the right, or is wide.": "Escolha outra gravura para a esquerda: esta está à direita, ou é larga.",
+  "↑/↓ navigate  •  Enter apply  •  L left painting  •  Space preview colours  •  Esc back": "↑/↓ navegar  •  Enter aplicar  •  L pintura à esquerda  •  Space prévia das cores  •  Esc voltar"
 }

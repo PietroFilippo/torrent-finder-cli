@@ -132,7 +132,7 @@ PROFILE_GUID = profile_guid(APP, NAME)
 # Terminal caches pictures by path) and its icon, so a version that draws them
 # differently gets new files, and a profile written before it is redrawn once
 # at start (``stale``).
-LOOK_VERSION = "v3"
+LOOK_VERSION = "v4"
 
 # Windows Terminal's default scheme, for the Simple palettes' named colours.
 CAMPBELL = {

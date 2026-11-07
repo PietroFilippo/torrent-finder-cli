@@ -86,7 +86,6 @@
     "other": "O fogo apagou; {n} vasos esfriaram."
   },
   "The furnace is cold; nothing is downloading.": "O atanor está frio; nada sendo baixado.",
-  "↑/↓ navigate  •  Enter actions  •  X stop  •  O open folder  •  C clear finished  •  Esc back": "↑/↓ navegar  •  Enter ações  •  X parar  •  O abrir pasta  •  C limpar concluídos  •  Esc voltar",
   "[warn]Could not open {folder}[/warn]": "[warn]Não foi possível abrir {folder}[/warn]",
   "[warn]Could not stop {title}: {error}[/warn]": "[warn]Não foi possível parar {title}: {error}[/warn]",
   "[warn]Could not start the download again: {error}[/warn]": "[warn]Não foi possível iniciar o download de novo: {error}[/warn]",
@@ -174,5 +173,13 @@
   "the downloaded file stays in {folder}": "o arquivo baixado continua em {folder}",
   "download state::stopping": "parando",
   "Stopping · waiting for its file to close in {folder}": "Parando · esperando o arquivo fechar em {folder}",
-  "Retry and Remove come back once it has stopped.": "Tentar de novo e Remover voltam quando ele parar."
+  "Retry and Remove come back once it has stopped.": "Tentar de novo e Remover voltam quando ele parar.",
+  "↑/↓ navigate  •  Enter actions  •  X stop  •  A stop all  •  O open folder  •  C clear finished  •  Esc back": "↑/↓ navegar  •  Enter ações  •  X parar  •  A parar tudo  •  O abrir pasta  •  C limpar concluídos  •  Esc voltar",
+  "Nothing is running.": "Nada está rodando.",
+  "Stop all": "Parar tudo",
+  "Stop {n} download?": {
+    "one": "Parar {n} download?",
+    "other": "Parar todos os {n} downloads?"
+  },
+  "[warn]Some downloads could not be stopped: {error}[/warn]": "[warn]Alguns downloads não puderam parar: {error}[/warn]"
 }

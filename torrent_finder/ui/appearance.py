@@ -387,40 +387,37 @@ def _placement_rows(chosen: str, painting_key: str, chosen_companion: str = "") 
             for key, label in paintings.PLACEMENTS.items()]
 
 
-def _painting_row(key: str, entry, chosen: str, plain: bool):
+def _painting_row(key: str, entry, chosen: str, plain: bool, left: str | None = None):
+    """One painting. With Both sides (*left* is the left plate), the right and left
+    plates say which side they are on, and every plate tells how to put it there."""
     across = (t(" A wide work: it fills the window behind the text, its edges fading into the page.")
               if entry.wide else "")
-    return _choice(entry.title_label(), ("painting", key), key == chosen, entry.artist_credit_label(),
-                   t("{credit}; public domain. Recoloured in the colourway's ink.{across} {help}",
-                     credit=entry.credit_label(), across=across, help=_painting_help(plain)))
+    hint = entry.artist_credit_label()
+    if left is not None and not entry.wide:
+        across = " " + t("Enter puts it on the right, L on the left.")
+        if key == chosen:
+            hint = t("right side") + " · " + hint
+        elif key == left:
+            hint = t("left side") + " · " + hint
+    row = _choice(entry.title_label(), ("painting", key), key == chosen, hint,
+                  t("{credit}; public domain. Recoloured in the colourway's ink.{across} {help}",
+                    credit=entry.credit_label(), across=across, help=_painting_help(plain)))
+    if left is not None and key == left and key != chosen:
+        row.marker, row.marker_style = "◐", ""  # the left plate of Both sides
+    return row
 
 
-def _painting_rows(chosen: str, plain: bool = False) -> list:
+def _painting_rows(chosen: str, plain: bool = False, left: str | None = None) -> list:
     """The Painting section's rows: none, the plates (beside the text), then the wide
-    works (across the window) under their own heading, oldest first."""
+    works (across the window) under their own heading, oldest first. *left* is the
+    left plate when the side is Both sides."""
     rows = [_choice(t("None", ctx="painting"), ("painting", paintings.NONE), chosen == paintings.NONE,
                     t("a plain page"), t("No painting behind the app."))]
     catalog = paintings.catalog()
-    rows += [_painting_row(key, entry, chosen, plain) for key, entry in catalog.items() if not entry.wide]
+    rows += [_painting_row(key, entry, chosen, plain, left) for key, entry in catalog.items() if not entry.wide]
     wide = [_painting_row(key, entry, chosen, plain) for key, entry in catalog.items() if entry.wide]
     if wide:
         rows += [_section(t("Wide paintings")), *wide]
-    return rows
-
-
-def _companion_rows(painting_key: str, chosen: str) -> list:
-    """The Left painting section's rows (Both sides only): the usual companion, then every other plate."""
-    usual = paintings.catalog()[paintings.facing(painting_key)]
-    chosen = chosen if chosen and chosen != painting_key else ""  # itself: the usual companion stands in
-    rows = [_choice(t("Its companion: {name}", name=usual.title_label()), ("companion", ""), not chosen,
-                    usual.artist_credit_label(),
-                    t("The plate paired with this painting: the same book or the same mood."))]
-    for key, entry in paintings.catalog().items():
-        if key == painting_key or entry.wide:
-            continue
-        rows.append(_choice(entry.title_label(), ("companion", key), chosen == key, entry.artist_credit_label(),
-                            t("{title} on the left, faded, and this painting on the right.",
-                              title=entry.title_label())))
     return rows
 
 
@@ -458,6 +455,27 @@ def appearance_menu() -> None:
     def design_of(key: str) -> str:
         return theme.THEMES[key].design
 
+    def left_plate() -> str | None:
+        """The left plate while the side is Both sides (a plate is chosen), else None."""
+        painting_key = chosen["painting"]
+        if chosen["placement"] != "facing" or painting_key == paintings.NONE or paintings.is_wide(painting_key):
+            return None
+        return paintings.left_plate(painting_key, chosen["companion"])
+
+    def set_left(index: int, items: list) -> bool:
+        """L on a plate: it goes on the left of Both sides."""
+        value = items[index].value
+        if left_plate() is None or not (isinstance(value, tuple) and value[0] == "painting"):
+            return True  # only the painting list, and only with Both sides
+        key = value[1]
+        if key == chosen["painting"] or not paintings.companion_key(key) or key == paintings.NONE:
+            state["notice"] = t("Choose another plate for the left: this one is on the right, or is wide.")
+            return True
+        chosen["companion"] = key
+        persist("companion")
+        items[:] = build()
+        return True
+
     def chosen_font(design: str):
         choice = _font_choice(design, chosen["fonts"].get(design))
         return terminal_profile.FONTS[choice["font"]], choice["size"]
@@ -477,15 +495,11 @@ def appearance_menu() -> None:
                                  _swatches(option), _theme_help(option)))
         if design == "athanor" and paintings.catalog():
             items.append(_section(t("Painting")))
-            items += _painting_rows(chosen["painting"], plain(design))
+            items += _painting_rows(chosen["painting"], plain(design), left_plate())
             if chosen["painting"] != paintings.NONE:
                 if not paintings.is_wide(chosen["painting"]):  # a wide work always fills the window
                     items.append(_section(t("Painting side")))
                     items += _placement_rows(chosen["placement"], chosen["painting"], chosen["companion"])
-                    if chosen["placement"] == "facing":
-                        items.append(_section(t("Left painting")))
-                        items += _companion_rows(chosen["painting"],
-                                                 paintings.companion_key(chosen["companion"]) or "")
                 items.append(_section(t("Painting image")))
                 items.append(SelectItem(t("Save the painting as an image"), ("export", None), is_action=True,
                                         hint=t("a PNG in the {colours} colours", colours=theme.THEMES[state['preview']].name),
@@ -671,14 +685,17 @@ def appearance_menu() -> None:
         elif design_of(state["preview"]) != "athanor" or not terminal_profile.installed():
             # True for Simple, and for Athanor until its profile gives the page and painting.
             lines.append(t(BACKGROUND_NOTE))
-        lines.append(t("↑/↓ navigate  •  Enter apply  •  Space preview colours  •  Esc back"))
+        lines.append(t("↑/↓ navigate  •  Enter apply  •  L left painting  •  Space preview colours  •  Esc back")
+                     if left_plate() is not None else
+                     t("↑/↓ navigate  •  Enter apply  •  Space preview colours  •  Esc back"))
         return "\n".join(lines)
 
     items = build()
     start = next(i for i, item in enumerate(items) if item.value == ("theme", chosen["theme"]))
     try:
         arrow_select(items, title=t("Settings › Appearance"), status=status, footer=footer,
-                     start_index=start, on_action=choose, key_actions={" ": preview})
+                     start_index=start, on_action=choose,
+                     key_actions={" ": preview, "L": set_left, "l": set_left})
     finally:
         if state["preview"] != chosen["theme"]:
             theme.apply(chosen["theme"])  # leaving during a preview (Esc or Back): the applied theme returns

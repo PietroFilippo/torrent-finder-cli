@@ -36,8 +36,9 @@ from PIL import Image, ImageOps  # noqa: E402
 
 from torrent_finder.paintings import ASSETS, write_png  # noqa: E402
 
-HEIGHT, MAX_WIDTH = 560, 560  # dots; the app draws each dot as 2x2 pixels
-WIDE_WIDTH = 980               # wide works: 1.75 times wider than tall, near a maximised window
+HEIGHT, MAX_WIDTH = 1080, 1080  # dots; the app draws each dot as one pixel: near 1:1 in a 1080p window
+WIDE_WIDTH = 1890                # wide works: 1.75 times wider than tall, near a maximised window
+SCAN_WIDTH = 2400                # the Commons rendition: enough detail for HEIGHT, cropped
 API = "https://commons.wikimedia.org/w/api.php"
 AGENT = "torrent-finder-cli build_paintings (https://github.com/PietroFilippo/torrent-finder-cli)"
 
@@ -122,9 +123,9 @@ def _get(url: str) -> bytes:
 
 
 def _scan(title: str) -> tuple[bytes, str, str]:
-    """The scan's bytes (a 1400-pixel rendition), its page URL and licence."""
+    """The scan's bytes (a SCAN_WIDTH-pixel rendition), its page URL and licence."""
     query = urllib.parse.urlencode({"action": "query", "format": "json", "prop": "imageinfo",
-                                    "iiprop": "url|extmetadata", "iiurlwidth": 1400, "titles": title})
+                                    "iiprop": "url|extmetadata", "iiurlwidth": SCAN_WIDTH, "titles": title})
     pages = json.loads(_get(f"{API}?{query}"))["query"]["pages"]
     info = next(iter(pages.values()))["imageinfo"][0]
     licence = info.get("extmetadata", {}).get("LicenseShortName", {}).get("value", "")

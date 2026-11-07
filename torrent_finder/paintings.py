@@ -36,6 +36,7 @@ _PAIRS = (("dore-satan", "dore-despair"), ("dore-charon", "dore-raven"), ("dore-
           ("durer-melencolia", "maier-emblem"), ("flammarion", "smith-hermit"))
 FACING = {a: b for pair in _PAIRS for a, b in (pair, pair[::-1])}
 SPREAD_ASPECT = 1.9  # a maximised Windows Terminal window, tab row taken, on a 16:9 screen
+PLATE_INK = 0.85     # how much of the ink a plate on the right keeps: text beside it keeps its contrast
 FAINT = 0.55         # how much of the ink a plate behind the text keeps: on the left, or the companion
 ACROSS_INK = 0.85    # how much a wide work keeps: mostly dark mezzotints, their light under the text
 
@@ -294,14 +295,15 @@ def _faded(key: str, sides: str, side: float = 0.0, end: float = END_FADE) -> tu
     return width, height, _pack(dissolve(width, height, _bit_rows(width, rows), sides, side, end))
 
 
-def render(key: str, ink: str, page: str, factor: int = 2, placement: str = DEFAULT_PLACEMENT,
+def render(key: str, ink: str, page: str, factor: int = 1, placement: str = DEFAULT_PLACEMENT,
            companion: str = "") -> bytes:
     """The painting as a PNG in *ink* on *page*, each dot *factor* pixels square.
 
     The edges facing the text dissolve into the page (``dissolve``), so the
-    painting has no box. A plate on the right keeps the full ink; on the left
-    it lies under the text and keeps FAINT of it, a wide work across the
-    window ACROSS_INK. With the ``facing`` placement the picture is a spread: the
+    painting has no box. A plate on the right keeps PLATE_INK of the ink; on
+    the left it lies under the text and keeps FAINT of it, a wide work across
+    the window ACROSS_INK. The bitmaps are about a window's height in dots, so
+    one dot is one pixel (*factor* 1) and the terminal barely scales them. With the ``facing`` placement the picture is a spread: the
     companion plate, faded, on the left and *key* on the right (see ``spread``).
     """
     placement = placed(key, placement)
@@ -309,8 +311,7 @@ def render(key: str, ink: str, page: str, factor: int = 2, placement: str = DEFA
         return spread(key, left_plate(key, companion), ink, page, factor)
     side, end = (ACROSS_FADE, ACROSS_FADE) if placement == ACROSS else (0.0, END_FADE)
     width, height, rows = scale(*_faded(key, _FADES[placement], side, end), factor)
-    if placement != "right":
-        ink = faint(ink, page, ACROSS_INK if placement == ACROSS else FAINT)
+    ink = faint(ink, page, {ACROSS: ACROSS_INK, "right": PLATE_INK}.get(placement, FAINT))
     return write_png(width, height, rows, (_rgb(page), _rgb(ink)))
 
 
@@ -328,7 +329,7 @@ _LEFT_PLATE = str.maketrans({"0": "00", "1": "10"})   # pixel value 2: the faded
 _RIGHT_PLATE = str.maketrans({"0": "00", "1": "01"})  # pixel value 1: the ink
 
 
-def spread(key: str, companion: str, ink: str, page: str, factor: int = 2, aspect: float = SPREAD_ASPECT) -> bytes:
+def spread(key: str, companion: str, ink: str, page: str, factor: int = 1, aspect: float = SPREAD_ASPECT) -> bytes:
     """Two plates in one picture, *companion* faded on the left and *key* on the right, as a 2-bit PNG.
 
     Both stand at full height on the outer edges with the page between them, in
@@ -350,7 +351,8 @@ def spread(key: str, companion: str, ink: str, page: str, factor: int = 2, aspec
         bits = a.translate(_LEFT_PLATE) + gap + b.translate(_RIGHT_PLATE)
         bits += "0" * (-len(bits) % 8)
         rows.append(int(bits, 2).to_bytes(len(bits) // 8, "big"))
-    return write_png(width, height, rows, (_rgb(page), _rgb(ink), _rgb(faint(ink, page))), depth=2)
+    return write_png(width, height, rows,
+                     (_rgb(page), _rgb(faint(ink, page, PLATE_INK)), _rgb(faint(ink, page))), depth=2)
 
 
 def export_folder() -> Path:
@@ -359,7 +361,7 @@ def export_folder() -> Path:
     return pictures / "torrent-finder" if pictures.is_dir() else Path.home() / "torrent-finder"
 
 
-def export(key: str, palette, folder: "str | Path", factor: int = 2, placement: str = DEFAULT_PLACEMENT,
+def export(key: str, palette, folder: "str | Path", factor: int = 1, placement: str = DEFAULT_PLACEMENT,
            version: str = "", companion: str = "") -> Path:
     """Save the painting in *palette*'s page and ink colours as a PNG in *folder*; returns its path.
 

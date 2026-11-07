@@ -267,6 +267,49 @@ class DirectJobTests(unittest.TestCase):
             self.manager.shutdown()
         self.assertTrue(all(event.is_set() for event in self.manager._direct_done))
 
+    def test_stop_all_stops_every_running_download_and_keeps_the_manager_open(self):
+        events = [threading.Event() for _ in range(3)]
+        jobs = [self.enqueue(lambda c, p, n, e=e: (e.set(), c.wait(5), [])[2], key=f"/v{i}")
+                for i, e in enumerate(events)]  # two run, the third waits in the queue
+        self.assertTrue(events[0].wait(5) and events[1].wait(5))
+        self.assertEqual(self.manager.stop_all_active(), [])
+        self.assertEqual({self.job(job.id).state for job in jobs}, {"stopped"})
+        self.assertTrue(wait_for(lambda: not self.manager.is_busy()))
+        again = self.enqueue(lambda *args: [os.path.join(self.root.name, "next.cbz")], key="/next")
+        self.assertTrue(wait_for(lambda: self.job(again.id).state == "done"))  # still takes new downloads
+
+    def test_a_on_the_downloads_screen_asks_then_stops_them_all(self):
+        release = threading.Event()
+        jobs = [self.enqueue(lambda c, p, n: (release.wait(5) or c.wait(5), [])[1], key=f"/v{i}") for i in range(2)]
+        asked = []
+
+        def choose(items, **kwargs):
+            kwargs["key_actions"]["A"](0, items)
+            return None
+        with patch.object(downloads_ui, "current", return_value=self.manager), \
+             patch.object(downloads_ui, "arrow_select", side_effect=choose), \
+             patch("torrent_finder.ui.prompts.confirm_prompt",
+                   side_effect=lambda message, title: asked.append(message) or True):
+            downloads_ui.downloads_screen()
+        release.set()
+        self.assertIn("Stop all 2 downloads?", asked[0])
+        self.assertIn("starts over", asked[0])  # what stopping direct downloads loses
+        self.assertEqual({self.job(job.id).state for job in jobs}, {"stopped"})
+
+    def test_declining_stop_all_stops_nothing(self):
+        release = threading.Event()
+        job = self.enqueue(lambda c, p, n: (release.wait(5), [])[1])
+
+        def choose(items, **kwargs):
+            kwargs["key_actions"]["a"](0, items)
+            return None
+        with patch.object(downloads_ui, "current", return_value=self.manager), \
+             patch.object(downloads_ui, "arrow_select", side_effect=choose), \
+             patch("torrent_finder.ui.prompts.confirm_prompt", return_value=False):
+            downloads_ui.downloads_screen()
+        self.assertIn(self.job(job.id).state, ("queued", "running"))
+        release.set()
+
     def test_page_archives_unpack_as_pages(self):
         saved = os.path.join(self.root.name, "Berserk v01.cbz")
         with patch("torrent_finder.downloads.unpack.enabled", return_value=True), \

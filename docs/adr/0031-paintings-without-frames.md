@@ -82,6 +82,18 @@ random spread from 85% to 35%) because it read as too granular, and the left
 plate became a choice. `LOOK_VERSION` went to `v3`, so profiles drawn by
 v0.11.0 are redrawn once at start.
 
+*Amended 2026-11-05 (look v4):* the paintings were coarse and text over them
+read poorly. They are now built 1080 dots high from 2400-pixel scans and
+drawn one dot per pixel (before: 560 dots at 2x2), so a window shows close to
+one dot per screen pixel: finer engraving detail and a finer texture behind
+the text. A plate on the right keeps 85% of the ink (`PLATE_INK`), which
+gives the text beside it more contrast; plates on the left and wide works
+keep their fainter inks. The 20 PNGs grow to about 1.9 MB. The Left painting
+section was removed: with Both sides, **L** in the painting list puts a plate
+on the left (marked ◐, its row hinted "left side"; the right one "right
+side"), and **Enter** still picks the right one. The paper-band test now
+looks for near-solid lines (over 90% lit): a pale sky is not paper.
+
 ## Rejected
 
 - **Inverting every plate**: the paper is dots too, so the box stays, and
